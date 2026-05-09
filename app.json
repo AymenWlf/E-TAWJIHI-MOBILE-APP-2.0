@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "E-TAWJIHI-MOBILE-SHELL",
-    "slug": "E-TAWJIHI-MOBILE-SHELL",
+    "name": "E-Tawjihi",
+    "slug": "e-tawjihi-mobile-shell",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
@@ -11,15 +11,16 @@
     "splash": {
       "image": "./assets/images/splash-icon.png",
       "resizeMode": "contain",
-      "backgroundColor": "#ffffff"
+      "backgroundColor": "#333E8F"
     },
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "softwareKeyboardLayoutMode": "pan"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#ffffff"
+        "backgroundColor": "#333E8F"
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false
@@ -30,7 +31,15 @@
       "favicon": "./assets/images/favicon.png"
     },
     "plugins": [
-      "expo-router"
+      "expo-router",
+      "@react-native-community/datetimepicker",
+      [
+        "expo-notifications",
+        {
+          "color": "#333E8F",
+          "defaultChannel": "default"
+        }
+      ]
     ],
     "experiments": {
       "typedRoutes": true

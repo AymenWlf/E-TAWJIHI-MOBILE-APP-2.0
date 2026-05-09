@@ -1,0 +1,277 @@
+import type FontAwesome from '@expo/vector-icons/FontAwesome';
+
+import type { HomeCopyKey } from '@/constants/i18n';
+import type { CandidacyStatus } from '@/types/inscriptions';
+
+type IconName = React.ComponentProps<typeof FontAwesome>['name'];
+
+export type StatusVisual = {
+  /** Couleur d'accent (texte / icône). */
+  fg: string;
+  /** Couleur de fond (badge / surface douce). */
+  bg: string;
+  /** Couleur de bordure (optionnelle). */
+  border: string;
+  /** Nom d'icône FontAwesome. */
+  icon: IconName;
+  /** Clé i18n pour le label affiché. */
+  labelKey: HomeCopyKey;
+};
+
+export const STATUS_VISUALS: Record<CandidacyStatus, StatusVisual> = {
+  interested: {
+    fg: '#1D4ED8',
+    bg: '#DBEAFE',
+    border: '#BFDBFE',
+    icon: 'star',
+    labelKey: 'inscStatusInterested',
+  },
+  applied: {
+    fg: '#9A3412',
+    bg: '#FFEDD5',
+    border: '#FED7AA',
+    icon: 'paper-plane',
+    labelKey: 'inscStatusApplied',
+  },
+  pre_admitted: {
+    fg: '#6D28D9',
+    bg: '#EDE9FE',
+    border: '#DDD6FE',
+    icon: 'hourglass-half',
+    labelKey: 'inscStatusPreAdmitted',
+  },
+  admitted: {
+    fg: '#15803D',
+    bg: '#DCFCE7',
+    border: '#BBF7D0',
+    icon: 'check-circle',
+    labelKey: 'inscStatusAdmitted',
+  },
+  enrolled: {
+    fg: '#065F46',
+    bg: '#A7F3D0',
+    border: '#6EE7B7',
+    icon: 'graduation-cap',
+    labelKey: 'inscStatusEnrolled',
+  },
+  rejected: {
+    fg: '#B91C1C',
+    bg: '#FEE2E2',
+    border: '#FECACA',
+    icon: 'times-circle',
+    labelKey: 'inscStatusRejected',
+  },
+  withdrawn: {
+    fg: '#475569',
+    bg: '#E2E8F0',
+    border: '#CBD5E1',
+    icon: 'sign-out',
+    labelKey: 'inscStatusWithdrawn',
+  },
+};
+
+/** Liste ordonnée des statuts pour l'UI (de "intéressé" → "inscrit"). */
+export const STATUS_FLOW: CandidacyStatus[] = [
+  'interested',
+  'applied',
+  'pre_admitted',
+  'admitted',
+  'enrolled',
+  'rejected',
+  'withdrawn',
+];
+
+/** Format dd/MM/yyyy à partir d'une date ISO ou y-m-d. */
+export function formatShortDate(iso: string | null | undefined, locale: 'fr' | 'ar' = 'fr'): string {
+  if (!iso) return '—';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return iso;
+  const day = String(d.getDate()).padStart(2, '0');
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const year = d.getFullYear();
+  if (locale === 'ar') {
+    return `${day}/${month}/${year}`;
+  }
+  return `${day}/${month}/${year}`;
+}
+
+/** Renvoie le nom à afficher selon la locale (priorité à la langue choisie quand dispo). */
+export function pickEstablishmentName(
+  e: { nom?: string | null; nomArabe?: string | null } | null | undefined,
+  locale: 'fr' | 'ar',
+): string {
+  if (!e) return '—';
+  const ar = (e.nomArabe ?? '').trim();
+  const fr = (e.nom ?? '').trim();
+  if (locale === 'ar') return ar !== '' ? ar : fr || '—';
+  return fr !== '' ? fr : ar || '—';
+}
+
+/**
+ * Renvoie le **couple** (primary, secondary) des noms d'établissement à
+ * afficher : la langue choisie en premier, l'autre langue en sous-titre.
+ *
+ * Cette présentation est volontaire pour les cards d'annonces et de
+ * candidatures (FR + AR toujours visibles côté utilisateur), à condition
+ * que l'établissement ait défini les deux versions et qu'elles soient
+ * distinctes. Si un seul nom est disponible, `secondary` est vide ⇒ le
+ * composant doit alors masquer la deuxième ligne.
+ */
+export function pickEstablishmentNamesPair(
+  e: { nom?: string | null; nomArabe?: string | null } | null | undefined,
+  locale: 'fr' | 'ar',
+): { primary: string; secondary: string } {
+  if (!e) return { primary: '—', secondary: '' };
+  const ar = (e.nomArabe ?? '').trim();
+  const fr = (e.nom ?? '').trim();
+  if (locale === 'ar') {
+    return {
+      primary: ar !== '' ? ar : fr || '—',
+      secondary: ar !== '' && fr !== '' && fr !== ar ? fr : '',
+    };
+  }
+  return {
+    primary: fr !== '' ? fr : ar || '—',
+    secondary: fr !== '' && ar !== '' && fr !== ar ? ar : '',
+  };
+}
+
+/**
+ * Renvoie le titre d'annonce à afficher selon la locale.
+ * Priorité à `titleAr` lorsque la langue choisie est l'arabe ; fallback au titre FR.
+ */
+export function pickAnnouncementTitle(
+  a:
+    | {
+        title?: string | null;
+        titleAr?: string | null;
+      }
+    | null
+    | undefined,
+  locale: 'fr' | 'ar',
+): string {
+  if (!a) return '';
+  const ar = (a.titleAr ?? '').trim();
+  const fr = (a.title ?? '').trim();
+  if (locale === 'ar') return ar !== '' ? ar : fr;
+  return fr !== '' ? fr : ar;
+}
+
+/**
+ * Renvoie le libellé du bouton CTA "lien principal" :
+ *  1. `customLabel` non vide ⇒ tel quel (saisie admin),
+ *  2. sinon, libellé i18n par défaut selon le type d'annonce
+ *     ("Voir le résultat", "Postuler à la bourse", "Lien d'inscription"…),
+ *  3. fallback générique `inscOpenLinkBtn` ("Ouvrir le lien" / "فتح الرابط").
+ */
+export function pickRegistrationUrlLabelKey(
+  announcementType: string | null | undefined,
+): HomeCopyKey {
+  const t = (announcementType ?? '').trim().toLowerCase();
+  if (t === '') return 'inscOpenLinkBtn';
+  if (t.includes('résultat') || t.includes('resultat') || t.includes('نتيجة')) {
+    return 'inscOpenLinkBtnResult';
+  }
+  if (t.includes('bourse') || t.includes('منحة') || t.includes('منح')) {
+    return 'inscOpenLinkBtnScholarship';
+  }
+  if (t.includes('offre') || t.includes('عرض')) {
+    return 'inscOpenLinkBtnOffer';
+  }
+  if (t.includes('message') || t.includes('رسالة') || t.includes('important')) {
+    return 'inscOpenLinkBtnInfo';
+  }
+  if (t.includes('inscription') || t.includes('ouverture') || t.includes('تسجيل')) {
+    return 'inscOpenLinkBtnRegister';
+  }
+  return 'inscOpenLinkBtn';
+}
+
+export function pickRegistrationUrlLabel(
+  customLabel: string | null | undefined,
+  announcementType: string | null | undefined,
+  t: (k: HomeCopyKey) => string,
+): string {
+  const c = (customLabel ?? '').trim();
+  if (c !== '') return c;
+  return t(pickRegistrationUrlLabelKey(announcementType));
+}
+
+/** Renvoie la description HTML à rendre selon la locale (FR par défaut, AR si dispo). */
+export function pickAnnouncementDescriptionHtml(
+  a:
+    | {
+        descriptionHtml?: string | null;
+        descriptionHtmlAr?: string | null;
+      }
+    | null
+    | undefined,
+  locale: 'fr' | 'ar',
+): string {
+  if (!a) return '';
+  const ar = (a.descriptionHtmlAr ?? '').trim();
+  const fr = (a.descriptionHtml ?? '').trim();
+  if (locale === 'ar') return ar !== '' ? ar : fr;
+  return fr !== '' ? fr : ar;
+}
+
+/**
+ * Formate "X jours / heures restants" ou "Clos depuis X jours" selon le signe.
+ * Renvoie aussi un niveau de criticité pour la couleur.
+ */
+export type DeadlineKind = 'closed' | 'today' | 'soon' | 'normal';
+
+export function formatDaysUntilClose(
+  days: number | undefined | null,
+  locale: 'fr' | 'ar' = 'fr',
+): { label: string; kind: DeadlineKind } {
+  if (days === null || days === undefined || Number.isNaN(days)) {
+    return { label: '', kind: 'normal' };
+  }
+  if (days < 0) {
+    if (locale === 'ar') return { label: `مغلق منذ ${Math.abs(days)} يومًا`, kind: 'closed' };
+    return { label: `Fermé depuis ${Math.abs(days)} j`, kind: 'closed' };
+  }
+  if (days === 0) {
+    return { label: locale === 'ar' ? 'يُغلق اليوم' : 'Clôture aujourd\'hui', kind: 'today' };
+  }
+  if (days === 1) {
+    return { label: locale === 'ar' ? 'يبقى يوم واحد' : 'J-1', kind: 'today' };
+  }
+  if (days <= 7) {
+    return {
+      label: locale === 'ar' ? `يتبقى ${days} أيام` : `J-${days}`,
+      kind: 'soon',
+    };
+  }
+  return {
+    label: locale === 'ar' ? `يتبقى ${days} يومًا` : `${days} jours restants`,
+    kind: 'normal',
+  };
+}
+
+/** "Il y a X jours / heures…" (FR/AR très simple). */
+export function formatTimeAgo(iso: string | null | undefined, locale: 'fr' | 'ar' = 'fr'): string {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const now = Date.now();
+  const diffMs = Math.max(0, now - d.getTime());
+  const min = Math.round(diffMs / 60_000);
+  const hr = Math.round(diffMs / 3_600_000);
+  const day = Math.round(diffMs / 86_400_000);
+  if (locale === 'ar') {
+    if (min < 1) return 'الآن';
+    if (min < 60) return `قبل ${min} دقيقة`;
+    if (hr < 24) return `قبل ${hr} ساعة`;
+    if (day < 30) return `قبل ${day} يومًا`;
+    const months = Math.round(day / 30);
+    return `قبل ${months} شهرًا`;
+  }
+  if (min < 1) return 'À l\'instant';
+  if (min < 60) return `Il y a ${min} min`;
+  if (hr < 24) return `Il y a ${hr} h`;
+  if (day < 30) return `Il y a ${day} j`;
+  const months = Math.round(day / 30);
+  return `Il y a ${months} mois`;
+}
