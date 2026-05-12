@@ -1,7 +1,6 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
 import type {
-  CandidacyStatus,
   EstablishmentFollow,
   EstablishmentFollowState,
   EstablishmentFollowTimeline,
@@ -10,8 +9,6 @@ import type {
 type ListResponse = {
   success: boolean;
   data: EstablishmentFollow[];
-  counts: Partial<Record<CandidacyStatus, number>>;
-  statuses: CandidacyStatus[];
 };
 
 type ItemResponse = {
@@ -34,25 +31,29 @@ type SimpleResponse = { success: boolean; message?: string };
 
 export type EstablishmentFollowsPayload = {
   items: EstablishmentFollow[];
-  counts: Partial<Record<CandidacyStatus, number>>;
 };
 
-/** GET /api/establishment-follows */
+/**
+ * GET /api/establishment-follows
+ *
+ * Le suivi école porte le statut de candidature de l'utilisateur sur
+ * l'école (refonte UX 2026-05). Chaque item inclut son `status` courant
+ * et la liste `availableStatuses` (union des annonces de l'école) pour
+ * piloter le sheet de modification de statut.
+ */
 export async function fetchEstablishmentFollows(
   accessToken: string,
-  status?: CandidacyStatus,
 ): Promise<EstablishmentFollowsPayload> {
   try {
-    const url = buildApiUrl('/api/establishment-follows', status ? { status } : undefined);
+    const url = buildApiUrl('/api/establishment-follows');
     const res = await httpGetJson<ListResponse>(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
     return {
       items: Array.isArray(res.data) ? res.data : [],
-      counts: res.counts ?? {},
     };
   } catch {
-    return { items: [], counts: {} };
+    return { items: [] };
   }
 }
 
@@ -60,8 +61,13 @@ export type UpsertFollowInput = {
   establishmentId?: number;
   /** Raccourci : si fourni, le backend résout l'école depuis l'annonce. */
   contestAnnouncementId?: number;
-  status?: CandidacyStatus;
   notes?: string;
+  /**
+   * Optionnel — au create, force le statut initial (doit faire partie de
+   * l'union des statuts autorisés de l'école). Sinon, le backend retombe
+   * sur le slug `interested`.
+   */
+  statusId?: number | null;
 };
 
 /** POST /api/establishment-follows */
@@ -80,25 +86,6 @@ export async function upsertEstablishmentFollow(
   }
 }
 
-/** PATCH /api/establishment-follows/{id}/status */
-export async function updateFollowStatus(
-  accessToken: string,
-  id: number,
-  status: CandidacyStatus,
-): Promise<EstablishmentFollow | null> {
-  try {
-    const url = buildApiUrl(`/api/establishment-follows/${id}/status`);
-    const res = await httpPostJson<ItemResponse, { status: CandidacyStatus }>(
-      url,
-      { status },
-      { headers: { Authorization: `Bearer ${accessToken}` } },
-    );
-    return res.success ? res.data : null;
-  } catch {
-    return null;
-  }
-}
-
 /** POST /api/establishment-follows/{id}/note */
 export async function setFollowNotes(
   accessToken: string,
@@ -110,6 +97,31 @@ export async function setFollowNotes(
     const res = await httpPostJson<ItemResponse, { notes: string }>(
       url,
       { notes },
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+    return res.success ? res.data : null;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * POST /api/establishment-follows/{id}/status
+ *
+ * `statusId === null` ⇒ retire le statut. Sinon le backend valide que
+ * l'id appartient à l'union des statuts autorisés de l'école et renvoie
+ * 422 si ce n'est pas le cas.
+ */
+export async function updateFollowStatus(
+  accessToken: string,
+  id: number,
+  statusId: number | null,
+): Promise<EstablishmentFollow | null> {
+  try {
+    const url = buildApiUrl(`/api/establishment-follows/${id}/status`);
+    const res = await httpPostJson<ItemResponse, { statusId: number | null }>(
+      url,
+      { statusId },
       { headers: { Authorization: `Bearer ${accessToken}` } },
     );
     return res.success ? res.data : null;

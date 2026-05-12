@@ -1,12 +1,18 @@
 /**
- * Tokens alignés sur la charte E-Tawjihi (Global Front — docs/CHARTE_GRAPHIQUE.md).
- * Bleu principal = topbar site (`Topbar.tsx` / `Layout.tsx`) : #333e8f.
+ * Tokens alignés sur la charte E-Tawjihi (Global Front — docs/CHARTE_GRAPHIQUE.md + `index.css` :root).
+ * Bleu principal = barre nav (`Topbar.tsx`) : #333E8F ; vert marque = `--solid-secondary` : #047857.
  */
 export const brand = {
   primary: '#333E8F',
   primaryHover: '#2A3478',
   primaryInteractive: '#3F4D9F',
-  emerald: '#158f65',
+  /** Vert marque (charte : croissance / actions secondaires type « envoyer ») */
+  emerald: '#047857',
+  emeraldHover: '#065F46',
+  /** Fond « fil d’info » — aligné `--brand-chat-surface` côté web */
+  chatSurface: '#EEF1F7',
+  /** Puces lien sous message officiel */
+  linkChipBg: '#E8EAF4',
   cyan: '#0E7490',
   text: '#0F172A',
   textSecondary: '#475569',

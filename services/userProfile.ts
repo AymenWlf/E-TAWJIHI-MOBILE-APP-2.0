@@ -22,6 +22,10 @@ export type UserProfile = {
   diplomeEnCours?: string | null;
   nomEtablissement?: string | null;
   typeLycee?: string | null;
+  /** Bac national (Maroc) */
+  massarCode?: string | null;
+  /** Bac mission — code étudiant */
+  studentCode?: string | null;
   typeEcolePrefere?: string[] | null;
   servicesPrefere?: string[] | null;
   tuteur?: string | null;
@@ -64,6 +68,8 @@ export type UpdateUserProfilePayload = {
   diplomeEnCours?: string;
   nomEtablissement?: string;
   typeLycee?: string; // 'public' | 'prive' | ''
+  massarCode?: string;
+  studentCode?: string;
 
   /* ─── Tuteur (setup wizard) ─── */
   tuteur?: string;

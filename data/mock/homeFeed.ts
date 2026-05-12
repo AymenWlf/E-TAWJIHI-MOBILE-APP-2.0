@@ -18,6 +18,8 @@ export type StorySlide = {
   uri: string;
   durationMs?: number;
   caption?: string;
+  /** Ouvre un lien (CTA tracké côté API si présent). */
+  linkUrl?: string | null;
 };
 
 /** Chaîne type Instagram (plusieurs slides). */

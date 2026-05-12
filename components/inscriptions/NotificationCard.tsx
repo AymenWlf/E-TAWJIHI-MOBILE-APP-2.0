@@ -5,6 +5,7 @@ import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { AppNotification } from '@/types/inscriptions';
+import { notificationMessage, notificationTimeAgo, notificationTitle } from '@/utils/notificationDisplay';
 
 type Props = {
   notif: AppNotification;
@@ -18,11 +19,20 @@ const TYPE_ICON: Record<string, React.ComponentProps<typeof FontAwesome>['name']
   plan_step_completed: 'check',
   candidacy_status_changed: 'paper-plane',
   announcement: 'bullhorn',
+  community_qna_reply: 'comment',
+  community_qna_official: 'check-circle',
+  community_qna_thread_reply: 'comments-o',
+  community_qna_thread_official: 'check-circle',
+  community_qna_me_too: 'hand-o-up',
+  follow_school_new_announcement: 'bullhorn',
 };
 
 export function NotificationCard({ notif, onPress }: Props) {
-  const { isRTL } = useLocale();
+  const { isRTL, locale } = useLocale();
   const icon = TYPE_ICON[notif.type] ?? 'bell';
+  const title = notificationTitle(notif, locale);
+  const message = notificationMessage(notif, locale);
+  const timeAgo = notificationTimeAgo(notif, locale);
 
   return (
     <Pressable
@@ -48,14 +58,14 @@ export function NotificationCard({ notif, onPress }: Props) {
             style={[styles.title, !notif.isRead && styles.titleUnread, isRTL && styles.rtl]}
             numberOfLines={2}
           >
-            {notif.title}
+            {title}
           </Text>
           {!notif.isRead ? <View style={styles.dot} /> : null}
         </View>
         <Text style={[styles.message, isRTL && styles.rtl]} numberOfLines={3}>
-          {notif.message}
+          {message}
         </Text>
-        <Text style={[styles.time, isRTL && styles.rtl]}>{notif.timeAgo}</Text>
+        <Text style={[styles.time, isRTL && styles.rtl]}>{timeAgo}</Text>
       </View>
     </Pressable>
   );

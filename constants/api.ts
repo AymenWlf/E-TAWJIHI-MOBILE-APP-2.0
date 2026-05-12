@@ -8,6 +8,12 @@ import { Platform } from 'react-native';
 const DEV_LOCAL_PORT = (process.env.EXPO_PUBLIC_API_PORT ?? '8001').trim() || '8001';
 
 /**
+ * IP ou hostname du Mac qui sert l’API en dev, si la détection Metro échoue
+ * (souvent sur **iPhone physique**). Ex. `.env` : `EXPO_PUBLIC_DEV_API_HOST=192.168.1.10`
+ */
+const DEV_API_HOST_OVERRIDE = (process.env.EXPO_PUBLIC_DEV_API_HOST ?? '').trim();
+
+/**
  * URL de production utilisée hors `__DEV__` (ou comme dernier recours).
  */
 const PROD_URL = 'https://apinew.e-tawjihi.ma';
@@ -21,6 +27,8 @@ function getMetroHost(): string | null {
   // SDK <49 : Constants.manifest?.debuggerHost / hostUri
   const candidates: (string | null | undefined)[] = [
     (Constants.expoConfig as any)?.hostUri,
+    (Constants.expoConfig as any)?.debuggerHost,
+    (Constants as any)?.debuggerHost,
     (Constants as any)?.expoGoConfig?.debuggerHost,
     (Constants as any)?.manifest2?.extra?.expoGo?.debuggerHost,
     (Constants as any)?.manifest?.debuggerHost,
@@ -39,13 +47,27 @@ function getMetroHost(): string | null {
 }
 
 /**
+ * Expo Web : si la page est ouverte via une IP LAN (`http://192.168.x.x:8081`),
+ * l’API doit viser la **même** machine — pas `localhost` (qui serait le téléphone / tablette).
+ */
+function getWebDevApiHostname(): string {
+  if (typeof window === 'undefined') return 'localhost';
+  const h = window.location?.hostname;
+  if (!h) return 'localhost';
+  if (h === 'localhost' || h === '127.0.0.1') return 'localhost';
+  if (/^(\d{1,3}\.){3}\d{1,3}$/.test(h)) return h;
+  return 'localhost';
+}
+
+/**
  * Hôte local utilisé en dev selon la plateforme :
  * - Android emulator : 10.0.2.2 (loopback hôte depuis l'émulateur)
- * - iOS simulator / web : localhost
- * - Device physique : IP LAN du Mac détectée via Metro (ou EXPO_PUBLIC_API_BASE_URL)
+ * - iOS simulator / web : localhost (ou IP de la page en web sur le LAN)
+ * - Device physique : IP LAN du Mac détectée via Metro (`EXPO_PUBLIC_DEV_API_HOST` si besoin)
  */
 function getDevHost(): string {
-  if (Platform.OS === 'web') return 'localhost';
+  if (DEV_API_HOST_OVERRIDE) return DEV_API_HOST_OVERRIDE;
+  if (Platform.OS === 'web') return getWebDevApiHostname();
   if (Platform.OS === 'android') {
     // Sur émulateur Android : 10.0.2.2.
     // Sur device Android physique : IP LAN du Mac.

@@ -24,14 +24,24 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { Platform } from 'react-native';
+import { DeviceEventEmitter, Platform } from 'react-native';
 import { router } from 'expo-router';
 
 import { buildApiUrl } from '@/constants/api';
+import { NOTIFICATIONS_IN_APP_REFRESH_EVENT } from '@/services/notifications';
 import { httpDeleteJson, httpPostJson } from '@/services/http';
 import { getMobileVisitorId } from '@/utils/visitorId';
 
 type AuthTokenGetter = () => Promise<string | null>;
+
+/**
+ * `expo-notifications` n'expose pas ses bindings natifs sur le web (Expo Go
+ * web ou build web). Toute tentative d'appel (`getLastNotificationResponseAsync`,
+ * `setNotificationHandler`, `getExpoPushTokenAsync`, …) lève
+ * `ExpoNotifications.X is not available on web`. On court-circuite donc
+ * tous les entry points publics quand on tourne dans un navigateur.
+ */
+const IS_WEB = Platform.OS === 'web';
 
 let foregroundHandlerSet = false;
 let listenersAttached = false;
@@ -45,7 +55,7 @@ let responseSubscription: Notifications.EventSubscription | null = null;
  * + son pour rester cohérent avec le comportement « notif quand app fermée ».
  */
 function ensureForegroundHandler(): void {
-  if (foregroundHandlerSet) return;
+  if (foregroundHandlerSet || IS_WEB) return;
   foregroundHandlerSet = true;
   Notifications.setNotificationHandler({
     handleNotification: async () => ({
@@ -97,6 +107,7 @@ function resolveProjectId(): string | undefined {
  *   - exécution dans Expo Go (SDK 53+) — message clair en console pour debug
  */
 export async function getExpoPushTokenIfPossible(): Promise<string | null> {
+  if (IS_WEB) return null;
   if (!Device.isDevice) {
     // Émulateurs/simulateurs : pas de push réel.
     return null;
@@ -126,6 +137,7 @@ export async function getExpoPushTokenIfPossible(): Promise<string | null> {
  * (les erreurs réseau ne doivent pas bloquer le rendu).
  */
 export async function registerForPushAndSubmit(getAuthToken: AuthTokenGetter): Promise<string | null> {
+  if (IS_WEB) return null;
   try {
     const expoToken = await getExpoPushTokenIfPossible();
     if (!expoToken) return null;
@@ -166,6 +178,7 @@ export async function registerForPushAndSubmit(getAuthToken: AuthTokenGetter): P
  * registration sur la session suivante.
  */
 export async function unregisterPushToken(getAuthToken: AuthTokenGetter): Promise<void> {
+  if (IS_WEB) return;
   const token = lastRegisteredToken;
   lastRegisteredToken = null;
   if (!token) return;
@@ -201,7 +214,8 @@ async function recordPushClick(contestId: number, getAuthToken: AuthTokenGetter)
 
 /**
  * Type minimal de la donnée embarquée dans une notification push backend.
- * Le serveur émet `{ type: 'contest_announcement', contestId, route }`.
+ * Le serveur émet `{ type: 'contest_announcement', contestId, route }` ou
+ * `{ type: 'daily_challenge', route }`.
  */
 type ContestPushData = {
   type?: string;
@@ -211,7 +225,7 @@ type ContestPushData = {
 
 /**
  * Lit la `data` d'une notification (avec tolérance sur le format) et
- * exécute le côté « clic » : tracking + deep-link vers la fiche annonce.
+ * exécute le côté « clic » : tracking + deep-link vers la fiche annonce ou le défi du jour.
  */
 async function handleNotificationTap(
   raw: Notifications.NotificationContent | null | undefined,
@@ -219,6 +233,20 @@ async function handleNotificationTap(
 ): Promise<void> {
   if (!raw) return;
   const data = (raw.data ?? {}) as ContestPushData;
+
+  if (data.type === 'daily_challenge') {
+    const route =
+      typeof data.route === 'string' && data.route.trim() !== ''
+        ? data.route.trim()
+        : '/daily-challenge';
+    try {
+      router.push(route as Parameters<typeof router.push>[0]);
+    } catch {
+      /* noop */
+    }
+    return;
+  }
+
   const idRaw = data.contestId;
   const id = typeof idRaw === 'string' ? Number(idRaw) : idRaw;
   if (!id || !Number.isFinite(id)) return;
@@ -245,6 +273,12 @@ async function handleNotificationTap(
  * en pratique l'app vit pendant toute la session donc on ne nettoie pas).
  */
 export function attachNotificationListeners(getAuthToken: AuthTokenGetter): () => void {
+  // Web : `expo-notifications` n'est pas linké, on saute proprement
+  // sans toucher à `listenersAttached` pour rester idempotent côté natif.
+  if (IS_WEB) {
+    return () => undefined;
+  }
+
   ensureForegroundHandler();
 
   if (listenersAttached) {
@@ -262,7 +296,8 @@ export function attachNotificationListeners(getAuthToken: AuthTokenGetter): () =
   // Cas 2 : app déjà running, user reçoit une notif → on garde le hook
   // (utile si on veut afficher un toast / mettre à jour un badge).
   receivedSubscription = Notifications.addNotificationReceivedListener(() => {
-    /* noop : `setNotificationHandler` gère déjà l'affichage en foreground. */
+    /** Nouvelle notif (y compris premier plan) → même flux que messages : badge + liste API à jour sans ouvrir le panneau. */
+    DeviceEventEmitter.emit(NOTIFICATIONS_IN_APP_REFRESH_EVENT);
   });
 
   // Cas 3 : user tap sur une notification (foreground OU background).

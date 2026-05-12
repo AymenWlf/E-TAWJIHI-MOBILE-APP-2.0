@@ -1,11 +1,12 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
+  InteractionManager,
   Linking,
   Platform,
   Pressable,
@@ -15,10 +16,17 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ShareIconButton } from '@/components/share/ShareIconButton';
+import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
+import { CommunityQnaSection } from '@/components/community/CommunityQnaSection';
+import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
+import { ContestYoutubeTutorial } from '@/components/inscriptions/ContestYoutubeTutorial';
 import {
   EligibilityBadge,
   EligibilitySummary,
 } from '@/components/inscriptions/EligibilityViews';
+import { StatusBadge } from '@/components/inscriptions/StatusBadge';
+import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
 import { EstablishmentDescriptionHtml } from '@/components/schools/EstablishmentDescriptionHtml';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
@@ -28,6 +36,9 @@ import {
 } from '@/constants/establishmentMedia';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
+import { useSharePreview } from '@/contexts/SharePreviewContext';
+import { sharePayloadContestAnnouncementDetail } from '@/utils/sharePagePayloads';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import {
   fetchContestAnnouncementDetail,
@@ -38,9 +49,15 @@ import {
 import {
   deleteEstablishmentFollowByEstablishment,
   fetchFollowStateByEstablishment,
+  updateFollowStatus,
   upsertEstablishmentFollow,
 } from '@/services/establishmentFollows';
+import { markUnreadNotificationsForContestAnnouncement } from '@/services/notifications';
 import { recordEstablishmentClick } from '@/services/establishmentTracking';
+import type {
+  CandidacyStatusType,
+  EstablishmentFollow,
+} from '@/types/inscriptions';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
   formatDaysUntilClose,
@@ -50,29 +67,65 @@ import {
   pickEstablishmentName,
   pickRegistrationUrlLabel,
 } from '@/utils/candidacyStatus';
+import { splitSiblingsAroundCurrent } from '@/utils/contestAnnouncementSiblings';
 import { downloadDocument, pickDocumentIcon, viewDocument } from '@/utils/documents';
 import { evaluateEligibility } from '@/utils/eligibility';
+import { fireAndForget } from '@/utils/fireAndForget';
+import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
 
 export default function InscriptionDetailScreen() {
   const router = useRouter();
   const { t, locale, isRTL, setLocale } = useLocale();
+  const { presentShare } = useSharePreview();
   const insets = useSafeAreaInsets();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{
+    id?: string;
+    qnaQ?: string | string[];
+    qnaScroll?: string | string[];
+  }>();
   const id = useMemo(() => Number(params.id ?? 0), [params.id]);
-  const { profile: eligibilityProfile } = useEligibilityProfile();
+  const highlightQuestionId = useMemo(() => {
+    const raw = params.qnaQ;
+    const s = Array.isArray(raw) ? raw[0] : raw;
+    const n = Number(s ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [params.qnaQ]);
+  const qnaScrollRequested = useMemo(() => {
+    const raw = params.qnaScroll;
+    const s = Array.isArray(raw) ? raw[0] : raw;
+    return s === '1' || s === 'true';
+  }, [params.qnaScroll]);
+  const scrollRef = useRef<ScrollView>(null);
+  const qnaScrollDoneRef = useRef(false);
+  const { profile: eligibilityProfile, loading: eligibilityProfileLoading } = useEligibilityProfile();
   const { user, getValidAccessToken } = useAuth();
   const isLoggedIn = Boolean(user);
+  const { refreshUnread } = useNotificationsDrawer();
 
   const [data, setData] = useState<ContestAnnouncementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  // Suivi de l'école rattachée à l'annonce. Permet à l'utilisateur de
-  // commencer à « suivre » l'établissement directement depuis la fiche
-  // annonce (raccourci utile : nouveau scolaire arrive le plus souvent par
-  // une annonce de concours, pas par la page école).
-  const [isFollowingEst, setIsFollowingEst] = useState(false);
+  /**
+   * Suivi école courant (objet complet) pour pouvoir afficher le statut
+   * et appeler `updateFollowStatus` avec son id. `null` ⇒ pas (encore)
+   * suivie. Refonte UX 2026-05 : suivre = créer l'EstablishmentFollow,
+   * statut par défaut côté backend (`interested`).
+   */
+  const [currentFollow, setCurrentFollow] = useState<EstablishmentFollow | null>(null);
+  const isFollowingEst = currentFollow !== null;
   const [followBusy, setFollowBusy] = useState(false);
+  /** État suivi serveur pour l’école de l’annonce (évite cœur « non suivi » le temps du fetch). */
+  const [followStateLoading, setFollowStateLoading] = useState(false);
+
+  /**
+   * Sheet de mise à jour du statut depuis la page annonce. Les statuts
+   * proposés sont ceux **autorisés par l'annonce courante** (sous-ensemble
+   * de ce que l'école accepte). Si l'utilisateur ne suit pas encore, le
+   * suivi est créé automatiquement à la confirmation avec le statut choisi.
+   */
+  const [statusSheetOpen, setStatusSheetOpen] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(id) || id <= 0) {
@@ -87,7 +140,7 @@ export default function InscriptionDetailScreen() {
       setError(t('inscDetailNotFound'));
     } else {
       setData(detail);
-      void recordContestImpression(detail.id, 'detail');
+      fireAndForget(recordContestImpression(detail.id, 'detail'));
     }
     setLoading(false);
   }, [id, t]);
@@ -96,26 +149,68 @@ export default function InscriptionDetailScreen() {
     void load();
   }, [load]);
 
+  /** Aligner la cloche / pastilles avec la lecture sur cette page : marquer les notifs liées à l’annonce. */
+  useEffect(() => {
+    if (!data || !isLoggedIn || data.id !== id) return;
+    let cancelled = false;
+    void (async () => {
+      const token = await getValidAccessToken();
+      if (!token || cancelled) return;
+      const marked = await markUnreadNotificationsForContestAnnouncement(token, id);
+      if (!cancelled && marked > 0) void refreshUnread();
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [data, id, isLoggedIn, getValidAccessToken, refreshUnread]);
+
   // Charge l'état suivi côté serveur dès qu'on connaît l'établissement.
-  // En cas d'utilisateur déconnecté, on laisse `isFollowingEst = false` :
+  // En cas d'utilisateur déconnecté, on laisse `currentFollow = null` :
   // le bouton tap déclenchera une redirection vers le login.
   useEffect(() => {
     let cancelled = false;
     const eid = data?.establishment?.id ?? 0;
     if (!isLoggedIn || !Number.isFinite(eid) || eid <= 0) {
-      setIsFollowingEst(false);
+      setCurrentFollow(null);
+      setFollowStateLoading(false);
       return;
     }
+    setFollowStateLoading(true);
     void (async () => {
       const token = await getValidAccessToken();
-      if (!token || cancelled) return;
+      if (!token || cancelled) {
+        if (!cancelled) setFollowStateLoading(false);
+        return;
+      }
       const state = await fetchFollowStateByEstablishment(token, eid);
-      if (!cancelled) setIsFollowingEst(state.isFollowing);
+      if (!cancelled) {
+        setCurrentFollow(state.follow);
+        setFollowStateLoading(false);
+      }
     })();
     return () => {
       cancelled = true;
     };
   }, [data?.establishment?.id, getValidAccessToken, isLoggedIn]);
+
+  useEffect(() => {
+    qnaScrollDoneRef.current = false;
+  }, [id, qnaScrollRequested]);
+
+  useEffect(() => {
+    if (!qnaScrollRequested || qnaScrollDoneRef.current || loading || !data) return;
+    let timeoutId: ReturnType<typeof setTimeout> | undefined;
+    const interactionTask = InteractionManager.runAfterInteractions(() => {
+      timeoutId = setTimeout(() => {
+        qnaScrollDoneRef.current = true;
+        scrollRef.current?.scrollToEnd({ animated: true });
+      }, 420);
+    });
+    return () => {
+      interactionTask.cancel?.();
+      if (timeoutId) clearTimeout(timeoutId);
+    };
+  }, [qnaScrollRequested, loading, data, id]);
 
   const onToggleFollowEst = useCallback(async () => {
     const eid = data?.establishment?.id ?? 0;
@@ -140,7 +235,7 @@ export default function InscriptionDetailScreen() {
               setFollowBusy(true);
               const ok = await deleteEstablishmentFollowByEstablishment(token, eid);
               setFollowBusy(false);
-              if (ok) setIsFollowingEst(false);
+              if (ok) setCurrentFollow(null);
             },
           },
         ],
@@ -151,10 +246,9 @@ export default function InscriptionDetailScreen() {
     setFollowBusy(true);
     const { follow } = await upsertEstablishmentFollow(token, {
       establishmentId: eid,
-      status: 'interested',
     });
     setFollowBusy(false);
-    if (follow) setIsFollowingEst(true);
+    if (follow) setCurrentFollow(follow);
   }, [
     data?.establishment?.id,
     getValidAccessToken,
@@ -165,6 +259,72 @@ export default function InscriptionDetailScreen() {
   ]);
 
   /**
+   * Confirmation du sheet de statut. Deux cas :
+   *   1. L'utilisateur ne suit pas encore l'école ⇒ on crée le suivi avec
+   *      le `statusId` choisi (le backend pose ce statut s'il est
+   *      autorisé par l'union des annonces, sinon il retombera sur
+   *      `interested` — ce qui n'arrive pas en pratique car le statut
+   *      vient de l'annonce courante, donc déjà autorisé).
+   *   2. L'utilisateur suit déjà ⇒ `updateFollowStatus` direct.
+   */
+  const onConfirmStatus = useCallback(
+    async (next: CandidacyStatusType | null) => {
+      const eid = data?.establishment?.id ?? 0;
+      if (!Number.isFinite(eid) || eid <= 0) return;
+      if (!isLoggedIn) {
+        router.push('/login' as never);
+        return;
+      }
+      setStatusBusy(true);
+      try {
+        const token = await getValidAccessToken();
+        if (!token) return;
+
+        if (!currentFollow) {
+          const { follow } = await upsertEstablishmentFollow(token, {
+            contestAnnouncementId: data?.id,
+            establishmentId: eid,
+            statusId: next?.id ?? null,
+          });
+          if (follow) {
+            // Si on vient de créer le follow et qu'on voulait un statut
+            // précis, on s'assure qu'il est bien posé (le backend ne pose
+            // le `statusId` qu'à la création — couvert ici — mais on
+            // re-PATCH par sécurité si la valeur n'est pas la bonne).
+            if (next?.id != null && follow.status?.id !== next.id) {
+              const updated = await updateFollowStatus(token, follow.id, next.id);
+              setCurrentFollow(updated ?? follow);
+            } else {
+              setCurrentFollow(follow);
+            }
+          }
+        } else {
+          const updated = await updateFollowStatus(
+            token,
+            currentFollow.id,
+            next?.id ?? null,
+          );
+          if (updated) setCurrentFollow(updated);
+        }
+      } finally {
+        setStatusBusy(false);
+        setStatusSheetOpen(false);
+      }
+    },
+    [currentFollow, data?.establishment?.id, data?.id, getValidAccessToken, isLoggedIn, router],
+  );
+
+  /** Ouvre la sheet (avec garde sur login + statuts dispo). */
+  const onPressUpdateStatus = useCallback(() => {
+    if (!isLoggedIn) {
+      router.push('/login' as never);
+      return;
+    }
+    if (!data?.availableStatuses?.length) return;
+    setStatusSheetOpen(true);
+  }, [data?.availableStatuses?.length, isLoggedIn, router]);
+
+  /**
    * Navigation vers la fiche école associée à l'annonce. Trace un clic
    * « detail » sur l'établissement (équivalent d'un click depuis listing
    * mais avec un point de départ différent — annonce vs liste écoles).
@@ -172,13 +332,13 @@ export default function InscriptionDetailScreen() {
   const onPressViewEstablishment = useCallback(() => {
     const est = data?.establishment;
     if (!est?.id) return;
-    void recordEstablishmentClick(est.id, 'detail');
+    fireAndForget(recordEstablishmentClick(est.id, 'detail'));
     router.push(`/etablissements/${est.id}/${est.slug ?? ''}` as never);
   }, [data?.establishment, router]);
 
   const onPressOpenLink = useCallback(() => {
     if (!data?.registrationUrl) return;
-    void recordContestClick(data.id, 'detail');
+    fireAndForget(recordContestClick(data.id, 'detail'));
     void Linking.openURL(data.registrationUrl).catch(() =>
       Alert.alert('Erreur', "Impossible d'ouvrir le lien."),
     );
@@ -255,6 +415,19 @@ export default function InscriptionDetailScreen() {
         })} MAD`
       : null;
 
+  const siblingBlocks = splitSiblingsAroundCurrent(
+    { id: data.id, dateOuverture: data.dateStart },
+    data.autresAnnoncesMemeEtablissement ?? [],
+  );
+  const hasSiblingHistory =
+    siblingBlocks.newer.length > 0 || siblingBlocks.older.length > 0;
+
+  const siblingStatusLabel = (s: { isOpen: boolean; isExpire: boolean }) => {
+    if (s.isOpen) return t('inscOpen');
+    if (s.isExpire) return t('inscClosed');
+    return t('inscDetailSiblingUpcoming');
+  };
+
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -276,6 +449,27 @@ export default function InscriptionDetailScreen() {
         <Text style={[styles.topBarTitle, isRTL && styles.rtl]} numberOfLines={1}>
           {data.announcementType || data.type}
         </Text>
+        <ShareIconButton
+          color={brand.white}
+          style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}
+          onPress={() => {
+            const thumb =
+              data.ogImage && /^https?:\/\//i.test(data.ogImage.trim())
+                ? data.ogImage.trim()
+                : /^https?:\/\//i.test(logoUri)
+                  ? logoUri
+                  : undefined;
+            presentShare(
+              sharePayloadContestAnnouncementDetail({
+                id: data.id,
+                announcementTitle: title,
+                establishmentName: estName,
+                subtitle: villesShort || undefined,
+                thumbUrl: thumb,
+              }),
+            );
+          }}
+        />
         <View
           style={[styles.langSwitch, isRTL && styles.rowRtl]}
           accessibilityRole="tablist"
@@ -313,11 +507,14 @@ export default function InscriptionDetailScreen() {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[
           styles.scroll,
-          { paddingBottom: insets.bottom + 100 },
+          { paddingBottom: insets.bottom + spacing.section + spacing.xl },
         ]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
       >
         {/* ── Hero (cover ou bandeau couleur de marque) ── */}
         {data.ogImage ? (
@@ -378,23 +575,23 @@ export default function InscriptionDetailScreen() {
             </Pressable>
             <Pressable
               onPress={onToggleFollowEst}
-              disabled={followBusy}
+              disabled={followBusy || followStateLoading}
               style={({ pressed }) => [
                 styles.estActionBtn,
                 isFollowingEst ? styles.estActionBtnFollowing : styles.estActionBtnFollow,
                 pressed && { opacity: 0.85 },
-                followBusy && { opacity: 0.7 },
+                (followBusy || followStateLoading) && { opacity: 0.7 },
               ]}
               accessibilityRole="button"
               accessibilityLabel={
-                isFollowingEst ? t('followSchoolUnfollowBtn') : t('followSchoolBtn')
+                followStateLoading ? t('inscLoading') : isFollowingEst ? t('followSchoolUnfollowBtn') : t('followSchoolBtn')
               }
             >
-              {followBusy ? (
+              {followBusy || followStateLoading ? (
                 <ActivityIndicator size="small" color={isFollowingEst ? brand.primary : brand.white} />
               ) : (
                 <FontAwesome
-                  name={isFollowingEst ? 'check' : 'plus'}
+                  name={isFollowingEst ? 'heart' : 'heart-o'}
                   size={12}
                   color={isFollowingEst ? brand.primary : brand.white}
                 />
@@ -414,10 +611,12 @@ export default function InscriptionDetailScreen() {
 
         {/* ── Title + countdown ── */}
         <View style={[styles.titleBlock, isRTL && styles.titleBlockRtl]}>
-          <View style={[styles.typePill, isRTL && styles.rowRtl]}>
-            <FontAwesome name="bookmark" size={10} color={brand.primary} />
-            <Text style={styles.typePillTxt}>{data.announcementType}</Text>
-          </View>
+          <AnnouncementTypeChip
+            type={data.announcementType}
+            variant="pill"
+            size="sm"
+            isRTL={isRTL}
+          />
           <Text style={[styles.title, isRTL && styles.rtl]}>{title}</Text>
           {deadline.label ? (
             <View
@@ -458,10 +657,61 @@ export default function InscriptionDetailScreen() {
           ) : null}
           {!noEligibility ? (
             <View style={[styles.heroEligibilityRow, isRTL && styles.rowRtl]}>
-              <EligibilityBadge result={eligibility} size="sm" />
+              {isLoggedIn && eligibilityProfileLoading ? (
+                <View style={styles.heroEligibilityLoading}>
+                  <ActivityIndicator size="small" color={brand.primary} />
+                </View>
+              ) : (
+                <EligibilityBadge result={eligibility} size="sm" />
+              )}
             </View>
           ) : null}
         </View>
+
+        {/* ── Statut de candidature (école) ──
+           Affiché uniquement si l'admin a autorisé au moins un statut sur
+           cette annonce. Le statut affiché est celui de l'EstablishmentFollow
+           (porté par l'école), et la mise à jour passe par les statuts
+           autorisés ici, **avec auto-follow** si l'utilisateur ne suivait
+           pas encore l'école. */}
+        {data.availableStatuses.length > 0 ? (
+          <View style={styles.candidacyStatusBlock}>
+            <View style={[styles.candidacyStatusRow, isRTL && styles.rowRtl]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.candidacyStatusEyebrow, isRTL && styles.rtl]}>
+                  {t('inscStatusBlockTitle')}
+                </Text>
+                <View style={[styles.candidacyStatusBadgeRow, isRTL && styles.rowRtl]}>
+                  {followStateLoading ? (
+                    <ActivityIndicator size="small" color={brand.primary} />
+                  ) : (
+                    <StatusBadge status={currentFollow?.status ?? null} size="sm" />
+                  )}
+                </View>
+              </View>
+              <Pressable
+                onPress={onPressUpdateStatus}
+                disabled={statusBusy || followStateLoading}
+                style={({ pressed }) => [
+                  styles.candidacyStatusBtn,
+                  pressed && { opacity: 0.85 },
+                  (statusBusy || followStateLoading) && { opacity: 0.6 },
+                ]}
+              >
+                {statusBusy ? (
+                  <ActivityIndicator size="small" color={brand.white} />
+                ) : (
+                  <FontAwesome name="pencil" size={12} color={brand.white} />
+                )}
+                <Text style={styles.candidacyStatusBtnTxt} numberOfLines={1}>
+                  {currentFollow?.status
+                    ? t('inscStatusActionUpdate')
+                    : t('inscStatusActionTitle')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
 
         {/* ── Dates clés ── */}
         <Section title={t('inscDetailKeyDates')} icon="calendar" rtl={isRTL}>
@@ -481,12 +731,29 @@ export default function InscriptionDetailScreen() {
           </View>
         </Section>
 
+        <AppBannerSlot zone="mid_square" analyticsPage="/mobile/inscriptions/annonce/detail" style={{ marginHorizontal: spacing.md }} />
+
         {/* ── Frais ── */}
         {(fee || data.preRegistrationFee === '0') ? (
           <Section title={t('inscDetailFees')} icon="money" rtl={isRTL}>
             <Text style={[styles.feeTxt, isRTL && styles.rtl]}>
               {fee ?? t('inscDetailFreeRegistration')}
             </Text>
+          </Section>
+        ) : null}
+
+        {/* ── Tutoriel vidéo (YouTube) ── */}
+        {data.inscriptionTutorialYoutubeUrl &&
+        parseYoutubeVideoId(data.inscriptionTutorialYoutubeUrl) ? (
+          <Section title={t('inscDetailTutorialTitle')} icon="video-camera" rtl={isRTL}>
+            <ContestYoutubeTutorial
+              youtubeUrl={data.inscriptionTutorialYoutubeUrl}
+              title={t('inscDetailTutorialTitle')}
+              playbackErrorLabel={t('inscDetailTutorialPlaybackError')}
+              retryLabel={t('inscDetailTutorialRetry')}
+              rtl={isRTL}
+              showHeading={false}
+            />
           </Section>
         ) : null}
 
@@ -511,6 +778,10 @@ export default function InscriptionDetailScreen() {
             <Text style={[styles.muted, isRTL && styles.rtl]}>
               {t('inscDetailNoEligibilityCriteria')}
             </Text>
+          ) : isLoggedIn && eligibilityProfileLoading ? (
+            <View style={styles.eligibilitySectionLoading}>
+              <ActivityIndicator color={brand.primary} />
+            </View>
           ) : (
             <EligibilitySummary
               result={eligibility}
@@ -546,6 +817,85 @@ export default function InscriptionDetailScreen() {
           </Section>
         ) : null}
 
+        {/* ── Autres annonces (même établissement) : plus récentes / plus anciennes ── */}
+        {hasSiblingHistory ? (
+          <Section title={t('inscDetailSiblingHistoryTitle')} icon="history" rtl={isRTL}>
+            <Text style={[styles.siblingHint, isRTL && styles.rtl]}>{t('inscDetailSiblingHistoryHint')}</Text>
+            {siblingBlocks.newer.length > 0 ? (
+              <View style={{ gap: spacing.xs }}>
+                <Text style={[styles.siblingSubheading, isRTL && styles.rtl]}>
+                  {t('inscDetailSiblingsNewer')}
+                </Text>
+                {siblingBlocks.newer.map((s) => (
+                  <Pressable
+                    key={s.id}
+                    onPress={() => router.push(`/inscriptions/${s.id}` as never)}
+                    style={({ pressed }) => [
+                      styles.siblingRow,
+                      isRTL && styles.rowRtl,
+                      pressed && { opacity: 0.88 },
+                    ]}
+                  >
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.siblingRowTitle, isRTL && styles.rtl]} numberOfLines={3}>
+                        {pickAnnouncementTitle(
+                          { title: s.titreSpecial, titleAr: s.titreSpecialAr ?? null },
+                          locale,
+                        )}
+                      </Text>
+                      <Text style={[styles.siblingRowMeta, isRTL && styles.rtl]} numberOfLines={2}>
+                        {formatShortDate(s.dateDebut, locale)} → {formatShortDate(s.dateFin, locale)} ·{' '}
+                        {siblingStatusLabel(s)} · {s.typeAnnonce}
+                      </Text>
+                    </View>
+                    <FontAwesome
+                      name={isRTL ? 'chevron-left' : 'chevron-right'}
+                      size={12}
+                      color={brand.textMuted}
+                    />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+            {siblingBlocks.older.length > 0 ? (
+              <View style={{ gap: spacing.xs, marginTop: siblingBlocks.newer.length > 0 ? spacing.md : 0 }}>
+                <Text style={[styles.siblingSubheading, isRTL && styles.rtl]}>
+                  {t('inscDetailSiblingsOlder')}
+                </Text>
+                {siblingBlocks.older.map((s) => (
+                  <Pressable
+                    key={s.id}
+                    onPress={() => router.push(`/inscriptions/${s.id}` as never)}
+                    style={({ pressed }) => [
+                      styles.siblingRow,
+                      isRTL && styles.rowRtl,
+                      pressed && { opacity: 0.88 },
+                    ]}
+                  >
+                    <View style={{ flex: 1, minWidth: 0 }}>
+                      <Text style={[styles.siblingRowTitle, isRTL && styles.rtl]} numberOfLines={3}>
+                        {pickAnnouncementTitle(
+                          { title: s.titreSpecial, titleAr: s.titreSpecialAr ?? null },
+                          locale,
+                        )}
+                      </Text>
+                      <Text style={[styles.siblingRowMeta, isRTL && styles.rtl]} numberOfLines={2}>
+                        {formatShortDate(s.dateDebut, locale)} → {formatShortDate(s.dateFin, locale)} ·{' '}
+                        {siblingStatusLabel(s)} · {s.typeAnnonce}
+                      </Text>
+                    </View>
+                    <FontAwesome
+                      name={isRTL ? 'chevron-left' : 'chevron-right'}
+                      size={12}
+                      color={brand.textMuted}
+                    />
+                  </Pressable>
+                ))}
+              </View>
+            ) : null}
+          </Section>
+        ) : null}
+
         {/* ── Documents utiles (aperçu in-app + téléchargement) ── */}
         {data.documentsUtiles.length > 0 ? (
           <Section title={t('inscDetailDocuments')} icon="file-text-o" rtl={isRTL}>
@@ -567,6 +917,15 @@ export default function InscriptionDetailScreen() {
               ))}
             </View>
           </Section>
+        ) : null}
+
+        {id > 0 ? (
+          <CommunityQnaSection
+            contextType="contest_announcement"
+            contextId={id}
+            highlightQuestionId={highlightQuestionId}
+            scrollParentRef={scrollRef}
+          />
         ) : null}
       </ScrollView>
 
@@ -593,6 +952,24 @@ export default function InscriptionDetailScreen() {
             </Text>
           </Pressable>
         </View>
+      ) : null}
+
+      {/* Sheet de mise à jour du statut. On affiche UNIQUEMENT les
+          statuts débloqués par l'annonce (`showUnavailable={false}`) :
+          les statuts d'autres annonces de la même école n'ont pas leur
+          place ici, ils risqueraient de laisser croire qu'ils sont
+          actionnables depuis cette annonce. Si l'utilisateur n'est pas
+          encore suiveur de l'école, le suivi est créé à la confirmation
+          avec le statut choisi. */}
+      {data.availableStatuses.length > 0 ? (
+        <StatusUpdateSheet
+          visible={statusSheetOpen}
+          currentStatus={currentFollow?.status ?? null}
+          availableStatuses={data.availableStatuses}
+          showUnavailable={false}
+          onClose={() => setStatusSheetOpen(false)}
+          onConfirm={onConfirmStatus}
+        />
       ) : null}
     </View>
   );
@@ -906,18 +1283,53 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 2,
   },
-  typePill: {
+  heroEligibilityLoading: {
+    minHeight: 24,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  title: { color: brand.text, fontSize: fontSize.xl, fontWeight: '800', lineHeight: 28 },
+
+  /* Bloc « Statut de candidature » sous le titre */
+  candidacyStatusBlock: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    backgroundColor: brand.white,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: brand.border,
+  },
+  candidacyStatusRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 5,
-    alignSelf: 'flex-start',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(51,62,143,0.10)',
+    gap: spacing.sm,
   },
-  typePillTxt: { color: brand.primary, fontWeight: '700', fontSize: fontSize.xs },
-  title: { color: brand.text, fontSize: fontSize.xl, fontWeight: '800', lineHeight: 28 },
+  candidacyStatusEyebrow: {
+    color: brand.textMuted,
+    fontWeight: '700',
+    fontSize: fontSize.xs,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    marginBottom: 6,
+  },
+  candidacyStatusBadgeRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexWrap: 'wrap',
+  },
+  candidacyStatusBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 9,
+    borderRadius: radius.full,
+    backgroundColor: brand.primary,
+  },
+  candidacyStatusBtnTxt: { color: brand.white, fontWeight: '800', fontSize: fontSize.xs },
 
   countdown: {
     flexDirection: 'row',
@@ -951,6 +1363,45 @@ const styles = StyleSheet.create({
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sectionTitle: { color: brand.text, fontSize: fontSize.md, fontWeight: '800' },
 
+  siblingHint: {
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    color: brand.textMuted,
+    lineHeight: 16,
+    marginBottom: spacing.xs,
+  },
+  siblingSubheading: {
+    fontSize: 10,
+    fontWeight: '800',
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
+    color: brand.primary,
+    marginBottom: 4,
+  },
+  siblingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: brand.border,
+    backgroundColor: '#FAFBFC',
+  },
+  siblingRowTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    color: brand.text,
+    lineHeight: 18,
+  },
+  siblingRowMeta: {
+    marginTop: 2,
+    fontSize: 10,
+    fontWeight: '600',
+    color: brand.textMuted,
+  },
+
   /* Dates */
   datesRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
   datePill: {
@@ -972,6 +1423,11 @@ const styles = StyleSheet.create({
 
   /* Eligibility section */
   muted: { color: brand.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
+  eligibilitySectionLoading: {
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
 
   /* Links */
   linksWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },

@@ -1,14 +1,14 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Tabs } from 'expo-router';
-import { useEffect, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ChatbotFloatingBubble } from '@/components/chatbot/ChatbotFloatingBubble';
+import { FloatingBubbleHub } from '@/components/global/FloatingBubbleHub';
 import { Text } from '@/components/ui/Text';
-import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
-import { fetchUnreadCount } from '@/services/notifications';
 import { CAIRO } from '@/theme/arabicTypography';
 import { brand } from '@/theme/tokens';
 
@@ -43,34 +43,11 @@ function TabIcon({
 export default function TabLayout() {
   const { t, isRTL } = useLocale();
   const { count: cartCount } = useShopCart();
-  const { user, getValidAccessToken } = useAuth();
+  const { unreadCount: notifUnread } = useNotificationsDrawer();
   const insets = useSafeAreaInsets();
-  const [notifUnread, setNotifUnread] = useState(0);
-
-  // Refresh unread count périodiquement (toutes les 60s) + immédiatement quand on est loggé.
-  useEffect(() => {
-    if (!user) {
-      setNotifUnread(0);
-      return;
-    }
-    let cancelled = false;
-    const loadCount = async () => {
-      const token = await getValidAccessToken();
-      if (!token || cancelled) return;
-      const c = await fetchUnreadCount(token);
-      if (!cancelled) setNotifUnread(c);
-    };
-    void loadCount();
-    const interval = setInterval(() => {
-      void loadCount();
-    }, 60_000);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [user, getValidAccessToken]);
 
   return (
+    <>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -109,7 +86,7 @@ export default function TabLayout() {
         options={{
           title: t('tabHome'),
           tabBarIcon: ({ focused, color, size }) => (
-            <TabIcon name="home" focused={focused} color={color} size={size} />
+            <TabIcon name="home" focused={focused} color={color} size={size} badgeCount={notifUnread} />
           ),
         }}
       />
@@ -155,7 +132,22 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/**
+       * Événements : même barre d’onglets que le reste de l’app, sans entrée visible
+       * (navigation via sidebar / liens). Voir expo-router : `href: null`.
+       */}
+      <Tabs.Screen
+        name="evenements"
+        options={{
+          href: null,
+          headerShown: false,
+        }}
+      />
     </Tabs>
+    {/* Hub unique à droite → ouvre Chatbot / Communauté */}
+    <ChatbotFloatingBubble hideLauncher />
+    <FloatingBubbleHub />
+    </>
   );
 }
 

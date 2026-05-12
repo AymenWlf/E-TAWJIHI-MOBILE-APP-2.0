@@ -1,98 +1,21 @@
-import type FontAwesome from '@expo/vector-icons/FontAwesome';
-
 import type { HomeCopyKey } from '@/constants/i18n';
-import type { CandidacyStatus } from '@/types/inscriptions';
+import type { CandidacyStatusType } from '@/types/inscriptions';
+import { formatShortDateInParis } from '@/utils/dateParis';
 
-type IconName = React.ComponentProps<typeof FontAwesome>['name'];
+/**
+ * Helpers de présentation pour le module Inscriptions.
+ *
+ * Refonte 2026-05 : les statuts ne sont plus codés en dur dans
+ * `STATUS_VISUALS` / `STATUS_FLOW` ; ils proviennent du catalogue admin
+ * (`CandidacyStatusType`) via `services/candidacyStatusTypes.ts` et sont
+ * cachés en `AsyncStorage`. On garde uniquement les utilitaires de date,
+ * de nom d'établissement et de copie i18n qui ne dépendent plus du
+ * catalogue.
+ */
 
-export type StatusVisual = {
-  /** Couleur d'accent (texte / icône). */
-  fg: string;
-  /** Couleur de fond (badge / surface douce). */
-  bg: string;
-  /** Couleur de bordure (optionnelle). */
-  border: string;
-  /** Nom d'icône FontAwesome. */
-  icon: IconName;
-  /** Clé i18n pour le label affiché. */
-  labelKey: HomeCopyKey;
-};
-
-export const STATUS_VISUALS: Record<CandidacyStatus, StatusVisual> = {
-  interested: {
-    fg: '#1D4ED8',
-    bg: '#DBEAFE',
-    border: '#BFDBFE',
-    icon: 'star',
-    labelKey: 'inscStatusInterested',
-  },
-  applied: {
-    fg: '#9A3412',
-    bg: '#FFEDD5',
-    border: '#FED7AA',
-    icon: 'paper-plane',
-    labelKey: 'inscStatusApplied',
-  },
-  pre_admitted: {
-    fg: '#6D28D9',
-    bg: '#EDE9FE',
-    border: '#DDD6FE',
-    icon: 'hourglass-half',
-    labelKey: 'inscStatusPreAdmitted',
-  },
-  admitted: {
-    fg: '#15803D',
-    bg: '#DCFCE7',
-    border: '#BBF7D0',
-    icon: 'check-circle',
-    labelKey: 'inscStatusAdmitted',
-  },
-  enrolled: {
-    fg: '#065F46',
-    bg: '#A7F3D0',
-    border: '#6EE7B7',
-    icon: 'graduation-cap',
-    labelKey: 'inscStatusEnrolled',
-  },
-  rejected: {
-    fg: '#B91C1C',
-    bg: '#FEE2E2',
-    border: '#FECACA',
-    icon: 'times-circle',
-    labelKey: 'inscStatusRejected',
-  },
-  withdrawn: {
-    fg: '#475569',
-    bg: '#E2E8F0',
-    border: '#CBD5E1',
-    icon: 'sign-out',
-    labelKey: 'inscStatusWithdrawn',
-  },
-};
-
-/** Liste ordonnée des statuts pour l'UI (de "intéressé" → "inscrit"). */
-export const STATUS_FLOW: CandidacyStatus[] = [
-  'interested',
-  'applied',
-  'pre_admitted',
-  'admitted',
-  'enrolled',
-  'rejected',
-  'withdrawn',
-];
-
-/** Format dd/MM/yyyy à partir d'une date ISO ou y-m-d. */
+/** Format dd/MM/yyyy à partir d'une date ISO ou y-m-d (calendrier Europe/Paris). */
 export function formatShortDate(iso: string | null | undefined, locale: 'fr' | 'ar' = 'fr'): string {
-  if (!iso) return '—';
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return iso;
-  const day = String(d.getDate()).padStart(2, '0');
-  const month = String(d.getMonth() + 1).padStart(2, '0');
-  const year = d.getFullYear();
-  if (locale === 'ar') {
-    return `${day}/${month}/${year}`;
-  }
-  return `${day}/${month}/${year}`;
+  return formatShortDateInParis(iso, locale);
 }
 
 /** Renvoie le nom à afficher selon la locale (priorité à la langue choisie quand dispo). */
@@ -274,4 +197,17 @@ export function formatTimeAgo(iso: string | null | undefined, locale: 'fr' | 'ar
   if (day < 30) return `Il y a ${day} j`;
   const months = Math.round(day / 30);
   return `Il y a ${months} mois`;
+}
+
+/** Renvoie le libellé d'un statut selon la locale (sécurisé contre `null`). */
+export function pickStatusLabel(
+  status: CandidacyStatusType | null | undefined,
+  locale: 'fr' | 'ar',
+): string {
+  if (!status) return '';
+  if (locale === 'ar') {
+    const ar = (status.labelAr ?? '').trim();
+    return ar !== '' ? ar : status.labelFr;
+  }
+  return status.labelFr;
 }

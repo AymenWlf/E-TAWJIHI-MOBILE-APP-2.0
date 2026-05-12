@@ -71,7 +71,11 @@ export async function setAuthToken(token: string): Promise<void> {
 }
 
 export async function getAuthToken(): Promise<string | null> {
-  return await AsyncStorage.getItem(TOKEN_KEY);
+  try {
+    return await AsyncStorage.getItem(TOKEN_KEY);
+  } catch {
+    return null;
+  }
 }
 
 export async function clearAuthToken(): Promise<void> {
@@ -84,6 +88,10 @@ export async function setRefreshToken(token: string): Promise<void> {
 }
 
 export async function getRefreshToken(): Promise<string | null> {
-  return await AsyncStorage.getItem(REFRESH_KEY);
+  try {
+    return await AsyncStorage.getItem(REFRESH_KEY);
+  } catch {
+    return null;
+  }
 }
 

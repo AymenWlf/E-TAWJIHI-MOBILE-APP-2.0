@@ -1,7 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Modal, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, Linking, Modal, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import {
@@ -26,6 +26,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import type { StoryChannel } from '@/data/mock/homeFeed';
 import { isStoryImageUri } from '@/constants/storyMedia';
+import { recordStoryEvent } from '@/services/stories';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, spacing } from '@/theme/tokens';
 
@@ -36,6 +37,8 @@ type Props = {
   onClose: () => void;
   /** Appelé quand la dernière slide d’une chaîne a été vue (passage auto ou tap suivant). */
   onChannelFullyRead: (channelId: string) => void;
+  /** Identifiant visiteur pour KPIs (`/api/stories/record-event`). */
+  analyticsVisitorId?: string | null;
 };
 
 const { height: WIN_H } = Dimensions.get('window');
@@ -74,6 +77,7 @@ export function StoryViewerModal({
   initialChannelIndex,
   onClose,
   onChannelFullyRead,
+  analyticsVisitorId,
 }: Props) {
   const insets = useSafeAreaInsets();
   const [chIdx, setChIdx] = useState(0);
@@ -121,6 +125,41 @@ export function StoryViewerModal({
   const coverUri = currentChannel?.coverUri ?? currentChannel?.slides[0]?.uri;
 
   useEffect(() => {
+    if (!visible || !currentChannel) return;
+    void recordStoryEvent('open', {
+      channelId: currentChannel.id,
+      visitorId: analyticsVisitorId ?? undefined,
+      viewport: 'mobile',
+    });
+  }, [visible, chIdx, currentChannel?.id, analyticsVisitorId]);
+
+  useEffect(() => {
+    if (!visible || !currentChannel || !currentSlide) return;
+    void recordStoryEvent('slide_view', {
+      channelId: currentChannel.id,
+      slideId: currentSlide.id,
+      visitorId: analyticsVisitorId ?? undefined,
+      viewport: 'mobile',
+    });
+  }, [visible, chIdx, slideIdx, currentChannel?.id, currentSlide?.id, analyticsVisitorId]);
+
+  const openSlideLink = useCallback(async () => {
+    const url = currentSlide?.linkUrl?.trim();
+    if (!url) return;
+    void recordStoryEvent('cta_click', {
+      channelId: currentChannel?.id,
+      slideId: currentSlide?.id,
+      visitorId: analyticsVisitorId ?? undefined,
+      viewport: 'mobile',
+    });
+    try {
+      await Linking.openURL(url);
+    } catch {
+      /* ignore */
+    }
+  }, [analyticsVisitorId, currentChannel?.id, currentSlide?.id, currentSlide?.linkUrl]);
+
+  useEffect(() => {
     if (currentSlide?.uri) {
       setImageLoading(true);
     }
@@ -157,6 +196,11 @@ export function StoryViewerModal({
         return;
       }
     }
+    void recordStoryEvent('complete', {
+      channelId: channel.id,
+      visitorId: analyticsVisitorId ?? undefined,
+      viewport: 'mobile',
+    });
     onChannelFullyRead(channel.id);
     if (ch < list.length - 1) {
       slideIdxSv.value = 0;
@@ -165,7 +209,7 @@ export function StoryViewerModal({
     } else {
       onClose();
     }
-  }, [onChannelFullyRead, onClose, slideIdxSv]);
+  }, [analyticsVisitorId, onChannelFullyRead, onClose, slideIdxSv]);
 
   const rewind = useCallback(() => {
     cancelAnimation(segProgress);
@@ -421,9 +465,18 @@ export function StoryViewerModal({
               />
             </View>
 
-            {currentSlide?.caption ? (
+            {(currentSlide?.caption || currentSlide?.linkUrl) ? (
               <View style={[styles.captionWrap, { paddingBottom: insets.bottom + spacing.lg }]}>
-                <Text style={styles.caption}>{currentSlide.caption}</Text>
+                {currentSlide?.caption ? <Text style={styles.caption}>{currentSlide.caption}</Text> : null}
+                {currentSlide?.linkUrl ? (
+                  <Pressable
+                    onPress={() => void openSlideLink()}
+                    style={({ pressed }) => [styles.ctaBtn, pressed && { opacity: 0.85 }]}
+                    accessibilityRole="link"
+                    accessibilityLabel="Ouvrir le lien">
+                    <Text style={styles.ctaBtnTxt}>Voir le lien →</Text>
+                  </Pressable>
+                ) : null}
               </View>
             ) : null}
           </Animated.View>
@@ -565,5 +618,18 @@ const styles = StyleSheet.create({
     textShadowColor: 'rgba(0,0,0,0.55)',
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 4,
+  },
+  ctaBtn: {
+    marginTop: spacing.md,
+    alignSelf: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    borderRadius: 999,
+    backgroundColor: 'rgba(255,255,255,0.22)',
+  },
+  ctaBtnTxt: {
+    color: brand.white,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
   },
 });

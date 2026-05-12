@@ -14,9 +14,16 @@ type Props = {
   unreadCount: number;
   onPressNotifications?: () => void;
   onPressProfile?: () => void;
+  /** Ouvre le menu latéral (navigation principale). */
+  onPressMenu?: () => void;
 };
 
-export function HomeTopBar({ unreadCount, onPressNotifications, onPressProfile }: Props) {
+export function HomeTopBar({
+  unreadCount,
+  onPressNotifications,
+  onPressProfile,
+  onPressMenu,
+}: Props) {
   const { locale, setLocale, t, isRTL } = useLocale();
   const notificationsA11y =
     unreadCount > 0
@@ -25,6 +32,17 @@ export function HomeTopBar({ unreadCount, onPressNotifications, onPressProfile }
 
   return (
     <View style={[styles.row, isRTL && styles.rowRtl]}>
+      {onPressMenu ? (
+        <Pressable
+          onPress={onPressMenu}
+          hitSlop={10}
+          style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.88 }]}
+          accessibilityRole="button"
+          accessibilityLabel={t('sidebarOpen')}
+        >
+          <FontAwesome name="bars" size={22} color={homeShell.text} />
+        </Pressable>
+      ) : null}
       <View style={[styles.logoBlock, isRTL && styles.logoBlockRtl]} accessibilityLabel="E-Tawjihi">
         <Image
           source={{ uri: ETAWJIHI_LOGO_LIGHT_URL }}
@@ -88,6 +106,12 @@ export function HomeTopBar({ unreadCount, onPressNotifications, onPressProfile }
 }
 
 const styles = StyleSheet.create({
+  menuBtn: {
+    marginEnd: spacing.sm,
+    paddingVertical: 4,
+    paddingHorizontal: 2,
+    justifyContent: 'center',
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

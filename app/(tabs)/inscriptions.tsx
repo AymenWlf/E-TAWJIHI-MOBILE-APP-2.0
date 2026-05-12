@@ -1,24 +1,26 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Linking from 'expo-linking';
-import { useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Animated,
   FlatList,
   Pressable,
-  RefreshControl,
-  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SidebarMenuIconButton } from '@/components/SidebarMenuIconButton';
+import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
+import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
 import { Text } from '@/components/ui/Text';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
+import { ContestAnnouncementQnaBottomSheet } from '@/components/inscriptions/ContestAnnouncementQnaBottomSheet';
 import { FollowedSchoolCard } from '@/components/inscriptions/FollowedSchoolCard';
-import { NotificationCard } from '@/components/inscriptions/NotificationCard';
 import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
 import {
   countActiveEstablishmentFilters,
@@ -32,14 +34,17 @@ import {
 } from '@/components/schools/SearchablePickSheet';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
+import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import {
-  reportLinkVisited,
-} from '@/services/candidacies';
+  fetchActiveCandidacyStatuses,
+  loadCandidacyStatusesWithRefresh,
+} from '@/services/candidacyStatusTypes';
+import { reportLinkVisited } from '@/services/candidacies';
 import {
   fetchContestAnnouncements,
   recordContestClick,
-  recordContestImpression,
   recordContestListingImpressionsBatch,
   type ContestAnnouncementCard,
 } from '@/services/contestAnnouncements';
@@ -55,48 +60,90 @@ import {
   upsertEstablishmentFollow,
 } from '@/services/establishmentFollows';
 import {
-  fetchNotifications,
-  fetchUnreadCount,
-  markAllNotificationsRead,
-  markNotificationRead,
-} from '@/services/notifications';
-import {
   listAllSecteursActive,
   listCities,
   type CityRow,
   type SecteurRow,
 } from '@/services/referenceData';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
-import type {
-  AppNotification,
-  CandidacyStatus,
-  EstablishmentFollow,
-} from '@/types/inscriptions';
-import { STATUS_FLOW, STATUS_VISUALS } from '@/utils/candidacyStatus';
+import type { CandidacyStatusType, EstablishmentFollow } from '@/types/inscriptions';
 import { evaluateEligibilityByFiliere } from '@/utils/eligibility';
 import { establishmentMatchesAllFilters } from '@/utils/establishmentWebFilters';
+import { fireAndForget } from '@/utils/fireAndForget';
+import {
+  followRequiresAttention,
+  loadFollowLatestSeenMap,
+  mergeDefaultSeenForFollows,
+  saveFollowLatestSeenMap,
+  sortFollowsActionRequiredFirst,
+} from '@/utils/followLatestAnnouncementSeen';
 
-type TabId = 'notifications' | 'candidacies' | 'announcements';
+type TabId = 'candidacies' | 'announcements';
 
 export default function InscriptionsTabScreen() {
   const router = useRouter();
+  const { tab: tabParam } = useLocalSearchParams<{ tab?: string | string[] }>();
   const { t, isRTL, locale, setLocale } = useLocale();
   const { user, getValidAccessToken, isLoading: authLoading } = useAuth();
+  const { refreshUnread } = useNotificationsDrawer();
+  const { presentShare } = useSharePreview();
   const isLoggedIn = Boolean(user);
 
   const [tab, setTab] = useState<TabId>('announcements');
 
-  // Notifications state
-  const [notifs, setNotifs] = useState<AppNotification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const [notifFilter, setNotifFilter] = useState<'all' | 'unread'>('all');
-  const [notifLoading, setNotifLoading] = useState(false);
+  const tabFromUrl = useMemo(() => {
+    const raw = tabParam === undefined ? undefined : Array.isArray(tabParam) ? tabParam[0] : tabParam;
+    return raw === 'candidacies' || raw === 'announcements' ? raw : undefined;
+  }, [tabParam]);
 
-  // Suivi école (= "Candidatures" dans l'UI)
+  useEffect(() => {
+    if (tabFromUrl === 'candidacies') setTab('candidacies');
+    else if (tabFromUrl === 'announcements') setTab('announcements');
+  }, [tabFromUrl]);
+
+  /**
+   * Suivi école : porte le statut de candidature de l'utilisateur sur
+   * l'école (refonte UX 2026-05). C'est la **seule** liste affichée dans
+   * l'onglet Candidatures, le concept de candidature par annonce ayant
+   * été retiré de l'UI.
+   */
   const [follows, setFollows] = useState<EstablishmentFollow[]>([]);
-  const [followCounts, setFollowCounts] = useState<Partial<Record<CandidacyStatus, number>>>({});
-  const [followFilter, setFollowFilter] = useState<CandidacyStatus | ''>('');
   const [followsLoading, setFollowsLoading] = useState(false);
+  /** Après le premier fetch des suivis (connecté) — évite un état « non suivi » fictif sur les cartes annonces. */
+  const [followsReady, setFollowsReady] = useState(!isLoggedIn);
+
+  /** Catalogue des statuts (API) — pour le filtre de l’onglet Candidatures. */
+  const [candidacyStatusCatalog, setCandidacyStatusCatalog] = useState<CandidacyStatusType[]>([]);
+  /** `''` = toutes ; `none` = sans statut ; sinon id numérique en string. */
+  const [candidacyStatusFilter, setCandidacyStatusFilter] = useState('');
+  const [candidacyStatusPickerOpen, setCandidacyStatusPickerOpen] = useState(false);
+  /** Filtre « nouvelle annonce non consultée » dans l’onglet Candidatures. */
+  const [candidaciesAttentionFilter, setCandidaciesAttentionFilter] = useState<'all' | 'action_required'>(
+    'all',
+  );
+
+  /**
+   * Sheet de mise à jour du statut d'un follow. `activeFollow` détient
+   * le follow ciblé pour ré-utiliser sa palette de statuts autorisés
+   * (`availableStatuses`) sans round-trip au backend.
+   */
+  const [activeFollow, setActiveFollow] = useState<EstablishmentFollow | null>(null);
+  const [statusSheetOpen, setStatusSheetOpen] = useState(false);
+
+  /**
+   * Sheet de mise à jour du statut **depuis une annonce** (onglet
+   * Annonces). Les statuts proposés sont ceux de l'annonce ; si
+   * l'utilisateur ne suit pas l'école, le suivi est créé à la
+   * confirmation avec le statut choisi (auto-follow).
+   */
+  const [activeAnnouncement, setActiveAnnouncement] = useState<ContestAnnouncementCard | null>(
+    null,
+  );
+  const [annStatusSheetOpen, setAnnStatusSheetOpen] = useState(false);
+
+  /** Q&R / commentaires d’une annonce (modal comme sur la liste Écoles). */
+  const [announcementQnaSheet, setAnnouncementQnaSheet] = useState<{ id: number; title: string } | null>(null);
+  const closeAnnouncementQnaSheet = useCallback(() => setAnnouncementQnaSheet(null), []);
 
   // Annonces
   const [announcements, setAnnouncements] = useState<ContestAnnouncementCard[]>([]);
@@ -108,21 +155,21 @@ export default function InscriptionsTabScreen() {
   const [schoolPickerOpen, setSchoolPickerOpen] = useState(false);
 
   /**
-   * Filtres rapides (pills) propres à l'onglet « Annonces » :
-   *  - `statusFilter`     : ouvert / fermé / tous (basé sur `isOpen` /
-   *    `isExpire` calculés côté backend à partir des dates).
-   *  - `eligibilityFilter`: éligible / non éligible / tous, basé sur la
-   *    filière du Bac uniquement (cf. `evaluateEligibilityByFiliere`).
-   *  - `sortBy`           : ordre d'affichage. `closingSoon` trie par
-   *    nombre de jours restants (`daysUntilClose`) croissant en plaçant
-   *    les annonces déjà fermées en queue de liste.
+   * Tri par dernier délai. C'est volontairement un toggle binaire
+   * (sélectionné / non sélectionné) plutôt qu'un picker à plusieurs
+   * options : on ne propose qu'une alternative au tri par défaut, donc
+   * un bouton « Trier par délai » qui s'allume / s'éteint suffit.
+   *
+   * Les filtres « statut » et « éligibilité » vivent désormais dans
+   * `filtersValue` (et donc dans la modale Filtres avancés) — ils ont
+   * été retirés de la barre rapide pour alléger l'UI.
    */
-  const [statusFilter, setStatusFilter] = useState<'all' | 'open' | 'closed'>('all');
-  const [eligibilityFilter, setEligibilityFilter] = useState<
-    'all' | 'eligible' | 'not_eligible'
-  >('all');
-  const [sortBy, setSortBy] = useState<'default' | 'closingSoon'>('default');
-  const { profile: eligibilityProfile } = useEligibilityProfile();
+  const [sortByClosingSoon, setSortByClosingSoon] = useState(false);
+  const {
+    profile: eligibilityProfile,
+    loading: eligibilityProfileLoading,
+    refetch: refetchEligibilityProfile,
+  } = useEligibilityProfile();
 
   /**
    * Filtres avancés (mêmes que sur la page « Écoles supérieures »).
@@ -141,43 +188,44 @@ export default function InscriptionsTabScreen() {
   const [filtersDataLoaded, setFiltersDataLoaded] = useState(false);
   const [filtersDataLoading, setFiltersDataLoading] = useState(false);
 
-  // Status sheet (sur un follow école)
-  const [statusSheetOpen, setStatusSheetOpen] = useState(false);
-  const [activeFollow, setActiveFollow] = useState<EstablishmentFollow | null>(null);
-
   const [refreshing, setRefreshing] = useState(false);
 
-  // ── Loaders ──
-  const reloadNotifications = useCallback(async () => {
-    if (!isLoggedIn) return;
-    const token = await getValidAccessToken();
-    if (!token) return;
-    setNotifLoading(true);
-    try {
-      const res = await fetchNotifications(token, {
-        unreadOnly: notifFilter === 'unread',
-        limit: 100,
-      });
-      setNotifs(res.items);
-      setUnreadCount(res.unreadCount);
-    } finally {
-      setNotifLoading(false);
-    }
-  }, [getValidAccessToken, isLoggedIn, notifFilter]);
+  /**
+   * Par suivi d’école : id de la dernière annonce considérée comme « vue ».
+   * Sert à détecter une nouvelle « dernière annonce » sans champ API dédié.
+   */
+  const [latestSeenMap, setLatestSeenMap] = useState<Record<string, number>>({});
 
-  const reloadFollows = useCallback(async () => {
-    if (!isLoggedIn) return;
-    const token = await getValidAccessToken();
-    if (!token) return;
-    setFollowsLoading(true);
-    try {
-      const res = await fetchEstablishmentFollows(token, followFilter || undefined);
-      setFollows(res.items);
-      setFollowCounts(res.counts);
-    } finally {
-      setFollowsLoading(false);
-    }
-  }, [getValidAccessToken, isLoggedIn, followFilter]);
+  // ── Loaders ──
+  useEffect(() => {
+    if (!isLoggedIn) setFollowsReady(true);
+    else setFollowsReady(false);
+  }, [isLoggedIn, user?.id]);
+
+  const reloadFollows = useCallback(
+    async (opts?: { silent?: boolean }): Promise<EstablishmentFollow[] | undefined> => {
+      if (!isLoggedIn) {
+        setFollowsReady(true);
+        return undefined;
+      }
+      const token = await getValidAccessToken();
+      if (!token) {
+        setFollowsReady(true);
+        return undefined;
+      }
+      const silent = opts?.silent === true;
+      if (!silent) setFollowsLoading(true);
+      try {
+        const res = await fetchEstablishmentFollows(token);
+        setFollows(res.items);
+        return res.items;
+      } finally {
+        if (!silent) setFollowsLoading(false);
+        setFollowsReady(true);
+      }
+    },
+    [getValidAccessToken, isLoggedIn],
+  );
 
   const reloadAnnouncements = useCallback(async () => {
     setAnnouncementsLoading(true);
@@ -228,40 +276,49 @@ export default function InscriptionsTabScreen() {
   }, [tab, ensureFiltersDataLoaded]);
 
   useEffect(() => {
-    if (isLoggedIn) {
-      void reloadFollows();
-      void reloadNotifications();
-      // Light refresh of unread count alone
-      void (async () => {
-        const token = await getValidAccessToken();
-        if (token) {
-          const c = await fetchUnreadCount(token);
-          setUnreadCount(c);
-        }
-      })();
-    }
-  }, [isLoggedIn, reloadFollows, reloadNotifications, getValidAccessToken]);
-
-  // Reload notifs when filter switches
-  useEffect(() => {
-    if (isLoggedIn) void reloadNotifications();
-  }, [notifFilter, isLoggedIn, reloadNotifications]);
-
-  // Reload follows when filter switches
-  useEffect(() => {
     if (isLoggedIn) void reloadFollows();
-  }, [followFilter, isLoggedIn, reloadFollows]);
+  }, [isLoggedIn, reloadFollows]);
+
+  /** Pré-charge le catalogue des statuts à l’ouverture des onglets Candidatures ou Annonces (filtre statut). */
+  useEffect(() => {
+    if (tab !== 'candidacies' && tab !== 'announcements') return;
+    void (async () => {
+      const initial = await loadCandidacyStatusesWithRefresh((fresh) => {
+        setCandidacyStatusCatalog(fresh);
+      });
+      setCandidacyStatusCatalog(initial);
+    })();
+  }, [tab]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      if (tab === 'notifications') await reloadNotifications();
-      else if (tab === 'candidacies') await reloadFollows();
-      else await reloadAnnouncements();
+      let freshFollows: EstablishmentFollow[] | undefined;
+      if (tab === 'candidacies') {
+        freshFollows = await reloadFollows();
+      } else {
+        await reloadAnnouncements();
+        if (isLoggedIn) freshFollows = await reloadFollows();
+      }
+      const statuses = await fetchActiveCandidacyStatuses();
+      setCandidacyStatusCatalog(statuses);
+
+      if (isLoggedIn) {
+        await refetchEligibilityProfile();
+        if (freshFollows !== undefined) {
+          const snapshot = freshFollows;
+          const persisted = await loadFollowLatestSeenMap();
+          setLatestSeenMap((cur) => {
+            const merged = mergeDefaultSeenForFollows(snapshot, { ...persisted, ...cur });
+            if (merged.changed) void saveFollowLatestSeenMap(merged.map);
+            return merged.map;
+          });
+        }
+      }
     } finally {
       setRefreshing(false);
     }
-  }, [tab, reloadNotifications, reloadFollows, reloadAnnouncements]);
+  }, [tab, reloadFollows, reloadAnnouncements, isLoggedIn, refetchEligibilityProfile]);
 
   // Set des establishment IDs suivis (utile pour l'AnnouncementCard "déjà suivie ?").
   const followedEstablishmentSet = useMemo(() => {
@@ -273,31 +330,136 @@ export default function InscriptionsTabScreen() {
   }, [follows]);
 
   /**
-   * Liste unique des écoles qui apparaissent dans les annonces chargées,
-   * triée par nom — alimente le picker de filtre.
+   * Map id-école → follow courant. Permet à l'AnnouncementCard d'afficher
+   * le statut existant et au handler de confirmation de savoir s'il faut
+   * créer un nouveau follow (auto-follow) ou patcher l'existant.
+   */
+  const followsByEstId = useMemo(() => {
+    const m = new Map<number, EstablishmentFollow>();
+    follows.forEach((f) => {
+      if (f.establishment?.id) m.set(f.establishment.id, f);
+    });
+    return m;
+  }, [follows]);
+
+  /** Candidatures « actives » : pas de statut explicite ou statut catalogue `isActive`. */
+  const activeCandidaciesCount = useMemo(
+    () => follows.filter((f) => !f.status || f.status.isActive).length,
+    [follows],
+  );
+
+  const candidaciesBadgeScale = useRef(new Animated.Value(1)).current;
+  const prevActiveCandidaciesRef = useRef(0);
+  const prevAttentionTotalRef = useRef(0);
+  const skipActiveBumpRef = useRef(true);
+
+  const playCandidaciesBadgeBump = useCallback(() => {
+    candidaciesBadgeScale.setValue(1);
+    Animated.sequence([
+      Animated.spring(candidaciesBadgeScale, {
+        toValue: 1.32,
+        friction: 5,
+        tension: 280,
+        useNativeDriver: true,
+      }),
+      Animated.spring(candidaciesBadgeScale, {
+        toValue: 1,
+        friction: 7,
+        tension: 220,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, [candidaciesBadgeScale]);
+
+  /** Actions requises sur l’ensemble des suivis (hors filtre statut) — badge onglet + ligne de compteur. */
+  const candidaciesAttentionTotalCount = useMemo(
+    () => follows.filter((f) => followRequiresAttention(f, latestSeenMap)).length,
+    [follows, latestSeenMap],
+  );
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      skipActiveBumpRef.current = true;
+      prevActiveCandidaciesRef.current = 0;
+      prevAttentionTotalRef.current = 0;
+      return;
+    }
+    if (followsLoading) return;
+    if (skipActiveBumpRef.current) {
+      skipActiveBumpRef.current = false;
+      prevActiveCandidaciesRef.current = activeCandidaciesCount;
+      prevAttentionTotalRef.current = candidaciesAttentionTotalCount;
+      return;
+    }
+    if (
+      activeCandidaciesCount > prevActiveCandidaciesRef.current ||
+      candidaciesAttentionTotalCount > prevAttentionTotalRef.current
+    ) {
+      playCandidaciesBadgeBump();
+    }
+    prevActiveCandidaciesRef.current = activeCandidaciesCount;
+    prevAttentionTotalRef.current = candidaciesAttentionTotalCount;
+  }, [
+    activeCandidaciesCount,
+    candidaciesAttentionTotalCount,
+    followsLoading,
+    isLoggedIn,
+    playCandidaciesBadgeBump,
+  ]);
+
+  /**
+   * Liste des écoles affichables dans le picker de filtre. On préfère la
+   * liste complète (`allEstablishments`, chargée par
+   * `ensureFiltersDataLoaded`) pour permettre à l'utilisateur de choisir
+   * une école qui n'a pas (encore) d'annonce — utile par exemple pour
+   * suivre les futures publications. Tant que ce pré-chargement n'a pas
+   * abouti, on retombe sur les écoles présentes dans les annonces déjà
+   * chargées pour ne pas afficher un picker vide.
+   *
+   * Triée par nom dans la locale courante.
    */
   const schoolFilterItems = useMemo<SearchablePickItem[]>(() => {
-    const map = new Map<number, { label: string; subtitle: string }>();
-    for (const a of announcements) {
-      const e = a.establishment;
-      if (!e || !e.id) continue;
+    type Row = {
+      id: number;
+      nom?: string | null;
+      nomArabe?: string | null;
+      sigle?: string | null;
+    };
+    const map = new Map<number, { label: string; subtitle: string; searchText: string }>();
+
+    const addRow = (e: Row | null | undefined) => {
+      if (!e || !e.id) return;
       const ar = (e.nomArabe ?? '').trim();
       const fr = (e.nom ?? '').trim();
+      const sig = (e.sigle ?? '').trim();
       const primary = locale === 'ar' && ar ? ar : fr || ar || `#${e.id}`;
       const secondaryParts: string[] = [];
-      if (e.sigle) secondaryParts.push(e.sigle);
+      if (sig) secondaryParts.push(sig);
       if (locale === 'ar' && fr && ar) secondaryParts.push(fr);
       else if (locale === 'fr' && ar && fr) secondaryParts.push(ar);
-      map.set(e.id, { label: primary, subtitle: secondaryParts.join(' · ') });
+      /** Recherche : nom FR, nom AR et sigle (indépendamment de la locale d’affichage). */
+      const searchText = [fr, ar, sig].filter(Boolean).join(' ');
+      map.set(e.id, { label: primary, subtitle: secondaryParts.join(' · '), searchText });
+    };
+
+    if (allEstablishments.length > 0) {
+      for (const e of allEstablishments) addRow(e);
+    } else {
+      // Fallback : utilise les écoles déjà associées à une annonce, le
+      // temps que le pré-chargement complet (`ensureFiltersDataLoaded`)
+      // se termine.
+      for (const a of announcements) addRow(a.establishment);
     }
+
     const arr = Array.from(map.entries()).map(([id, v]) => ({
       id: `est-${id}`,
       value: String(id),
       label: v.label,
       subtitle: v.subtitle || undefined,
+      searchText: v.searchText,
     }));
     return arr.sort((a, b) => a.label.localeCompare(b.label, locale === 'ar' ? 'ar' : 'fr'));
-  }, [announcements, locale]);
+  }, [allEstablishments, announcements, locale]);
 
   /**
    * Map id → école normalisée (lookup constant lors du filtrage des annonces).
@@ -361,19 +523,19 @@ export default function InscriptionsTabScreen() {
       });
     }
 
-    /* 3) Filtre statut ouvert/fermé.
+    /* 3) Filtre statut ouvert/fermé (provient de la modale Filtres avancés).
        On préfère `isExpire` à `daysUntilClose <= 0` car le backend est
        seul à connaître son fuseau horaire de référence. */
-    if (statusFilter === 'open') {
+    if (filtersValue.statusFilter === 'open') {
       out = out.filter((a) => a.isOpen && !a.isExpire);
-    } else if (statusFilter === 'closed') {
+    } else if (filtersValue.statusFilter === 'closed') {
       out = out.filter((a) => a.isExpire || !a.isOpen);
     }
 
-    /* 4) Filtre éligibilité (filière du Bac). Silencieusement ignoré si
-       l'utilisateur n'a pas de profil ⇒ on conserve la liste complète
-       pour ne pas piéger un visiteur. */
-    if (eligibilityFilter !== 'all' && eligibilityProfile) {
+    /* 4) Filtre éligibilité (filière du Bac, depuis Filtres avancés).
+       Silencieusement ignoré si l'utilisateur n'a pas de profil ⇒ on
+       conserve la liste complète pour ne pas piéger un visiteur. */
+    if (filtersValue.eligibilityFilter !== 'all' && eligibilityProfile) {
       out = out.filter((a) => {
         const verdict = evaluateEligibilityByFiliere(
           {
@@ -383,13 +545,13 @@ export default function InscriptionsTabScreen() {
           eligibilityProfile,
         );
         if (verdict === 'unknown') return true;
-        return verdict === eligibilityFilter;
+        return verdict === filtersValue.eligibilityFilter;
       });
     }
 
     /* 5) Tri par dernier délai : annonces ouvertes avec délai croissant en
        tête, puis annonces fermées (jours négatifs) en fin de liste. */
-    if (sortBy === 'closingSoon') {
+    if (sortByClosingSoon) {
       out = [...out].sort((a, b) => {
         const aClosed = a.isExpire || !a.isOpen;
         const bClosed = b.isExpire || !b.isOpen;
@@ -408,10 +570,8 @@ export default function InscriptionsTabScreen() {
     allEstablishmentsById,
     filtersValue,
     villesInRegion,
-    statusFilter,
-    eligibilityFilter,
     eligibilityProfile,
-    sortBy,
+    sortByClosingSoon,
   ]);
 
   /** Libellé du filtre actif (nom de l'école choisie, ou "Toutes les écoles"). */
@@ -421,6 +581,143 @@ export default function InscriptionsTabScreen() {
     const hit = schoolFilterItems.find((it) => it.value === sid);
     return hit?.label ?? t('inscFilterSchoolAll');
   }, [schoolFilterId, schoolFilterItems, t]);
+
+  const candidacyStatusFilterItems = useMemo<SearchablePickItem[]>(() => {
+    const byId = new Map<number, CandidacyStatusType>();
+    for (const s of candidacyStatusCatalog) {
+      if (s.isActive) byId.set(s.id, s);
+    }
+    for (const f of follows) {
+      const st = f.status;
+      if (st && !byId.has(st.id)) byId.set(st.id, st);
+    }
+    const merged = Array.from(byId.values()).sort((a, b) => a.sortOrder - b.sortOrder);
+    /** Aligné sur `StatusBadge` lorsque `status === null`. */
+    const noneAppearance = {
+      icon: 'circle',
+      colorFg: '#6B7280',
+      colorBg: '#F3F4F6',
+      colorBorder: '#E5E7EB',
+    };
+    const rows: SearchablePickItem[] = [
+      {
+        id: 'status-none',
+        value: 'none',
+        label: t('inscStatusNone'),
+        statusAppearance: noneAppearance,
+      },
+    ];
+    for (const s of merged) {
+      rows.push({
+        id: `status-${s.id}`,
+        value: String(s.id),
+        label: locale === 'ar' ? s.labelAr : s.labelFr,
+        statusAppearance: {
+          icon: s.icon,
+          colorFg: s.colorFg,
+          colorBg: s.colorBg,
+          colorBorder: s.colorBorder,
+        },
+      });
+    }
+    return rows;
+  }, [candidacyStatusCatalog, follows, locale, t]);
+
+  const candidacyStatusFilterLabel = useMemo(() => {
+    if (!candidacyStatusFilter) return t('inscCandidaciesFilterAll');
+    if (candidacyStatusFilter === 'none') return t('inscStatusNone');
+    const sid = Number(candidacyStatusFilter);
+    if (!Number.isFinite(sid)) return t('inscCandidaciesFilterAll');
+    const fromCat = candidacyStatusCatalog.find((s) => s.id === sid);
+    if (fromCat) return locale === 'ar' ? fromCat.labelAr : fromCat.labelFr;
+    const fromFollow = follows.find((f) => f.status?.id === sid)?.status;
+    if (fromFollow) return locale === 'ar' ? fromFollow.labelAr : fromFollow.labelFr;
+    return `#${sid}`;
+  }, [candidacyStatusFilter, candidacyStatusCatalog, follows, locale, t]);
+
+  const filteredFollows = useMemo(() => {
+    if (!candidacyStatusFilter) return follows;
+    if (candidacyStatusFilter === 'none') {
+      return follows.filter((f) => !f.status);
+    }
+    const sid = Number(candidacyStatusFilter);
+    if (!Number.isFinite(sid)) return follows;
+    return follows.filter((f) => f.status?.id === sid);
+  }, [follows, candidacyStatusFilter]);
+
+  /** Nombre de candidatures (liste filtrée par statut) avec une dernière annonce non consultée. */
+  const candidaciesAttentionCount = useMemo(
+    () => filteredFollows.filter((f) => followRequiresAttention(f, latestSeenMap)).length,
+    [filteredFollows, latestSeenMap],
+  );
+
+  const candidaciesDisplayFollows = useMemo(() => {
+    let rows = filteredFollows;
+    if (candidaciesAttentionFilter === 'action_required') {
+      rows = rows.filter((f) => followRequiresAttention(f, latestSeenMap));
+    }
+    return sortFollowsActionRequiredFirst(rows, latestSeenMap);
+  }, [filteredFollows, candidaciesAttentionFilter, latestSeenMap]);
+
+  useEffect(() => {
+    if (!isLoggedIn) {
+      setLatestSeenMap({});
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const persisted = await loadFollowLatestSeenMap();
+      if (cancelled) return;
+      setLatestSeenMap((cur) => {
+        const merged = mergeDefaultSeenForFollows(follows, { ...persisted, ...cur });
+        if (merged.changed) void saveFollowLatestSeenMap(merged.map);
+        return merged.map;
+      });
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isLoggedIn, follows]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoggedIn || tab !== 'candidacies') return;
+      let cancelled = false;
+      void (async () => {
+        const persisted = await loadFollowLatestSeenMap();
+        if (cancelled) return;
+        setLatestSeenMap((cur) => {
+          const merged = mergeDefaultSeenForFollows(follows, { ...cur, ...persisted });
+          return merged.map;
+        });
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [isLoggedIn, tab, follows]),
+  );
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshUnread();
+    }, [refreshUnread]),
+  );
+
+  /** Retour sur l’onglet ou depuis une fiche annonce / suivi (pile racine) : données à jour pour les badges « action requise ». */
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoggedIn) return;
+      void reloadFollows({ silent: true });
+    }, [isLoggedIn, reloadFollows]),
+  );
+
+  const markLatestAnnouncementSeenForFollow = useCallback((followId: number, announcementId: number) => {
+    setLatestSeenMap((prev) => {
+      const next = { ...prev, [String(followId)]: announcementId };
+      void saveFollowLatestSeenMap(next);
+      return next;
+    });
+  }, []);
 
   // ── Actions ──
   const handleOpenLink = useCallback(
@@ -439,7 +736,7 @@ export default function InscriptionsTabScreen() {
         Alert.alert(t('inscErrorLoad'));
         return;
       }
-      void recordContestClick(contestId, 'detail');
+      fireAndForget(recordContestClick(contestId, 'detail'));
       if (candidacyId) {
         const token = await getValidAccessToken();
         if (token) {
@@ -466,7 +763,6 @@ export default function InscriptionsTabScreen() {
         if (!token) return;
         const { follow } = await upsertEstablishmentFollow(token, {
           contestAnnouncementId: announcement.id,
-          status: 'interested',
         });
         if (follow) {
           setFollows((prev) => {
@@ -478,10 +774,6 @@ export default function InscriptionsTabScreen() {
             }
             return [follow, ...prev];
           });
-          setFollowCounts((prev) => ({
-            ...prev,
-            [follow.status]: (prev[follow.status] ?? 0) + 1,
-          }));
         }
       } finally {
         setFollowBusyId(null);
@@ -501,17 +793,7 @@ export default function InscriptionsTabScreen() {
         if (!token) return;
         const ok = await deleteEstablishmentFollowByEstablishment(token, eid);
         if (ok) {
-          setFollows((prev) => {
-            const removed = prev.find((f) => f.establishment?.id === eid);
-            if (removed) {
-              setFollowCounts((c) => {
-                const next = { ...c };
-                if (next[removed.status]) next[removed.status] = Math.max(0, (next[removed.status] ?? 0) - 1);
-                return next;
-              });
-            }
-            return prev.filter((f) => f.establishment?.id !== eid);
-          });
+          setFollows((prev) => prev.filter((f) => f.establishment?.id !== eid));
         }
       } finally {
         setFollowBusyId(null);
@@ -520,20 +802,19 @@ export default function InscriptionsTabScreen() {
     [getValidAccessToken],
   );
 
-  const handleOpenStatusSheet = useCallback((f: EstablishmentFollow) => {
+  const handleOpenFollowStatusSheet = useCallback((f: EstablishmentFollow) => {
     setActiveFollow(f);
     setStatusSheetOpen(true);
   }, []);
 
-  const handleConfirmStatus = useCallback(
-    async (status: CandidacyStatus) => {
+  const handleConfirmFollowStatus = useCallback(
+    async (next: CandidacyStatusType | null) => {
       if (!activeFollow) return;
       const token = await getValidAccessToken();
       if (!token) return;
-      const updated = await updateFollowStatus(token, activeFollow.id, status);
+      const updated = await updateFollowStatus(token, activeFollow.id, next?.id ?? null);
       if (updated) {
-        setFollows((prev) => prev.map((f) => (f.id === updated.id ? updated : f)));
-        await reloadFollows();
+        await reloadFollows({ silent: true });
       }
       setStatusSheetOpen(false);
       setActiveFollow(null);
@@ -541,79 +822,69 @@ export default function InscriptionsTabScreen() {
     [activeFollow, getValidAccessToken, reloadFollows],
   );
 
-  const handleUnfollowFromSheet = useCallback(() => {
-    if (!activeFollow) return;
-    Alert.alert(
-      t('followSchoolUnfollowConfirmTitle'),
-      t('followSchoolUnfollowConfirmMsg'),
-      [
-        { text: t('inscCancel'), style: 'cancel' },
-        {
-          text: t('inscDelete'),
-          style: 'destructive',
-          onPress: async () => {
-            const token = await getValidAccessToken();
-            if (!token) return;
-            const ok = await deleteEstablishmentFollow(token, activeFollow.id);
-            if (ok) {
-              setFollows((prev) => prev.filter((f) => f.id !== activeFollow.id));
-              setStatusSheetOpen(false);
-              setActiveFollow(null);
-              await reloadFollows();
-            }
-          },
-        },
-      ],
-    );
-  }, [activeFollow, getValidAccessToken, reloadFollows, t]);
-
-  const handleNotifPress = useCallback(
-    async (n: AppNotification) => {
-      if (!n.isRead) {
-        const token = await getValidAccessToken();
-        if (token) {
-          await markNotificationRead(token, n.id);
-        }
-        setNotifs((prev) => prev.map((x) => (x.id === n.id ? { ...x, isRead: true } : x)));
-        setUnreadCount((c) => Math.max(0, c - 1));
-      }
-      // Navigation prioritaire : page détail d'annonce si metadata fournit l'id
-      const meta = (n.metadata ?? {}) as {
-        announcement_id?: number | string;
-        contest_announcement_id?: number | string;
-        establishment_id?: number | string;
-      };
-      const annId = Number(meta.announcement_id ?? meta.contest_announcement_id ?? 0);
-      if (Number.isFinite(annId) && annId > 0) {
-        router.push(`/inscriptions/${annId}` as never);
+  /** Ouverture de la sheet depuis une carte annonce. Garde sur le login. */
+  const handleOpenAnnouncementStatusSheet = useCallback(
+    (a: ContestAnnouncementCard) => {
+      if (!isLoggedIn) {
+        router.push('/login' as never);
         return;
       }
-      const eid = Number(meta.establishment_id ?? 0);
-      if (Number.isFinite(eid) && eid > 0) {
-        const target = follows.find((f) => f.establishment?.id === eid);
-        if (target) {
-          router.push(`/inscriptions/follow/${target.id}` as never);
-        }
-      }
+      if (!(a.availableStatuses?.length ?? 0)) return;
+      setActiveAnnouncement(a);
+      setAnnStatusSheetOpen(true);
     },
-    [getValidAccessToken, follows, router],
+    [isLoggedIn, router],
   );
 
-  const handleMarkAllRead = useCallback(async () => {
-    const token = await getValidAccessToken();
-    if (!token) return;
-    const ok = await markAllNotificationsRead(token);
-    if (ok) {
-      setNotifs((prev) => prev.map((n) => ({ ...n, isRead: true })));
-      setUnreadCount(0);
-    }
-  }, [getValidAccessToken]);
+  /**
+   * Confirmation depuis la sheet d'annonce. Auto-follow si nécessaire :
+   *   - pas encore suiveur ⇒ création + statut, fallback PATCH si le
+   *     backend a posé `interested` au lieu du statut demandé.
+   *   - déjà suiveur ⇒ updateFollowStatus direct.
+   * Met à jour la liste locale `follows` pour rafraîchir la card sans
+   * round-trip (la prochaine ouverture de la sheet voit le bon statut).
+   */
+  const handleConfirmAnnouncementStatus = useCallback(
+    async (next: CandidacyStatusType | null) => {
+      if (!activeAnnouncement) return;
+      const eid = activeAnnouncement.establishment?.id ?? 0;
+      if (!Number.isFinite(eid) || eid <= 0) return;
+      const token = await getValidAccessToken();
+      if (!token) return;
+      const existing = followsByEstId.get(eid) ?? null;
+
+      let changed = false;
+      if (!existing) {
+        const { follow } = await upsertEstablishmentFollow(token, {
+          contestAnnouncementId: activeAnnouncement.id,
+          establishmentId: eid,
+          statusId: next?.id ?? null,
+        });
+        if (follow) {
+          if (next?.id != null && follow.status?.id !== next.id) {
+            await updateFollowStatus(token, follow.id, next.id);
+          }
+          changed = true;
+        }
+      } else {
+        const updated = await updateFollowStatus(token, existing.id, next?.id ?? null);
+        if (updated) changed = true;
+      }
+
+      if (changed) await reloadFollows({ silent: true });
+
+      setAnnStatusSheetOpen(false);
+      setActiveAnnouncement(null);
+    },
+    [activeAnnouncement, followsByEstId, getValidAccessToken, reloadFollows],
+  );
 
   // ── Renders ──
 
   const renderHeader = () => (
     <View style={styles.hero}>
       <View style={[styles.heroTop, isRTL && styles.rowRtl]}>
+        <SidebarMenuIconButton color={brand.white} />
         <View style={styles.heroTitles}>
           <Text style={[styles.heroEyebrow, isRTL && styles.rtl]}>{t('inscEyebrow')}</Text>
           <Text style={[styles.heroTitle, isRTL && styles.rtl]}>{t('inscTitle')}</Text>
@@ -656,17 +927,17 @@ export default function InscriptionsTabScreen() {
 
       {/* Tabs */}
       <View style={styles.tabsRow}>
-        {(['announcements', 'candidacies', 'notifications'] as const).map((id) => {
+        {(['announcements', 'candidacies'] as const).map((id) => {
           const active = tab === id;
-          const labelKey: 'inscTabCandidacies' | 'inscTabNotifications' | 'inscTabAnnouncements' =
-            id === 'candidacies'
-              ? 'inscTabCandidacies'
-              : id === 'notifications'
-                ? 'inscTabNotifications'
-                : 'inscTabAnnouncements';
+          const labelKey: 'inscTabCandidacies' | 'inscTabAnnouncements' =
+            id === 'candidacies' ? 'inscTabCandidacies' : 'inscTabAnnouncements';
           const icon: React.ComponentProps<typeof FontAwesome>['name'] =
-            id === 'candidacies' ? 'flag-checkered' : id === 'notifications' ? 'bell' : 'bullhorn';
-          const showBadge = id === 'notifications' && unreadCount > 0;
+            id === 'candidacies' ? 'flag-checkered' : 'bullhorn';
+          const showCandidaciesBadge =
+            id === 'candidacies' &&
+            isLoggedIn &&
+            (activeCandidaciesCount > 0 || candidaciesAttentionTotalCount > 0);
+          const isCandidacies = id === 'candidacies';
           return (
             <Pressable
               key={id}
@@ -677,13 +948,53 @@ export default function InscriptionsTabScreen() {
                 pressed && !active && { opacity: 0.85 },
               ]}
             >
-              <FontAwesome name={icon} size={13} color={active ? brand.primary : brand.white} />
-              <Text style={[styles.tabTxt, active && styles.tabTxtActive]}>{t(labelKey)}</Text>
-              {showBadge ? (
-                <View style={styles.tabBadge}>
-                  <Text style={styles.tabBadgeTxt}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              {isCandidacies ? (
+                <View style={styles.tabCandidaciesInline}>
+                  <View style={[styles.tabCandidaciesIconText, isRTL && styles.rowRtl]}>
+                    <FontAwesome name={icon} size={13} color={active ? brand.primary : brand.white} />
+                    <Text
+                      style={[styles.tabTxt, active && styles.tabTxtActive, styles.tabCandidaciesLabel]}
+                      numberOfLines={1}>
+                      {t(labelKey)}
+                    </Text>
+                  </View>
+                  {showCandidaciesBadge ? (
+                    <Animated.View
+                      style={[
+                        styles.candidaciesTabBadgeWrap,
+                        isRTL && styles.rowRtl,
+                        { transform: [{ scale: candidaciesBadgeScale }] },
+                      ]}
+                      accessibilityLabel={t('inscCandidaciesTabBadgeA11y')
+                        .replace('{{active}}', String(activeCandidaciesCount))
+                        .replace('{{attention}}', String(candidaciesAttentionTotalCount))}
+                    >
+                      <View style={[styles.tabBadge, styles.tabBadgeCandidaciesCompact, styles.candidaciesBadgeActive]}>
+                        <Text style={styles.tabBadgeTxt}>
+                          {activeCandidaciesCount > 99 ? '99+' : activeCandidaciesCount}
+                        </Text>
+                      </View>
+                      {candidaciesAttentionTotalCount > 0 ? (
+                        <View
+                          style={[
+                            styles.tabBadge,
+                            styles.tabBadgeCandidaciesCompact,
+                            styles.candidaciesBadgeAttention,
+                          ]}>
+                          <Text style={styles.tabBadgeTxt}>
+                            {candidaciesAttentionTotalCount > 99 ? '99+' : candidaciesAttentionTotalCount}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </Animated.View>
+                  ) : null}
                 </View>
-              ) : null}
+              ) : (
+                <>
+                  <FontAwesome name={icon} size={13} color={active ? brand.primary : brand.white} />
+                  <Text style={[styles.tabTxt, active && styles.tabTxtActive]}>{t(labelKey)}</Text>
+                </>
+              )}
             </Pressable>
           );
         })}
@@ -706,138 +1017,135 @@ export default function InscriptionsTabScreen() {
     </View>
   );
 
-  const renderNotifications = () => {
-    if (!isLoggedIn) return renderRequireLogin();
-    return (
-      <FlatList
-        data={notifs}
-        keyExtractor={(n) => `notif-${n.id}`}
-        contentContainerStyle={styles.list}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={brand.primary} />
-        }
-        ListHeaderComponent={
-          <View style={styles.subHeader}>
-            <View style={[styles.chipsRow, isRTL && styles.rowRtl]}>
-              {(['all', 'unread'] as const).map((f) => {
-                const active = notifFilter === f;
-                return (
-                  <Pressable
-                    key={f}
-                    onPress={() => setNotifFilter(f)}
-                    style={({ pressed }) => [
-                      styles.chip,
-                      active && styles.chipActive,
-                      pressed && !active && { opacity: 0.85 },
-                    ]}
-                  >
-                    <Text style={[styles.chipTxt, active && styles.chipTxtActive]}>
-                      {t(f === 'all' ? 'inscNotifFilterAll' : 'inscNotifFilterUnread')}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-              {unreadCount > 0 ? (
-                <Pressable
-                  onPress={handleMarkAllRead}
-                  style={({ pressed }) => [styles.markAll, pressed && { opacity: 0.85 }]}
-                >
-                  <FontAwesome name="check-square-o" size={11} color={brand.primary} />
-                  <Text style={styles.markAllTxt}>{t('inscNotifMarkAllRead')}</Text>
-                </Pressable>
-              ) : null}
-            </View>
-          </View>
-        }
-        renderItem={({ item }) => (
-          <NotificationCard notif={item} onPress={() => handleNotifPress(item)} />
-        )}
-        ItemSeparatorComponent={() => <View style={{ height: spacing.sm }} />}
-        ListEmptyComponent={
-          notifLoading ? (
-            <View style={styles.empty}>
-              <ActivityIndicator color={brand.primary} />
-            </View>
-          ) : (
-            <View style={styles.empty}>
-              <View style={styles.emptyIcon}>
-                <FontAwesome name="bell-slash-o" size={28} color={brand.primary} />
-              </View>
-              <Text style={styles.emptyTitle}>{t('inscNotifEmptyTitle')}</Text>
-              <Text style={styles.emptyTxt}>{t('inscNotifEmptyDesc')}</Text>
-            </View>
-          )
-        }
-      />
-    );
-  };
-
   const renderCandidacies = () => {
     if (!isLoggedIn) return renderRequireLogin();
     return (
       <FlatList
-        data={follows}
+        data={candidaciesDisplayFollows}
         keyExtractor={(f) => `follow-${f.id}`}
+        style={{ flex: 1 }}
         contentContainerStyle={styles.list}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={brand.primary} />
+          <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
         ListHeaderComponent={
           <View style={styles.subHeader}>
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.statusChipsRow}
-            >
+            <View style={[styles.filterBar, isRTL && styles.filterBarRtl]}>
               <Pressable
-                onPress={() => setFollowFilter('')}
+                accessibilityRole="button"
+                accessibilityLabel={t('inscCandidaciesFilterStatusPickTitle')}
+                onPress={() => setCandidacyStatusPickerOpen(true)}
                 style={({ pressed }) => [
-                  styles.chip,
-                  followFilter === '' && styles.chipActive,
-                  pressed && { opacity: 0.85 },
+                  styles.filterField,
+                  isRTL && styles.filterFieldRtl,
+                  pressed && { opacity: 0.92 },
                 ]}
               >
-                <Text style={[styles.chipTxt, followFilter === '' && styles.chipTxtActive]}>
-                  {t('inscCandidaciesFilterAll')} (
-                  {Object.values(followCounts).reduce<number>((a, b) => a + (b ?? 0), 0)})
-                </Text>
+                <FontAwesome name="flag" size={14} color={brand.primary} />
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.filterFieldLbl, isRTL && styles.rtl]}>
+                    {t('inscCandidaciesFilterStatusLabel')}
+                  </Text>
+                  <Text
+                    style={[
+                      styles.filterFieldVal,
+                      !candidacyStatusFilter && styles.filterFieldValMuted,
+                      isRTL && styles.rtl,
+                    ]}
+                    numberOfLines={1}
+                  >
+                    {candidacyStatusFilterLabel}
+                  </Text>
+                </View>
+                <FontAwesome
+                  name={isRTL ? 'chevron-left' : 'chevron-right'}
+                  size={12}
+                  color={brand.textMuted}
+                />
               </Pressable>
-              {STATUS_FLOW.map((s) => {
-                const visual = STATUS_VISUALS[s];
-                const count = followCounts[s] ?? 0;
-                if (count === 0 && followFilter !== s) return null;
-                const active = followFilter === s;
+              {candidacyStatusFilter ? (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('inscFilterReset')}
+                  onPress={() => setCandidacyStatusFilter('')}
+                  hitSlop={10}
+                  style={({ pressed }) => [styles.filterClearBtn, pressed && { opacity: 0.85 }]}
+                >
+                  <FontAwesome name="times-circle" size={18} color={brand.primary} />
+                </Pressable>
+              ) : null}
+            </View>
+
+            <View style={[styles.attentionFilterRow, isRTL && styles.rowRtl]}>
+              {(['all', 'action_required'] as const).map((mode) => {
+                const active = candidaciesAttentionFilter === mode;
+                const isRequired = mode === 'action_required';
                 return (
                   <Pressable
-                    key={s}
-                    onPress={() => setFollowFilter(s)}
+                    key={mode}
+                    onPress={() => setCandidaciesAttentionFilter(mode)}
                     style={({ pressed }) => [
-                      styles.chip,
-                      active && { backgroundColor: visual.bg, borderColor: visual.fg },
-                      pressed && { opacity: 0.85 },
+                      styles.attentionChip,
+                      active && styles.attentionChipActive,
+                      isRequired && active && styles.attentionChipActiveDanger,
+                      pressed && !active && { opacity: 0.88 },
                     ]}
+                    accessibilityRole="tab"
+                    accessibilityState={{ selected: active }}
                   >
-                    <FontAwesome name={visual.icon} size={10} color={active ? visual.fg : brand.textMuted} />
                     <Text
                       style={[
-                        styles.chipTxt,
-                        active && { color: visual.fg, fontWeight: '800' },
+                        styles.attentionChipTxt,
+                        active && styles.attentionChipTxtActive,
+                        isRequired && active && styles.attentionChipTxtActiveDanger,
                       ]}
                     >
-                      {t(visual.labelKey)} ({count})
+                      {mode === 'all'
+                        ? t('inscCandidaciesAttentionFilterAll')
+                        : t('inscCandidaciesAttentionFilterRequired')}
                     </Text>
+                    {isRequired && candidaciesAttentionCount > 0 ? (
+                      <View
+                        style={[
+                          styles.attentionChipBadge,
+                          active && styles.attentionChipBadgeActive,
+                        ]}
+                      >
+                        <Text style={styles.attentionChipBadgeTxt}>
+                          {candidaciesAttentionCount > 99 ? '99+' : candidaciesAttentionCount}
+                        </Text>
+                      </View>
+                    ) : null}
                   </Pressable>
                 );
               })}
-            </ScrollView>
+            </View>
+
+            <Text style={[styles.followsCount, isRTL && styles.rtl]}>
+              {t('followedSchoolsTitle')} (
+              {candidacyStatusFilter
+                ? `${filteredFollows.length}${
+                    follows.length !== filteredFollows.length ? ` / ${follows.length}` : ''
+                  }`
+                : `${activeCandidaciesCount} ${t('inscCandidaciesActiveShort')}`}
+              {candidacyStatusFilter
+                ? candidaciesAttentionCount > 0
+                  ? ` · ${candidaciesAttentionCount} ${t('inscCandidaciesActionsRequiredShort')}`
+                  : ''
+                : candidaciesAttentionTotalCount > 0
+                  ? ` · ${candidaciesAttentionTotalCount} ${t('inscCandidaciesActionsRequiredShort')}`
+                  : ''}
+              )
+            </Text>
           </View>
         }
         renderItem={({ item }) => (
           <FollowedSchoolCard
             follow={item}
+            actionRequired={followRequiresAttention(item, latestSeenMap)}
             onPress={() => router.push(`/inscriptions/follow/${item.id}` as never)}
-            onUpdateStatus={() => handleOpenStatusSheet(item)}
-            onUnfollow={async () => {
+            onUpdateStatus={() => handleOpenFollowStatusSheet(item)}
+            onUnfollow={() => {
               Alert.alert(
                 t('followSchoolUnfollowConfirmTitle'),
                 t('followSchoolUnfollowConfirmMsg'),
@@ -851,7 +1159,7 @@ export default function InscriptionsTabScreen() {
                       if (!token) return;
                       const ok = await deleteEstablishmentFollow(token, item.id);
                       if (ok) {
-                        setFollows((prev) => prev.filter((f) => f.id !== item.id));
+                        setFollows((prev) => prev.filter((x) => x.id !== item.id));
                         await reloadFollows();
                       }
                     },
@@ -861,6 +1169,7 @@ export default function InscriptionsTabScreen() {
             }}
             onOpenLatest={() => {
               if (item.latestAnnouncement?.id) {
+                markLatestAnnouncementSeenForFollow(item.id, item.latestAnnouncement.id);
                 router.push(`/inscriptions/${item.latestAnnouncement.id}` as never);
               }
             }}
@@ -878,7 +1187,7 @@ export default function InscriptionsTabScreen() {
             <View style={styles.empty}>
               <ActivityIndicator color={brand.primary} />
             </View>
-          ) : (
+          ) : follows.length === 0 ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
                 <FontAwesome name="flag-o" size={28} color={brand.primary} />
@@ -892,7 +1201,34 @@ export default function InscriptionsTabScreen() {
                 <Text style={styles.ctaTxt}>{t('inscCandidaciesEmptyCta')}</Text>
               </Pressable>
             </View>
-          )
+          ) : filteredFollows.length === 0 ? (
+            <View style={styles.empty}>
+              <View style={styles.emptyIcon}>
+                <FontAwesome name="filter" size={28} color={brand.primary} />
+              </View>
+              <Text style={styles.emptyTitle}>{t('inscCandidaciesFilteredEmptyTitle')}</Text>
+              <Text style={styles.emptyTxt}>{t('inscCandidaciesFilteredEmptyDesc')}</Text>
+              <Pressable
+                onPress={() => setCandidacyStatusFilter('')}
+                style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.ctaTxt}>{t('inscCandidaciesFilterAll')}</Text>
+              </Pressable>
+            </View>
+          ) : candidaciesAttentionFilter === 'action_required' ? (
+            <View style={styles.empty}>
+              <View style={styles.emptyIcon}>
+                <FontAwesome name="check-circle" size={28} color="#059669" />
+              </View>
+              <Text style={styles.emptyTitle}>{t('inscCandidaciesActionRequiredEmpty')}</Text>
+              <Pressable
+                onPress={() => setCandidaciesAttentionFilter('all')}
+                style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
+              >
+                <Text style={styles.ctaTxt}>{t('inscCandidaciesAttentionFilterAll')}</Text>
+              </Pressable>
+            </View>
+          ) : null
         }
       />
     );
@@ -946,7 +1282,7 @@ export default function InscriptionsTabScreen() {
         ) : null}
       </View>
 
-      {/* Bouton "Filtres avancés" — ouvre la même modale que la page Écoles. */}
+      {/* Bouton "Filtres avancés" + toggle tri par délai. */}
       <View style={[styles.advancedFilterRow, isRTL && styles.rowRtl]}>
         <Pressable
           accessibilityRole="button"
@@ -968,6 +1304,38 @@ export default function InscriptionsTabScreen() {
             </View>
           ) : null}
         </Pressable>
+
+        {/*
+          Tri par dernier délai — toggle binaire ON/OFF placé à côté du
+          bouton « Filtres avancés ». Le label reste fixe (« Trier par
+          délai ») ; on signifie l'état via le style (couleur de fond
+          + couleur du texte).
+        */}
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('inscSortClosingSoon')}
+          accessibilityState={{ selected: sortByClosingSoon }}
+          onPress={() => setSortByClosingSoon((v) => !v)}
+          style={({ pressed }) => [
+            styles.advancedFilterBtn,
+            isRTL && styles.rowRtl,
+            sortByClosingSoon && styles.advancedFilterBtnActive,
+            pressed && { opacity: 0.9 },
+          ]}>
+          <FontAwesome
+            name="sort-amount-asc"
+            size={14}
+            color={sortByClosingSoon ? brand.white : brand.primary}
+          />
+          <Text
+            style={[
+              styles.advancedFilterBtnTxt,
+              sortByClosingSoon && styles.advancedFilterBtnTxtActive,
+            ]}>
+            {t('inscSortClosingSoon')}
+          </Text>
+        </Pressable>
+
         {activeAdvancedFiltersCount > 0 ? (
           <Pressable
             accessibilityRole="button"
@@ -980,123 +1348,6 @@ export default function InscriptionsTabScreen() {
           </Pressable>
         ) : null}
       </View>
-
-      {/* Pills : statut + éligibilité + tri rapide. */}
-      <ScrollView
-        horizontal
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.quickFiltersRow}
-        style={isRTL ? styles.rowRtl : undefined}>
-        {/* Statut ouvert / fermé */}
-        {(
-          [
-            { value: 'all' as const, label: t('inscFilterStatusAll'), icon: 'list' as const },
-            {
-              value: 'open' as const,
-              label: t('inscFilterStatusOpen'),
-              icon: 'check-circle' as const,
-            },
-            {
-              value: 'closed' as const,
-              label: t('inscFilterStatusClosed'),
-              icon: 'lock' as const,
-            },
-          ]
-        ).map((opt) => {
-          const active = statusFilter === opt.value;
-          return (
-            <Pressable
-              key={`status-${opt.value}`}
-              onPress={() => setStatusFilter(opt.value)}
-              style={({ pressed }) => [
-                styles.quickPill,
-                active && styles.quickPillActive,
-                pressed && { opacity: 0.85 },
-              ]}>
-              <FontAwesome
-                name={opt.icon}
-                size={11}
-                color={active ? brand.white : brand.primary}
-              />
-              <Text style={[styles.quickPillTxt, active && styles.quickPillTxtActive]}>
-                {opt.label}
-              </Text>
-            </Pressable>
-          );
-        })}
-
-        <View style={styles.quickPillSep} />
-
-        {/* Éligibilité — masqué si l'utilisateur n'a pas de profil utilisable. */}
-        {eligibilityProfile
-          ? (
-              [
-                {
-                  value: 'all' as const,
-                  label: t('inscFilterEligibilityAll'),
-                  icon: 'list' as const,
-                },
-                {
-                  value: 'eligible' as const,
-                  label: t('inscFilterEligibilityEligible'),
-                  icon: 'check' as const,
-                },
-                {
-                  value: 'not_eligible' as const,
-                  label: t('inscFilterEligibilityNotEligible'),
-                  icon: 'times' as const,
-                },
-              ]
-            ).map((opt) => {
-              const active = eligibilityFilter === opt.value;
-              return (
-                <Pressable
-                  key={`elig-${opt.value}`}
-                  onPress={() => setEligibilityFilter(opt.value)}
-                  style={({ pressed }) => [
-                    styles.quickPill,
-                    active && styles.quickPillActive,
-                    pressed && { opacity: 0.85 },
-                  ]}>
-                  <FontAwesome
-                    name={opt.icon}
-                    size={11}
-                    color={active ? brand.white : brand.primary}
-                  />
-                  <Text style={[styles.quickPillTxt, active && styles.quickPillTxtActive]}>
-                    {opt.label}
-                  </Text>
-                </Pressable>
-              );
-            })
-          : null}
-
-        {eligibilityProfile ? <View style={styles.quickPillSep} /> : null}
-
-        {/* Tri */}
-        <Pressable
-          onPress={() => setSortBy(sortBy === 'closingSoon' ? 'default' : 'closingSoon')}
-          style={({ pressed }) => [
-            styles.quickPill,
-            sortBy === 'closingSoon' && styles.quickPillActive,
-            pressed && { opacity: 0.85 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={t('inscSortLabel')}>
-          <FontAwesome
-            name="sort-amount-asc"
-            size={11}
-            color={sortBy === 'closingSoon' ? brand.white : brand.primary}
-          />
-          <Text
-            style={[
-              styles.quickPillTxt,
-              sortBy === 'closingSoon' && styles.quickPillTxtActive,
-            ]}>
-            {sortBy === 'closingSoon' ? t('inscSortClosingSoon') : t('inscSortDefault')}
-          </Text>
-        </Pressable>
-      </ScrollView>
     </View>
   );
 
@@ -1104,18 +1355,30 @@ export default function InscriptionsTabScreen() {
     <FlatList
       data={visibleAnnouncements}
       keyExtractor={(a) => `ann-${a.id}`}
+      style={{ flex: 1 }}
       contentContainerStyle={styles.list}
       refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={brand.primary} />
+        <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
       }
-      ListHeaderComponent={renderAnnouncementsFilterBar()}
-      renderItem={({ item }) => {
+      ListHeaderComponent={
+        <View>
+          <AppBannerSlot zone="top" analyticsPage="/mobile/inscriptions/annonces" />
+          {renderAnnouncementsFilterBar()}
+        </View>
+      }
+      renderItem={({ item, index }) => {
         const eid = item.establishment?.id ?? 0;
         const isFollowed = eid > 0 && followedEstablishmentSet.has(eid);
         return (
+        <View>
+          {index > 0 && index % 3 === 0 ? (
+            <AppBannerSlot zone="mid" analyticsPage="/mobile/inscriptions/annonces" />
+          ) : null}
           <AnnouncementCard
             item={item}
             isFollowed={isFollowed}
+            followStateLoading={isLoggedIn && !followsReady}
+            eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
             busy={followBusyId === item.id}
             onPress={() => router.push(`/inscriptions/${item.id}` as never)}
             onToggleFollow={() => {
@@ -1123,7 +1386,16 @@ export default function InscriptionsTabScreen() {
               else void handleFollow(item);
             }}
             onOpenLink={() => handleOpenLink(null, item.registrationUrl, item.id)}
+            onOpenComments={() =>
+              setAnnouncementQnaSheet({
+                id: item.id,
+                title: (isRTL && item.titleAr ? item.titleAr : item.title) || '',
+              })
+            }
+            currentStatus={eid > 0 ? followsByEstId.get(eid)?.status ?? null : null}
+            onUpdateStatus={() => handleOpenAnnouncementStatusSheet(item)}
           />
+        </View>
         );
       }}
       ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
@@ -1132,13 +1404,31 @@ export default function InscriptionsTabScreen() {
           <View style={styles.empty}>
             <ActivityIndicator color={brand.primary} />
           </View>
-        ) : (
+        ) : announcements.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
               <FontAwesome name="bullhorn" size={28} color={brand.primary} />
             </View>
             <Text style={styles.emptyTitle}>{t('inscAnnouncementsEmptyTitle')}</Text>
             <Text style={styles.emptyTxt}>{t('inscAnnouncementsEmptyDesc')}</Text>
+          </View>
+        ) : (
+          <View style={styles.empty}>
+            <View style={styles.emptyIcon}>
+              <FontAwesome name="filter" size={28} color={brand.primary} />
+            </View>
+            <Text style={styles.emptyTitle}>{t('inscAnnouncementsFilteredEmptyTitle')}</Text>
+            <Text style={styles.emptyTxt}>{t('inscAnnouncementsFilteredEmptyDesc')}</Text>
+            <Pressable
+              onPress={() => {
+                setSchoolFilterId('');
+                setFiltersValue(defaultEstablishmentFilters());
+                setSortByClosingSoon(false);
+              }}
+              style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
+            >
+              <Text style={styles.ctaTxt}>{t('schoolsReset')}</Text>
+            </Pressable>
           </View>
         )
       }
@@ -1160,18 +1450,41 @@ export default function InscriptionsTabScreen() {
       <View style={styles.body}>
         {tab === 'announcements' ? renderAnnouncements() : null}
         {tab === 'candidacies' ? renderCandidacies() : null}
-        {tab === 'notifications' ? renderNotifications() : null}
       </View>
 
+      {/* Sheet de mise à jour du statut d'un follow école. Les statuts
+          proposables = union des annonces de l'école (calcul backend). */}
       <StatusUpdateSheet
         visible={statusSheetOpen}
-        currentStatus={activeFollow?.status}
+        currentStatus={activeFollow?.status ?? null}
+        availableStatuses={activeFollow?.availableStatuses ?? []}
         onClose={() => {
           setStatusSheetOpen(false);
           setActiveFollow(null);
         }}
-        onConfirm={handleConfirmStatus}
-        onRequestDelete={activeFollow ? handleUnfollowFromSheet : undefined}
+        onConfirm={handleConfirmFollowStatus}
+      />
+
+      {/* Sheet de mise à jour du statut depuis une carte annonce.
+          Contrairement à la sheet « école suivie », on n'affiche QUE les
+          statuts débloqués par cette annonce (`showUnavailable={false}`)
+          — pas les statuts d'autres annonces de l'école, pour ne pas
+          créer de confusion sur ce qui est réellement actionnable ici.
+          Auto-follow côté handler si l'école n'est pas encore suivie. */}
+      <StatusUpdateSheet
+        visible={annStatusSheetOpen}
+        currentStatus={
+          activeAnnouncement?.establishment?.id
+            ? followsByEstId.get(activeAnnouncement.establishment.id)?.status ?? null
+            : null
+        }
+        availableStatuses={activeAnnouncement?.availableStatuses ?? []}
+        showUnavailable={false}
+        onClose={() => {
+          setAnnStatusSheetOpen(false);
+          setActiveAnnouncement(null);
+        }}
+        onConfirm={handleConfirmAnnouncementStatus}
       />
 
       {/* Modal recherchable pour filtrer les annonces par école. */}
@@ -1188,7 +1501,22 @@ export default function InscriptionsTabScreen() {
         rtl={isRTL}
       />
 
-      {/* Modale de filtres avancés — partagée avec la page Écoles. */}
+      <SearchablePickSheet
+        visible={candidacyStatusPickerOpen}
+        title={t('inscCandidaciesFilterStatusPickTitle')}
+        searchPlaceholder={t('inscCandidaciesFilterStatusSearchPlaceholder')}
+        emptyLabel={t('inscCandidaciesFilterStatusNoResults')}
+        allLabel={t('inscCandidaciesFilterAll')}
+        items={candidacyStatusFilterItems}
+        selectedValue={candidacyStatusFilter}
+        onPick={(v) => setCandidacyStatusFilter(v)}
+        onClose={() => setCandidacyStatusPickerOpen(false)}
+        rtl={isRTL}
+      />
+
+      {/* Modale de filtres avancés — partagée avec la page Écoles, mais
+          on active la section « Statut » uniquement ici car les écoles
+          n'ont pas de notion d'ouverture/fermeture. */}
       <EstablishmentFiltersModal
         visible={filtersOpen}
         onClose={() => setFiltersOpen(false)}
@@ -1196,6 +1524,14 @@ export default function InscriptionsTabScreen() {
         onChange={setFiltersValue}
         cities={cities}
         secteurs={secteurs}
+        showStatusFilter
+      />
+
+      <ContestAnnouncementQnaBottomSheet
+        visible={announcementQnaSheet !== null}
+        announcementId={announcementQnaSheet?.id ?? 0}
+        announcementTitle={announcementQnaSheet?.title ?? ''}
+        onClose={closeAnnouncementQnaSheet}
       />
     </SafeAreaView>
   );
@@ -1247,6 +1583,7 @@ const styles = StyleSheet.create({
   /* Tabs */
   tabsRow: {
     flexDirection: 'row',
+    alignItems: 'stretch',
     gap: 6,
     backgroundColor: 'rgba(255,255,255,0.12)',
     padding: 4,
@@ -1258,9 +1595,31 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 5,
     flex: 1,
+    minWidth: 0,
     paddingVertical: 9,
     paddingHorizontal: 6,
     borderRadius: radius.full,
+  },
+  /** Onglet Candidatures : une ligne icône + libellé + pastilles à droite du texte. */
+  tabCandidaciesInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+    maxWidth: '100%',
+  },
+  tabCandidaciesIconText: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  tabCandidaciesLabel: {
+    flexShrink: 1,
+    textAlign: 'center',
   },
   tabActive: { backgroundColor: brand.white },
   tabTxt: { color: brand.white, fontWeight: '700', fontSize: fontSize.xs },
@@ -1273,22 +1632,87 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: 2,
+  },
+  tabBadgeLtr: { marginStart: 2 },
+  tabBadgeRtl: { marginEnd: 2 },
+  candidaciesTabBadgeWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 3,
+    flexShrink: 0,
+  },
+  tabBadgeCandidaciesCompact: {
+    minWidth: 15,
+    height: 15,
+    paddingHorizontal: 3,
+    borderRadius: 8,
+  },
+  candidaciesBadgeActive: {
+    backgroundColor: '#059669',
+  },
+  candidaciesBadgeAttention: {
+    backgroundColor: '#DC2626',
   },
   tabBadgeTxt: { color: brand.white, fontSize: 9, fontWeight: '800' },
 
   /* Sub-header (filters) */
   subHeader: { paddingTop: spacing.md, paddingBottom: spacing.sm },
+  attentionFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  attentionChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    borderRadius: radius.full,
+    backgroundColor: brand.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: brand.border,
+  },
+  attentionChipActive: {
+    backgroundColor: 'rgba(51,62,143,0.12)',
+    borderColor: brand.primary,
+  },
+  attentionChipActiveDanger: {
+    backgroundColor: '#FEE2E2',
+    borderColor: '#F87171',
+  },
+  attentionChipTxt: {
+    fontSize: fontSize.xs,
+    fontWeight: '800',
+    color: brand.textMuted,
+  },
+  attentionChipTxtActive: { color: brand.primary },
+  attentionChipTxtActiveDanger: { color: '#991B1B' },
+  attentionChipBadge: {
+    minWidth: 17,
+    height: 17,
+    paddingHorizontal: 4,
+    borderRadius: 9,
+    backgroundColor: '#FECACA',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  attentionChipBadgeActive: {
+    backgroundColor: '#DC2626',
+  },
+  attentionChipBadgeTxt: {
+    color: brand.white,
+    fontSize: 9,
+    fontWeight: '900',
+  },
+  followsCount: { color: brand.textMuted, fontSize: fontSize.xs, fontWeight: '700' },
   chipsRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.xs,
     flexWrap: 'wrap',
-  },
-  statusChipsRow: {
-    flexDirection: 'row',
-    gap: spacing.xs,
-    paddingRight: spacing.lg,
   },
   chip: {
     flexDirection: 'row',
@@ -1308,20 +1732,9 @@ const styles = StyleSheet.create({
   chipTxt: { color: brand.textMuted, fontSize: fontSize.xs, fontWeight: '700' },
   chipTxtActive: { color: brand.white },
 
-  markAll: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(51,62,143,0.08)',
-    marginLeft: 'auto',
-  },
-  markAllTxt: { color: brand.primary, fontWeight: '700', fontSize: fontSize.xs },
-
   /* Lists */
   list: {
+    flexGrow: 1,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
     paddingBottom: spacing.section * 2,
@@ -1409,6 +1822,14 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '800',
   },
+  /* État ON du bouton « Trier par délai » : fond plein bleu primaire. */
+  advancedFilterBtnActive: {
+    backgroundColor: brand.primary,
+    borderColor: brand.primary,
+  },
+  advancedFilterBtnTxtActive: {
+    color: brand.white,
+  },
   advancedFilterBadge: {
     minWidth: 20,
     height: 20,
@@ -1436,43 +1857,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
 
-  /* Pills compacts (statut / éligibilité / tri). */
-  quickFiltersRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    paddingTop: spacing.sm,
-    paddingBottom: 2,
-  },
-  quickPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.full,
-    backgroundColor: brand.white,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: brand.border,
-  },
-  quickPillActive: {
-    backgroundColor: brand.primary,
-    borderColor: brand.primary,
-  },
-  quickPillTxt: {
-    color: brand.text,
-    fontSize: 11,
-    fontWeight: '700',
-  },
-  quickPillTxtActive: {
-    color: brand.white,
-  },
-  quickPillSep: {
-    width: StyleSheet.hairlineWidth,
-    height: 18,
-    backgroundColor: brand.border,
-    marginHorizontal: 4,
-  },
 
   /* Empty / require login */
   empty: {

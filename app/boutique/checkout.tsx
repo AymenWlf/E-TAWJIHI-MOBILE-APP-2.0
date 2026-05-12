@@ -21,6 +21,7 @@ import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { createShopOrder, fetchShopPublicSettings } from '@/services/shop';
+import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { ShopDeliveryMode, ShopShippingFeeMode } from '@/types/shop';
 import {
@@ -29,6 +30,7 @@ import {
   shopPriceFormatOptsForCatalogOrCartLine,
 } from '@/utils/shopFormatPrice';
 import { saveShopOrderAccessToken } from '@/utils/shopOrderTokenStorage';
+import { getMobileVisitorId } from '@/utils/visitorId';
 import { getActiveShopVilles, parseShopVillePriceAmount, shopVilleListLabel, type ShopVilleRow } from '@/utils/shopVilles';
 
 const ACTIVE_VILLES = getActiveShopVilles();
@@ -67,6 +69,10 @@ export default function BoutiqueCheckoutScreen() {
     return () => {
       alive = false;
     };
+  }, []);
+
+  useEffect(() => {
+    void recordShopBoutiqueEvent('view_checkout');
   }, []);
 
   const subtotal = useMemo(
@@ -150,6 +156,7 @@ export default function BoutiqueCheckoutScreen() {
 
     setSubmitting(true);
     try {
+      const analyticsVisitorId = await getMobileVisitorId();
       const result = await createShopOrder({
         lines: lines.map((l) => ({ productId: l.productId, quantity: l.quantity })),
         email: email.trim(),
@@ -162,6 +169,8 @@ export default function BoutiqueCheckoutScreen() {
         pickupDate: deliveryMode === 'pickup_office' ? pickupDate.trim() : undefined,
         pickupTime: deliveryMode === 'pickup_office' && pickupTime.trim() ? pickupTime.trim() : undefined,
         notes: notes.trim() || undefined,
+        analyticsVisitorId,
+        analyticsViewport: 'mobile',
       });
       await saveShopOrderAccessToken(result.publicId, result.accessToken);
       await clear();

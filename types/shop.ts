@@ -147,6 +147,8 @@ export interface CreateShopOrderInput {
   pickupTime?: string;
   notes?: string;
   trafficSource?: string;
+  analyticsVisitorId?: string;
+  analyticsViewport?: 'mobile' | 'desktop';
 }
 
 export interface CreateShopOrderResult {

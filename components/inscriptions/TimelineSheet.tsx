@@ -1,15 +1,24 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
+import {
+  findStatusByCode,
+  loadCandidacyStatusesWithRefresh,
+} from '@/services/candidacyStatusTypes';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
-import type { CandidacyEvent, CandidacyTimelinePayload } from '@/types/inscriptions';
+import type {
+  CandidacyEvent,
+  CandidacyStatusType,
+  CandidacyTimelinePayload,
+} from '@/types/inscriptions';
 import {
   formatShortDate,
   formatTimeAgo,
   pickAnnouncementTitle,
-  STATUS_VISUALS,
+  pickStatusLabel,
 } from '@/utils/candidacyStatus';
 
 type Props = {
@@ -31,10 +40,31 @@ const EVENT_ICON: Record<CandidacyEvent['type'], React.ComponentProps<typeof Fon
 export function TimelineSheet({ visible, loading, payload, onClose }: Props) {
   const { t, locale, isRTL } = useLocale();
 
+  // Catalogue actif chargé via le service avec cache (pour rendre les
+  // events `status_changed` qui ne portent que des codes string).
+  const [catalog, setCatalog] = useState<CandidacyStatusType[]>([]);
+  useEffect(() => {
+    if (!visible) return;
+    let cancelled = false;
+    void loadCandidacyStatusesWithRefresh((fresh) => {
+      if (!cancelled) setCatalog(fresh);
+    }).then((cached) => {
+      if (!cancelled) setCatalog(cached);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [visible]);
+
+  const labelForCode = (code: string | null): string => {
+    if (!code) return '';
+    const s = findStatusByCode(catalog, code);
+    return s ? pickStatusLabel(s, locale) : t('inscStatusUnknown');
+  };
+
   const renderEventLabel = (e: CandidacyEvent): string => {
     if (e.type === 'status_changed' && e.newStatus) {
-      const visual = STATUS_VISUALS[e.newStatus];
-      return `${t('inscEventStatusChanged')} → ${visual ? t(visual.labelKey) : e.newStatus}`;
+      return `${t('inscEventStatusChanged')} → ${labelForCode(e.newStatus)}`;
     }
     switch (e.type) {
       case 'created': return t('inscEventCreated');

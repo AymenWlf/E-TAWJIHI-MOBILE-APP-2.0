@@ -1,40 +1,69 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { EligibilityBadge } from '@/components/inscriptions/EligibilityViews';
-import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
+import { EstablishmentTypeBadge, establishmentTypeDisplayLabel } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
 
 import { useLocale } from '@/contexts/LocaleContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import type { EstablishmentNormalized } from '@/services/establishments';
+import { recordReferencingClickNative, recordReferencingImpressionNative } from '@/services/referencingAds';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { evaluateEligibility } from '@/utils/eligibility';
 import { formatVillesCourtes, secteurTitres, universityName } from '@/utils/establishmentFormat';
+import { fireAndForget } from '@/utils/fireAndForget';
 
 type Props = {
   item: EstablishmentNormalized;
   onPress?: () => void;
   /**
-   * Affiche un bouton de suivi compact dans le coin de la card lorsqu'`onToggleFollow`
-   * est fourni. Le tap sur ce bouton ne déclenche pas l'`onPress` parent
-   * (Pressable imbriqué = événement consommé localement).
+   * Suivi : bouton texte « Suivre » / « Abonné » en bas si `onToggleFollow` est fourni.
+   * Le tap ne déclenche pas l’`onPress` de la carte.
    */
   isFollowed?: boolean;
+  /** Tant que `true`, n’affiche pas un état suivi/non suivi avant la fin du chargement serveur. */
+  followStateLoading?: boolean;
   followBusy?: boolean;
   onToggleFollow?: () => void;
+  /** Profil éligibilité en cours de chargement — pas de badge « éligible » approximatif. */
+  eligibilityLoading?: boolean;
+  /** Ouvre le panneau Q&R (commentaires / questions) depuis le bas ; icône en barre d’actions. */
+  onOpenComments?: () => void;
 };
 
 export function EstablishmentCard({
   item,
   onPress,
   isFollowed,
+  followStateLoading,
   followBusy,
   onToggleFollow,
+  eligibilityLoading,
+  onOpenComments,
 }: Props) {
   const { isRTL, t } = useLocale();
   const { profile: eligibilityProfile } = useEligibilityProfile();
+  const referencingImpSent = useRef(false);
+
+  const placementId = item.referencingPlacementId;
+  useEffect(() => {
+    if (!placementId || referencingImpSent.current) return;
+    referencingImpSent.current = true;
+    const source = item.isSponsored ? 'sponsorship' : 'referencing';
+    fireAndForget(recordReferencingImpressionNative({ placementId, source }));
+  }, [placementId, item.isSponsored]);
+
+  const handleCardPress = () => {
+    if (placementId) {
+      const source = item.isSponsored ? 'sponsorship' : 'referencing';
+      fireAndForget(recordReferencingClickNative({ placementId, source }));
+    }
+    onPress?.();
+  };
+
   const eligibility = evaluateEligibility(
     {
       filieresAcceptees: item.filieresAcceptees,
@@ -60,9 +89,34 @@ export function EstablishmentCard({
   const bourseLbl =
     item.boursesDisponibles && item.bourseMin !== undefined != null ? 'Bourses' : '';
 
+  const followersKnown = typeof item.followersCount === 'number' && Number.isFinite(item.followersCount);
+  const followersCount = followersKnown ? Math.max(0, Math.floor(item.followersCount as number)) : null;
+  const commentsKnown =
+    typeof item.communityQnaMessageCount === 'number' && Number.isFinite(item.communityQnaMessageCount);
+  const commentsCount = commentsKnown ? Math.max(0, Math.floor(item.communityQnaMessageCount as number)) : null;
+  const commentsStatsPending = Boolean(onOpenComments) && !commentsKnown;
+  const statsClusterA11y = commentsStatsPending
+    ? t('estCardStatsLoadingA11y')
+    : t('estCardStatsClusterA11y')
+        .replace('{{followers}}', followersCount != null ? String(followersCount) : '—')
+        .replace('{{comments}}', commentsCount != null ? String(commentsCount) : '—');
+
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.card, isRTL && styles.cardRtl, pressed && { opacity: 0.96 }]}>
+    <Pressable
+      onPress={handleCardPress}
+      style={({ pressed }) => [
+        styles.card,
+        item.isSponsored && styles.cardSponsored,
+        isRTL && styles.cardRtl,
+        pressed && { opacity: 0.96 },
+      ]}>
       <View style={[styles.accentBar, isRTL && styles.accentBarRtl]} />
+
+      {item.isSponsored ? (
+        <View style={styles.sponsoredTopWrap}>
+          <TinyBadge label={t('estCardBadgeSponsored')} tint="blue" textRtl={isRTL} />
+        </View>
+      ) : null}
 
       <View style={[styles.topRow, isRTL && styles.topRowRtl]}>
         <View style={[styles.logoOuter, isRTL && styles.logoOuterRtl]}>
@@ -81,54 +135,18 @@ export function EstablishmentCard({
           ) : null}
           <View style={[styles.badgeRow, isRTL && styles.badgeRowRtl]}>
             <EstablishmentTypeBadge type={item.type} size="xs" hideIfUnknown={false} />
-            {item.isSponsored ? <TinyBadge label="Sponsorisé" tint="blue" /> : null}
             {item.isRecommended ? <TinyBadge label="Recommandé" tint="green" /> : null}
             {item.accreditationEtat ? <TinyBadge label="État" tint="green" /> : null}
-            <EligibilityBadge result={eligibility} size="xs" />
+            {eligibilityLoading ? (
+              <View style={styles.eligibilityLoadingDot}>
+                <ActivityIndicator size="small" color={homeShell.blue} />
+              </View>
+            ) : (
+              <EligibilityBadge result={eligibility} size="xs" />
+            )}
           </View>
         </View>
         <View style={[styles.topRight, isRTL && styles.topRightRtl]}>
-          {onToggleFollow ? (
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation?.();
-                onToggleFollow();
-              }}
-              disabled={followBusy}
-              accessibilityRole="button"
-              accessibilityState={{ selected: !!isFollowed, busy: !!followBusy }}
-              accessibilityLabel={
-                isFollowed ? t('followSchoolUnfollowBtn') : t('followSchoolBtn')
-              }
-              hitSlop={8}
-              style={({ pressed }) => [
-                styles.followBtn,
-                isFollowed && styles.followBtnActive,
-                pressed && { opacity: 0.85 },
-                followBusy && { opacity: 0.6 },
-              ]}
-            >
-              {followBusy ? (
-                <ActivityIndicator size="small" color={isFollowed ? brand.white : brand.primary} />
-              ) : (
-                <>
-                  <FontAwesome
-                    name={isFollowed ? 'heart' : 'heart-o'}
-                    size={12}
-                    color={isFollowed ? brand.white : brand.primary}
-                  />
-                  <Text
-                    style={[styles.followBtnTxt, isFollowed && styles.followBtnTxtActive]}
-                    numberOfLines={1}
-                  >
-                    {isFollowed
-                      ? t('inscAnnouncementsFollowing')
-                      : t('inscAnnouncementsFollow')}
-                  </Text>
-                </>
-              )}
-            </Pressable>
-          ) : null}
           <FontAwesome
             name={isRTL ? 'chevron-left' : 'chevron-right'}
             size={14}
@@ -156,7 +174,11 @@ export function EstablishmentCard({
       ) : null}
 
       <View style={[styles.metricRow, isRTL && styles.metricRowRtl]}>
-        <Metric icon="money" label={t('estLabelTuition')} value={item.fraisLabel} />
+        <Metric
+          icon="building"
+          label={t('estLabelSchoolType')}
+          value={establishmentTypeDisplayLabel(item.type, t)}
+        />
         {item.dureeLabel ? <Metric icon="clock-o" label={t('estLabelDuration')} value={item.dureeLabel} /> : null}
         <Metric
           icon="graduation-cap"
@@ -201,11 +223,87 @@ export function EstablishmentCard({
           </View>
         </View>
       )}
+
+      {onToggleFollow || onOpenComments ? (
+        <View style={[styles.actionBar, isRTL && styles.actionBarRtl]}>
+          {onToggleFollow ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onToggleFollow();
+              }}
+              disabled={followBusy || followStateLoading}
+              accessibilityRole="button"
+              accessibilityState={{
+                selected: !!isFollowed,
+                busy: !!followBusy || !!followStateLoading,
+              }}
+              accessibilityLabel={
+                followStateLoading ? t('inscLoading') : isFollowed ? t('followSchoolUnfollowBtn') : t('followSchoolBtn')
+              }
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.actionBarBtn,
+                styles.followBtn,
+                !followStateLoading && isFollowed && styles.followBtnActive,
+                pressed && { opacity: 0.85 },
+                (followBusy || followStateLoading) && { opacity: 0.6 },
+              ]}>
+              {followBusy || followStateLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={!followStateLoading && isFollowed ? brand.primary : brand.white}
+                />
+              ) : (
+                <>
+                  <FontAwesome
+                    name={isFollowed ? 'heart' : 'heart-o'}
+                    size={12}
+                    color={isFollowed ? brand.primary : brand.white}
+                  />
+                  <Text
+                    style={[styles.followBtnTxt, isFollowed && styles.followBtnTxtActive, isRTL && styles.txtRtl]}
+                    numberOfLines={1}
+                  >
+                    {isFollowed ? t('inscAnnouncementsFollowing') : t('inscAnnouncementsFollow')}
+                  </Text>
+                </>
+              )}
+            </Pressable>
+          ) : null}
+          {onOpenComments ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onOpenComments();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('estCardBtnComment')}. ${statsClusterA11y}. ${t('estCardQnaOpenA11y')}`}
+              hitSlop={8}
+              style={({ pressed }) => [
+                styles.actionBarBtn,
+                styles.commentBtn,
+                pressed && { opacity: 0.88 },
+              ]}>
+              <FontAwesome name="comment-o" size={12} color={brand.primary} />
+              {commentsStatsPending ? (
+                <ActivityIndicator size="small" color={brand.primary} style={{ marginStart: 4 }} />
+              ) : (
+                <Text style={[styles.commentBtnTxt, isRTL && styles.txtRtl]} numberOfLines={1}>
+                  {commentsCount != null && commentsCount > 0
+                    ? `${t('estCardBtnComment')} (${commentsCount})`
+                    : t('estCardBtnComment')}
+                </Text>
+              )}
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
     </Pressable>
   );
 }
 
-function TinyBadge({ label, tint }: { label: string; tint: 'neutral' | 'blue' | 'green' }) {
+function TinyBadge({ label, tint, textRtl }: { label: string; tint: 'neutral' | 'blue' | 'green'; textRtl?: boolean }) {
   const bg =
     tint === 'blue'
       ? 'rgba(51,62,143,0.10)'
@@ -216,7 +314,7 @@ function TinyBadge({ label, tint }: { label: string; tint: 'neutral' | 'blue' | 
     tint === 'blue' ? homeShell.blue : tint === 'green' ? homeShell.greenDark : homeShell.blueDeep;
   return (
     <View style={[styles.tinyBadge, { backgroundColor: bg }]}>
-      <Text style={[styles.tinyBadgeTxt, { color: fg }]}>{label}</Text>
+      <Text style={[styles.tinyBadgeTxt, { color: fg }, textRtl && styles.txtRtl]}>{label}</Text>
     </View>
   );
 }
@@ -249,6 +347,11 @@ const styles = StyleSheet.create({
     elevation: 2,
     position: 'relative',
   },
+  cardSponsored: {
+    borderColor: '#a78bfa',
+    borderWidth: 2,
+    backgroundColor: '#faf5ff',
+  },
   cardRtl: {
     direction: 'rtl',
   },
@@ -269,6 +372,11 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 0,
     borderTopRightRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
+  },
+  sponsoredTopWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
   },
   topRow: {
     flexDirection: 'row',
@@ -362,30 +470,6 @@ const styles = StyleSheet.create({
     marginStart: 0,
     marginEnd: spacing.sm,
     alignItems: 'flex-start',
-  },
-  followBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: radius.full,
-    backgroundColor: brand.white,
-    borderWidth: 1,
-    borderColor: brand.primary,
-    minHeight: 26,
-  },
-  followBtnActive: {
-    backgroundColor: brand.primary,
-    borderColor: brand.primary,
-  },
-  followBtnTxt: {
-    color: brand.primary,
-    fontSize: 11,
-    fontWeight: '800',
-  },
-  followBtnTxtActive: {
-    color: brand.white,
   },
   chev: {
     alignSelf: 'flex-end',
@@ -529,6 +613,73 @@ const styles = StyleSheet.create({
   },
   footerIconsRtl: {
     flexDirection: 'row-reverse',
+  },
+  actionBar: {
+    marginTop: spacing.md,
+    marginHorizontal: -spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderColor: homeShell.borderOnWhite,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.sm,
+  },
+  actionBarRtl: {
+    flexDirection: 'row-reverse',
+  },
+  /** Deux boutons (Suivre / Commentaire) partagent la largeur. */
+  actionBarBtn: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: 40,
+  },
+  /** Non suivi = bouton rempli ; suivi = contour (via `followBtnActive`). */
+  followBtn: {
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderRadius: radius.lg,
+    backgroundColor: brand.primary,
+    borderWidth: 1,
+    borderColor: brand.primary,
+  },
+  commentBtn: {
+    gap: 5,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderRadius: radius.lg,
+    backgroundColor: brand.white,
+    borderWidth: 1,
+    borderColor: brand.primary,
+  },
+  commentBtnTxt: {
+    color: brand.primary,
+    fontSize: 11,
+    fontWeight: '800',
+    flexShrink: 1,
+  },
+  followBtnActive: {
+    backgroundColor: brand.white,
+    borderColor: brand.primary,
+  },
+  followBtnTxt: {
+    color: brand.white,
+    fontSize: 11,
+    fontWeight: '800',
+    flexShrink: 1,
+  },
+  followBtnTxtActive: {
+    color: brand.primary,
+  },
+  eligibilityLoadingDot: {
+    minWidth: 28,
+    minHeight: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   txtRtl: {
     textAlign: 'right',

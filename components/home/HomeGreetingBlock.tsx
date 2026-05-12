@@ -1,4 +1,4 @@
-import { StyleSheet, View } from 'react-native';
+import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 
@@ -8,21 +8,38 @@ import { fontSize, radius, spacing } from '@/theme/tokens';
 type Props = {
   firstName: string;
   subtitle: string;
+  /** Sous-titre (ex. filière) en cours de chargement — pas de texte de repli trompeur. */
+  subtitleLoading?: boolean;
   greetingWord?: string;
   /** Alignement RTL (arabe) — le bloc salutation suit la direction du parent. */
   rtl?: boolean;
 };
 
-export function HomeGreetingBlock({ firstName, subtitle, greetingWord = 'Bonjour', rtl }: Props) {
+export function HomeGreetingBlock({
+  firstName,
+  subtitle,
+  subtitleLoading,
+  greetingWord = 'Bonjour',
+  rtl,
+}: Props) {
   return (
     <View style={[styles.wrap, rtl && styles.wrapRtl]}>
       <Text style={[styles.greet, rtl && styles.textRtl]}>
         {greetingWord} <Text style={styles.name}>{firstName}</Text>
       </Text>
-      <View style={[styles.subRow, rtl && styles.subRowRtl]} accessibilityLabel={subtitle}>
-        <Text style={[styles.subText, rtl && styles.textRtl]} numberOfLines={2}>
-          {subtitle}
-        </Text>
+      <View
+        style={[styles.subRow, rtl && styles.subRowRtl]}
+        accessibilityLabel={subtitleLoading ? undefined : subtitle}
+      >
+        {subtitleLoading ? (
+          <View style={[styles.subLoading, rtl && styles.subLoadingRtl]}>
+            <ActivityIndicator size="small" color="rgba(255,255,255,0.95)" />
+          </View>
+        ) : (
+          <Text style={[styles.subText, rtl && styles.textRtl]} numberOfLines={2}>
+            {subtitle}
+          </Text>
+        )}
       </View>
     </View>
   );
@@ -64,5 +81,14 @@ const styles = StyleSheet.create({
     color: homeShell.text,
     fontSize: fontSize.sm,
     fontWeight: '700',
+  },
+  subLoading: {
+    minHeight: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 2,
+  },
+  subLoadingRtl: {
+    alignSelf: 'stretch',
   },
 });

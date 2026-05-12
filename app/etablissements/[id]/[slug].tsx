@@ -1,13 +1,28 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Alert, Image, Linking, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  ActivityIndicator,
+  Alert,
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ShareIconButton } from '@/components/share/ShareIconButton';
+import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
+import { CommunityQnaSection } from '@/components/community/CommunityQnaSection';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
+import { ContestAnnouncementQnaBottomSheet } from '@/components/inscriptions/ContestAnnouncementQnaBottomSheet';
+import { ContestYoutubeTutorial } from '@/components/inscriptions/ContestYoutubeTutorial';
 import {
   EligibilityBadge,
   EligibilitySummary,
@@ -17,6 +32,7 @@ import { EstablishmentDescriptionHtml } from '@/components/schools/Establishment
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import {
   fetchContestAnnouncementsByEstablishment,
@@ -24,7 +40,9 @@ import {
   type ContestAnnouncementCard,
 } from '@/services/contestAnnouncements';
 import {
-  recordEstablishmentClick,
+  recordReferencingPageViewNative,
+} from '@/services/referencingAds';
+import {
   recordEstablishmentDetailImpressionOnce,
 } from '@/services/establishmentTracking';
 import {
@@ -32,24 +50,36 @@ import {
   fetchFollowStateByEstablishment,
   upsertEstablishmentFollow,
 } from '@/services/establishmentFollows';
+import { getEstablishmentFileUrl } from '@/constants/establishmentMedia';
 import { getEstablishmentByIdSlug, type EstablishmentNormalized } from '@/services/establishments';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { mapCampusForDisplay } from '@/utils/campusMaps';
 import { evaluateEligibility } from '@/utils/eligibility';
+import { fireAndForget } from '@/utils/fireAndForget';
 import { formatVillesCourtes, universityName } from '@/utils/establishmentFormat';
+import { pickBrochureFromDocuments } from '@/utils/establishmentBrochure';
+import { sharePayloadEstablishmentDetail } from '@/utils/sharePagePayloads';
+import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
 
 export default function EstablishmentDetailScreen() {
   const router = useRouter();
   const { isRTL, t, locale, setLocale } = useLocale();
+  const { presentShare } = useSharePreview();
   const insets = useSafeAreaInsets();
+  const scrollRef = useRef<ScrollView>(null);
   const { user, getValidAccessToken } = useAuth();
-  const { profile: eligibilityProfile } = useEligibilityProfile();
+  const { profile: eligibilityProfile, loading: eligibilityProfileLoading } = useEligibilityProfile();
   const isLoggedIn = Boolean(user);
-  const params = useLocalSearchParams<{ id?: string; slug?: string }>();
+  const params = useLocalSearchParams<{ id?: string; slug?: string; qnaQ?: string | string[] }>();
   const id = useMemo(() => Number(params.id ?? 0), [params.id]);
   const slug = (params.slug ?? '').toString();
-
+  const highlightQuestionId = useMemo(() => {
+    const raw = params.qnaQ;
+    const s = Array.isArray(raw) ? raw[0] : raw;
+    const n = Number(s ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [params.qnaQ]);
   const [data, setData] = useState<EstablishmentNormalized | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -57,19 +87,37 @@ export default function EstablishmentDetailScreen() {
   /* Annonces publiées de cet établissement (concours, résultats, bourses…). */
   const [announcements, setAnnouncements] = useState<ContestAnnouncementCard[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
+  const [announcementQnaSheet, setAnnouncementQnaSheet] = useState<{ id: number; title: string } | null>(null);
+  const closeAnnouncementQnaSheet = useCallback(() => setAnnouncementQnaSheet(null), []);
 
   // Suivi école
   const [isFollowing, setIsFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
   const [followId, setFollowId] = useState<number | null>(null);
+  const [followProbeDone, setFollowProbeDone] = useState(!isLoggedIn);
+
+  useEffect(() => {
+    if (!isLoggedIn) setFollowProbeDone(true);
+    else setFollowProbeDone(false);
+  }, [isLoggedIn, user?.id, id]);
 
   const refreshFollowState = useCallback(async () => {
-    if (!isLoggedIn || !id) return;
+    if (!isLoggedIn || !id) {
+      setFollowProbeDone(true);
+      return;
+    }
     const token = await getValidAccessToken();
-    if (!token) return;
-    const state = await fetchFollowStateByEstablishment(token, id);
-    setIsFollowing(state.isFollowing);
-    setFollowId(state.follow?.id ?? null);
+    if (!token) {
+      setFollowProbeDone(true);
+      return;
+    }
+    try {
+      const state = await fetchFollowStateByEstablishment(token, id);
+      setIsFollowing(state.isFollowing);
+      setFollowId(state.follow?.id ?? null);
+    } finally {
+      setFollowProbeDone(true);
+    }
   }, [getValidAccessToken, id, isLoggedIn]);
 
   useEffect(() => {
@@ -112,7 +160,6 @@ export default function EstablishmentDetailScreen() {
     setFollowBusy(true);
     const { follow } = await upsertEstablishmentFollow(token, {
       establishmentId: id,
-      status: 'interested',
     });
     setFollowBusy(false);
     if (follow) {
@@ -147,9 +194,17 @@ export default function EstablishmentDetailScreen() {
   /* Tracking analytique : impression « detail » (1 fois par session pour
      éviter de gonfler les chiffres si l'utilisateur ouvre/ferme la même
      fiche plusieurs fois). */
+  const referencingPageViewSent = useRef(false);
+
   useEffect(() => {
     if (!Number.isFinite(id) || id <= 0) return;
     recordEstablishmentDetailImpressionOnce(id);
+  }, [id]);
+
+  useEffect(() => {
+    if (!Number.isFinite(id) || id <= 0 || referencingPageViewSent.current) return;
+    referencingPageViewSent.current = true;
+    fireAndForget(recordReferencingPageViewNative(id));
   }, [id]);
 
   /* Annonces de l'école : chargement séparé, n'attend pas le détail établissement. */
@@ -218,6 +273,26 @@ export default function EstablishmentDetailScreen() {
       (data.specialitesBacMissionAcceptees?.length ?? 0) > 0 ||
       (data.anneesBacAcceptees?.length ?? 0) > 0);
 
+  const schoolMedia = useMemo(() => {
+    if (!data) {
+      return {
+        photoUris: [] as string[],
+        videoRaw: null as string | null,
+        brochureUrl: null as string | null,
+      };
+    }
+    const rawPhotos = data.media?.photos ?? [];
+    const photoUris = rawPhotos
+      .map((p) => getEstablishmentFileUrl(p?.url))
+      .filter((u): u is string => Boolean(u));
+    const videoRaw =
+      String(data.media?.videoUrl ?? data.videoUrl ?? '')
+        .trim() || null;
+    const brochureDoc = pickBrochureFromDocuments(data.media?.documents);
+    const brochureUrl = brochureDoc?.url ? getEstablishmentFileUrl(brochureDoc.url) : null;
+    return { photoUris, videoRaw, brochureUrl };
+  }, [data]);
+
   return (
     <View style={styles.safe}>
       <StatusBar style="light" />
@@ -236,6 +311,23 @@ export default function EstablishmentDetailScreen() {
           <Text style={[styles.headerTitle, isRTL && styles.txtRtl]} numberOfLines={1}>
             {t('estDetailTitle')}
           </Text>
+          {id > 0 ? (
+            <ShareIconButton
+              color={homeShell.text}
+              style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}
+              onPress={() =>
+                presentShare(
+                  sharePayloadEstablishmentDetail({
+                    id,
+                    slug: slug || 'fiche',
+                    title: data ? primaryName : t('estDetailTitle'),
+                    subtitle: data ? secondaryLine || undefined : undefined,
+                    thumbUrl: data?.displayLogoUrl,
+                  }),
+                )
+              }
+            />
+          ) : null}
           <View
             style={[styles.langSwitch, isRTL && styles.langSwitchRtl]}
             accessibilityRole="tablist"
@@ -281,17 +373,14 @@ export default function EstablishmentDetailScreen() {
         </View>
       ) : (
         <ScrollView
+          ref={scrollRef}
           style={styles.scroll}
-          contentContainerStyle={[styles.content, { paddingBottom: spacing.section + insets.bottom }]}
+          contentContainerStyle={[styles.content, { paddingBottom: spacing.section + insets.bottom + spacing.xl }]}
           showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         >
-          {data.displayCoverUrl ? (
-            <Image source={{ uri: data.displayCoverUrl }} style={styles.cover} accessibilityIgnoresInvertColors />
-          ) : (
-            <View style={[styles.cover, styles.coverPlaceholder]} />
-          )}
-
-          <View style={[styles.heroCard, data.displayCoverUrl ? styles.heroOverlap : styles.heroFlat]}>
+          <View style={[styles.heroCard, styles.heroFlat]}>
             <View style={styles.logoRing}>
               <Image source={{ uri: data.displayLogoUrl }} style={styles.heroLogo} resizeMode="contain" accessibilityIgnoresInvertColors />
             </View>
@@ -303,29 +392,44 @@ export default function EstablishmentDetailScreen() {
               {data.isRecommended ? <PillSolid label={t('estBadgeRecommended')} tint="green" /> : null}
               {data.isSponsored ? <PillSolid label={t('estBadgeSponsored')} tint="sponsor" /> : null}
               {/* Badge éligibilité personnalisé — masqué si pas de critères / pas connecté. */}
-              <EligibilityBadge result={eligibility} size="sm" />
+              {isLoggedIn && eligibilityProfileLoading ? (
+                <View style={styles.heroEligibilityLoading}>
+                  <ActivityIndicator size="small" color={brand.primary} />
+                </View>
+              ) : (
+                <EligibilityBadge result={eligibility} size="sm" />
+              )}
             </View>
 
             {/* Bouton Suivre / Ne plus suivre l'école (et accès rapide à la timeline si déjà suivie). */}
             <View style={[styles.followRow, isRTL && styles.flagsRowRtl]}>
               <Pressable
                 onPress={onToggleFollow}
-                disabled={followBusy}
+                disabled={followBusy || !followProbeDone}
                 style={({ pressed }) => [
                   styles.followBtn,
-                  isFollowing ? styles.followBtnActive : null,
+                  !followProbeDone ? null : isFollowing ? styles.followBtnActive : null,
                   pressed && { opacity: 0.85 },
-                  followBusy && { opacity: 0.6 },
+                  (followBusy || !followProbeDone) && { opacity: 0.6 },
                 ]}
               >
-                <FontAwesome
-                  name={isFollowing ? 'check' : 'plus'}
-                  size={13}
-                  color={isFollowing ? brand.primary : brand.white}
-                />
-                <Text style={isFollowing ? styles.followBtnActiveTxt : styles.followBtnTxt}>
-                  {isFollowing ? t('followSchoolUnfollowBtn') : t('followSchoolBtn')}
-                </Text>
+                {followBusy || !followProbeDone ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={followProbeDone && isFollowing ? brand.primary : brand.white}
+                  />
+                ) : (
+                  <>
+                    <FontAwesome
+                      name={isFollowing ? 'heart' : 'heart-o'}
+                      size={13}
+                      color={isFollowing ? brand.primary : brand.white}
+                    />
+                    <Text style={isFollowing ? styles.followBtnActiveTxt : styles.followBtnTxt}>
+                      {isFollowing ? t('followSchoolUnfollowBtn') : t('followSchoolBtn')}
+                    </Text>
+                  </>
+                )}
               </Pressable>
               {isFollowing && followId ? (
                 <Pressable
@@ -365,19 +469,104 @@ export default function EstablishmentDetailScreen() {
             </Grid>
           </Section>
 
+          <AppBannerSlot zone="mid_square" analyticsPage="/mobile/ecoles/detail" style={{ marginHorizontal: spacing.md }} />
+
           <Section title={t('estDetailPresentation')} rtl={isRTL}>
             <EstablishmentDescriptionHtml description={desc} />
           </Section>
+
+          {schoolMedia.photoUris.length > 0 ? (
+            <Section
+              title={`${t('estDetailMediaPhotos')} (${schoolMedia.photoUris.length})`}
+              rtl={isRTL}
+            >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.photoStrip,
+                  isRTL && styles.photoStripRtl,
+                ]}
+              >
+                {schoolMedia.photoUris.map((uri, idx) => (
+                  <Pressable
+                    key={`${uri}-${idx}`}
+                    onPress={() => void Linking.openURL(uri).catch(() => undefined)}
+                  >
+                    <Image
+                      source={{ uri }}
+                      style={styles.photoThumb}
+                      resizeMode="cover"
+                      accessibilityIgnoresInvertColors
+                    />
+                  </Pressable>
+                ))}
+              </ScrollView>
+            </Section>
+          ) : null}
+
+          {schoolMedia.videoRaw ? (
+            parseYoutubeVideoId(schoolMedia.videoRaw) ? (
+              <Section title={t('estDetailMediaVideo')} rtl={isRTL}>
+                <ContestYoutubeTutorial
+                  youtubeUrl={schoolMedia.videoRaw}
+                  title={t('estDetailMediaVideo')}
+                  playbackErrorLabel={t('inscDetailTutorialPlaybackError')}
+                  retryLabel={t('inscDetailTutorialRetry')}
+                  rtl={isRTL}
+                  showHeading={false}
+                />
+              </Section>
+            ) : (
+              <Section title={t('estDetailMediaVideo')} rtl={isRTL}>
+                <Pressable
+                  onPress={() => {
+                    const raw = schoolMedia.videoRaw!;
+                    const u = /^https?:\/\//i.test(raw)
+                      ? raw
+                      : getEstablishmentFileUrl(raw);
+                    if (u) void Linking.openURL(u).catch(() => undefined);
+                  }}
+                  style={({ pressed }) => [styles.mediaOpenRow, isRTL && styles.mediaOpenRowRtl, pressed && { opacity: 0.88 }]}
+                >
+                  <FontAwesome name="play-circle" size={20} color={homeShell.blue} />
+                  <Text style={[styles.mediaOpenTxt, isRTL && styles.txtRtl]}>{t('estDetailMediaVideoOpen')}</Text>
+                </Pressable>
+              </Section>
+            )
+          ) : null}
+
+          {schoolMedia.brochureUrl ? (
+            <Section title={t('estDetailMediaBrochure')} rtl={isRTL}>
+              <Pressable
+                onPress={() =>
+                  void Linking.openURL(schoolMedia.brochureUrl!).catch(() => undefined)
+                }
+                style={({ pressed }) => [styles.mediaOpenRow, isRTL && styles.mediaOpenRowRtl, pressed && { opacity: 0.88 }]}
+              >
+                <FontAwesome name="file-pdf-o" size={18} color={homeShell.blue} />
+                <Text style={[styles.mediaOpenTxt, isRTL && styles.txtRtl]}>
+                  {t('estDetailMediaBrochureOpen')}
+                </Text>
+              </Pressable>
+            </Section>
+          ) : null}
 
           {/* Éligibilité personnalisée — visible uniquement si l'école a publié
               des critères (filières / spécialités / années de bac). */}
           {showEligibilitySection ? (
             <Section title={t('inscDetailEligibility')} rtl={isRTL}>
-              <EligibilitySummary
-                result={eligibility}
-                onCompleteProfile={() => router.push('/account-setup' as never)}
-                onLogin={() => router.push('/login' as never)}
-              />
+              {isLoggedIn && eligibilityProfileLoading ? (
+                <View style={styles.announcementsLoading}>
+                  <ActivityIndicator color={brand.primary} />
+                </View>
+              ) : (
+                <EligibilitySummary
+                  result={eligibility}
+                  onCompleteProfile={() => router.push('/account-setup' as never)}
+                  onLogin={() => router.push('/login' as never)}
+                />
+              )}
             </Section>
           ) : null}
 
@@ -399,6 +588,8 @@ export default function EstablishmentDetailScreen() {
                     item={a}
                     /* Le suivi est porté par l'école entière → on reflète l'état global. */
                     isFollowed={isFollowing}
+                    followStateLoading={isLoggedIn && !followProbeDone}
+                    eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
                     busy={followBusy}
                     onToggleFollow={onToggleFollow}
                     onOpenLink={() => {
@@ -406,6 +597,12 @@ export default function EstablishmentDetailScreen() {
                         void Linking.openURL(a.registrationUrl).catch(() => undefined);
                       }
                     }}
+                    onOpenComments={() =>
+                      setAnnouncementQnaSheet({
+                        id: a.id,
+                        title: (isRTL && a.titleAr ? a.titleAr : a.title) || '',
+                      })
+                    }
                     onPress={() => router.push(`/inscriptions/${a.id}` as never)}
                   />
                 ))}
@@ -486,9 +683,28 @@ export default function EstablishmentDetailScreen() {
               ) : null}
             </Section>
           ) : null}
+
+          {id > 0 ? (
+            <CommunityQnaSection
+              contextType="establishment"
+              contextId={id}
+              marginHorizontal={spacing.xl}
+              highlightQuestionId={highlightQuestionId}
+              scrollParentRef={scrollRef}
+              composerLayout="instagram"
+              instagramAnchoredDock
+            />
+          ) : null}
         </ScrollView>
       )}
       </View>
+
+      <ContestAnnouncementQnaBottomSheet
+        visible={announcementQnaSheet !== null}
+        announcementId={announcementQnaSheet?.id ?? 0}
+        announcementTitle={announcementQnaSheet?.title ?? ''}
+        onClose={closeAnnouncementQnaSheet}
+      />
     </View>
   );
 }
@@ -713,16 +929,6 @@ const styles = StyleSheet.create({
   content: {
     paddingBottom: spacing.section,
   },
-  cover: {
-    width: '100%',
-    height: 200,
-    backgroundColor: homeShell.blueDeep,
-  },
-  coverPlaceholder: {
-    opacity: 1,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: homeShell.borderOnWhite,
-  },
   heroCard: {
     marginHorizontal: spacing.xl,
     backgroundColor: homeShell.card,
@@ -736,9 +942,6 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     elevation: 3,
     alignItems: 'center',
-  },
-  heroOverlap: {
-    marginTop: -48,
   },
   heroFlat: {
     marginTop: spacing.lg,
@@ -789,6 +992,12 @@ const styles = StyleSheet.create({
     writingDirection: 'rtl',
     textAlign: 'center',
     lineHeight: 20,
+  },
+  heroEligibilityLoading: {
+    minHeight: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 2,
   },
   /* Suivi école — bouton placé sous les badges. */
   followRow: {
@@ -1002,5 +1211,39 @@ const styles = StyleSheet.create({
   linkLineRtl: {
     textAlign: 'right',
     writingDirection: 'rtl',
+  },
+  photoStrip: {
+    flexDirection: 'row',
+    gap: spacing.sm,
+    paddingVertical: 2,
+  },
+  photoStripRtl: {
+    flexDirection: 'row-reverse',
+  },
+  photoThumb: {
+    width: 200,
+    height: 120,
+    borderRadius: radius.lg,
+    backgroundColor: '#E2E8F0',
+  },
+  mediaOpenRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: homeShell.borderOnWhite,
+  },
+  mediaOpenRowRtl: {
+    flexDirection: 'row-reverse',
+  },
+  mediaOpenTxt: {
+    flex: 1,
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    color: homeShell.blue,
   },
 });

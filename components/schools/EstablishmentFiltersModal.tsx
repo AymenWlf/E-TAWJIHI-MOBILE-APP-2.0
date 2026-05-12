@@ -72,15 +72,25 @@ export type EstablishmentFiltersValue = {
    * Filtre d'éligibilité de l'utilisateur connecté (basé sur la filière
    * du Bac uniquement — l'année du bac n'est volontairement pas prise en
    * compte ici, c'est un critère trop restrictif pour un filtre rapide).
-   *  - `all`           : aucun filtrage (défaut).
-   *  - `eligible`      : ne garder que les écoles où l'utilisateur passe.
-   *  - `not_eligible`  : ne garder que les écoles où l'utilisateur ne passe pas.
+   *  - `all`           : aucun filtrage.
+   *  - `eligible`      : ne garder que les écoles/annonces éligibles
+   *    (défaut — on présuppose que c'est ce qui intéresse l'utilisateur).
+   *  - `not_eligible`  : ne garder que les écoles/annonces non éligibles.
    *
    * Le filtre n'a d'effet que si l'utilisateur est connecté ET a renseigné
    * son profil (filière ou spécialités). Sinon il est silencieusement
-   * ignoré côté parent (les écoles « unknown » sont toujours affichées).
+   * ignoré côté parent (les éléments « unknown » sont toujours affichés).
    */
   eligibilityFilter: 'all' | 'eligible' | 'not_eligible';
+  /**
+   * Filtre statut « ouvert / fermé » des annonces. Pertinent uniquement
+   * pour les listings d'annonces — pour les écoles ce champ est ignoré
+   * (et la modale cache la section grâce à `showStatusFilter={false}`).
+   *  - `all`    : ouvertes + fermées.
+   *  - `open`   : uniquement les annonces encore ouvertes.
+   *  - `closed` : uniquement les annonces fermées / expirées.
+   */
+  statusFilter: 'all' | 'open' | 'closed';
 };
 
 /** Valeurs par défaut équivalentes à « pas de filtre actif ». */
@@ -99,7 +109,12 @@ export const defaultEstablishmentFilters = (): EstablishmentFiltersValue => ({
   sponsoredOnly: false,
   accreditationEtat: false,
   echangeInternational: false,
-  eligibilityFilter: 'all',
+  // Choix produit : on présélectionne « éligible » pour mettre en avant
+  // ce qui correspond directement au profil de l'utilisateur. Pour un
+  // visiteur sans profil, le filtre est silencieusement ignoré côté
+  // parent (cf. `EligibilityFilter` doc).
+  eligibilityFilter: 'eligible',
+  statusFilter: 'all',
 });
 
 /** Nombre de filtres actuellement actifs (utile pour afficher un badge). */
@@ -118,7 +133,12 @@ export function countActiveEstablishmentFilters(v: EstablishmentFiltersValue): n
     (v.sponsoredOnly ? 1 : 0) +
     (v.accreditationEtat ? 1 : 0) +
     (v.echangeInternational ? 1 : 0) +
-    (v.eligibilityFilter && v.eligibilityFilter !== 'all' ? 1 : 0)
+    // Le filtre éligibilité par défaut est `eligible` : on ne le compte
+    // pas comme « actif » pour ne pas afficher en permanence un badge à
+    // côté du bouton « Filtres avancés ». Idem pour `statusFilter`
+    // (défaut `all`).
+    (v.eligibilityFilter && v.eligibilityFilter !== 'eligible' ? 1 : 0) +
+    (v.statusFilter && v.statusFilter !== 'all' ? 1 : 0)
   );
 }
 
@@ -129,6 +149,12 @@ export type EstablishmentFiltersModalProps = {
   onChange: (next: EstablishmentFiltersValue) => void;
   cities: CityRow[];
   secteurs: SecteurRow[];
+  /**
+   * Affiche la section « Statut » (Tous / Ouvert / Fermé). Pertinent
+   * uniquement pour les listings d'annonces — les écoles n'ont pas de
+   * notion d'ouverture / fermeture.
+   */
+  showStatusFilter?: boolean;
 };
 
 export function EstablishmentFiltersModal({
@@ -138,6 +164,7 @@ export function EstablishmentFiltersModal({
   onChange,
   cities,
   secteurs,
+  showStatusFilter = false,
 }: EstablishmentFiltersModalProps) {
   const { isRTL, t } = useLocale();
   const { height: winH } = useWindowDimensions();
@@ -492,6 +519,50 @@ export function EstablishmentFiltersModal({
                 />
               </View>
             </View>
+
+            {/*
+              Statut « ouvert / fermé » — affiché uniquement quand le
+              parent l'a explicitement demandé (cas des annonces). Côté
+              écoles cette section reste cachée pour éviter d'embrouiller
+              l'utilisateur avec un critère qui n'a pas de sens.
+            */}
+            {showStatusFilter ? (
+              <>
+                <Text style={[styles.modalLabel, isRTL && styles.txtRtl]}>
+                  {t('inscFilterStatusLabel')}
+                </Text>
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={isRTL && styles.hScrollRtl}
+                  contentContainerStyle={styles.hScrollTight}
+                  nestedScrollEnabled>
+                  {(
+                    [
+                      { value: 'all', label: t('inscFilterStatusAll') },
+                      { value: 'open', label: t('inscFilterStatusOpen') },
+                      { value: 'closed', label: t('inscFilterStatusClosed') },
+                    ] as const
+                  ).map((opt) => (
+                    <Pressable
+                      key={opt.value}
+                      onPress={() => set('statusFilter', opt.value)}
+                      style={[
+                        styles.modalTypeChip,
+                        value.statusFilter === opt.value && styles.modalTypeChipOn,
+                      ]}>
+                      <Text
+                        style={[
+                          styles.modalTypeChipTxt,
+                          value.statusFilter === opt.value && styles.modalTypeChipTxtOn,
+                        ]}>
+                        {opt.label}
+                      </Text>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </>
+            ) : null}
 
             {/*
               Éligibilité — basée sur la filière du bac (cf.

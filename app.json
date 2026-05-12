@@ -15,7 +15,7 @@
     },
     "ios": {
       "supportsTablet": true,
-      "softwareKeyboardLayoutMode": "pan"
+      "softwareKeyboardLayoutMode": "resize"
     },
     "android": {
       "adaptiveIcon": {
@@ -23,7 +23,8 @@
         "backgroundColor": "#333E8F"
       },
       "edgeToEdgeEnabled": true,
-      "predictiveBackGestureEnabled": false
+      "predictiveBackGestureEnabled": false,
+      "softwareKeyboardLayoutMode": "resize"
     },
     "web": {
       "bundler": "metro",

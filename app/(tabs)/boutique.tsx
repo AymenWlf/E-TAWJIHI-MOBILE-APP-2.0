@@ -8,17 +8,20 @@ import {
   FlatList,
   Image,
   Pressable,
-  RefreshControl,
   StyleSheet,
   TextInput,
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { SidebarMenuIconButton } from '@/components/SidebarMenuIconButton';
+import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { fetchShopProducts } from '@/services/shop';
+import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { ShopProductListItem } from '@/types/shop';
 import {
@@ -29,7 +32,6 @@ import {
   shopPromoDiscountPercent,
 } from '@/utils/shopFormatPrice';
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
-
 const PAGE_SIZE = 20;
 const { width: SCREEN_W } = Dimensions.get('window');
 const GUTTER = spacing.md;
@@ -39,6 +41,7 @@ const CARD_W = (SCREEN_W - H_PAD * 2 - GUTTER) / 2;
 export default function BoutiqueTabScreen() {
   const router = useRouter();
   const { t, isRTL, locale, setLocale } = useLocale();
+  const { presentShare } = useSharePreview();
   const { count: cartCount, addLine, lines: cartLines } = useShopCart();
 
   const [items, setItems] = useState<ShopProductListItem[]>([]);
@@ -84,7 +87,7 @@ export default function BoutiqueTabScreen() {
         setRefreshing(false);
       }
     },
-    [type, debouncedSearch],
+    [type, debouncedSearch, t],
   );
 
   useEffect(() => {
@@ -117,6 +120,7 @@ export default function BoutiqueTabScreen() {
         images: p.images,
         isFreeShipping: Boolean(p.isFreeShipping),
       });
+      void recordShopBoutiqueEvent('add_to_cart', p.id);
     },
     [addLine],
   );
@@ -136,6 +140,7 @@ export default function BoutiqueTabScreen() {
         images: p.images,
         isFreeShipping: Boolean(p.isFreeShipping),
       });
+      void recordShopBoutiqueEvent('add_to_cart', p.id);
       router.push('/boutique/checkout' as any);
     },
     [addLine, router],
@@ -153,6 +158,7 @@ export default function BoutiqueTabScreen() {
         {/* ── Hero header ── */}
         <View style={styles.hero}>
           <View style={[styles.heroTop, isRTL && styles.heroTopRtl]}>
+            <SidebarMenuIconButton color={brand.white} />
             <View style={styles.heroTitles}>
               <Text style={[styles.heroEyebrow, isRTL && styles.txtRtl]}>{t('shopEyebrow')}</Text>
               <Text style={[styles.heroTitle, isRTL && styles.txtRtl]}>{t('shopTitle')}</Text>
@@ -296,7 +302,10 @@ export default function BoutiqueTabScreen() {
             product={p}
             t={t}
             isRTL={isRTL}
-            onPress={() => router.push(`/boutique/${p.slug}` as any)}
+            onPress={() => {
+              void recordShopBoutiqueEvent('click_product', p.id);
+              router.push(`/boutique/${p.slug}` as any);
+            }}
             onAdd={() => void handleAdd(p)}
             onBuyNow={() => void handleBuyNow(p)}
             inCart={inCartIds.has(p.id)}
@@ -323,14 +332,7 @@ export default function BoutiqueTabScreen() {
         numColumns={2}
         contentContainerStyle={styles.list}
         style={[styles.flatList, isRTL ? styles.rtl : styles.ltr]}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={brand.primary}
-            colors={[brand.primary]}
-          />
-        }
+        refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         onEndReached={onEndReached}
         onEndReachedThreshold={0.4}
         showsVerticalScrollIndicator={false}
@@ -386,6 +388,10 @@ function ProductCard({
   onBuyNow: () => void;
   inCart: boolean;
 }) {
+  useEffect(() => {
+    void recordShopBoutiqueEvent('impression_listing', p.id);
+  }, [p.id]);
+
   const promoPct = shopPromoDiscountPercent(p.price, p.compareAtPrice);
   const isOut = p.isOutOfStock === true;
   const priceOpts = shopPriceFormatOptsForCatalogOrCartLine(p);
@@ -527,6 +533,7 @@ const styles = StyleSheet.create({
   },
 
   list: {
+    flexGrow: 1,
     paddingHorizontal: H_PAD,
     paddingTop: spacing.md,
     paddingBottom: spacing.xxl,

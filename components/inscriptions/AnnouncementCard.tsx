@@ -1,7 +1,9 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Image, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
 import { EligibilityBadge } from '@/components/inscriptions/EligibilityViews';
+import { StatusBadge } from '@/components/inscriptions/StatusBadge';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
 import {
@@ -12,6 +14,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import type { ContestAnnouncementCard } from '@/services/contestAnnouncements';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import type { CandidacyStatusType } from '@/types/inscriptions';
 import {
   formatDaysUntilClose,
   formatShortDate,
@@ -24,20 +27,44 @@ import { evaluateEligibility } from '@/utils/eligibility';
 type Props = {
   item: ContestAnnouncementCard;
   isFollowed: boolean;
+  /** Chargement initial du suivi côté serveur — pas d’icône cœur trompeuse. */
+  followStateLoading?: boolean;
+  /** Profil éligibilité en cours de chargement — pas de badge approximatif. */
+  eligibilityLoading?: boolean;
   busy?: boolean;
   onToggleFollow: () => void;
   onOpenLink: () => void;
   /** Ouvre la page détail de l'annonce. Si non fourni, la card n'est pas cliquable globalement. */
   onPress?: () => void;
+  /** Ouvre les questions-réponses (ex. détail annonce avec scroll vers la section Q&R). */
+  onOpenComments?: () => void;
+  /**
+   * Statut courant de l'utilisateur sur l'école rattachée à l'annonce
+   * (vit sur `EstablishmentFollow`). `null` ⇒ pas de statut explicite.
+   * Affiché en badge si un statut est posé OU si l'annonce autorise au
+   * moins un statut (auquel cas on incite à le définir).
+   */
+  currentStatus?: CandidacyStatusType | null;
+  /**
+   * Ouvre la sheet de mise à jour de statut depuis la card. Si fourni
+   * **et** que l'annonce autorise au moins un statut, un bouton dédié
+   * « Mettre à jour » s'affiche.
+   */
+  onUpdateStatus?: () => void;
 };
 
 export function AnnouncementCard({
   item,
   isFollowed,
+  followStateLoading,
+  eligibilityLoading,
   busy,
   onToggleFollow,
   onOpenLink,
   onPress,
+  onOpenComments,
+  currentStatus = null,
+  onUpdateStatus,
 }: Props) {
   const { t, locale, isRTL } = useLocale();
   const { profile: eligibilityProfile } = useEligibilityProfile();
@@ -66,6 +93,17 @@ export function AnnouncementCard({
     fallbackEstablishmentAvatarName(est?.nom, est?.sigle);
 
   const deadline = formatDaysUntilClose(item.daysUntilClose, locale);
+  // « Statut » disponible sur la card uniquement quand l'annonce autorise
+  // au moins un statut **et** que la page parente nous fournit le handler
+  // (sinon on n'a pas de quoi ouvrir la sheet — afficher le badge serait
+  // trompeur).
+  const canUpdateStatus =
+    typeof onUpdateStatus === 'function' && (item.availableStatuses?.length ?? 0) > 0;
+
+  const commentsKnown =
+    typeof item.communityQnaMessageCount === 'number' && Number.isFinite(item.communityQnaMessageCount);
+  const commentsCount = commentsKnown ? Math.max(0, Math.floor(item.communityQnaMessageCount as number)) : null;
+  const commentsStatsPending = Boolean(onOpenComments) && !commentsKnown;
 
   return (
     <Pressable
@@ -73,11 +111,32 @@ export function AnnouncementCard({
       disabled={!onPress}
       style={({ pressed }) => [styles.card, pressed && onPress && { opacity: 0.92 }]}
     >
+      {/*
+        Bandeau « type d'annonce » : positionné en overlay sur l'image cover
+        si elle existe, sinon en première ligne du body. Repère visuel
+        immédiat (couleur dédiée par type via `AnnouncementTypeChip`),
+        repensé pour libérer la place à droite du logo de l'école.
+      */}
       {item.ogImage ? (
-        <Image source={{ uri: item.ogImage }} style={styles.cover} resizeMode="cover" />
+        <View style={styles.coverWrap}>
+          <Image source={{ uri: item.ogImage }} style={styles.cover} resizeMode="cover" />
+          <View style={[styles.coverChip, isRTL ? styles.coverChipRtl : styles.coverChipLtr]}>
+            <AnnouncementTypeChip type={item.announcementType} variant="pill" isRTL={isRTL} />
+          </View>
+        </View>
       ) : null}
 
       <View style={styles.body}>
+        {/* Bandeau type — affiché ici uniquement quand il n'y a pas de cover. */}
+        {!item.ogImage ? (
+          <AnnouncementTypeChip
+            type={item.announcementType}
+            variant="banner"
+            isRTL={isRTL}
+            style={styles.typeBanner}
+          />
+        ) : null}
+
         {/* ── Établissement (logo + nom + sigle + type) ── */}
         <View style={[styles.estRow, isRTL && styles.rowRtl]}>
           <Image
@@ -103,11 +162,6 @@ export function AnnouncementCard({
               ) : null}
               {est?.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
             </View>
-          </View>
-          <View style={[styles.typePill]}>
-            <Text style={styles.typePillTxt} numberOfLines={1}>
-              {item.announcementType}
-            </Text>
           </View>
         </View>
 
@@ -165,7 +219,13 @@ export function AnnouncementCard({
 
         {/* ── Eligibilité personnalisée (basée sur le profil étudiant) ── */}
         <View style={[styles.eligibilityRow, isRTL && styles.rowRtl]}>
-          <EligibilityBadge result={eligibility} size="xs" />
+          {eligibilityLoading ? (
+            <View style={styles.eligibilityLoadingDot}>
+              <ActivityIndicator size="small" color={brand.primary} />
+            </View>
+          ) : (
+            <EligibilityBadge result={eligibility} size="xs" />
+          )}
         </View>
 
         {deadline.label ? (
@@ -205,47 +265,149 @@ export function AnnouncementCard({
           </View>
         ) : null}
 
-        {/* ── Actions ── */}
-        <View style={[styles.actions, isRTL && styles.rowRtl]}>
-          <Pressable
-            onPress={onToggleFollow}
-            disabled={busy}
-            style={({ pressed }) => [
-              styles.btn,
-              isFollowed ? styles.btnFollowed : styles.btnFollow,
-              pressed && { opacity: 0.85 },
-              busy && { opacity: 0.5 },
-            ]}
-          >
-            <FontAwesome
-              name={isFollowed ? 'check' : 'plus'}
-              size={11}
-              color={isFollowed ? brand.primary : brand.white}
-            />
-            <Text style={isFollowed ? styles.btnFollowedTxt : styles.btnFollowTxt}>
-              {isFollowed ? t('inscAnnouncementsFollowing') : t('inscAnnouncementsFollow')}
-            </Text>
-          </Pressable>
+        {/* ── Statut de candidature (école) ── */}
+        {canUpdateStatus ? (
+          <View style={[styles.statusRow, isRTL && styles.rowRtl]}>
+            <StatusBadge status={currentStatus} size="sm" />
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onUpdateStatus?.();
+              }}
+              style={({ pressed }) => [
+                styles.statusEditBtn,
+                isRTL && styles.rowRtl,
+                pressed && { opacity: 0.85 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={
+                currentStatus ? t('inscStatusActionUpdate') : t('inscStatusActionTitle')
+              }
+            >
+              <FontAwesome name="pencil" size={11} color={brand.primary} />
+              <Text style={styles.statusEditBtnTxt} numberOfLines={1}>
+                {currentStatus ? t('inscStatusActionUpdate') : t('inscStatusActionTitle')}
+              </Text>
+            </Pressable>
+          </View>
+        ) : null}
 
-          <Pressable
-            onPress={onOpenLink}
-            disabled={!item.registrationUrl}
-            style={({ pressed }) => [
-              styles.btn,
-              styles.btnLink,
-              !item.registrationUrl && styles.btnDisabled,
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            <FontAwesome name="external-link" size={11} color={brand.primary} />
-            <Text style={styles.btnLinkTxt} numberOfLines={1}>
-              {pickRegistrationUrlLabel(
-                item.registrationUrlLabel,
-                item.announcementType,
-                t,
+        {/* ── Actions : suivi + commentaires (optionnel) puis lien d'inscription ── */}
+        <View style={styles.actionsCol}>
+          <View style={[styles.actionsRow, isRTL && styles.rowRtl]}>
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onToggleFollow();
+              }}
+              disabled={busy || followStateLoading}
+              style={({ pressed }) => [
+                styles.btn,
+                styles.btnFlex,
+                !followStateLoading && isFollowed ? styles.btnFollowed : styles.btnFollow,
+                pressed && { opacity: 0.85 },
+                (busy || followStateLoading) && { opacity: 0.5 },
+              ]}
+            >
+              {busy || followStateLoading ? (
+                <ActivityIndicator
+                  size="small"
+                  color={!followStateLoading && isFollowed ? brand.primary : brand.white}
+                />
+              ) : (
+                <>
+                  <FontAwesome
+                    name={isFollowed ? 'heart' : 'heart-o'}
+                    size={11}
+                    color={isFollowed ? brand.primary : brand.white}
+                  />
+                  <Text style={isFollowed ? styles.btnFollowedTxt : styles.btnFollowTxt}>
+                    {isFollowed ? t('inscAnnouncementsFollowing') : t('inscAnnouncementsFollow')}
+                  </Text>
+                </>
               )}
-            </Text>
-          </Pressable>
+            </Pressable>
+
+            {onOpenComments ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onOpenComments();
+                }}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnFlex,
+                  styles.btnComment,
+                  pressed && { opacity: 0.85 },
+                ]}
+                accessibilityRole="button"
+                accessibilityLabel={`${t('estCardBtnComment')}. ${t('estCardQnaOpenA11y')}`}
+              >
+                <FontAwesome name="comment-o" size={11} color={brand.primary} />
+                {commentsStatsPending ? (
+                  <ActivityIndicator size="small" color={brand.primary} style={{ marginStart: 4 }} />
+                ) : (
+                  <Text style={[styles.btnCommentTxt, isRTL && styles.rtl]} numberOfLines={1}>
+                    {commentsCount != null && commentsCount > 0
+                      ? `${t('estCardBtnComment')} (${commentsCount})`
+                      : t('estCardBtnComment')}
+                  </Text>
+                )}
+              </Pressable>
+            ) : null}
+
+            {!onOpenComments ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onOpenLink();
+                }}
+                disabled={!item.registrationUrl}
+                style={({ pressed }) => [
+                  styles.btn,
+                  styles.btnFlex,
+                  styles.btnLink,
+                  !item.registrationUrl && styles.btnDisabled,
+                  pressed && { opacity: 0.85 },
+                ]}
+              >
+                <FontAwesome name="external-link" size={11} color={brand.primary} />
+                <Text style={styles.btnLinkTxt} numberOfLines={1}>
+                  {pickRegistrationUrlLabel(
+                    item.registrationUrlLabel,
+                    item.announcementType,
+                    t,
+                  )}
+                </Text>
+              </Pressable>
+            ) : null}
+          </View>
+
+          {onOpenComments ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onOpenLink();
+              }}
+              disabled={!item.registrationUrl}
+              style={({ pressed }) => [
+                styles.btn,
+                styles.btnLink,
+                styles.btnLinkFull,
+                !item.registrationUrl && styles.btnDisabled,
+                pressed && { opacity: 0.85 },
+              ]}
+            >
+              <FontAwesome name="external-link" size={11} color={brand.primary} />
+              <Text style={styles.btnLinkTxt} numberOfLines={1}>
+                {pickRegistrationUrlLabel(
+                  item.registrationUrlLabel,
+                  item.announcementType,
+                  t,
+                )}
+              </Text>
+            </Pressable>
+          ) : null}
         </View>
       </View>
     </Pressable>
@@ -265,7 +427,15 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     elevation: 1,
   },
+  coverWrap: { position: 'relative' },
   cover: { width: '100%', height: 110, backgroundColor: brand.borderLight },
+  coverChip: {
+    position: 'absolute',
+    top: spacing.sm,
+  },
+  coverChipLtr: { left: spacing.sm },
+  coverChipRtl: { right: spacing.sm },
+  typeBanner: { marginBottom: 2 },
   body: { padding: spacing.md, gap: spacing.sm },
   estRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowRtl: { flexDirection: 'row-reverse' },
@@ -301,13 +471,6 @@ const styles = StyleSheet.create({
   },
   metaItem: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   metaTxt: { color: brand.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
-  typePill: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-    backgroundColor: 'rgba(51,62,143,0.10)',
-  },
-  typePillTxt: { color: brand.primary, fontWeight: '700', fontSize: fontSize.xs },
   title: { color: brand.text, fontWeight: '700', fontSize: fontSize.md, lineHeight: 21 },
   villeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
   villeTxt: { color: brand.textSecondary, fontSize: fontSize.xs, fontWeight: '600', flex: 1 },
@@ -330,6 +493,12 @@ const styles = StyleSheet.create({
     gap: 6,
     flexWrap: 'wrap',
     minHeight: 0,
+  },
+  eligibilityLoadingDot: {
+    minWidth: 28,
+    minHeight: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 
   /* Countdown bandeau */
@@ -387,7 +556,31 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-  actions: { flexDirection: 'row', gap: spacing.sm, marginTop: 2 },
+  /* Ligne de statut (badge + bouton « Mettre à jour ») juste avant les
+     actions principales. Si l'annonce ne propose aucun statut, ou si le
+     parent ne fournit pas de handler, ce bloc reste masqué. */
+  statusRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    marginTop: 2,
+  },
+  statusEditBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: brand.primary,
+    backgroundColor: brand.white,
+  },
+  statusEditBtnTxt: { color: brand.primary, fontWeight: '800', fontSize: fontSize.xs },
+
+  actionsCol: { marginTop: 2, gap: spacing.sm },
+  actionsRow: { flexDirection: 'row', gap: spacing.sm, alignItems: 'stretch' },
   btn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -396,8 +589,15 @@ const styles = StyleSheet.create({
     paddingVertical: 9,
     paddingHorizontal: 12,
     borderRadius: radius.md,
-    flex: 1,
   },
+  btnFlex: { flex: 1, minWidth: 0 },
+  btnLinkFull: { alignSelf: 'stretch' },
+  btnComment: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: brand.primary,
+    backgroundColor: brand.white,
+  },
+  btnCommentTxt: { color: brand.primary, fontSize: fontSize.sm, fontWeight: '700' },
   btnFollow: { backgroundColor: brand.primary },
   btnFollowTxt: { color: brand.white, fontSize: fontSize.sm, fontWeight: '700' },
   btnFollowed: {

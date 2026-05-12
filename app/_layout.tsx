@@ -16,9 +16,16 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplash } from '@/components/AnimatedSplash';
+import { AppSidebarPanel } from '@/components/AppSidebarPanel';
+import { MobileAnalyticsTracker } from '@/components/MobileAnalyticsTracker';
+import { NotificationsOffcanvas } from '@/components/notifications/NotificationsOffcanvas';
+import { AppSidebarProvider } from '@/contexts/AppSidebarContext';
+import { NotificationsDrawerProvider } from '@/contexts/NotificationsDrawerContext';
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { GlobalWallUnreadProvider } from '@/contexts/GlobalWallUnreadContext';
 import { LocaleProvider } from '@/contexts/LocaleContext';
+import { SharePreviewProvider } from '@/contexts/SharePreviewContext';
 import { ShopCartProvider } from '@/contexts/ShopCartContext';
 import {
   attachNotificationListeners,
@@ -76,11 +83,15 @@ export default function RootLayout() {
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
         <LocaleProvider>
-          <AuthProvider>
-            <ShopCartProvider>
-              <RootLayoutNav />
-            </ShopCartProvider>
-          </AuthProvider>
+          <SharePreviewProvider>
+            <AuthProvider>
+              <GlobalWallUnreadProvider>
+                <ShopCartProvider>
+                  <RootLayoutNav />
+                </ShopCartProvider>
+              </GlobalWallUnreadProvider>
+            </AuthProvider>
+          </SharePreviewProvider>
         </LocaleProvider>
       </SafeAreaProvider>
     </GestureHandlerRootView>
@@ -99,20 +110,29 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={navTheme}>
-      <Stack>
-        <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-        <Stack.Screen name="login" options={{ headerShown: false }} />
-        <Stack.Screen name="register" options={{ headerShown: false }} />
-        <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
-        <Stack.Screen name="account-setup" options={{ headerShown: false }} />
-        <Stack.Screen name="logout" options={{ headerShown: false }} />
-        <Stack.Screen name="boutique/[slug]" options={{ headerShown: false }} />
-        <Stack.Screen name="boutique/cart" options={{ headerShown: false }} />
-        <Stack.Screen name="boutique/checkout" options={{ headerShown: false }} />
-        <Stack.Screen name="boutique/thank-you" options={{ headerShown: false }} />
-        <Stack.Screen name="inscriptions/[id]" options={{ headerShown: false }} />
-        <Stack.Screen name="inscriptions/follow/[id]" options={{ headerShown: false }} />
-      </Stack>
+      <AppSidebarProvider>
+        <NotificationsDrawerProvider>
+          <MobileAnalyticsTracker />
+          <AppSidebarPanel />
+          <Stack>
+            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+            <Stack.Screen name="login" options={{ headerShown: false }} />
+            <Stack.Screen name="register" options={{ headerShown: false }} />
+            <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+            <Stack.Screen name="account-setup" options={{ headerShown: false }} />
+            <Stack.Screen name="logout" options={{ headerShown: false }} />
+            <Stack.Screen name="boutique/[slug]" options={{ headerShown: false }} />
+            <Stack.Screen name="boutique/cart" options={{ headerShown: false }} />
+            <Stack.Screen name="boutique/checkout" options={{ headerShown: false }} />
+            <Stack.Screen name="boutique/thank-you" options={{ headerShown: false }} />
+            <Stack.Screen name="inscriptions/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="inscriptions/follow/[id]" options={{ headerShown: false }} />
+            <Stack.Screen name="communaute" options={{ headerShown: false }} />
+            <Stack.Screen name="daily-challenge" options={{ headerShown: false }} />
+          </Stack>
+          <NotificationsOffcanvas />
+        </NotificationsDrawerProvider>
+      </AppSidebarProvider>
     </ThemeProvider>
   );
 }
@@ -154,6 +174,7 @@ function useSetupRedirectGate() {
     const isOnAuth =
       route === 'login' || route === 'register' || route === 'forgot-password';
     const isOnLogout = route === 'logout';
+    const isPublicDailyChallenge = route === 'daily-challenge';
 
     // Defer navigation to next tick so Expo Router state is settled
     const navigate = (dest: string) => {
@@ -162,7 +183,7 @@ function useSetupRedirectGate() {
 
     // Not logged in → login (unless already on an auth/logout screen)
     if (!user) {
-      if (!isOnAuth && !isOnLogout) navigate('/login');
+      if (!isOnAuth && !isOnLogout && !isPublicDailyChallenge) navigate('/login');
       return;
     }
 

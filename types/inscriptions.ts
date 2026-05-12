@@ -1,26 +1,45 @@
 /**
  * Types partagés pour le système Inscriptions / Suivi de candidature.
- * Source : RegistrationCandidacyController, ContestAnnouncementController, NotificationController.
+ *
+ * Source : `RegistrationCandidacyController`, `ContestAnnouncementController`,
+ * `EstablishmentFollowController` et `CandidacyStatusTypeController`.
+ *
+ * Refonte 2026-05 : les statuts de candidature ne sont plus une union
+ * littérale mais une référence vers le catalogue admin
+ * `CandidacyStatusType` (couleurs, libellés FR/AR, icône, ordre, etc.).
+ * Chaque annonce expose la liste des statuts qu'elle autorise via
+ * `availableStatuses`. Une candidature peut avoir un statut `null` :
+ * l'utilisateur a souscrit sans déclarer d'action explicite.
  */
 
-export type CandidacyStatus =
-  | 'interested'
-  | 'applied'
-  | 'pre_admitted'
-  | 'admitted'
-  | 'enrolled'
-  | 'rejected'
-  | 'withdrawn';
-
-export const ALL_CANDIDACY_STATUSES: CandidacyStatus[] = [
-  'interested',
-  'applied',
-  'pre_admitted',
-  'admitted',
-  'enrolled',
-  'rejected',
-  'withdrawn',
-];
+/**
+ * Statut de candidature configurable côté admin.
+ * Le `code` (snake_case) reste stable pour relier les events historiques
+ * même après renommage des libellés ; les valeurs visuelles sont
+ * directement appliquées par les composants (pas de mapping en dur).
+ */
+export type CandidacyStatusType = {
+  id: number;
+  code: string;
+  labelFr: string;
+  labelAr: string;
+  /** Nom d'icône FontAwesome (ex. `star`, `check-circle`). */
+  icon: string;
+  /** Couleur d'accent (texte / icône) au format hex `#RRGGBB`. */
+  colorFg: string;
+  /** Couleur de fond du badge. */
+  colorBg: string;
+  /** Couleur de bordure du badge. */
+  colorBorder: string;
+  sortOrder: number;
+  isActive: boolean;
+  /**
+   * Quand `true`, l'arrivée à ce statut marque la candidature comme
+   * « inscription administrative effectuée » (cf. backend
+   * `RegistrationCandidacyController::applyStatusTimestamps`).
+   */
+  isEnrollmentMarker: boolean;
+};
 
 export type EstablishmentBrief = {
   id: number;
@@ -73,7 +92,16 @@ export type AnnouncementBrief = {
   specialitesBacMissionAcceptees?: string[];
   /** Critères d'éligibilité — Années scolaires du bac acceptées. */
   anneesBacAcceptees?: string[];
+  /**
+   * Sous-ensemble du catalogue admin que l'étudiant pourra sélectionner
+   * pour cette annonce (ordonné dans l'ordre voulu par l'admin).
+   * Liste vide ⇒ aucune action de candidature possible (seul le suivi
+   * école reste accessible).
+   */
+  availableStatuses: CandidacyStatusType[];
   establishment: EstablishmentBrief | null;
+  /** Compteur public Q&R (liste suivi école), si exposé par l’API. */
+  communityQnaMessageCount?: number;
 };
 
 export type CandidacyEventType =
@@ -87,8 +115,15 @@ export type CandidacyEventType =
 export type CandidacyEvent = {
   id: number;
   type: CandidacyEventType;
-  oldStatus: CandidacyStatus | null;
-  newStatus: CandidacyStatus | null;
+  /**
+   * Code (snake_case) du statut **avant** le changement, snapshot au
+   * moment de l'event. `null` si l'event n'est pas un changement de
+   * statut ou si la candidature n'avait aucun statut auparavant. Le code
+   * est conservé tel quel même si le statut est ensuite supprimé.
+   */
+  oldStatus: string | null;
+  /** Code (snake_case) du statut **après** le changement. */
+  newStatus: string | null;
   message: string | null;
   metadata: Record<string, unknown> | null;
   createdAt: string;
@@ -96,7 +131,13 @@ export type CandidacyEvent = {
 
 export type Candidacy = {
   id: number;
-  status: CandidacyStatus;
+  /**
+   * Statut courant de la candidature. `null` quand l'utilisateur a juste
+   * souscrit sans choisir d'action (ou si l'annonce n'autorise plus aucun
+   * statut). Sinon, objet complet (couleur/libellé/icône) renvoyé par le
+   * backend, prêt à afficher.
+   */
+  status: CandidacyStatusType | null;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
@@ -106,6 +147,17 @@ export type Candidacy = {
   announcement: AnnouncementBrief | null;
   /** Présent dans la liste, null dans l'objet timeline. */
   lastEvent: CandidacyEvent | null;
+};
+
+export type CandidacyListResponse = {
+  data: Candidacy[];
+  /**
+   * Compte par code de statut (ex. `{ "interested": 3, "applied": 1, "null": 2 }`).
+   * La clé `null` regroupe les candidatures sans statut explicite.
+   */
+  counts: Record<string, number>;
+  /** Catalogue actif (ordonné), pour rendre les filtres et la timeline. */
+  statuses: CandidacyStatusType[];
 };
 
 export type CandidacyTimelinePayload = {
@@ -133,13 +185,28 @@ export type EstablishmentFollowEvent = CandidacyEvent & {
   candidacyId: number | null;
 };
 
+/**
+ * Suivi d'un établissement par l'utilisateur — porte également le statut
+ * de candidature de l'utilisateur sur cette école (refonte UX 2026-05).
+ *
+ * `availableStatuses` est l'**union** des statuts autorisés par toutes
+ * les annonces publiées de l'école, calculée par le backend. Vide ⇒
+ * aucune action de modification de statut possible côté UI.
+ */
 export type EstablishmentFollow = {
   id: number;
-  status: CandidacyStatus;
   notes: string | null;
   createdAt: string;
   updatedAt: string;
   establishment: EstablishmentBrief | null;
+  /**
+   * Statut courant. Initialisé à `interested` (slug conventionnel) au
+   * follow ; modifiable ensuite via `updateFollowStatus`. `null` si l'admin
+   * a supprimé le statut référencé ou si l'utilisateur l'a effacé.
+   */
+  status: CandidacyStatusType | null;
+  /** Statuts proposables (union des annonces de l'école), triés. */
+  availableStatuses: CandidacyStatusType[];
   stats: EstablishmentFollowStats;
   latestAnnouncement: AnnouncementBrief | null;
   latestEvent: EstablishmentFollowEvent | null;
@@ -160,10 +227,14 @@ export type AppNotification = {
   id: number;
   title: string;
   message: string;
+  /** Libellés arabes (si absents, l’UI retombe sur `title` / `message`). */
+  titleAr?: string | null;
+  messageAr?: string | null;
   type: string;
   isRead: boolean;
   createdAt: string;
   timeAgo: string;
+  timeAgoAr?: string | null;
   metadata: Record<string, unknown> | null;
 };
 

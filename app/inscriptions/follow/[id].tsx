@@ -1,21 +1,25 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
   Image,
+  Platform,
   Pressable,
   StyleSheet,
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { CommunityQnaSection } from '@/components/community/CommunityQnaSection';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
+import { ContestAnnouncementQnaBottomSheet } from '@/components/inscriptions/ContestAnnouncementQnaBottomSheet';
 import { StatusBadge } from '@/components/inscriptions/StatusBadge';
 import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
+import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
 import {
@@ -29,30 +33,36 @@ import {
   fetchEstablishmentFollowTimeline,
   updateFollowStatus,
 } from '@/services/establishmentFollows';
+import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
-import type {
-  CandidacyStatus,
-  EstablishmentFollowTimeline,
-} from '@/types/inscriptions';
-import {
-  formatTimeAgo,
-  pickEstablishmentName,
-  STATUS_VISUALS,
-} from '@/utils/candidacyStatus';
+import type { CandidacyStatusType, EstablishmentFollowTimeline } from '@/types/inscriptions';
+import { formatTimeAgo, pickEstablishmentName } from '@/utils/candidacyStatus';
+import { updateLatestSeenOnDisk } from '@/utils/followLatestAnnouncementSeen';
 
 export default function FollowedSchoolDetailScreen() {
   const router = useRouter();
   const { t, locale, isRTL, setLocale } = useLocale();
   const insets = useSafeAreaInsets();
   const { getValidAccessToken } = useAuth();
-  const params = useLocalSearchParams<{ id?: string }>();
+  const params = useLocalSearchParams<{ id?: string; qnaQ?: string | string[] }>();
   const followId = useMemo(() => Number(params.id ?? 0), [params.id]);
+  const highlightQuestionId = useMemo(() => {
+    const raw = params.qnaQ;
+    const s = Array.isArray(raw) ? raw[0] : raw;
+    const n = Number(s ?? 0);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  }, [params.qnaQ]);
+  const listRef = useRef<FlatList<any>>(null);
+  const [listScrollY, setListScrollY] = useState(0);
 
   const [data, setData] = useState<EstablishmentFollowTimeline | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [statusSheetOpen, setStatusSheetOpen] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [statusSheetOpen, setStatusSheetOpen] = useState(false);
+  const [statusBusy, setStatusBusy] = useState(false);
+  const [announcementQnaSheet, setAnnouncementQnaSheet] = useState<{ id: number; title: string } | null>(null);
+  const closeAnnouncementQnaSheet = useCallback(() => setAnnouncementQnaSheet(null), []);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(followId) || followId <= 0) {
@@ -80,6 +90,25 @@ export default function FollowedSchoolDetailScreen() {
     setRefreshing(false);
   }, [load]);
 
+  const onConfirmStatus = useCallback(
+    async (next: CandidacyStatusType | null) => {
+      if (!data?.follow) return;
+      setStatusBusy(true);
+      try {
+        const token = await getValidAccessToken();
+        if (!token) return;
+        const updated = await updateFollowStatus(token, data.follow.id, next?.id ?? null);
+        if (updated) {
+          setData((prev) => (prev ? { ...prev, follow: updated } : prev));
+        }
+      } finally {
+        setStatusBusy(false);
+        setStatusSheetOpen(false);
+      }
+    },
+    [data?.follow, getValidAccessToken],
+  );
+
   const onUnfollow = useCallback(() => {
     if (!data?.follow) return;
     Alert.alert(
@@ -102,29 +131,6 @@ export default function FollowedSchoolDetailScreen() {
       ],
     );
   }, [data, getValidAccessToken, router, t]);
-
-  const onConfirmStatus = useCallback(
-    async (status: CandidacyStatus) => {
-      // NB : on ne ferme la sheet qu'APRÈS la résolution de la requête pour
-      // que `StatusUpdateSheet` puisse afficher l'état de chargement sur le
-      // bouton « Mettre à jour » pendant l'aller-retour réseau.
-      if (!data?.follow) {
-        setStatusSheetOpen(false);
-        return;
-      }
-      const token = await getValidAccessToken();
-      if (!token) {
-        setStatusSheetOpen(false);
-        return;
-      }
-      const updated = await updateFollowStatus(token, data.follow.id, status);
-      if (updated) {
-        setData((prev) => (prev ? { ...prev, follow: updated } : prev));
-      }
-      setStatusSheetOpen(false);
-    },
-    [data, getValidAccessToken],
-  );
 
   /**
    * Navigation vers la fiche complète de l'établissement.
@@ -175,7 +181,6 @@ export default function FollowedSchoolDetailScreen() {
 
   const follow = data.follow;
   const est = follow.establishment;
-  const visual = STATUS_VISUALS[follow.status];
   const estName = pickEstablishmentName(est, locale);
   const villes = (est?.villes ?? []).filter(Boolean);
   const villeMain = est?.ville?.trim() || '';
@@ -244,12 +249,14 @@ export default function FollowedSchoolDetailScreen() {
           canViewSchool && pressed && { opacity: 0.85 },
         ]}
       >
-        <Image
-          source={{ uri: logoUri }}
-          style={styles.estLogo}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
+        <View style={styles.logoWrap}>
+          <Image
+            source={{ uri: logoUri }}
+            style={styles.estLogo}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+        </View>
         <View style={{ flex: 1 }}>
           <Text style={[styles.estName, isRTL && styles.rtl]} numberOfLines={3}>
             {estName}
@@ -261,7 +268,6 @@ export default function FollowedSchoolDetailScreen() {
               </View>
             ) : null}
             {est?.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
-            <StatusBadge status={follow.status} size="sm" />
           </View>
           {villesShort ? (
             <View style={[styles.villeRow, isRTL && styles.rowRtl]}>
@@ -288,6 +294,34 @@ export default function FollowedSchoolDetailScreen() {
           />
         ) : null}
       </Pressable>
+
+      {/* Statut courant — affiché bien en évidence sur le hero, avec un
+          CTA dédié vers la sheet de mise à jour. Le CTA est masqué quand
+          aucune annonce de l'école n'autorise de statut. */}
+      <View style={[styles.statusBlock, isRTL && styles.rowRtl]}>
+        <View style={{ flexShrink: 1 }}>
+          <Text style={[styles.statusEyebrow, isRTL && styles.rtl]}>
+            {t('inscStatusBlockTitle')}
+          </Text>
+          <View style={{ marginTop: 6 }}>
+            <StatusBadge status={follow.status} size="md" />
+          </View>
+        </View>
+        {(follow.availableStatuses?.length ?? 0) > 0 ? (
+          <Pressable
+            onPress={() => setStatusSheetOpen(true)}
+            disabled={statusBusy}
+            style={({ pressed }) => [
+              styles.statusUpdateBtn,
+              pressed && { opacity: 0.85 },
+              statusBusy && { opacity: 0.6 },
+            ]}
+          >
+            <FontAwesome name="pencil" size={11} color={brand.primary} />
+            <Text style={styles.statusUpdateBtnTxt}>{t('inscStatusActionUpdate')}</Text>
+          </Pressable>
+        ) : null}
+      </View>
 
       {/* Stats */}
       <View style={[styles.statsRow, isRTL && styles.rowRtl]}>
@@ -339,15 +373,9 @@ export default function FollowedSchoolDetailScreen() {
         </Pressable>
       ) : null}
 
-      {/* Actions */}
+      {/* Actions — uniquement « Ne plus suivre » : la mise à jour de statut
+          se fait au niveau de chaque candidature (page d'annonce). */}
       <View style={[styles.actionsRow, isRTL && styles.rowRtl]}>
-        <Pressable
-          onPress={() => setStatusSheetOpen(true)}
-          style={({ pressed }) => [styles.actionBtn, pressed && { opacity: 0.85 }]}
-        >
-          <FontAwesome name="pencil" size={12} color={brand.primary} />
-          <Text style={styles.actionBtnTxt}>{t('inscStatusActionUpdate')}</Text>
-        </Pressable>
         <Pressable
           onPress={onUnfollow}
           disabled={busy}
@@ -369,7 +397,9 @@ export default function FollowedSchoolDetailScreen() {
   const renderTimeline = () => (
     <View style={styles.section}>
       <View style={[styles.sectionHeader, isRTL && styles.rowRtl]}>
-        <FontAwesome name="history" size={14} color={brand.primary} />
+        <View style={styles.sectionIconCircle}>
+          <FontAwesome name="history" size={13} color={brand.primary} />
+        </View>
         <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
           {t('followedSchoolTimelineTitle')}
         </Text>
@@ -379,9 +409,9 @@ export default function FollowedSchoolDetailScreen() {
       ) : (
         <View style={{ gap: spacing.sm }}>
           {data.events.map((ev) => (
-            <View key={`ev-${ev.id}`} style={[styles.eventRow, isRTL && styles.rowRtl]}>
-              <View style={[styles.eventDot, { backgroundColor: visual.fg }]} />
-              <View style={{ flex: 1 }}>
+            <View key={`ev-${ev.id}`} style={[styles.eventCard, isRTL && styles.rowRtl]}>
+              <View style={[styles.eventDot, { backgroundColor: homeShell.green }]} />
+              <View style={{ flex: 1, minWidth: 0 }}>
                 <Text style={[styles.eventMsg, isRTL && styles.rtl]}>
                   {ev.message ?? '—'}
                 </Text>
@@ -403,16 +433,35 @@ export default function FollowedSchoolDetailScreen() {
       <StatusBar style="light" />
 
       <FlatList
+        ref={listRef}
         data={data.announcements}
         keyExtractor={(a) => `ann-${a.id}`}
-        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + spacing.xxl }]}
+        contentContainerStyle={[styles.list, { paddingBottom: insets.bottom + spacing.xxl + spacing.lg }]}
         showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+        onScroll={(e) => setListScrollY(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={32}
         ListHeaderComponent={
           <>
             {renderHeader()}
             {renderTimeline()}
-            <View style={[styles.sectionHeader, { paddingHorizontal: spacing.lg }, isRTL && styles.rowRtl]}>
-              <FontAwesome name="bullhorn" size={14} color={brand.primary} />
+            {followId > 0 ? (
+              <View style={{ marginHorizontal: spacing.lg, marginBottom: spacing.md }}>
+                <CommunityQnaSection
+                  contextType="establishment_follow"
+                  contextId={followId}
+                  marginHorizontal={0}
+                  highlightQuestionId={highlightQuestionId}
+                  flatListRef={listRef}
+                  listScrollOffsetY={listScrollY}
+                />
+              </View>
+            ) : null}
+            <View style={[styles.announcementsTitleRow, isRTL && styles.rowRtl]}>
+              <View style={styles.sectionIconCircle}>
+                <FontAwesome name="bullhorn" size={13} color={brand.primary} />
+              </View>
               <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
                 {t('followedSchoolHistoricalAnnouncements')}
               </Text>
@@ -440,12 +489,24 @@ export default function FollowedSchoolDetailScreen() {
                 filieresAcceptees: item.filieresAcceptees ?? [],
                 specialitesBacMissionAcceptees: item.specialitesBacMissionAcceptees ?? [],
                 anneesBacAcceptees: item.anneesBacAcceptees ?? [],
+                availableStatuses: item.availableStatuses ?? [],
                 establishment: item.establishment ?? null,
+                communityQnaMessageCount: item.communityQnaMessageCount,
               }}
               isFollowed
               onToggleFollow={() => undefined}
               onOpenLink={() => undefined}
-              onPress={() => router.push(`/inscriptions/${item.id}` as never)}
+              onOpenComments={() => {
+                void updateLatestSeenOnDisk(followId, item.id);
+                setAnnouncementQnaSheet({
+                  id: item.id,
+                  title: (isRTL && item.titleAr ? item.titleAr : item.title) || '',
+                });
+              }}
+              onPress={() => {
+                void updateLatestSeenOnDisk(followId, item.id);
+                router.push(`/inscriptions/${item.id}` as never);
+              }}
             />
           </View>
         )}
@@ -456,16 +517,22 @@ export default function FollowedSchoolDetailScreen() {
             </Text>
           </View>
         }
-        refreshing={refreshing}
-        onRefresh={onRefresh}
+        refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       />
 
       <StatusUpdateSheet
         visible={statusSheetOpen}
         currentStatus={follow.status}
+        availableStatuses={follow.availableStatuses ?? []}
         onClose={() => setStatusSheetOpen(false)}
         onConfirm={onConfirmStatus}
-        onRequestDelete={onUnfollow}
+      />
+
+      <ContestAnnouncementQnaBottomSheet
+        visible={announcementQnaSheet !== null}
+        announcementId={announcementQnaSheet?.id ?? 0}
+        announcementTitle={announcementQnaSheet?.title ?? ''}
+        onClose={closeAnnouncementQnaSheet}
       />
     </View>
   );
@@ -486,21 +553,25 @@ const styles = StyleSheet.create({
 
   list: { paddingTop: 0 },
 
-  /* Hero */
+  /* Hero — bandeau marque + carte école qui « flotte » sur le fond */
   hero: {
-    backgroundColor: brand.primary,
+    backgroundColor: homeShell.bg,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.xl,
     gap: spacing.md,
+    borderBottomLeftRadius: radius.xl,
+    borderBottomRightRadius: radius.xl,
   },
   heroTopBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   iconBtn: {
-    width: 36,
-    height: 36,
+    width: 38,
+    height: 38,
     borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.28)',
   },
   heroTitle: {
     color: brand.white,
@@ -531,13 +602,27 @@ const styles = StyleSheet.create({
   estCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: spacing.md,
     backgroundColor: brand.white,
-    padding: spacing.md,
-    borderRadius: radius.lg,
+    padding: spacing.md + 2,
+    borderRadius: radius.xl,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.65)',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.14,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+    elevation: 5,
   },
   rowRtl: { flexDirection: 'row-reverse' },
-  estLogo: { width: 54, height: 54, borderRadius: radius.sm, backgroundColor: brand.borderLight },
+  logoWrap: {
+    padding: 3,
+    borderRadius: radius.md + 2,
+    backgroundColor: brand.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: brand.border,
+  },
+  estLogo: { width: 56, height: 56, borderRadius: radius.sm, backgroundColor: brand.borderLight },
   estName: { fontWeight: '800', color: brand.text, fontSize: fontSize.md, lineHeight: 19 },
   estMetaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6, marginTop: 4 },
   siglePill: {
@@ -562,15 +647,55 @@ const styles = StyleSheet.create({
     textDecorationLine: 'underline',
   },
 
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  /* Bloc statut courant + bouton mise à jour */
+  statusBlock: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    backgroundColor: brand.white,
+    borderRadius: radius.lg,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: spacing.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(226,232,240,0.95)',
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    shadowOffset: { width: 0, height: 3 },
+    elevation: 3,
+  },
+  statusEyebrow: {
+    color: brand.textMuted,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    textTransform: 'uppercase',
+  },
+  statusUpdateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: spacing.md + 2,
+    paddingVertical: 9,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(51,62,143,0.08)',
+    borderWidth: 1,
+    borderColor: 'rgba(51,62,143,0.22)',
+  },
+  statusUpdateBtnTxt: { color: brand.primary, fontWeight: '800', fontSize: fontSize.xs },
+
+  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   statPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    gap: 5,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
     borderRadius: radius.full,
-    backgroundColor: 'rgba(255,255,255,0.18)',
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.28)',
   },
   statPillTxt: { color: brand.white, fontSize: fontSize.xs, fontWeight: '700' },
 
@@ -580,16 +705,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
-    paddingVertical: 12,
+    paddingVertical: 13,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.md,
+    borderRadius: radius.lg,
     backgroundColor: brand.white,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.55)',
     shadowColor: '#0F172A',
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    shadowOffset: { width: 0, height: 1 },
-    elevation: 1,
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 3,
   },
   viewSchoolCtaTxt: {
     flex: 1,
@@ -612,30 +739,64 @@ const styles = StyleSheet.create({
     borderColor: brand.primary,
   },
   actionBtnTxt: { color: brand.primary, fontWeight: '800', fontSize: fontSize.sm },
-  actionDanger: { borderColor: '#FECACA', backgroundColor: '#FEF2F2' },
+  actionDanger: {
+    borderColor: 'rgba(248,113,113,0.45)',
+    backgroundColor: '#FFF1F2',
+  },
   actionDangerTxt: { color: '#B91C1C', fontWeight: '800', fontSize: fontSize.sm },
 
-  /* Sections */
+  /* Sections (cartes sur fond grisé) */
   section: {
     marginHorizontal: spacing.lg,
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     backgroundColor: brand.white,
-    borderRadius: radius.lg,
+    borderRadius: radius.xl,
     padding: spacing.lg,
     gap: spacing.md,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: brand.border,
+    borderColor: brand.borderLight,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.06,
+    shadowRadius: 14,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 2,
   },
-  sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: spacing.lg, marginBottom: spacing.sm },
-  sectionTitle: { color: brand.text, fontSize: fontSize.md, fontWeight: '800' },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: spacing.xs,
+  },
+  sectionIconCircle: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(51,62,143,0.10)',
+  },
+  announcementsTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+    paddingHorizontal: spacing.lg,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xs,
+  },
+  sectionTitle: { flex: 1, color: brand.text, fontSize: fontSize.md, fontWeight: '800' },
   muted: { color: brand.textMuted, fontSize: fontSize.sm, lineHeight: 20 },
 
-  eventRow: {
+  eventCard: {
     flexDirection: 'row',
     gap: spacing.sm,
-    paddingVertical: 6,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    backgroundColor: brand.backgroundSoft,
+    borderRadius: radius.md,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: brand.border,
   },
-  eventDot: { width: 8, height: 8, borderRadius: 4, marginTop: 7 },
+  eventDot: { width: 8, height: 8, borderRadius: 4, marginTop: 6 },
   eventMsg: { color: brand.text, fontSize: fontSize.sm, fontWeight: '700' },
   eventMeta: { color: brand.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
 

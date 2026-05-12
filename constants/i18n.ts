@@ -2,6 +2,11 @@ export type AppLocale = 'fr' | 'ar';
 
 export type HomeCopyKey =
   | 'notifications'
+  | 'notifDrawerTitle'
+  | 'notifDrawerClose'
+  | 'notifDrawerSubtitle'
+  | 'notifDrawerEmpty'
+  | 'notifDrawerOpenLink'
   | 'unreadSuffix'
   | 'help'
   | 'profile'
@@ -15,6 +20,91 @@ export type HomeCopyKey =
   | 'langAr'
   | 'gameDailyTitle'
   | 'gameDailyBody'
+  | 'dailyChallengeTitle'
+  | 'dailyChallengeClose'
+  | 'dailyChallengeNoChallenge'
+  | 'dailyChallengeLoginHint'
+  | 'dailyChallengeLoginCta'
+  | 'dailyChallengeTestButton'
+  | 'dailyChallengeRetry'
+  | 'dailyChallengeStreak'
+  | 'dailyChallengeStart'
+  | 'dailyChallengeSubmit'
+  | 'dailyChallengeNext'
+  | 'dailyChallengeResult'
+  | 'dailyChallengeRank'
+  | 'dailyChallengePlayers'
+  | 'dailyChallengeBadges'
+  | 'dailyChallengeLeaderboard'
+  | 'dailyChallengePlayed'
+  | 'dailyChallengeMicroLearn'
+  | 'dailyChallengeMicroLearnTeaser'
+  | 'dailyChallengeMicroLearnModalSubtitle'
+  | 'dailyChallengeMicroLearnModalIntro'
+  | 'dailyChallengeMicroLearnGotIt'
+  | 'dailyChallengeMicroLearnReopen'
+  | 'dailyChallengePickGames'
+  | 'dailyChallengePlayThis'
+  | 'dailyChallengeGameDone'
+  | 'dailyChallengeSeeScore'
+  | 'dailyChallengeBackToGames'
+  | 'dailyChallengeAllDone'
+  | 'dailyChallengeZipHint'
+  | 'dailyChallengeZipValidate'
+  | 'dailyChallengeZipOrder'
+  | 'dailyChallengeZipOrderError'
+  | 'dailyChallengeZipPathError'
+  | 'dailyChallengeZipPracticeTitle'
+  | 'dailyChallengeZipPracticeHint'
+  | 'dailyChallengeZipPracticeTag'
+  | 'dailyChallengeZipPracticeResult'
+  | 'dailyChallengeZipPracticeAgain'
+  | 'dailyChallengeZipUndo'
+  | 'dailyChallengeZipReset'
+  | 'dailyChallengeZipInteractionHint'
+  | 'dailyChallengeZipHowToPlay'
+  | 'dailyChallengeZipRulesCta'
+  | 'dailyChallengeZipRulesTitle'
+  | 'dailyChallengeZipSeeResults'
+  | 'dailyChallengeYourTime'
+  | 'dailyChallengeCongratsTitle'
+  | 'dailyChallengeCongratsPracticeLine'
+  | 'dailyChallengeFlawlessBadge'
+  | 'dailyChallengeSolvedIn'
+  | 'dailyChallengeResultCardTitle'
+  | 'dailyChallengeBeatPlayersPrefix'
+  | 'dailyChallengeBeatPlayersSuffix'
+  | 'dailyChallengeLeaderboardModalTitle'
+  | 'dailyChallengeLeaderboardTopToday'
+  | 'dailyChallengeLeaderboardLoadMore'
+  | 'dailyChallengeYouLabel'
+  | 'dailyChallengeScoreLabel'
+  | 'dailyChallengeHubHeroLine'
+  | 'dailyChallengeMissionsTitle'
+  | 'dailyChallengeProgressSectionTitle'
+  | 'dailyChallengeProgressBannerKicker'
+  | 'dailyChallengeProgressLevelShort'
+  | 'dailyChallengeProgressXpCaption'
+  | 'dailyChallengeProgressXpMaxed'
+  | 'dailyChallengeProgressBadgeQuest'
+  | 'dailyChallengeProgressRecordShort'
+  | 'dailyChallengeProgressIceShort'
+  | 'dailyChallengeStreakRecord'
+  | 'dailyChallengeIceStock'
+  | 'dailyChallengeYearProgressTitle'
+  | 'dailyChallengeYearProgressFromTitle'
+  | 'dailyChallengeLegendPlayed'
+  | 'dailyChallengeLegendMissed'
+  | 'dailyChallengeLegendIce'
+  | 'dailyChallengeLegendFuture'
+  | 'dailyChallengeMilestonesTitle'
+  | 'dailyChallengeIceUsedTitle'
+  | 'dailyChallengeIceUsedBody'
+  | 'dailyChallengeIceUnlockedTitle'
+  | 'dailyChallengeIceUnlockedBody'
+  | 'dailyChallengeIceExplainTitle'
+  | 'dailyChallengeIceExplainBody'
+  | 'dailyChallengeIceExplainCta'
   | 'infoDailyTitle'
   | 'infoDailyBody'
   | 'practicalTitle'
@@ -38,8 +128,11 @@ export type HomeCopyKey =
   | 'practicalCardTap'
   | 'practicalCardA11y'
   | 'schoolsTitle'
+  | 'schoolsHeroEyebrow'
+  | 'schoolsHeroTitle'
   | 'schoolsFilters'
   | 'schoolsFiltersA11y'
+  | 'schoolsFollowedOnlyA11y'
   | 'schoolsSearchPlaceholder'
   | 'schoolsTypeAll'
   | 'schoolsTypeLabel'
@@ -75,6 +168,11 @@ export type HomeCopyKey =
   | 'schoolsReset'
   | 'schoolsApply'
   | 'schoolsRetry'
+  | 'estCardQnaOpenA11y'
+  | 'estCardBtnComment'
+  | 'estCardBadgeSponsored'
+  | 'estCardStatsClusterA11y'
+  | 'estCardStatsLoadingA11y'
   | 'schoolsClearFilter'
   | 'schoolsErrorNetwork'
   | 'planOffersTitle'
@@ -217,16 +315,23 @@ export type HomeCopyKey =
   | 'estDetailTitle'
   | 'estDetailSummary'
   | 'estDetailPresentation'
+  | 'estDetailMediaPhotos'
+  | 'estDetailMediaVideo'
+  | 'estDetailMediaVideoOpen'
+  | 'estDetailMediaBrochure'
+  | 'estDetailMediaBrochureOpen'
   | 'estDetailDegrees'
   | 'estDetailSectors'
   | 'estDetailScholarships'
   | 'estDetailEngagements'
   | 'estDetailCampus'
+  | 'estDetailCampusNoMapsUrl'
   | 'estDetailContact'
   | 'estDetailAnnouncements'
   | 'estDetailAnnouncementsEmpty'
   | 'estLabelSectors'
   | 'estLabelTuition'
+  | 'estLabelSchoolType'
   | 'estLabelDuration'
   | 'estLabelAdmission'
   | 'estAdmissionConcours'
@@ -243,6 +348,10 @@ export type HomeCopyKey =
   | 'accountLoginCta'
   | 'accountSectionProfile'
   | 'accountSectionAcademic'
+  | 'accountMassarCode'
+  | 'accountStudentCode'
+  | 'accountMassarCodeHint'
+  | 'accountStudentCodeHint'
   | 'accountSectionTutor'
   | 'accountSelectPlaceholder'
   | 'accountSelectNoResults'
@@ -294,6 +403,166 @@ export type HomeCopyKey =
   | 'tabInscriptions'
   | 'tabBoutique'
   | 'tabCompte'
+  | 'hubGlobalWallUnreadBadgeA11y'
+  | 'globalWallTitle'
+  | 'globalWallIntro'
+  | 'globalWallEmpty'
+  | 'globalWallReplies'
+  | 'globalWallReplyPlaceholder'
+  | 'globalWallLoginToReply'
+  | 'globalWallError'
+  | 'globalWallBubbleA11y'
+  | 'globalWallComposerPlaceholder'
+  | 'globalWallPublishMainFeed'
+  | 'globalWallPublishAsReply'
+  | 'globalWallReplyHere'
+  | 'globalWallReplyingToBanner'
+  | 'globalWallCancelReplyTarget'
+  | 'globalWallAttachPage'
+  | 'globalWallPickPageTitle'
+  | 'globalWallPickSchoolsSection'
+  | 'globalWallPickAnnouncementsSection'
+  | 'globalWallSearchSchoolsPlaceholder'
+  | 'globalWallPickClose'
+  | 'globalWallCustomPathHint'
+  | 'globalWallCustomPathLabel'
+  | 'globalWallCustomPathPlaceholder'
+  | 'globalWallCustomTitleLabel'
+  | 'globalWallCustomTitlePlaceholder'
+  | 'globalWallApplyCustomLink'
+  | 'globalWallCustomLinkMissing'
+  | 'globalWallClearAttachedPage'
+  | 'globalWallSenderViews'
+  | 'globalWallScrollToBottom'
+  | 'globalWallNewMessagesCount'
+  | 'globalWallReactionPick'
+  | 'globalWallAttachMainPagesSection'
+  | 'globalWallAttachBack'
+  | 'globalWallAttachSchoolsListing'
+  | 'globalWallAttachAnnouncementsListing'
+  | 'globalWallPresetHome'
+  | 'globalWallPresetSchools'
+  | 'globalWallPresetFilieres'
+  | 'globalWallPresetContestAnnouncements'
+  | 'globalWallPresetInscriptions'
+  | 'globalWallPresetBoutique'
+  | 'globalWallPresetEvents'
+  | 'globalWallPresetBlog'
+  | 'globalWallPresetSecteurs'
+  | 'globalWallPresetServices'
+  | 'globalWallPresetCommunity'
+  | 'chatbotDestExternal'
+  | 'chatbotDestWebPage'
+  | 'chatbotBubbleA11y'
+  | 'chatbotTitle'
+  | 'chatbotWelcome'
+  | 'chatbotPlaceholder'
+  | 'chatbotSendA11y'
+  | 'chatbotCloseA11y'
+  | 'chatbotNewChat'
+  | 'chatbotError'
+  | 'chatbotRecoHeading'
+  | 'chatbotBoutiqueCardsHeading'
+  | 'chatbotOpenWebsite'
+  | 'chatbotTooltip'
+  | 'chatbotSuggEcoles'
+  | 'chatbotSuggContestAnnouncements'
+  | 'chatbotSuggBoutique'
+  | 'chatbotShortcutMsgEcoles'
+  | 'chatbotShortcutMsgContestAnnouncements'
+  | 'chatbotShortcutMsgBoutique'
+  | 'chatbotThinkingHeader'
+  | 'chatbotLoadingSubtitle'
+  | 'chatbotPrepHint1'
+  | 'chatbotPrepHint2'
+  | 'chatbotPrepHint3'
+  | 'chatbotPrepHint4'
+  | 'chatbotThinkingAnalyze'
+  | 'chatbotThinkingContext'
+  | 'chatbotThinkingSuggestions'
+  | 'shareSheetTitle'
+  | 'shareSheetPreviewHint'
+  | 'shareLinkPreviewLoading'
+  | 'shareCopyLink'
+  | 'shareNativeShare'
+  | 'shareCopiedFeedback'
+  | 'shareOpenSheetA11y'
+  | 'shareKindHome'
+  | 'shareKindSchools'
+  | 'shareKindSchool'
+  | 'shareKindAnnouncement'
+  | 'shareKindAnnouncements'
+  | 'shareKindEvent'
+  | 'shareKindEvents'
+  | 'shareKindCommunity'
+  | 'shareKindBoutique'
+  | 'shareKindBoutiqueProduct'
+  | 'sidebarTitle'
+  | 'sidebarOpen'
+  | 'sidebarClose'
+  | 'sidebarCart'
+  | 'sidebarEvents'
+  | 'eventsAgendaTitle'
+  | 'eventsDetailPractical'
+  | 'eventsDetailDescription'
+  | 'eventsDetailStatus'
+  | 'eventsDetailVenue'
+  | 'eventsDetailLocationLabel'
+  | 'eventsDetailRegistrationInfo'
+  | 'eventsTabUpcoming'
+  | 'eventsTabLive'
+  | 'eventsTabPast'
+  | 'eventsEmpty'
+  | 'eventsEmptyLive'
+  | 'eventsRegister'
+  | 'eventsRegFormTitle'
+  | 'eventsRegFirstName'
+  | 'eventsRegLastName'
+  | 'eventsRegEmail'
+  | 'eventsRegPhone'
+  | 'eventsRegPhoneHint'
+  | 'eventsRegSubmit'
+  | 'eventsRegCancel'
+  | 'eventsRegMissingPhone'
+  | 'eventsRegError'
+  | 'eventsRegisterExternalLink'
+  | 'eventsConnectionPending'
+  | 'eventsExternalRegClosed'
+  | 'eventsExternalDefaultInfo'
+  | 'eventsUnregister'
+  | 'eventsConfirmPresence'
+  | 'eventsFull'
+  | 'eventsLoadError'
+  | 'eventsOnlineLink'
+  | 'eventsMapsLink'
+  | 'eventsOpenDetail'
+  | 'eventsKindWebinar'
+  | 'eventsKindLive'
+  | 'eventsKindEvent'
+  | 'eventsPastBadge'
+  | 'eventsRegisteredLabel'
+  | 'eventsPlacesLabel'
+  | 'eventsFillLabel'
+  | 'eventsLiveNow'
+  | 'eventsDateStart'
+  | 'eventsDateEnd'
+  | 'eventsDuration'
+  | 'eventsRegOpen'
+  | 'eventsRegClosed'
+  | 'eventsRegClosedHint'
+  | 'eventsLiveBannerTitle'
+  | 'eventsLiveBannerSubtitle'
+  | 'eventsFollowUpTitle'
+  | 'eventsContactNew'
+  | 'eventsContactUnreachable'
+  | 'eventsContactWhatsapp'
+  | 'eventsContactConfirmed'
+  | 'eventsContactCancelled'
+  | 'eventsContactAbandoned'
+  | 'eventsAttendanceAttended'
+  | 'eventsAttendanceAbsent'
+  | 'eventsContactStatusPrefix'
+  | 'eventsAttendancePrefix'
 
   // ── Inscriptions / suivi de candidatures ──
   | 'inscEyebrow'
@@ -302,6 +571,15 @@ export type HomeCopyKey =
   | 'inscTabNotifications'
   | 'inscTabCandidacies'
   | 'inscTabAnnouncements'
+  | 'inscCandidaciesActiveShort'
+  | 'inscCandidaciesActiveBadgeA11y'
+  | 'inscCandidaciesTabBadgeA11y'
+  | 'inscCandidaciesActionsRequiredShort'
+  | 'inscCandidaciesAttentionFilterAll'
+  | 'inscCandidaciesAttentionFilterRequired'
+  | 'inscCandidaciesActionRequiredBanner'
+  | 'inscCandidaciesLatestAnnouncementActionTag'
+  | 'inscCandidaciesActionRequiredEmpty'
   | 'inscFilterSchoolLabel'
   | 'inscFilterSchoolAll'
   | 'inscFilterSchoolPickTitle'
@@ -333,24 +611,30 @@ export type HomeCopyKey =
   | 'inscCandidaciesEmptyDesc'
   | 'inscCandidaciesEmptyCta'
   | 'inscCandidaciesFilterAll'
+  | 'inscCandidaciesFilterStatusLabel'
+  | 'inscCandidaciesFilterStatusPickTitle'
+  | 'inscCandidaciesFilterStatusSearchPlaceholder'
+  | 'inscCandidaciesFilterStatusNoResults'
+  | 'inscCandidaciesFilteredEmptyTitle'
+  | 'inscCandidaciesFilteredEmptyDesc'
   | 'inscAnnouncementsEmptyTitle'
   | 'inscAnnouncementsEmptyDesc'
+  | 'inscAnnouncementsFilteredEmptyTitle'
+  | 'inscAnnouncementsFilteredEmptyDesc'
   | 'inscAnnouncementsFollow'
   | 'inscAnnouncementsFollowing'
   | 'inscAnnouncementsOpenLink'
   | 'inscAnnouncementsAlreadyTracked'
   | 'inscAnnouncementsMarkApplied'
-  | 'inscStatusInterested'
-  | 'inscStatusApplied'
-  | 'inscStatusPreAdmitted'
-  | 'inscStatusAdmitted'
-  | 'inscStatusEnrolled'
-  | 'inscStatusRejected'
-  | 'inscStatusWithdrawn'
+  | 'inscStatusUnknown'
+  | 'inscStatusNone'
   | 'inscStatusActionTitle'
+  | 'inscStatusActionClear'
   | 'inscStatusActionSubtitle'
   | 'inscStatusActionUpdate'
   | 'inscStatusActionUpdating'
+  | 'inscStatusBlockTitle'
+  | 'inscStatusUnavailable'
   | 'inscOpenLinkBtn'
   | 'inscOpenLinkA11y'
   | 'inscOpenLinkBtnResult'
@@ -390,6 +674,14 @@ export type HomeCopyKey =
   | 'inscDetailRetry'
   | 'inscDetailAboutSchool'
   | 'inscDetailAnnouncementDescription'
+  | 'inscDetailTutorialTitle'
+  | 'inscDetailTutorialPlaybackError'
+  | 'inscDetailTutorialRetry'
+  | 'inscDetailSiblingHistoryTitle'
+  | 'inscDetailSiblingsNewer'
+  | 'inscDetailSiblingsOlder'
+  | 'inscDetailSiblingHistoryHint'
+  | 'inscDetailSiblingUpcoming'
   | 'inscDetailEligibility'
   | 'inscDetailFilieresBacNormal'
   | 'inscDetailFilieresBacMission'
@@ -448,11 +740,48 @@ export type HomeCopyKey =
   | 'followedSchoolTimelineNoAnnouncements'
   | 'followedSchoolHistoricalAnnouncements'
   | 'followedSchoolViewSchool'
-  | 'followedSchoolBackToList';
+  | 'followedSchoolBackToList'
+  /* Questions & réponses communautaires */
+  | 'qnaSectionTitle'
+  | 'qnaIntro'
+  | 'qnaRefresh'
+  | 'qnaEmpty'
+  | 'qnaBodyTooShort'
+  | 'qnaPrivateBadge'
+  | 'qnaPrivateHint'
+  | 'qnaMeToo'
+  | 'qnaOfficialBadge'
+  | 'qnaAnswerPlaceholder'
+  | 'qnaSendAnswer'
+  | 'qnaTapToReply'
+  | 'qnaReplyDockTitle'
+  | 'qnaAskTitle'
+  | 'qnaLoginToParticipate'
+  | 'qnaVisibilityPublic'
+  | 'qnaVisibilityPrivate'
+  | 'qnaHintPublic'
+  | 'qnaHintPrivate'
+  | 'qnaPlaceholder'
+  | 'qnaSubmit'
+  | 'qnaCommunityAnswerBadge'
+  | 'qnaVerdictCorrect'
+  | 'qnaVerdictIncorrect'
+  | 'qnaVerdictIncomplete'
+  | 'qnaVerdictTeamLabel'
+  | 'qnaLoadingComments'
+  | 'qnaShowRepliesOne'
+  | 'qnaShowRepliesMany'
+  | 'qnaShowRemainingRepliesOne'
+  | 'qnaShowRemainingRepliesMany';
 
 export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
   fr: {
     notifications: 'Notifications',
+    notifDrawerTitle: 'Notifications',
+    notifDrawerClose: 'Fermer',
+    notifDrawerSubtitle: 'Alertes inscriptions, annonces et questions-réponses.',
+    notifDrawerEmpty: 'Aucune notification pour le moment.',
+    notifDrawerOpenLink: 'Voir',
     unreadSuffix: 'non lues',
     help: 'Aide',
     profile: 'Profil',
@@ -466,6 +795,101 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     langAr: 'AR',
     gameDailyTitle: 'Jeu quotidien',
     gameDailyBody: 'À brancher sur le mini-jeu (shell).',
+    dailyChallengeTitle: 'Défi du jour',
+    dailyChallengeClose: 'Fermer',
+    dailyChallengeNoChallenge: 'Aucun défi publié pour aujourd’hui. Revenez plus tard.',
+    dailyChallengeLoginHint: 'Connectez-vous pour enregistrer votre score et le classement.',
+    dailyChallengeLoginCta: 'Connexion',
+    dailyChallengeTestButton: 'Tester le jeu quotidien',
+    dailyChallengeRetry: 'Réessayer',
+    dailyChallengeStreak: 'Série',
+    dailyChallengeStart: 'Commencer',
+    dailyChallengeSubmit: 'Valider',
+    dailyChallengeNext: 'Question suivante',
+    dailyChallengeResult: 'Résultat',
+    dailyChallengeRank: 'Classement',
+    dailyChallengePlayers: 'joueurs',
+    dailyChallengeBadges: 'Badges',
+    dailyChallengeLeaderboard: 'Voir le classement',
+    dailyChallengePlayed: 'Tu as déjà joué aujourd’hui.',
+    dailyChallengeMicroLearn: 'Le saviez-vous ?',
+    dailyChallengeMicroLearnTeaser:
+      'Astuce du jour — touche pour découvrir un complément utile en quelques secondes.',
+    dailyChallengeMicroLearnModalSubtitle: 'Un complément court pour aller plus loin',
+    dailyChallengeMicroLearnModalIntro:
+      'Ce bloc résume une idée clé liée au défi d’aujourd’hui. Tu peux le relire à tout moment depuis cet écran ; une fois lu, le rappel devient discret.',
+    dailyChallengeMicroLearnGotIt: 'C’est noté',
+    dailyChallengeMicroLearnReopen: 'Revoir l’astuce',
+    dailyChallengePickGames: 'Choisis une mission ci-dessous (ordre libre).',
+    dailyChallengePlayThis: 'Jouer',
+    dailyChallengeGameDone: 'Terminé',
+    dailyChallengeSeeScore: 'Classement (ce jeu)',
+    dailyChallengeBackToGames: 'Retour aux jeux',
+    dailyChallengeAllDone: 'Bravo, tu as fini tous les jeux du jour !',
+    dailyChallengeZipHint:
+      'Glisser pour tracer ; touche une case déjà sur le tracé pour raccourcir (pas en plein glissé).',
+    dailyChallengeZipValidate: 'Valider l’ordre',
+    dailyChallengeZipOrder: 'Ton ordre',
+    dailyChallengeZipOrderError: 'Problème d’ordre : passe par les numéros 1, 2, 3… dans l’ordre sur ton tracé.',
+    dailyChallengeZipPathError: 'Parcours invalide (mur ou case inaccessible).',
+    dailyChallengeZipPracticeTitle: 'Entraînement SNAKE — 10 grilles',
+    dailyChallengeZipPracticeHint: 'Tailles 5×5 à 12×12 — score local, rejouable.',
+    dailyChallengeZipPracticeTag: 'Entraînement',
+    dailyChallengeZipPracticeResult: 'Mode entraînement — score non enregistré sur le classement.',
+    dailyChallengeZipPracticeAgain: 'Rejouer cette grille',
+    dailyChallengeZipUndo: 'Annuler le dernier pas',
+    dailyChallengeZipReset: 'Recommencer',
+    dailyChallengeZipInteractionHint:
+      'Astuce : tu peux glisser sur la grille ; pour raccourcir, touche une case déjà sur ton tracé (hors glisser).',
+    dailyChallengeZipHowToPlay:
+      'Commence sur la case 1, puis 2, 3… dans l’ordre. Chaque case une fois. Les murs bloquent. Grille complète = envoi automatique.',
+    dailyChallengeZipRulesCta: 'Règles',
+    dailyChallengeZipRulesTitle: 'SNAKE — règles',
+    dailyChallengeZipSeeResults: 'Voir résultats & classement',
+    dailyChallengeYourTime: 'Temps',
+    dailyChallengeCongratsTitle: 'Bravo !',
+    dailyChallengeCongratsPracticeLine: 'Entraînement — score local, hors classement officiel.',
+    dailyChallengeFlawlessBadge: 'Sans faute',
+    dailyChallengeSolvedIn: 'Réussi en',
+    dailyChallengeResultCardTitle: 'Ton résultat',
+    dailyChallengeBeatPlayersPrefix: 'Tu devances environ',
+    dailyChallengeBeatPlayersSuffix: '% des participants aujourd’hui.',
+    dailyChallengeLeaderboardModalTitle: 'Classement du jour',
+    dailyChallengeLeaderboardTopToday: 'Meilleurs temps',
+    dailyChallengeLeaderboardLoadMore: 'Charger plus',
+    dailyChallengeYouLabel: 'Toi',
+    dailyChallengeScoreLabel: 'Score',
+    dailyChallengeHubHeroLine: 'Une session courte, chaque jour, pour avancer pas à pas.',
+    dailyChallengeMissionsTitle: 'Missions du jour',
+    dailyChallengeProgressSectionTitle: 'Ta progression',
+    dailyChallengeProgressBannerKicker: 'Zone joueur',
+    dailyChallengeProgressLevelShort: 'Trophées {{n}} / {{total}}',
+    dailyChallengeProgressXpCaption: '{{pct}} % vers le palier {{next}} j.',
+    dailyChallengeProgressXpMaxed: 'Tous les paliers débloqués — maintiens ta série !',
+    dailyChallengeProgressBadgeQuest: 'Quête badges',
+    dailyChallengeProgressRecordShort: 'Record série',
+    dailyChallengeProgressIceShort: 'Gels (ICE)',
+    dailyChallengeStreakRecord: 'Record : {{n}}',
+    dailyChallengeIceStock: 'ICE × {{n}}',
+    dailyChallengeYearProgressTitle: 'Année {{year}}',
+    dailyChallengeYearProgressFromTitle: '{{year}} — depuis le {{date}}',
+    dailyChallengeLegendPlayed: 'Joué',
+    dailyChallengeLegendMissed: 'Manqué',
+    dailyChallengeLegendIce: 'ICE',
+    dailyChallengeLegendFuture: 'À venir',
+    dailyChallengeMilestonesTitle: 'Paliers série',
+    dailyChallengeIceUsedTitle: 'ICE utilisé',
+    dailyChallengeIceUsedBody:
+      'Hier sans partie : un ICE a été utilisé automatiquement pour garder ta série (jour {{date}}).',
+    dailyChallengeIceUnlockedTitle: 'ICE débloqué',
+    dailyChallengeIceUnlockedBody:
+      '{{streak}} jours de série : tu gagnes un ICE (tu en as {{freezes}}).',
+    dailyChallengeIceExplainTitle: 'Les ICE (gels)',
+    dailyChallengeIceExplainBody:
+      'Un ICE protège ta série si tu ne joues pas un jour : sans partie la veille, un ICE est utilisé automatiquement pour ne pas remettre ta série à zéro.\n\n' +
+      'Tu gagnes des ICE en atteignant certains paliers de jours consécutifs. Le chiffre affiché est ton stock disponible.\n\n' +
+      'Sur le calendrier, un jour marqué ICE correspond à un gel utilisé ou enregistré pour ce jour.',
+    dailyChallengeIceExplainCta: 'Compris',
     infoDailyTitle: 'Information du jour',
     infoDailyBody: 'À brancher sur le bulletin du jour (shell).',
     practicalTitle: 'Liens pratiques',
@@ -496,8 +920,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     practicalCardTap: 'Toucher pour ouvrir',
     practicalCardA11y: 'Ouvrir le lien pratique',
     schoolsTitle: 'Écoles supérieures',
+    schoolsHeroEyebrow: 'Écoles supérieures',
+    schoolsHeroTitle: 'ÉCOLES SUP',
     schoolsFilters: 'Filtres',
     schoolsFiltersA11y: 'Filtres détaillés',
+    schoolsFollowedOnlyA11y: 'Uniquement les écoles que je suis',
     schoolsSearchPlaceholder: 'Rechercher (nom, ville, université...)',
     schoolsTypeAll: 'Tous',
     schoolsTypeLabel: "Type d'établissement",
@@ -534,6 +961,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsReset: 'Réinitialiser',
     schoolsApply: 'Appliquer',
     schoolsRetry: 'Réessayer',
+    estCardQnaOpenA11y: 'Ouvrir les questions et réponses',
+    estCardBtnComment: 'Commentaire',
+    estCardBadgeSponsored: 'Sponsorisé',
+    estCardStatsClusterA11y: '{{followers}} personnes suivent cette école, {{comments}} messages dans la communauté',
+    estCardStatsLoadingA11y: 'Chargement des statistiques de la communauté',
     schoolsClearFilter: 'Effacer la sélection',
     schoolsErrorNetwork: 'Erreur réseau',
     planOffersTitle: 'Packs d’inscription & écoles',
@@ -677,16 +1109,23 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailTitle: 'Fiche école',
     estDetailSummary: 'Synthèse',
     estDetailPresentation: 'Présentation',
+    estDetailMediaPhotos: 'Photos',
+    estDetailMediaVideo: 'Vidéo',
+    estDetailMediaVideoOpen: 'Voir la vidéo',
+    estDetailMediaBrochure: 'Brochure',
+    estDetailMediaBrochureOpen: 'Ouvrir la brochure',
     estDetailDegrees: 'Diplômes délivrés',
     estDetailSectors: 'Secteurs métiers',
     estDetailScholarships: 'Bourses',
     estDetailEngagements: 'Engagements',
     estDetailCampus: 'Campus',
+    estDetailCampusNoMapsUrl: 'Aucun lien Google Maps pour ce campus.',
     estDetailContact: 'Contact',
     estDetailAnnouncements: 'Annonces de l\'école',
     estDetailAnnouncementsEmpty: 'Aucune annonce publiée pour cette école pour le moment.',
     estLabelSectors: 'Secteurs',
     estLabelTuition: 'Scolarité',
+    estLabelSchoolType: 'Type',
     estLabelDuration: 'Durée',
     estLabelAdmission: 'Admission',
     estAdmissionConcours: 'Concours',
@@ -703,6 +1142,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountLoginCta: 'Se connecter',
     accountSectionProfile: 'Profil',
     accountSectionAcademic: 'Infos académiques',
+    accountMassarCode: 'Code Massar',
+    accountStudentCode: 'Code étudiant',
+    accountMassarCodeHint: 'Identifiant Massar (bac marocain).',
+    accountStudentCodeHint: 'Code étudiant (bac mission / français).',
     accountSectionTutor: 'Tuteur',
     accountSelectPlaceholder: 'Sélectionner…',
     accountSelectNoResults: 'Aucun résultat',
@@ -754,18 +1197,196 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     tabInscriptions: 'Inscriptions',
     tabBoutique: 'Boutique',
     tabCompte: 'Compte',
+    hubGlobalWallUnreadBadgeA11y: '{{count}} nouveau(x) message(s) sur le groupe BAC 2026',
+    globalWallTitle: 'Groupe BAC 2026',
+    globalWallIntro:
+      'Messages de l’équipe E‑TAWJIHI et échanges. Répondez sous chaque publication (comme un groupe de discussion).',
+    globalWallEmpty: 'Aucune publication pour le moment.',
+    globalWallReplies: 'Réponses',
+    globalWallReplyPlaceholder: 'Votre message…',
+    globalWallLoginToReply: 'Connectez-vous pour répondre.',
+    globalWallError: 'Impossible de charger le groupe. Réessayez.',
+    globalWallBubbleA11y: 'Ouvrir le groupe BAC 2026',
+    globalWallComposerPlaceholder: 'Écrire un message au groupe…',
+    globalWallPublishMainFeed: 'Publication principale',
+    globalWallPublishAsReply: 'Réponse au dernier message',
+    globalWallReplyHere: 'Répondre ici',
+    globalWallReplyingToBanner: 'Réponse à · {{snippet}}',
+    globalWallCancelReplyTarget: 'Publication principale',
+    globalWallAttachPage: 'Page à partager',
+    globalWallPickPageTitle: 'Choisir une page',
+    globalWallPickSchoolsSection: 'Écoles',
+    globalWallPickAnnouncementsSection: 'Annonces concours',
+    globalWallSearchSchoolsPlaceholder: 'Rechercher une école…',
+    globalWallPickClose: 'Fermer',
+    globalWallCustomPathHint: 'Chemin du site (comme sur le web), ex. /filieres ou /boutique',
+    globalWallCustomPathLabel: 'Chemin',
+    globalWallCustomPathPlaceholder: '/ma-page',
+    globalWallCustomTitleLabel: 'Titre affiché',
+    globalWallCustomTitlePlaceholder: 'Ex. Voir les filières',
+    globalWallApplyCustomLink: 'Ajouter',
+    globalWallCustomLinkMissing: 'Indiquez un chemin (ex. /filieres) et un titre affiché.',
+    globalWallClearAttachedPage: 'Retirer la page',
+    globalWallSenderViews: '{{count}} vues',
+    globalWallScrollToBottom: 'Derniers messages',
+    globalWallNewMessagesCount: '{{count}} nouveaux',
+    globalWallReactionPick: 'Choisir une réaction',
+    globalWallAttachMainPagesSection: 'Pages du site',
+    globalWallAttachBack: 'Retour',
+    globalWallAttachSchoolsListing: 'Voir l’annuaire des écoles',
+    globalWallAttachAnnouncementsListing: 'Voir toutes les annonces concours',
+    globalWallPresetHome: 'Accueil',
+    globalWallPresetSchools: 'Écoles supérieures',
+    globalWallPresetFilieres: 'Filières',
+    globalWallPresetContestAnnouncements: 'Annonces concours',
+    globalWallPresetInscriptions: 'Mes inscriptions',
+    globalWallPresetBoutique: 'Boutique',
+    globalWallPresetEvents: 'Événements & webinaires',
+    globalWallPresetBlog: 'Blog',
+    globalWallPresetSecteurs: 'Secteurs & métiers',
+    globalWallPresetServices: 'Nos services',
+    globalWallPresetCommunity: 'Groupe BAC 2026',
+    chatbotDestExternal: 'Lien',
+    chatbotDestWebPage: 'Page web',
+    chatbotBubbleA11y: 'Ouvrir E‑MOWAJIH, assistant orientation',
+    chatbotTitle: 'E‑MOWAJIH',
+    chatbotWelcome:
+      'Bienvenue dans **cette version** de l’app E‑TAWJIHI.\n\nJe suis **E‑MOWAJIH** : orientation, **écoles**, **annonces concours**, **boutique**, services **TAWJIH PLUS** et **TASSJIL**, tout depuis le chat.\n\nQuand c’est utile, des **cartes** apparaissent sous ma réponse — touche une carte pour ouvrir la fiche école, l’annonce ou le produit.\n\nEn bas, les **raccourcis** te font gagner du temps ; sinon écris ta question librement.',
+    chatbotPlaceholder: 'Votre message…',
+    chatbotSendA11y: 'Envoyer',
+    chatbotCloseA11y: 'Fermer le chat',
+    chatbotNewChat: 'Nouvelle conversation',
+    chatbotError: 'Impossible d’envoyer le message. Réessayez.',
+    chatbotRecoHeading: 'Aller plus loin',
+    chatbotBoutiqueCardsHeading: 'Produits & packs',
+    chatbotOpenWebsite: 'Voir sur le site',
+    chatbotTooltip: 'Une question ? Parle avec E‑MOWAJIH',
+    chatbotSuggEcoles: 'Écoles',
+    chatbotSuggContestAnnouncements: 'Annonces concours',
+    chatbotSuggBoutique: 'Boutique',
+    chatbotShortcutMsgEcoles:
+      'Je voudrais des informations sur les écoles et établissements au Maroc.',
+    chatbotShortcutMsgContestAnnouncements:
+      'Où trouver les annonces de concours et les dates limites d’inscription aux établissements ?',
+    chatbotShortcutMsgBoutique:
+      'Quels produits ou packs me recommandez-vous sur la boutique, et comment passer commande ?',
+    chatbotThinkingHeader: 'E‑MOWAJIH prépare votre réponse',
+    chatbotLoadingSubtitle: 'Quelques secondes — merci de patienter.',
+    chatbotPrepHint1: 'Analyse de votre question et des mots-clés…',
+    chatbotPrepHint2: 'Consultation du contexte E‑TAWJIHI (écoles, filières, services, boutique)…',
+    chatbotPrepHint3: 'Vérification des informations à jour sur la plateforme…',
+    chatbotPrepHint4: 'Rédaction de votre réponse personnalisée…',
+    chatbotThinkingAnalyze: 'Analyse de votre question',
+    chatbotThinkingContext: 'Préparation du contexte',
+    chatbotThinkingSuggestions: 'Préparation des suggestions',
+    shareSheetTitle: 'Partager',
+    shareSheetPreviewHint:
+      'Aperçu enrichi (Open Graph) comme dans WhatsApp lorsque la page le permet — lien public e-tawjihi.ma.',
+    shareLinkPreviewLoading: 'Chargement de l’aperçu…',
+    shareCopyLink: 'Copier le lien',
+    shareNativeShare: 'Partager…',
+    shareCopiedFeedback: 'Lien copié dans le presse-papiers.',
+    shareOpenSheetA11y: 'Partager cette page',
+    shareKindHome: 'Accueil',
+    shareKindSchools: 'Écoles supérieures',
+    shareKindSchool: 'Fiche école',
+    shareKindAnnouncement: 'Annonce concours',
+    shareKindAnnouncements: 'Annonces concours',
+    shareKindEvent: 'Événement / webinaire',
+    shareKindEvents: 'Agenda événements',
+    shareKindCommunity: 'Groupe BAC 2026',
+    shareKindBoutique: 'Boutique',
+    shareKindBoutiqueProduct: 'Fiche produit',
+    sidebarTitle: 'Navigation',
+    sidebarOpen: 'Ouvrir le menu',
+    sidebarClose: 'Fermer',
+    sidebarCart: 'Panier',
+    sidebarEvents: 'Événements',
+    eventsAgendaTitle: 'Événements & webinaires',
+    eventsDetailPractical: 'Informations',
+    eventsDetailDescription: 'À propos',
+    eventsDetailStatus: 'Statut',
+    eventsDetailVenue: 'Lieu & capacité',
+    eventsDetailLocationLabel: 'Lieu',
+    eventsDetailRegistrationInfo: "Informations d'inscription",
+    eventsTabUpcoming: 'À venir',
+    eventsTabLive: 'En cours',
+    eventsTabPast: 'Passés',
+    eventsEmpty: 'Aucun événement dans cette liste.',
+    eventsEmptyLive: 'Aucun événement en direct pour le moment.',
+    eventsRegister: "S'inscrire",
+    eventsRegFormTitle: "Coordonnées d'inscription",
+    eventsRegFirstName: 'Prénom',
+    eventsRegLastName: 'Nom',
+    eventsRegEmail: 'E-mail',
+    eventsRegPhone: 'Téléphone',
+    eventsRegPhoneHint: 'Rattaché à votre compte (connexion).',
+    eventsRegSubmit: "Confirmer l'inscription",
+    eventsRegCancel: 'Annuler',
+    eventsRegMissingPhone: 'Votre compte doit avoir un numéro de téléphone pour vous inscrire.',
+    eventsRegError: "Impossible de s'inscrire.",
+    eventsRegisterExternalLink: "Lien d'inscription",
+    eventsConnectionPending:
+      'Le lien de connexion (visio) sera affiché après déblocage manuel. Utilisez le lien d’inscription externe si disponible.',
+    eventsExternalRegClosed: 'Inscription externe non disponible.',
+    eventsExternalDefaultInfo:
+      'Les inscriptions se font via une page externe (bouton ci-dessous), pas via le formulaire E-TAWJIHI.',
+    eventsUnregister: 'Me désinscrire',
+    eventsConfirmPresence: 'Confirmer ma présence',
+    eventsFull: 'Complet',
+    eventsLoadError: 'Impossible de charger les événements.',
+    eventsOnlineLink: 'Lien de connexion',
+    eventsMapsLink: 'Ouvrir dans Google Maps',
+    eventsOpenDetail: 'Détails',
+    eventsKindWebinar: 'Webinaire',
+    eventsKindLive: 'Live',
+    eventsKindEvent: 'Événement',
+    eventsPastBadge: 'Terminé',
+    eventsRegisteredLabel: 'inscrits',
+    eventsPlacesLabel: 'Places',
+    eventsFillLabel: 'Taux',
+    eventsLiveNow: 'En direct',
+    eventsDateStart: 'Début',
+    eventsDateEnd: 'Fin',
+    eventsDuration: 'Durée',
+    eventsRegOpen: 'Inscriptions ouvertes',
+    eventsRegClosed: 'Inscriptions fermées',
+    eventsRegClosedHint: 'Les inscriptions ne sont plus acceptées.',
+    eventsLiveBannerTitle: 'Événement en direct',
+    eventsLiveBannerSubtitle: 'La session est en cours.',
+    eventsFollowUpTitle: 'Suivi de votre inscription',
+    eventsContactNew: 'Nouveau',
+    eventsContactUnreachable: 'Injoignable',
+    eventsContactWhatsapp: 'WhatsApp envoyé',
+    eventsContactConfirmed: 'Confirmé',
+    eventsContactCancelled: 'Annulé',
+    eventsContactAbandoned: 'Abandonné',
+    eventsAttendanceAttended: 'Assisté',
+    eventsAttendanceAbsent: 'Absent',
+    eventsContactStatusPrefix: 'Statut contact',
+    eventsAttendancePrefix: 'Présence',
 
-    // ── Inscriptions / suivi de candidatures ──
+  // ── Inscriptions / suivi de candidatures ──
     inscEyebrow: 'Inscriptions & candidatures',
     inscTitle: 'Mes inscriptions',
     inscSubtitle: 'Suivez vos candidatures et restez informé des ouvertures.',
     inscTabNotifications: 'Notifications',
     inscTabCandidacies: 'Candidatures',
     inscTabAnnouncements: 'Annonces',
+    inscCandidaciesActiveShort: 'actives',
+    inscCandidaciesActiveBadgeA11y: '{{count}} candidatures actives',
+    inscCandidaciesTabBadgeA11y: '{{active}} candidatures actives, {{attention}} actions requises',
+    inscCandidaciesActionsRequiredShort: 'actions requises',
+    inscCandidaciesAttentionFilterAll: 'Toutes',
+    inscCandidaciesAttentionFilterRequired: 'Action requise',
+    inscCandidaciesActionRequiredBanner:
+      'Action requise : consultez la dernière annonce et mettez à jour votre statut si l’école le prévoit (ex. passage à « admis au concours »).',
+    inscCandidaciesLatestAnnouncementActionTag: 'À traiter',
+    inscCandidaciesActionRequiredEmpty: 'Aucune candidature ne demande votre attention pour le moment.',
     inscFilterSchoolLabel: 'École',
     inscFilterSchoolAll: 'Toutes les écoles',
     inscFilterSchoolPickTitle: 'Filtrer par école',
-    inscFilterSchoolSearchPlaceholder: 'Rechercher une école…',
+    inscFilterSchoolSearchPlaceholder: 'Nom, nom arabe ou sigle…',
     inscFilterSchoolNoResults: 'Aucune école trouvée',
     inscFilterReset: 'Réinitialiser',
     inscFilterStatusLabel: 'Statut',
@@ -793,24 +1414,31 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscCandidaciesEmptyDesc: 'Suivez une annonce ci-contre pour démarrer le suivi.',
     inscCandidaciesEmptyCta: 'Voir les annonces',
     inscCandidaciesFilterAll: 'Toutes',
+    inscCandidaciesFilterStatusLabel: 'Statut',
+    inscCandidaciesFilterStatusPickTitle: 'Filtrer par statut',
+    inscCandidaciesFilterStatusSearchPlaceholder: 'Rechercher un statut…',
+    inscCandidaciesFilterStatusNoResults: 'Aucun statut trouvé',
+    inscCandidaciesFilteredEmptyTitle: 'Aucune candidature pour ce statut',
+    inscCandidaciesFilteredEmptyDesc: 'Modifiez le filtre ou réinitialisez pour tout afficher.',
     inscAnnouncementsEmptyTitle: 'Aucune annonce',
     inscAnnouncementsEmptyDesc: 'Aucune annonce d\'inscription publiée pour l\'instant.',
+    inscAnnouncementsFilteredEmptyTitle: 'Aucune annonce pour ces filtres',
+    inscAnnouncementsFilteredEmptyDesc:
+      'Modifiez l’école ou les filtres avancés, ou réinitialisez pour afficher toutes les annonces.',
     inscAnnouncementsFollow: 'Suivre',
     inscAnnouncementsFollowing: 'Suivi',
     inscAnnouncementsOpenLink: 'Lien d\'inscription',
     inscAnnouncementsAlreadyTracked: 'Déjà suivi',
     inscAnnouncementsMarkApplied: 'J\'ai postulé',
-    inscStatusInterested: 'Intéressé',
-    inscStatusApplied: 'Candidature déposée',
-    inscStatusPreAdmitted: 'Pré-sélectionné',
-    inscStatusAdmitted: 'Admis',
-    inscStatusEnrolled: 'Inscrit',
-    inscStatusRejected: 'Refusé',
-    inscStatusWithdrawn: 'Abandonné',
+    inscStatusUnknown: 'Statut inconnu',
+    inscStatusNone: 'Aucun statut',
+    inscStatusActionClear: 'Retirer le statut',
     inscStatusActionTitle: 'Mettre à jour le statut',
     inscStatusActionSubtitle: 'Choisissez la nouvelle étape de votre candidature.',
     inscStatusActionUpdate: 'Mettre à jour',
     inscStatusActionUpdating: 'Mise à jour…',
+    inscStatusBlockTitle: 'Statut de candidature',
+    inscStatusUnavailable: 'Non disponible pour le moment',
     inscOpenLinkBtn: 'Ouvrir le lien',
     inscOpenLinkA11y: 'Ouvrir le lien d\'inscription officiel',
     inscOpenLinkBtnResult: 'Voir le résultat',
@@ -850,6 +1478,15 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscDetailRetry: 'Réessayer',
     inscDetailAboutSchool: 'À propos de l\'école',
     inscDetailAnnouncementDescription: 'Description',
+    inscDetailTutorialTitle: 'Tutoriel d’inscription (vidéo)',
+    inscDetailTutorialPlaybackError: 'Lecture intégrée indisponible sur cet appareil.',
+    inscDetailTutorialRetry: 'Réessayer',
+    inscDetailSiblingHistoryTitle: 'Autres annonces de l’établissement',
+    inscDetailSiblingsNewer: 'Annonces plus récentes',
+    inscDetailSiblingsOlder: 'Annonces plus anciennes',
+    inscDetailSiblingHistoryHint:
+      'Par rapport à cette annonce : fenêtres plus récentes ou déjà passées, même école.',
+    inscDetailSiblingUpcoming: 'À venir',
     inscDetailEligibility: 'Critères d\'éligibilité',
     inscDetailFilieresBacNormal: 'Filières (Bac Normal)',
     inscDetailFilieresBacMission: 'Filières (Bac Mission)',
@@ -912,9 +1549,47 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     followedSchoolHistoricalAnnouncements: 'Annonces de l\'école',
     followedSchoolViewSchool: 'Voir la fiche école',
     followedSchoolBackToList: 'Retour aux écoles suivies',
+    qnaSectionTitle: 'Questions & réponses',
+    qnaIntro:
+      'Posez une question publique (visible par la communauté) ou privée (réservée à l’équipe E-Tawjihi). Les réponses officielles sont signalées.',
+    qnaRefresh: 'Actualiser',
+    qnaEmpty: 'Aucune question pour le moment. Soyez le premier à en poser une.',
+    qnaBodyTooShort: 'Votre texte doit contenir au moins 3 caractères.',
+    qnaPrivateBadge: 'Privée · équipe E-Tawjihi',
+    qnaPrivateHint: 'Seule l’équipe E-Tawjihi peut répondre aux questions privées.',
+    qnaMeToo: 'Moi aussi',
+    qnaOfficialBadge: 'E-Tawjihi',
+    qnaAnswerPlaceholder: 'Votre réponse ou expérience…',
+    qnaSendAnswer: 'Publier la réponse',
+    qnaTapToReply: 'Répondre',
+    qnaReplyDockTitle: 'Réponse',
+    qnaAskTitle: 'Poser une question',
+    qnaLoginToParticipate: 'Connectez-vous pour poser une question ou répondre.',
+    qnaVisibilityPublic: 'Publique',
+    qnaVisibilityPrivate: 'Privée (équipe)',
+    qnaHintPublic: 'Visible par les autres étudiants ; ils peuvent répondre. L’équipe peut valider une réponse officielle.',
+    qnaHintPrivate: 'Visible uniquement par vous et l’équipe E-Tawjihi (situation personnelle ou sensible).',
+    qnaPlaceholder:
+      'Ex. : votre question sur l’école, les inscriptions, une information ou autre…',
+    qnaSubmit: 'Envoyer la question',
+    qnaCommunityAnswerBadge: 'Étudiant',
+    qnaVerdictCorrect: 'Correct',
+    qnaVerdictIncorrect: 'Incorrecte',
+    qnaVerdictIncomplete: 'Incomplète',
+    qnaVerdictTeamLabel: 'Évaluation équipe',
+    qnaLoadingComments: 'Chargement des échanges…',
+    qnaShowRepliesOne: 'Voir la réponse',
+    qnaShowRepliesMany: 'Voir les {{count}} réponses',
+    qnaShowRemainingRepliesOne: 'Voir la réponse restante',
+    qnaShowRemainingRepliesMany: 'Voir les {{count}} réponses restantes',
   },
   ar: {
     notifications: 'الإشعارات',
+    notifDrawerTitle: 'الإشعارات',
+    notifDrawerClose: 'إغلاق',
+    notifDrawerSubtitle: 'تنبيهات التسجيل والإعلانات والأسئلة والأجوبة.',
+    notifDrawerEmpty: 'لا توجد إشعارات حالياً.',
+    notifDrawerOpenLink: 'عرض',
     unreadSuffix: 'غير مقروءة',
     help: 'المساعدة',
     profile: 'الملف الشخصي',
@@ -928,6 +1603,101 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     langAr: 'عربي',
     gameDailyTitle: 'لعبة اليوم',
     gameDailyBody: 'سيتم ربطها باللعبة المصغرة (shell).',
+    dailyChallengeTitle: 'تحدي اليوم',
+    dailyChallengeClose: 'إغلاق',
+    dailyChallengeNoChallenge: 'لا يوجد تحدٍ اليوم. عد لاحقًا.',
+    dailyChallengeLoginHint: 'سجّل الدخول لحفظ النتيجة والتصنيف.',
+    dailyChallengeLoginCta: 'تسجيل الدخول',
+    dailyChallengeTestButton: 'تجربة لعبة اليوم',
+    dailyChallengeRetry: 'إعادة المحاولة',
+    dailyChallengeStreak: 'سلسلة',
+    dailyChallengeStart: 'ابدأ',
+    dailyChallengeSubmit: 'تأكيد',
+    dailyChallengeNext: 'السؤال التالي',
+    dailyChallengeResult: 'النتيجة',
+    dailyChallengeRank: 'الترتيب',
+    dailyChallengePlayers: 'لاعبين',
+    dailyChallengeBadges: 'شارات',
+    dailyChallengeLeaderboard: 'عرض التصنيف',
+    dailyChallengePlayed: 'لعبت اليوم بالفعل.',
+    dailyChallengeMicroLearn: 'هل تعلم؟',
+    dailyChallengeMicroLearnTeaser:
+      'نصيحة اليوم — المس لقراءة معلومة مفيدة في ثوانٍ.',
+    dailyChallengeMicroLearnModalSubtitle: 'مكمل قصير للتعمق قليلًا',
+    dailyChallengeMicroLearnModalIntro:
+      'يلخص هذا القسم فكرة مرتبطة بتحدي اليوم. يمكنك إعادة فتحه متى شئت؛ بعد القراءة يصبح التذكير أقل ظهورًا.',
+    dailyChallengeMicroLearnGotIt: 'تم',
+    dailyChallengeMicroLearnReopen: 'إعادة عرض النصيحة',
+    dailyChallengePickGames: 'اختر مهمة أدناه (الترتيب حرّ).',
+    dailyChallengePlayThis: 'العب',
+    dailyChallengeGameDone: 'منتهية',
+    dailyChallengeSeeScore: 'التصنيف (هذه اللعبة)',
+    dailyChallengeBackToGames: 'العودة إلى الألعاب',
+    dailyChallengeAllDone: 'أحسنت، أنهيت كل ألعاب اليوم!',
+    dailyChallengeZipHint:
+      'اسحب لرسم المسار؛ المس خلية على المسار لتقصيره (ليس أثناء السحب).',
+    dailyChallengeZipValidate: 'تأكيد الترتيب',
+    dailyChallengeZipOrder: 'ترتيبك',
+    dailyChallengeZipOrderError: 'مشكلة في الترتيب: مرّ على الأرقام ١، ٢، ٣… بالترتيب على مسارك.',
+    dailyChallengeZipPathError: 'مسار غير صالح (جدار أو خلية غير متاحة).',
+    dailyChallengeZipPracticeTitle: 'تدريب SNAKE — 10 شبكات',
+    dailyChallengeZipPracticeHint: 'شبكات ٥×٥ إلى ١٢×١٢ — نتيجة محليّة.',
+    dailyChallengeZipPracticeTag: 'تدريب',
+    dailyChallengeZipPracticeResult: 'وضع تدريب — لا يُحفظ في التصنيف.',
+    dailyChallengeZipPracticeAgain: 'إعادة هذه الشبكة',
+    dailyChallengeZipUndo: 'تراجع عن آخر خطوة',
+    dailyChallengeZipReset: 'إعادة البدء',
+    dailyChallengeZipInteractionHint:
+      'نصيحة: اسحب على الشبكة؛ للاختصار المسار المس خلية كانت على المسار الحالي (ليس أثناء السحب).',
+    dailyChallengeZipHowToPlay:
+      'ابدأ من ١ ثم ٢، ٣… بالترتيب. كل خلية مرة. الجدران تمنع المرور. إكمال الشبكة يرسل المحاولة تلقائيًا.',
+    dailyChallengeZipRulesCta: 'القواعد',
+    dailyChallengeZipRulesTitle: 'SNAKE — القواعد',
+    dailyChallengeZipSeeResults: 'عرض النتيجة والتصنيف',
+    dailyChallengeYourTime: 'الوقت',
+    dailyChallengeCongratsTitle: 'أحسنت!',
+    dailyChallengeCongratsPracticeLine: 'تدريب — النتيجة محليّة وليست في التصنيف الرسمي.',
+    dailyChallengeFlawlessBadge: 'بدون أخطاء',
+    dailyChallengeSolvedIn: 'أُنجز في',
+    dailyChallengeResultCardTitle: 'نتيجتك',
+    dailyChallengeBeatPlayersPrefix: 'تتقدّم على نحو',
+    dailyChallengeBeatPlayersSuffix: '% من المشاركين اليوم.',
+    dailyChallengeLeaderboardModalTitle: 'تصنيف اليوم',
+    dailyChallengeLeaderboardTopToday: 'أفضل الأوقات',
+    dailyChallengeLeaderboardLoadMore: 'تحميل المزيد',
+    dailyChallengeYouLabel: 'أنت',
+    dailyChallengeScoreLabel: 'النقاط',
+    dailyChallengeHubHeroLine: 'جلسة قصيرة كل يوم للتقدّم خطوة بخطوة.',
+    dailyChallengeMissionsTitle: 'مهام اليوم',
+    dailyChallengeProgressSectionTitle: 'تقدّمك',
+    dailyChallengeProgressBannerKicker: 'منطقة اللاعب',
+    dailyChallengeProgressLevelShort: 'الأوسمة {{n}} / {{total}}',
+    dailyChallengeProgressXpCaption: '{{pct}}٪ نحو هدف {{next}} يومًا',
+    dailyChallengeProgressXpMaxed: 'كل المراحل مفتوحة — حافظ على سلسلتك!',
+    dailyChallengeProgressBadgeQuest: 'مسار الشارات',
+    dailyChallengeProgressRecordShort: 'أفضل سلسلة',
+    dailyChallengeProgressIceShort: 'تجميدات ICE',
+    dailyChallengeStreakRecord: 'الأرقام القياسية: {{n}}',
+    dailyChallengeIceStock: 'ICE × {{n}}',
+    dailyChallengeYearProgressTitle: 'سنة {{year}}',
+    dailyChallengeYearProgressFromTitle: '{{year}} — منذ {{date}}',
+    dailyChallengeLegendPlayed: 'لُعب',
+    dailyChallengeLegendMissed: 'فائت',
+    dailyChallengeLegendIce: 'ICE',
+    dailyChallengeLegendFuture: 'قادم',
+    dailyChallengeMilestonesTitle: 'مراحل السلسلة',
+    dailyChallengeIceUsedTitle: 'تم استخدام ICE',
+    dailyChallengeIceUsedBody:
+      'لم تلعب أمس؛ تم استخدام ICE تلقائيًا للحفاظ على سلسلتك (اليوم {{date}}).',
+    dailyChallengeIceUnlockedTitle: 'ICE جديد',
+    dailyChallengeIceUnlockedBody:
+      '{{streak}} يومًا متتاليًا: ربحت ICE (لديك الآن {{freezes}}).',
+    dailyChallengeIceExplainTitle: 'ما هو ICE؟',
+    dailyChallengeIceExplainBody:
+      'ICE يحمي سلسلتك إذا لم تلعب يومًا: بدون لعب أمس، يُستهلك ICE تلقائيًا حتى لا تُصفّر سلسلتك.\n\n' +
+      'تربح ICE عند بلوغ بعض مراحل الأيام المتتالية. الرقم المعروض هو رصيدك المتاح.\n\n' +
+      'في التقويم، يوم بعلامة ICE يعني أن تجميدًا استُخدم أو سُجّل لهذا اليوم.',
+    dailyChallengeIceExplainCta: 'فهمت',
     infoDailyTitle: 'معلومة اليوم',
     infoDailyBody: 'سيتم ربطها بنشرة اليوم (shell).',
     practicalTitle: 'روابط مفيدة',
@@ -958,8 +1728,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     practicalCardTap: 'المس للفتح',
     practicalCardA11y: 'فتح الرابط المفيد',
     schoolsTitle: 'المدارس العليا',
+    schoolsHeroEyebrow: 'المدارس العليا',
+    schoolsHeroTitle: 'مدارس عليا',
     schoolsFilters: 'التصفية',
     schoolsFiltersA11y: 'فلاتر مفصلة',
+    schoolsFollowedOnlyA11y: 'المدارس التي أتابعها فقط',
     schoolsSearchPlaceholder: 'بحث (الاسم، المدينة، الجامعة...)',
     schoolsTypeAll: 'الكل',
     schoolsTypeLabel: 'نوع المؤسسة',
@@ -996,6 +1769,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsReset: 'إعادة الضبط',
     schoolsApply: 'تطبيق',
     schoolsRetry: 'إعادة المحاولة',
+    estCardQnaOpenA11y: 'فتح الأسئلة والأجوبة',
+    estCardBtnComment: 'تعليقات',
+    estCardBadgeSponsored: 'برعاية',
+    estCardStatsClusterA11y: '{{followers}} يتابعون هذه المدرسة، {{comments}} رسالة في المجتمع',
+    estCardStatsLoadingA11y: 'جارٍ تحميل إحصائيات المجتمع',
     schoolsClearFilter: 'إلغاء الاختيار',
     schoolsErrorNetwork: 'خطأ في الشبكة',
     planOffersTitle: 'باقات التسجيل والمدارس',
@@ -1139,16 +1917,23 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailTitle: 'ملف المدرسة',
     estDetailSummary: 'ملخص',
     estDetailPresentation: 'نبذة',
+    estDetailMediaPhotos: 'صور',
+    estDetailMediaVideo: 'فيديو',
+    estDetailMediaVideoOpen: 'مشاهدة الفيديو',
+    estDetailMediaBrochure: 'الكتيب',
+    estDetailMediaBrochureOpen: 'فتح الكتيب',
     estDetailDegrees: 'الشهادات الممنوحة',
     estDetailSectors: 'قطاعات المهن',
     estDetailScholarships: 'المنح',
     estDetailEngagements: 'الالتزامات',
     estDetailCampus: 'الحرم الجامعي',
+    estDetailCampusNoMapsUrl: 'لا يوجد رابط خرائط Google لهذا الحرم.',
     estDetailContact: 'التواصل',
     estDetailAnnouncements: 'إعلانات المؤسسة',
     estDetailAnnouncementsEmpty: 'لا توجد إعلانات منشورة لهذه المؤسسة حاليًا.',
     estLabelSectors: 'القطاعات',
     estLabelTuition: 'الدراسة',
+    estLabelSchoolType: 'النوع',
     estLabelDuration: 'المدة',
     estLabelAdmission: 'الولوج',
     estAdmissionConcours: 'مباراة',
@@ -1165,6 +1950,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountLoginCta: 'تسجيل الدخول',
     accountSectionProfile: 'الملف الشخصي',
     accountSectionAcademic: 'المعلومات الأكاديمية',
+    accountMassarCode: 'رمز مسار',
+    accountStudentCode: 'رمز التلميذ',
+    accountMassarCodeHint: 'معرّف مسار (البكالوريا المغربية).',
+    accountStudentCodeHint: 'رمز التلميذ (بكالوريا البعثة / الفرنسية).',
     accountSectionTutor: 'وليّ الأمر',
     accountSelectPlaceholder: 'اختر…',
     accountSelectNoResults: 'لا توجد نتائج',
@@ -1216,6 +2005,173 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     tabInscriptions: 'التسجيلات',
     tabBoutique: 'المتجر',
     tabCompte: 'حسابي',
+    hubGlobalWallUnreadBadgeA11y: '{{count}} رسالة جديدة في مجموعة الباك',
+    globalWallTitle: 'مجموعة باك 2026',
+    globalWallIntro:
+      'رسائل فريق E‑TAWJIHI والنقاشات. يمكنك الرد تحت كل منشور (مثل مجموعة محادثة).',
+    globalWallEmpty: 'لا توجد منشورات حالياً.',
+    globalWallReplies: 'الردود',
+    globalWallReplyPlaceholder: 'رسالتك…',
+    globalWallLoginToReply: 'سجّل الدخول للرد.',
+    globalWallError: 'تعذّر تحميل المجموعة. أعد المحاولة.',
+    globalWallBubbleA11y: 'فتح مجموعة باك 2026',
+    globalWallComposerPlaceholder: 'اكتب رسالة للمجموعة…',
+    globalWallPublishMainFeed: 'منشور رئيسي',
+    globalWallPublishAsReply: 'رد على آخر رسالة',
+    globalWallReplyHere: 'رد هنا',
+    globalWallReplyingToBanner: 'رد على · {{snippet}}',
+    globalWallCancelReplyTarget: 'منشور رئيسي',
+    globalWallAttachPage: 'صفحة للمشاركة',
+    globalWallPickPageTitle: 'اختر صفحة',
+    globalWallPickSchoolsSection: 'المدارس',
+    globalWallPickAnnouncementsSection: 'إعلانات المباريات',
+    globalWallSearchSchoolsPlaceholder: 'ابحث عن مدرسة…',
+    globalWallPickClose: 'إغلاق',
+    globalWallCustomPathHint: 'مسار الموقع (مثل الويب)، مثال /filieres أو /boutique',
+    globalWallCustomPathLabel: 'المسار',
+    globalWallCustomPathPlaceholder: '/my-page',
+    globalWallCustomTitleLabel: 'العنوان المعروض',
+    globalWallCustomTitlePlaceholder: 'مثال: اطلع على الشعب',
+    globalWallApplyCustomLink: 'إضافة',
+    globalWallCustomLinkMissing: 'أدخل المسار (مثال /filieres) والعنوان المعروض.',
+    globalWallClearAttachedPage: 'إزالة الصفحة',
+    globalWallSenderViews: '{{count}} مشاهدة',
+    globalWallScrollToBottom: 'آخر الرسائل',
+    globalWallNewMessagesCount: '{{count}} جديد',
+    globalWallReactionPick: 'اختر تفاعلاً',
+    globalWallAttachMainPagesSection: 'صفحات الموقع',
+    globalWallAttachBack: 'رجوع',
+    globalWallAttachSchoolsListing: 'دليل المدارس',
+    globalWallAttachAnnouncementsListing: 'جميع إعلانات المباريات',
+    globalWallPresetHome: 'الرئيسية',
+    globalWallPresetSchools: 'المدارس العليا',
+    globalWallPresetFilieres: 'الشُعب',
+    globalWallPresetContestAnnouncements: 'إعلانات المباريات',
+    globalWallPresetInscriptions: 'تسجيلاتي',
+    globalWallPresetBoutique: 'المتجر',
+    globalWallPresetEvents: 'الفعاليات والندوات',
+    globalWallPresetBlog: 'المدونة',
+    globalWallPresetSecteurs: 'القطاعات والمهن',
+    globalWallPresetServices: 'خدماتنا',
+    globalWallPresetCommunity: 'مجموعة باك 2026',
+    chatbotDestExternal: 'رابط',
+    chatbotDestWebPage: 'صفحة ويب',
+    chatbotBubbleA11y: 'فتح E‑MOWAJIH، مساعد التوجيه',
+    chatbotTitle: 'E‑MOWAJIH',
+    chatbotWelcome:
+      'مرحبًا بك في **هذا الإصدار** من تطبيق E‑TAWJIHI.\n\nأنا **E‑MOWAJIH**: التوجيه، **المدارس**، **إعلانات المباريات**، **المتجر**، وخدمتا **TAWJIH PLUS** و **TASSJIL** — كل ذلك من الدردشة.\n\nعند الحاجة تظهر **بطاقات** تحت إجابتي: المس البطاقة لفتح مؤسسة، إعلان، أو منتج.\n\nفي الأسفل **اختصارات** لتوفير الوقت؛ أو اكتب سؤالك مباشرة.',
+    chatbotPlaceholder: 'رسالتك…',
+    chatbotSendA11y: 'إرسال',
+    chatbotCloseA11y: 'إغلاق الدردشة',
+    chatbotNewChat: 'محادثة جديدة',
+    chatbotError: 'تعذّر إرسال الرسالة. أعد المحاولة.',
+    chatbotRecoHeading: 'متابعة',
+    chatbotBoutiqueCardsHeading: 'منتجات وحزم',
+    chatbotOpenWebsite: 'عرض على الموقع',
+    chatbotTooltip: 'سؤال؟ تحدّث مع E‑MOWAJIH',
+    chatbotSuggEcoles: 'المدارس',
+    chatbotSuggContestAnnouncements: 'إعلانات المباريات',
+    chatbotSuggBoutique: 'المتجر',
+    chatbotShortcutMsgEcoles: 'أريد معلومات عن المدارس والمؤسسات التعليمية في المغرب.',
+    chatbotShortcutMsgContestAnnouncements:
+      'أين أجد إعلانات المباريات وآخر أجل للتسجيل في المؤسسات؟',
+    chatbotShortcutMsgBoutique:
+      'ما المنتجات أو الباقات التي تنصحونني بها في المتجر، وكيف أطلب؟',
+    chatbotThinkingHeader: 'E‑MOWAJIH يجهّز إجابتك',
+    chatbotLoadingSubtitle: 'قد يستغرق ذلك بضع ثوانٍ — شكرًا على انتظارك.',
+    chatbotPrepHint1: 'تحليل سؤالك والكلمات المفتاحية…',
+    chatbotPrepHint2: 'الاطلاع على سياق E‑TAWJIHI (المدارس، الشُّعب، الخدمات، المتجر)…',
+    chatbotPrepHint3: 'التحقق من المعلومات المحدّثة على المنصة…',
+    chatbotPrepHint4: 'صياغة إجابتك المخصّصة…',
+    chatbotThinkingAnalyze: 'تحليل سؤالك',
+    chatbotThinkingContext: 'إعداد السياق',
+    chatbotThinkingSuggestions: 'إعداد الاقتراحات',
+    shareSheetTitle: 'مشاركة',
+    shareSheetPreviewHint:
+      'معاينة غنية (Open Graph) مثل واتساب عندما تدعمها الصفحة — رابط عام على e-tawjihi.ma.',
+    shareLinkPreviewLoading: 'جاري تحميل المعاينة…',
+    shareCopyLink: 'نسخ الرابط',
+    shareNativeShare: 'مشاركة…',
+    shareCopiedFeedback: 'تم نسخ الرابط.',
+    shareOpenSheetA11y: 'مشاركة هذه الصفحة',
+    shareKindHome: 'الرئيسية',
+    shareKindSchools: 'المدارس العليا',
+    shareKindSchool: 'بطاقة مؤسسة',
+    shareKindAnnouncement: 'إعلان مسابقة',
+    shareKindAnnouncements: 'إعلانات المسابقات',
+    shareKindEvent: 'فعالية / ندوة',
+    shareKindEvents: 'أجندة الفعاليات',
+    shareKindCommunity: 'مجموعة باك 2026',
+    shareKindBoutique: 'المتجر',
+    shareKindBoutiqueProduct: 'بطاقة منتج',
+    sidebarTitle: 'التنقل',
+    sidebarOpen: 'فتح القائمة',
+    sidebarClose: 'إغلاق',
+    sidebarCart: 'السلة',
+    sidebarEvents: 'الفعاليات',
+    eventsAgendaTitle: 'الفعاليات والندوات',
+    eventsDetailPractical: 'معلومات',
+    eventsDetailDescription: 'عن الفعالية',
+    eventsDetailStatus: 'الوضع',
+    eventsDetailVenue: 'المكان والسعة',
+    eventsDetailLocationLabel: 'المكان',
+    eventsDetailRegistrationInfo: 'معلومات التسجيل',
+    eventsTabUpcoming: 'القادمة',
+    eventsTabLive: 'جارية',
+    eventsTabPast: 'السابقة',
+    eventsEmpty: 'لا توجد فعاليات في هذه القائمة.',
+    eventsEmptyLive: 'لا توجد فعالية مباشرة حالياً.',
+    eventsRegister: 'التسجيل',
+    eventsRegFormTitle: 'بيانات التسجيل',
+    eventsRegFirstName: 'الاسم الأول',
+    eventsRegLastName: 'الاسم العائلي',
+    eventsRegEmail: 'البريد الإلكتروني',
+    eventsRegPhone: 'الهاتف',
+    eventsRegPhoneHint: 'مرتبط بحسابك (تسجيل الدخول).',
+    eventsRegSubmit: 'تأكيد التسجيل',
+    eventsRegCancel: 'إلغاء',
+    eventsRegMissingPhone: 'يجب أن يكون لحسابك رقم هاتف للتسجيل.',
+    eventsRegError: 'تعذّر التسجيل.',
+    eventsRegisterExternalLink: 'رابط التسجيل',
+    eventsConnectionPending:
+      'سيظهر رابط الاتصال بعد تفعيل يدوي. استخدم رابط التسجيل الخارجي إن وُجد.',
+    eventsExternalRegClosed: 'التسجيل الخارجي غير متاح.',
+    eventsExternalDefaultInfo:
+      'التسجيل يتم عبر صفحة خارجية (الزر أدناه)، وليس عبر نموذج التوجيهي.',
+    eventsUnregister: 'إلغاء التسجيل',
+    eventsConfirmPresence: 'تأكيد الحضور',
+    eventsFull: 'مكتمل',
+    eventsLoadError: 'تعذّر تحميل الفعاليات.',
+    eventsOnlineLink: 'رابط الاتصال',
+    eventsMapsLink: 'خرائط Google',
+    eventsOpenDetail: 'التفاصيل',
+    eventsKindWebinar: 'ندوة عبر الويب',
+    eventsKindLive: 'بث مباشر',
+    eventsKindEvent: 'فعالية',
+    eventsPastBadge: 'انتهت',
+    eventsRegisteredLabel: 'مسجّل',
+    eventsPlacesLabel: 'المقاعد',
+    eventsFillLabel: 'الإشغال',
+    eventsLiveNow: 'مباشر',
+    eventsDateStart: 'البداية',
+    eventsDateEnd: 'النهاية',
+    eventsDuration: 'المدة',
+    eventsRegOpen: 'التسجيل مفتوح',
+    eventsRegClosed: 'التسجيل مغلق',
+    eventsRegClosedHint: 'لم يعد بإمكان التسجيل لهذه الفعالية.',
+    eventsLiveBannerTitle: 'فعالية مباشرة',
+    eventsLiveBannerSubtitle: 'الجلسة جارية الآن.',
+    eventsFollowUpTitle: 'متابعة تسجيلك',
+    eventsContactNew: 'جديد',
+    eventsContactUnreachable: 'لا يمكن التواصل',
+    eventsContactWhatsapp: 'واتساب مُرسَل',
+    eventsContactConfirmed: 'مؤكّد',
+    eventsContactCancelled: 'ملغى',
+    eventsContactAbandoned: 'متروك',
+    eventsAttendanceAttended: 'حاضر',
+    eventsAttendanceAbsent: 'غائب',
+    eventsContactStatusPrefix: 'حالة التواصل',
+    eventsAttendancePrefix: 'الحضور',
 
     // ── التسجيلات / تتبع الترشيحات ──
     inscEyebrow: 'التسجيلات والترشيحات',
@@ -1224,10 +2180,20 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscTabNotifications: 'الإشعارات',
     inscTabCandidacies: 'الترشيحات',
     inscTabAnnouncements: 'الإعلانات',
+    inscCandidaciesActiveShort: 'نشطة',
+    inscCandidaciesActiveBadgeA11y: '{{count}} ترشيحات نشطة',
+    inscCandidaciesTabBadgeA11y: '{{active}} ترشيحات نشطة، {{attention}} إجراءات مطلوبة',
+    inscCandidaciesActionsRequiredShort: 'إجراءات مطلوبة',
+    inscCandidaciesAttentionFilterAll: 'الكل',
+    inscCandidaciesAttentionFilterRequired: 'إجراء مطلوب',
+    inscCandidaciesActionRequiredBanner:
+      'إجراء مطلوب: راجع آخر إعلان وحدّث حالتك إذا طلبت المؤسسة ذلك (مثال: الانتقال إلى « مقبول في المباراة »).',
+    inscCandidaciesLatestAnnouncementActionTag: 'يتطلب الإجراء',
+    inscCandidaciesActionRequiredEmpty: 'لا يوجد ترشيح يتطلّب انتباهك حاليًا.',
     inscFilterSchoolLabel: 'المؤسسة',
     inscFilterSchoolAll: 'جميع المؤسسات',
     inscFilterSchoolPickTitle: 'تصفية حسب المؤسسة',
-    inscFilterSchoolSearchPlaceholder: 'ابحث عن مؤسسة…',
+    inscFilterSchoolSearchPlaceholder: 'اسم، اسم عربي أو اختصار…',
     inscFilterSchoolNoResults: 'لا توجد مؤسسة مطابقة',
     inscFilterReset: 'إعادة تعيين',
     inscFilterStatusLabel: 'الحالة',
@@ -1255,24 +2221,31 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscCandidaciesEmptyDesc: 'تابع إعلانًا بجانب لتبدأ تتبع ترشيحك.',
     inscCandidaciesEmptyCta: 'استكشاف الإعلانات',
     inscCandidaciesFilterAll: 'الكل',
+    inscCandidaciesFilterStatusLabel: 'الحالة',
+    inscCandidaciesFilterStatusPickTitle: 'تصفية حسب الحالة',
+    inscCandidaciesFilterStatusSearchPlaceholder: 'ابحث عن حالة…',
+    inscCandidaciesFilterStatusNoResults: 'لا توجد حالة مطابقة',
+    inscCandidaciesFilteredEmptyTitle: 'لا ترشيح بهذه الحالة',
+    inscCandidaciesFilteredEmptyDesc: 'غيّر التصفية أو أعد التعيين لعرض الكل.',
     inscAnnouncementsEmptyTitle: 'لا توجد إعلانات',
     inscAnnouncementsEmptyDesc: 'لم يُنشر أي إعلان تسجيل في الوقت الحالي.',
+    inscAnnouncementsFilteredEmptyTitle: 'لا يوجد إعلان يطابق هذه المرشحات',
+    inscAnnouncementsFilteredEmptyDesc:
+      'غيّر المدرسة أو المرشحات المتقدمة، أو أعد التعيين لعرض كل الإعلانات.',
     inscAnnouncementsFollow: 'متابعة',
     inscAnnouncementsFollowing: 'مُتابَع',
     inscAnnouncementsOpenLink: 'رابط التسجيل',
     inscAnnouncementsAlreadyTracked: 'مُتابَع بالفعل',
     inscAnnouncementsMarkApplied: 'لقد تقدّمت',
-    inscStatusInterested: 'مهتم',
-    inscStatusApplied: 'تم الترشّح',
-    inscStatusPreAdmitted: 'انتقاء أوّلي',
-    inscStatusAdmitted: 'مقبول',
-    inscStatusEnrolled: 'مسجَّل',
-    inscStatusRejected: 'غير مقبول',
-    inscStatusWithdrawn: 'انسحاب',
+    inscStatusUnknown: 'حالة غير معروفة',
+    inscStatusNone: 'بدون حالة',
+    inscStatusActionClear: 'إزالة الحالة',
     inscStatusActionTitle: 'تحديث الحالة',
     inscStatusActionSubtitle: 'اختر المرحلة الجديدة لترشّحك.',
     inscStatusActionUpdate: 'تحديث',
     inscStatusActionUpdating: 'جارٍ التحديث…',
+    inscStatusBlockTitle: 'حالة الترشّح',
+    inscStatusUnavailable: 'غير متاحة حاليًا',
     inscOpenLinkBtn: 'فتح الرابط',
     inscOpenLinkA11y: 'فتح رابط التسجيل الرسمي',
     inscOpenLinkBtnResult: 'عرض النتيجة',
@@ -1312,6 +2285,14 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscDetailRetry: 'إعادة المحاولة',
     inscDetailAboutSchool: 'حول المؤسسة',
     inscDetailAnnouncementDescription: 'الوصف',
+    inscDetailTutorialTitle: 'شرح التسجيل (فيديو)',
+    inscDetailTutorialPlaybackError: 'تعذّر تشغيل الفيديو داخل التطبيق.',
+    inscDetailTutorialRetry: 'إعادة المحاولة',
+    inscDetailSiblingHistoryTitle: 'إعلانات أخرى للمؤسسة',
+    inscDetailSiblingsNewer: 'إعلانات أحدث',
+    inscDetailSiblingsOlder: 'إعلانات أقدم',
+    inscDetailSiblingHistoryHint: 'مقارنةً بهذا الإعلان: نفس المؤسسة، تواريخ أحدث أو أقدم.',
+    inscDetailSiblingUpcoming: 'قريباً',
     inscDetailEligibility: 'شروط الأهلية',
     inscDetailFilieresBacNormal: 'الشُّعب (الباكالوريا العادية)',
     inscDetailFilieresBacMission: 'الشُّعب (الباكالوريا البعثة)',
@@ -1374,5 +2355,37 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     followedSchoolHistoricalAnnouncements: 'إعلانات المؤسسة',
     followedSchoolViewSchool: 'عرض بطاقة المؤسسة',
     followedSchoolBackToList: 'العودة إلى المؤسسات المتابَعة',
+    qnaSectionTitle: 'أسئلة وأجوبة',
+    qnaIntro:
+      'اطرح سؤالاً عاماً (يظهر للمجتمع) أو خاصاً (لفريق إي-توجيهي فقط). الإجابات الرسمية موضحة بشارة.',
+    qnaRefresh: 'تحديث',
+    qnaEmpty: 'لا توجد أسئلة بعد. كن أول من يطرح سؤالاً.',
+    qnaBodyTooShort: 'النص يجب أن يضم 3 أحرف على الأقل.',
+    qnaPrivateBadge: 'خاص · فريق إي-توجيهي',
+    qnaPrivateHint: 'فريق إي-توجيهي فقط يمكنه الإجابة على الأسئلة الخاصة.',
+    qnaMeToo: 'أنا أيضاً',
+    qnaOfficialBadge: 'إي-توجيهي',
+    qnaAnswerPlaceholder: 'إجابتك أو تجربتك…',
+    qnaSendAnswer: 'نشر الإجابة',
+    qnaTapToReply: 'ردّ',
+    qnaReplyDockTitle: 'إجابة',
+    qnaAskTitle: 'طرح سؤال',
+    qnaLoginToParticipate: 'سجّل الدخول لطرح سؤال أو للإجابة.',
+    qnaVisibilityPublic: 'عام',
+    qnaVisibilityPrivate: 'خاص (الفريق)',
+    qnaHintPublic: 'مرئي للطلاب الآخرين ويمكنهم الإجابة. يمكن للفريق تثبيت إجابة رسمية.',
+    qnaHintPrivate: 'مرئي لك وللفريق فقط (حالة شخصية أو حساسة).',
+    qnaPlaceholder: 'مثال: سؤالك عن المؤسسة، التسجيل، معلومة أو غير ذلك…',
+    qnaSubmit: 'إرسال السؤال',
+    qnaCommunityAnswerBadge: 'طالب',
+    qnaVerdictCorrect: 'صحيح',
+    qnaVerdictIncorrect: 'غير صحيح',
+    qnaVerdictIncomplete: 'ناقص',
+    qnaVerdictTeamLabel: 'تقييم الفريق',
+    qnaLoadingComments: 'جاري تحميل الأسئلة والأجوبة…',
+    qnaShowRepliesOne: 'عرض الإجابة',
+    qnaShowRepliesMany: 'عرض {{count}} إجابات',
+    qnaShowRemainingRepliesOne: 'عرض الإجابة المتبقية',
+    qnaShowRemainingRepliesMany: 'عرض {{count}} إجابات أخرى',
   },
 };

@@ -90,13 +90,107 @@ export function applyEstablishmentWebClientFilters(
   return out;
 }
 
-/** Tri rapide : sponsorisés en premier (comme le listing web). */
+/** Tri : sponsorisés en premier, puis ordre stable par id (aligné listing web). */
 export function sortSponsoredFirst(items: EstablishmentNormalized[]): EstablishmentNormalized[] {
   return [...items].sort((a, b) => {
-    if (a.isSponsored && !b.isSponsored) return -1;
-    if (!a.isSponsored && b.isSponsored) return 1;
-    return 0;
+    const sa = Boolean(a.isSponsored);
+    const sb = Boolean(b.isSponsored);
+    if (sa && !sb) return -1;
+    if (!sa && sb) return 1;
+    return a.id - b.id;
   });
+}
+
+/** Même forme que les entrées de `fetchListingPlacementsByEstablishment` (champs utiles au tri). */
+export type EstablishmentListingPlacementLike = {
+  placementId: number;
+  isSponsored: boolean;
+};
+
+/** Fisher–Yates sur copie — aligné `EcolesSupérieures.tsx`. */
+export function shuffleEstablishmentsCopy<T>(arr: T[]): T[] {
+  const out = [...arr];
+  for (let i = out.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const t = out[i]!;
+    out[i] = out[j]!;
+    out[j] = t;
+  }
+  return out;
+}
+
+/**
+ * Signature stable du contenu (ids + placement) pour ne reshuffler le listing
+ * « style web » que lorsque la piscine ou les placements changent.
+ */
+export function getListingWebOrderContentSig(
+  pool: EstablishmentNormalized[],
+  placementByEid: Record<number, EstablishmentListingPlacementLike>,
+): string {
+  const rows = pool.map((e) => {
+    const p = placementByEid[e.id];
+    return `${e.id}:${p?.placementId ?? 0}:${p?.isSponsored ? 1 : 0}`;
+  });
+  rows.sort((a, b) => parseInt(a.split(':')[0]!, 10) - parseInt(b.split(':')[0]!, 10));
+  return rows.join('|');
+}
+
+export type EcolesSuperieuresWebSortOptions = {
+  /** `itemsPerPage` web (30). */
+  firstPageSize?: number;
+  /** Taille du premier bloc mélangé référencés + autres (10). */
+  mixBlockSize?: number;
+};
+
+/**
+ * Ordre d’affichage du listing « Écoles supérieures » web (`EcolesSupérieures.tsx`) :
+ * sponsorisés (référencés) mélangés en tête, puis bloc mélangé référencés-non-sponsor / tête des autres,
+ * puis complément de « première page », puis le reste.
+ * `merged` doit déjà inclure `mergeEstablishmentsWithListingPlacements`.
+ */
+export function sortEstablishmentsLikeEcolesSuperieuresWeb(
+  merged: EstablishmentNormalized[],
+  placementByEid: Record<number, EstablishmentListingPlacementLike>,
+  opts?: EcolesSuperieuresWebSortOptions,
+): EstablishmentNormalized[] {
+  const itemsPerPage = opts?.firstPageSize ?? 30;
+  const first10Size = opts?.mixBlockSize ?? 10;
+  if (merged.length === 0) return [];
+
+  const referencedIds = new Set(
+    Object.keys(placementByEid)
+      .map((k) => parseInt(k, 10))
+      .filter((id) => Number.isFinite(id) && id > 0),
+  );
+
+  const referencedList = merged.filter((e) => referencedIds.has(e.id));
+  const othersList = merged.filter((e) => !referencedIds.has(e.id));
+  const sponsoredList = referencedList.filter((e) => Boolean(e.isSponsored));
+  const referencedOnlyList = referencedList.filter((e) => !e.isSponsored);
+
+  const first10Pool = shuffleEstablishmentsCopy([
+    ...referencedOnlyList,
+    ...othersList.slice(0, Math.max(0, first10Size - referencedOnlyList.length)),
+  ]);
+  const first10 = first10Pool.slice(0, first10Size);
+  const first10Ids = new Set(first10.map((x) => x.id));
+
+  const restOfFirstPageCount = Math.max(0, itemsPerPage - first10Size);
+  const remainingOthers = othersList.filter((o) => !first10Ids.has(o.id));
+  const remainingReferenced = referencedOnlyList.filter((r) => !first10Ids.has(r.id));
+  const restOfFirstPage = remainingOthers.slice(0, restOfFirstPageCount);
+  const restOfFirstPageIds = new Set(restOfFirstPage.map((x) => x.id));
+  const remaining = [
+    ...remainingReferenced,
+    ...remainingOthers.filter((o) => !restOfFirstPageIds.has(o.id)),
+  ];
+
+  return [
+    ...shuffleEstablishmentsCopy(sponsoredList),
+    ...first10,
+    ...restOfFirstPage,
+    ...remaining,
+  ];
 }
 
 /**

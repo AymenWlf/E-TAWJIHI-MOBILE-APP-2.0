@@ -83,6 +83,18 @@ export function classifyEstablishmentType(raw?: string | null): Kind {
   return 'other';
 }
 
+/** Libellé traduit (cartes liste / métriques) — aligné sur {@link EstablishmentTypeBadge}. */
+export function establishmentTypeDisplayLabel(
+  raw: string | null | undefined,
+  t: (key: HomeCopyKey) => string,
+): string {
+  const kind = classifyEstablishmentType(raw);
+  const visual = VISUALS[kind];
+  if (visual.i18nKey) return t(visual.i18nKey);
+  const fallback = (raw ?? '').trim();
+  return fallback || '—';
+}
+
 type Props = {
   type?: string | null;
   size?: 'xs' | 'sm' | 'md';

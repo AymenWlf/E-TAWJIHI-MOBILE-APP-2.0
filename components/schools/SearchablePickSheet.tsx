@@ -1,4 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import type { ComponentProps } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
@@ -16,12 +17,56 @@ import { Text } from '@/components/ui/Text';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, radius, spacing } from '@/theme/tokens';
 
+type FaName = ComponentProps<typeof FontAwesome>['name'];
+
+function StatusPickSwatch({
+  icon,
+  colorFg,
+  colorBg,
+  colorBorder,
+}: {
+  icon: string;
+  colorFg: string;
+  colorBg: string;
+  colorBorder: string;
+}) {
+  const safeIcon = (icon || 'circle') as FaName;
+  return (
+    <View
+      style={[
+        styles.statusSwatch,
+        {
+          backgroundColor: colorBg,
+          borderColor: colorBorder,
+        },
+      ]}
+    >
+      <FontAwesome name={safeIcon} size={15} color={colorFg} />
+    </View>
+  );
+}
+
 export type SearchablePickItem = {
   id: string;
   /** Valeur stockée dans l’état parent (ville = titre ; secteur = id). */
   value: string;
   label: string;
   subtitle?: string;
+  /**
+   * Texte additionnel pour la recherche (nom arabe, sigle, etc.) sans modifier
+   * l’affichage. Si présent, la recherche s’applique sur `label` + `searchText`
+   * (+ `subtitle` si `searchInSubtitle`).
+   */
+  searchText?: string;
+  /**
+   * Pastille optionnelle (ex. statuts de candidature) : icône + couleurs du catalogue admin.
+   */
+  statusAppearance?: {
+    icon: string;
+    colorFg: string;
+    colorBg: string;
+    colorBorder: string;
+  };
 };
 
 type PanelProps = {
@@ -71,15 +116,21 @@ export function SearchablePickPanel({
     if (isActive) setQuery('');
   }, [isActive]);
 
+  const needsStatusSwatchColumn = useMemo(
+    () => items.some((i) => i.statusAppearance != null),
+    [items],
+  );
+
   const filtered = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return items;
     return items.filter((i) => {
-      const lbl = i.label.toLowerCase();
-      if (lbl.includes(q)) return true;
-      if (!searchInSubtitle) return false;
-      const sub = i.subtitle?.toLowerCase() ?? '';
-      return sub.includes(q);
+      const parts: string[] = [i.label];
+      const extra = (i.searchText ?? '').trim();
+      if (extra) parts.push(extra);
+      if (searchInSubtitle && i.subtitle) parts.push(i.subtitle);
+      const hay = parts.join('\n').toLowerCase();
+      return hay.includes(q);
     });
   }, [items, query, searchInSubtitle]);
 
@@ -144,9 +195,14 @@ export function SearchablePickPanel({
                 rtl && styles.rowRtl,
                 pressed && { backgroundColor: 'rgba(15,23,42,0.05)' },
               ]}>
-              <Text style={[styles.rowText, rtl && styles.rtlText, !selectedValue && styles.rowTextActive]}>
-                {allLabel}
-              </Text>
+              <View style={[styles.rowMain, rtl && styles.rowMainRtl]}>
+                {needsStatusSwatchColumn ? <View style={styles.statusSwatchPlaceholder} /> : null}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.rowText, rtl && styles.rtlText, !selectedValue && styles.rowTextActive]}>
+                    {allLabel}
+                  </Text>
+                </View>
+              </View>
               {!selectedValue ? <FontAwesome name="check" size={14} color={homeShell.blue} /> : null}
             </Pressable>
             <View style={styles.sep} />
@@ -163,6 +219,7 @@ export function SearchablePickPanel({
         ItemSeparatorComponent={() => <View style={styles.sep} />}
         renderItem={({ item }) => {
           const active = selectedValue !== '' && selectedValue === item.value;
+          const vis = item.statusAppearance;
           return (
             <Pressable
               accessibilityRole="button"
@@ -175,15 +232,25 @@ export function SearchablePickPanel({
                 rtl && styles.rowRtl,
                 pressed && { backgroundColor: 'rgba(15,23,42,0.05)' },
               ]}>
-              <View style={{ flex: 1, minWidth: 0 }}>
-                <Text style={[styles.rowText, rtl && styles.rtlText, active && styles.rowTextActive]} numberOfLines={2}>
-                  {item.label}
-                </Text>
-                {item.subtitle ? (
-                  <Text style={[styles.rowMeta, rtl && styles.rtlText]} numberOfLines={1}>
-                    {item.subtitle}
-                  </Text>
+              <View style={[styles.rowMain, rtl && styles.rowMainRtl]}>
+                {vis ? (
+                  <StatusPickSwatch
+                    icon={vis.icon}
+                    colorFg={vis.colorFg}
+                    colorBg={vis.colorBg}
+                    colorBorder={vis.colorBorder}
+                  />
                 ) : null}
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.rowText, rtl && styles.rtlText, active && styles.rowTextActive]} numberOfLines={2}>
+                    {item.label}
+                  </Text>
+                  {item.subtitle ? (
+                    <Text style={[styles.rowMeta, rtl && styles.rtlText]} numberOfLines={1}>
+                      {item.subtitle}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
               {active ? <FontAwesome name="check" size={14} color={homeShell.blue} /> : null}
             </Pressable>
@@ -301,6 +368,26 @@ const styles = StyleSheet.create({
     gap: spacing.sm + 4,
   },
   rowRtl: { flexDirection: 'row-reverse' },
+  rowMain: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm + 2,
+  },
+  rowMainRtl: { flexDirection: 'row-reverse' },
+  statusSwatchPlaceholder: {
+    width: 36,
+    height: 36,
+  },
+  statusSwatch: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+  },
   rowText: { color: homeShell.cardText, fontWeight: '700', fontSize: fontSize.sm + 1 },
   rowTextActive: { color: homeShell.blue },
   rowMeta: { color: homeShell.cardMuted, fontSize: 12, marginTop: 4 },

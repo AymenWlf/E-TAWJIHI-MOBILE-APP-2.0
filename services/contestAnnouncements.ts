@@ -1,6 +1,12 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
-import type { CustomLink, EstablishmentBrief } from '@/types/inscriptions';
+import type {
+  CandidacyStatusType,
+  CustomLink,
+  EstablishmentBrief,
+} from '@/types/inscriptions';
+import { fireAndForget } from '@/utils/fireAndForget';
+import type { ContestSiblingBrief } from '@/utils/contestAnnouncementSiblings';
 import { getMobileVisitorId } from '@/utils/visitorId';
 
 /**
@@ -34,7 +40,16 @@ export type ContestAnnouncementCard = {
   specialitesBacMissionAcceptees: string[];
   /** Critères d'éligibilité — Années scolaires du bac acceptées. */
   anneesBacAcceptees: string[];
+  /**
+   * Statuts de candidature autorisés par cette annonce (issus du
+   * référentiel admin, déjà filtrés sur `is_active=true` côté backend).
+   * Liste vide ⇒ aucune action de candidature : seul le suivi école est
+   * possible (les CTA « Mettre à jour mon statut » sont masqués).
+   */
+  availableStatuses: CandidacyStatusType[];
   establishment: EstablishmentBrief | null;
+  /** Messages publics Q&R (questions + réponses) pour l’icône commentaire sur la carte. */
+  communityQnaMessageCount?: number;
 };
 
 type RawCard = {
@@ -54,6 +69,8 @@ type RawCard = {
   filieresAcceptees?: string[];
   specialitesBacMissionAcceptees?: string[];
   anneesBacAcceptees?: string[];
+  availableStatuses?: RawAvailableStatus[];
+  communityQnaMessageCount?: number;
   etablissement?: {
     id?: number;
     nom?: string;
@@ -68,6 +85,50 @@ type RawCard = {
 };
 
 type ListResponse = { success: boolean; data: RawCard[] };
+
+/**
+ * Forme brute d'un `CandidacyStatusType` côté API. On accepte les types
+ * faibles (Partial / null) parce que le payload provient d'un controller
+ * Symfony qui peut omettre certains champs et qu'on veut être tolérant
+ * sans casser la liste si un statut est mal formé.
+ */
+type RawAvailableStatus = {
+  id?: number;
+  code?: string;
+  labelFr?: string;
+  labelAr?: string;
+  icon?: string;
+  colorFg?: string;
+  colorBg?: string;
+  colorBorder?: string;
+  sortOrder?: number;
+  isActive?: boolean;
+  isEnrollmentMarker?: boolean;
+};
+
+function normalizeAvailableStatuses(
+  raw: RawAvailableStatus[] | undefined,
+): CandidacyStatusType[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter(
+      (s): s is RawAvailableStatus =>
+        !!s && typeof s.id === 'number' && typeof s.code === 'string' && s.code.length > 0,
+    )
+    .map<CandidacyStatusType>((s) => ({
+      id: s.id as number,
+      code: s.code as string,
+      labelFr: s.labelFr ?? '',
+      labelAr: s.labelAr ?? '',
+      icon: s.icon ?? 'circle',
+      colorFg: s.colorFg ?? '#1D4ED8',
+      colorBg: s.colorBg ?? '#DBEAFE',
+      colorBorder: s.colorBorder ?? '#BFDBFE',
+      sortOrder: typeof s.sortOrder === 'number' ? s.sortOrder : 0,
+      isActive: s.isActive !== false,
+      isEnrollmentMarker: s.isEnrollmentMarker === true,
+    }));
+}
 
 function computeDaysUntilClose(dateEnd: string): number {
   const end = new Date(dateEnd);
@@ -115,6 +176,7 @@ function normalize(c: RawCard): ContestAnnouncementCard {
       ? c.specialitesBacMissionAcceptees
       : [],
     anneesBacAcceptees: Array.isArray(c.anneesBacAcceptees) ? c.anneesBacAcceptees : [],
+    availableStatuses: normalizeAvailableStatuses(c.availableStatuses),
     establishment: c.etablissement
       ? {
           id: c.etablissement.id ?? 0,
@@ -128,6 +190,10 @@ function normalize(c: RawCard): ContestAnnouncementCard {
           type: c.etablissement.type ?? null,
         }
       : null,
+    communityQnaMessageCount:
+      typeof c.communityQnaMessageCount === 'number' && Number.isFinite(c.communityQnaMessageCount)
+        ? Math.max(0, Math.floor(c.communityQnaMessageCount))
+        : undefined,
   };
 }
 
@@ -140,6 +206,60 @@ export async function fetchContestAnnouncements(): Promise<ContestAnnouncementCa
   } catch {
     return [];
   }
+}
+
+let contestAnnouncementsListCache: { at: number; data: ContestAnnouncementCard[] } | null = null;
+const CONTEST_ANNOUNCEMENTS_LIST_CACHE_MS = 45_000;
+
+/** Liste publiée avec court cache — évite un GET à chaque bulle du chat E‑MOWAJIH. */
+export async function fetchContestAnnouncementsCached(): Promise<ContestAnnouncementCard[]> {
+  const now = Date.now();
+  if (
+    contestAnnouncementsListCache &&
+    now - contestAnnouncementsListCache.at < CONTEST_ANNOUNCEMENTS_LIST_CACHE_MS
+  ) {
+    return contestAnnouncementsListCache.data;
+  }
+  const data = await fetchContestAnnouncements();
+  contestAnnouncementsListCache = { at: now, data };
+  return data;
+}
+
+/** Aligne une fiche détail sur la forme « carte liste » pour les mini-cards chat. */
+export function contestDetailToListCard(d: ContestAnnouncementDetail): ContestAnnouncementCard {
+  return {
+    id: d.id,
+    title: d.title,
+    titleAr: d.titleAr,
+    announcementType: d.announcementType,
+    dateStart: d.dateStart,
+    dateEnd: d.dateEnd,
+    isOpen: d.isOpen,
+    isExpire: d.isExpire,
+    daysUntilClose: d.daysUntilClose,
+    registrationUrl: d.registrationUrl,
+    registrationUrlLabel: d.registrationUrlLabel,
+    ogImage: d.ogImage,
+    liensUtiles: d.liensUtiles,
+    filieresAcceptees: d.filieresAcceptees,
+    specialitesBacMissionAcceptees: d.specialitesBacMissionAcceptees,
+    anneesBacAcceptees: d.anneesBacAcceptees,
+    availableStatuses: d.availableStatuses,
+    establishment: d.establishment
+      ? {
+          id: d.establishment.id,
+          nom: d.establishment.nom,
+          nomArabe: d.establishment.nomArabe,
+          sigle: d.establishment.sigle,
+          slug: d.establishment.slug,
+          logo: d.establishment.logo,
+          ville: d.establishment.ville,
+          villes: d.establishment.villes,
+          type: d.establishment.type,
+        }
+      : null,
+    communityQnaMessageCount: undefined,
+  };
 }
 
 /**
@@ -184,6 +304,9 @@ export type ContestAnnouncementDetail = {
   preRegistrationFee: string | null;
   ogImage: string | null;
   descriptionLeadImage: string | null;
+  /** Lien YouTube (tutoriel inscription) — optionnel */
+  inscriptionTutorialYoutubeUrl: string | null;
+  autresAnnoncesMemeEtablissement: ContestSiblingBrief[];
   metaTitle: string | null;
   metaDescription: string | null;
   liensUtiles: CustomLink[];
@@ -191,6 +314,8 @@ export type ContestAnnouncementDetail = {
   filieresAcceptees: string[];
   specialitesBacMissionAcceptees: string[];
   anneesBacAcceptees: string[];
+  /** Statuts de candidature autorisés (cf. `ContestAnnouncementCard`). */
+  availableStatuses: CandidacyStatusType[];
   establishment: {
     id: number;
     nom: string;
@@ -230,6 +355,8 @@ type RawDetail = {
   fraisPreinscription?: string | null;
   ogImage?: string | null;
   descriptionLeadImage?: string | null;
+  inscriptionTutorialYoutubeUrl?: string | null;
+  autresAnnoncesMemeEtablissement?: ContestSiblingBrief[];
   metaTitle?: string | null;
   metaDescription?: string | null;
   liensUtiles?: { titre?: string; url?: string }[];
@@ -237,6 +364,7 @@ type RawDetail = {
   filieresAcceptees?: string[];
   specialitesBacMissionAcceptees?: string[];
   anneesBacAcceptees?: string[];
+  availableStatuses?: RawAvailableStatus[];
   etablissement?: {
     id?: number;
     nom?: string;
@@ -263,6 +391,35 @@ function normalizeLinks(raw?: { titre?: string; url?: string }[]): CustomLink[] 
     }))
     .filter((l) => l.url.length > 0)
     .map((l) => ({ titre: l.titre || l.url, url: l.url }));
+}
+
+function normalizeSiblingsBrief(raw: unknown): ContestSiblingBrief[] {
+  if (!Array.isArray(raw)) return [];
+  const out: ContestSiblingBrief[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const o = row as Record<string, unknown>;
+    const id = typeof o.id === 'number' ? o.id : Number(o.id);
+    if (!Number.isFinite(id) || id <= 0) continue;
+    const titreSpecial = typeof o.titreSpecial === 'string' ? o.titreSpecial.trim() : '';
+    if (!titreSpecial) continue;
+    const dateDebut = typeof o.dateDebut === 'string' ? o.dateDebut : '';
+    const dateFin = typeof o.dateFin === 'string' ? o.dateFin : '';
+    if (!dateDebut || !dateFin) continue;
+    out.push({
+      id,
+      titreSpecial,
+      titreSpecialAr: typeof o.titreSpecialAr === 'string' ? o.titreSpecialAr : null,
+      typeAnnonce: typeof o.typeAnnonce === 'string' ? o.typeAnnonce : '',
+      dateDebut,
+      dateFin,
+      isOpen: Boolean(o.isOpen),
+      isExpire: Boolean(o.isExpire),
+      daysUntilClose: typeof o.daysUntilClose === 'number' ? o.daysUntilClose : undefined,
+      ogImage: typeof o.ogImage === 'string' ? o.ogImage : null,
+    });
+  }
+  return out;
 }
 
 function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
@@ -297,6 +454,11 @@ function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
     preRegistrationFee: d.fraisPreinscription ?? null,
     ogImage: d.ogImage ?? null,
     descriptionLeadImage: d.descriptionLeadImage ?? null,
+    inscriptionTutorialYoutubeUrl:
+      typeof d.inscriptionTutorialYoutubeUrl === 'string' && d.inscriptionTutorialYoutubeUrl.trim() !== ''
+        ? d.inscriptionTutorialYoutubeUrl.trim()
+        : null,
+    autresAnnoncesMemeEtablissement: normalizeSiblingsBrief(d.autresAnnoncesMemeEtablissement),
     metaTitle: d.metaTitle ?? null,
     metaDescription: d.metaDescription ?? null,
     liensUtiles: normalizeLinks(d.liensUtiles),
@@ -306,6 +468,7 @@ function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
       ? d.specialitesBacMissionAcceptees
       : [],
     anneesBacAcceptees: Array.isArray(d.anneesBacAcceptees) ? d.anneesBacAcceptees : [],
+    availableStatuses: normalizeAvailableStatuses(d.availableStatuses),
     establishment: {
       id: d.etablissement?.id ?? 0,
       nom: d.etablissement?.nom ?? '',
@@ -392,7 +555,7 @@ export function recordContestListingImpressionsBatch(items: { id: number }[]): v
     sessionListingTracked.add(it.id);
     // Fire-and-forget : un by-one keep-alive HTTP simple est suffisant
     // (pas de batching côté backend pour rester rétro-compatible web).
-    void recordContestImpression(it.id, 'listing');
+    fireAndForget(recordContestImpression(it.id, 'listing'));
   }
 }
 

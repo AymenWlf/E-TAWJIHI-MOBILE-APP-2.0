@@ -18,8 +18,8 @@ async function requestJson<T>(url: string, init: RequestInit): Promise<T> {
     const origin =
       typeof window !== 'undefined' && typeof window.location?.origin === 'string' ? window.location.origin : undefined;
     const hint = origin
-      ? ` (origin: ${origin}) — vérifie que l’API répond et que CORS autorise cette origin`
-      : ` — vérifie que l’API est joignable (device: IP au lieu de localhost)`;
+      ? ` (origin: ${origin}) — API démarrée ? CORS OK ? Sinon définir EXPO_PUBLIC_API_BASE_URL.`
+      : ` — API locale sur :8001 ? iPhone physique : EXPO_PUBLIC_DEV_API_HOST=<IP du Mac> ou EXPO_PUBLIC_API_BASE_URL.`;
     const err: ApiError = { message: `Failed to fetch: ${url}${hint}`, url };
     throw err;
   }

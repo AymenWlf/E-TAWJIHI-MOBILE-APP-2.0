@@ -1,5 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
@@ -15,15 +16,15 @@ import {
   formatTimeAgo,
   pickAnnouncementTitle,
   pickEstablishmentNamesPair,
-  STATUS_VISUALS,
 } from '@/utils/candidacyStatus';
 
 import { StatusBadge } from './StatusBadge';
 
 type Props = {
   follow: EstablishmentFollow;
+  /** Dernière annonce de l’école non encore « vue » (nouvelle annonce). */
+  actionRequired?: boolean;
   onPress?: () => void;
-  onUpdateStatus?: () => void;
   onUnfollow?: () => void;
   onOpenLatest?: () => void;
   /**
@@ -31,21 +32,33 @@ type Props = {
    * pour proposer une action utile à l'utilisateur.
    */
   onOpenSchool?: () => void;
+  /**
+   * Ouvre le sheet de mise à jour de statut. Le bouton n'est rendu que si
+   * `follow.availableStatuses` est non vide (au moins une annonce de l'école
+   * autorise un statut).
+   */
+  onUpdateStatus?: () => void;
 };
 
 export function FollowedSchoolCard({
   follow,
+  actionRequired = false,
   onPress,
-  onUpdateStatus,
   onUnfollow,
   onOpenLatest,
   onOpenSchool,
+  onUpdateStatus,
 }: Props) {
   const { t, locale, isRTL } = useLocale();
   const est = follow.establishment;
   const stats = follow.stats;
   const latest = follow.latestAnnouncement;
-  const visual = STATUS_VISUALS[follow.status];
+  // Coloration de la carte selon le statut courant (cohérent avec CandidacyCard).
+  const status = follow.status;
+  const cardBg = actionRequired ? '#FFF1F2' : status?.colorBg ?? brand.white;
+  const cardBorder = actionRequired ? '#FECACA' : status?.colorBorder ?? brand.border;
+  const accentColor = actionRequired ? '#DC2626' : status?.colorFg ?? brand.primary;
+  const hasUpdateAction = (follow.availableStatuses?.length ?? 0) > 0;
 
   const { primary: estNamePrimary, secondary: estNameSecondary } = pickEstablishmentNamesPair(
     est,
@@ -60,24 +73,71 @@ export function FollowedSchoolCard({
 
   const deadline = latest ? formatDaysUntilClose(latest.daysUntilClose, locale) : { label: '', kind: 'normal' as const };
 
+  const pulseScale = useRef(new Animated.Value(1)).current;
+  const pulseUpdate = Boolean(actionRequired && hasUpdateAction && onUpdateStatus);
+
+  useEffect(() => {
+    if (!pulseUpdate) {
+      pulseScale.setValue(1);
+      return;
+    }
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseScale, {
+          toValue: 1.08,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseScale, {
+          toValue: 1,
+          duration: 700,
+          easing: Easing.inOut(Easing.quad),
+          useNativeDriver: true,
+        }),
+      ]),
+    );
+    anim.start();
+    return () => {
+      anim.stop();
+      pulseScale.setValue(1);
+    };
+  }, [pulseUpdate, pulseScale]);
+
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: visual.bg, borderColor: visual.border },
+        { backgroundColor: cardBg, borderColor: cardBorder },
+        actionRequired && styles.cardActionRequired,
         pressed && { opacity: 0.92 },
       ]}
     >
       <View
         style={[
           styles.accentBar,
-          { backgroundColor: visual.fg },
+          { backgroundColor: accentColor },
           isRTL && styles.accentBarRtl,
         ]}
       />
 
-      {/* Header (logo + nom + statut) */}
+      {actionRequired ? (
+        <View style={[styles.actionRequiredBanner, isRTL && styles.rowRtl]}>
+          <FontAwesome name="exclamation-circle" size={12} color="#B91C1C" />
+          <Text style={[styles.actionRequiredBannerTxt, isRTL && styles.rtl]} numberOfLines={4}>
+            {t('inscCandidaciesActionRequiredBanner')}
+          </Text>
+        </View>
+      ) : null}
+
+      {/* Bandeau statut : posé tout en haut de la carte pour ne pas
+          écraser le bloc nom de l'école (qui peut être long en AR/FR). */}
+      <View style={[styles.statusRow, isRTL && styles.rowRtl]}>
+        <StatusBadge status={follow.status} size="sm" />
+      </View>
+
+      {/* Header : logo + nom (le statut est désormais au-dessus). */}
       <View style={[styles.headerRow, isRTL && styles.rowRtl]}>
         <Image
           source={{ uri: logoUri }}
@@ -103,7 +163,6 @@ export function FollowedSchoolCard({
             {est?.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
           </View>
         </View>
-        <StatusBadge status={follow.status} size="sm" />
       </View>
 
       {villesShort ? (
@@ -148,12 +207,20 @@ export function FollowedSchoolCard({
           onPress={onOpenLatest}
           style={({ pressed }) => [
             styles.latestBox,
+            actionRequired && styles.latestBoxActionRequired,
             pressed && onOpenLatest ? { opacity: 0.85 } : null,
           ]}
         >
           <View style={[styles.latestHeader, isRTL && styles.rowRtl]}>
             <FontAwesome name="bookmark" size={10} color={brand.primary} />
-            <Text style={styles.latestEyebrow}>{t('followedSchoolLatestAnnouncement')}</Text>
+            <Text style={[styles.latestEyebrow, isRTL && styles.rtl]} numberOfLines={1}>
+              {t('followedSchoolLatestAnnouncement')}
+            </Text>
+            {actionRequired ? (
+              <View style={[styles.latestActionTag, isRTL && styles.latestActionTagRtl]}>
+                <Text style={styles.latestActionTagTxt}>{t('inscCandidaciesLatestAnnouncementActionTag')}</Text>
+              </View>
+            ) : null}
           </View>
           <Text style={[styles.latestTitle, isRTL && styles.rtl]} numberOfLines={2}>
             {pickAnnouncementTitle(latest, locale) || latest.title}
@@ -239,17 +306,27 @@ export function FollowedSchoolCard({
         </Text>
       ) : null}
 
-      {/* Actions */}
+      {/* Actions — Mettre à jour le statut + Ne plus suivre */}
       <View style={[styles.actionsRow, isRTL && styles.rowRtl]}>
+        {hasUpdateAction && onUpdateStatus ? (
+          <Animated.View style={pulseUpdate ? { flex: 1, transform: [{ scale: pulseScale }] } : styles.btnFlex}>
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                onUpdateStatus();
+              }}
+              style={({ pressed }) => [styles.btn, styles.btnPrimary, pressed && { opacity: 0.85 }]}
+            >
+              <FontAwesome name="pencil" size={11} color={brand.white} />
+              <Text style={styles.btnPrimaryTxt}>{t('inscStatusActionUpdate')}</Text>
+            </Pressable>
+          </Animated.View>
+        ) : null}
         <Pressable
-          onPress={onUpdateStatus}
-          style={({ pressed }) => [styles.btn, styles.btnSecondary, pressed && { opacity: 0.85 }]}
-        >
-          <FontAwesome name="pencil" size={11} color={brand.primary} />
-          <Text style={styles.btnSecondaryTxt}>{t('inscStatusActionUpdate')}</Text>
-        </Pressable>
-        <Pressable
-          onPress={onUnfollow}
+          onPress={(e) => {
+            e.stopPropagation?.();
+            onUnfollow?.();
+          }}
           style={({ pressed }) => [styles.btn, styles.btnDanger, pressed && { opacity: 0.85 }]}
         >
           <FontAwesome name="trash-o" size={11} color="#B91C1C" />
@@ -278,6 +355,29 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     position: 'relative',
   },
+  cardActionRequired: {
+    borderWidth: 2,
+  },
+  actionRequiredBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'stretch',
+    marginHorizontal: -spacing.md,
+    marginTop: -spacing.md,
+    paddingVertical: 8,
+    paddingHorizontal: spacing.md,
+    backgroundColor: '#FEE2E2',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: '#FECACA',
+  },
+  actionRequiredBannerTxt: {
+    flex: 1,
+    color: '#991B1B',
+    fontWeight: '900',
+    fontSize: fontSize.xs,
+    letterSpacing: 0.15,
+  },
   accentBar: {
     position: 'absolute',
     top: 0,
@@ -295,6 +395,9 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.lg,
     borderBottomRightRadius: radius.lg,
   },
+  /* Le badge de statut est posé sur sa propre ligne en haut de carte
+     pour éviter qu'il ne pousse le bloc nom de l'école (parfois long). */
+  statusRow: { flexDirection: 'row', alignItems: 'center' },
   headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
   rowRtl: { flexDirection: 'row-reverse' },
   logo: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: brand.borderLight },
@@ -340,13 +443,38 @@ const styles = StyleSheet.create({
     borderColor: brand.border,
     gap: 4,
   },
-  latestHeader: { flexDirection: 'row', alignItems: 'center', gap: 5 },
+  latestBoxActionRequired: {
+    borderColor: '#F87171',
+    backgroundColor: '#FFF7F7',
+  },
+  latestHeader: { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
+  latestActionTag: {
+    marginStart: 'auto',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+    backgroundColor: '#FEE2E2',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#FECACA',
+  },
+  latestActionTagTxt: {
+    color: '#991B1B',
+    fontWeight: '900',
+    fontSize: 9,
+    letterSpacing: 0.2,
+  },
   latestEyebrow: {
+    flex: 1,
+    minWidth: 0,
     color: brand.primary,
     fontWeight: '800',
     fontSize: fontSize.xs,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+  },
+  latestActionTagRtl: {
+    marginStart: 0,
+    marginEnd: 'auto',
   },
   latestTitle: { color: brand.text, fontWeight: '700', fontSize: fontSize.sm, lineHeight: 18 },
   latestMeta: { marginTop: 2, flexDirection: 'row', alignItems: 'center' },
@@ -409,6 +537,7 @@ const styles = StyleSheet.create({
   emptyCtaTxt: { color: brand.primary, fontWeight: '800', fontSize: fontSize.xs },
 
   actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: 2 },
+  btnFlex: { flex: 1 },
   btn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -419,6 +548,8 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     flex: 1,
   },
+  btnPrimary: { backgroundColor: brand.primary },
+  btnPrimaryTxt: { color: brand.white, fontSize: fontSize.sm, fontWeight: '700' },
   btnSecondary: {
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: brand.primary,

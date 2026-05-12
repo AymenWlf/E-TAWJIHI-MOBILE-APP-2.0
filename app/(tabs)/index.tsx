@@ -1,7 +1,8 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useFocusEffect, router } from 'expo-router';
 import {
   ActivityIndicator,
-  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -11,39 +12,37 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
-import { HeroEducationCarousel } from '@/components/home/HeroEducationCarousel';
 import { HomePracticalInfoSection } from '@/components/home/HomePracticalInfoSection';
 import { HomeStackedPackCards } from '@/components/home/HomeStackedPackCards';
 import { HomeGreetingBlock } from '@/components/home/HomeGreetingBlock';
 import { HomeTopBackdrop } from '@/components/home/HomeTopBackdrop';
 import { HomeTopBar } from '@/components/home/HomeTopBar';
-import { NewsCarousel } from '@/components/home/NewsCarousel';
-import { PlanOffersSection } from '@/components/home/PlanOffersSection';
 import { StoriesRow } from '@/components/home/StoriesRow';
 import { StoryViewerModal } from '@/components/stories/StoryViewerModal';
 import { Text } from '@/components/ui/Text';
-import {
-  heroSlidesForLocale,
-  homeStackCardsForLocale,
-  mockUnreadNotifications,
-  newsForLocale,
-  packOffersForLocale,
-  storyChannelsForLocale,
-} from '@/data/mock/homeFeed';
+import { homeStackCardsForLocale, storyChannelsForLocale } from '@/data/mock/homeFeed';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useAppSidebar } from '@/contexts/AppSidebarContext';
+import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import { useStoryReadChannels } from '@/hooks/useStoryReadChannels';
+import { getMobileVisitorId } from '@/utils/visitorId';
+import { navigatePracticalLink } from '@/utils/navigatePracticalLink';
+import { fetchStoryChannels, recordStoryEvent } from '@/services/stories';
+import { fetchDailyChallengeToday } from '@/services/dailyChallenge';
 import { FILIERE_BAC_OPTIONS } from '@/constants/academicSetup';
 import { homeShell } from '@/theme/homeShell';
-import { brand, fontSize, spacing } from '@/theme/tokens';
+import { brand, spacing } from '@/theme/tokens';
 
 const H_PAD = spacing.xl;
 
 export default function IndexScreen() {
   const { t, isRTL, locale } = useLocale();
-  const { user, isLoading } = useAuth();
-  const { profile: eligibilityProfile } = useEligibilityProfile();
+  const { open: openSidebar } = useAppSidebar();
+  const { unreadCount: notifUnreadCount, openDrawer, refreshUnread } = useNotificationsDrawer();
+  const { user, isLoading, getValidAccessToken } = useAuth();
+  const { profile: eligibilityProfile, loading: eligibilityLoading } = useEligibilityProfile();
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
   const stackCardW = screenW - 2 * H_PAD;
@@ -52,14 +51,106 @@ export default function IndexScreen() {
     open: false,
     index: 0,
   });
-  const heroSlides = useMemo(() => heroSlidesForLocale(locale), [locale]);
-  const storyChannels = useMemo(() => storyChannelsForLocale(locale), [locale]);
-  const stackCards = useMemo(() => homeStackCardsForLocale(locale), [locale]);
-  const packOffers = useMemo(() => packOffersForLocale(locale), [locale]);
-  const newsItems = useMemo(() => newsForLocale(locale), [locale]);
+  const [storyChannels, setStoryChannels] = useState(() => storyChannelsForLocale(locale));
+  const [analyticsVisitorId, setAnalyticsVisitorId] = useState<string | null>(null);
+  const feedTrackedIdsRef = useRef<Set<string>>(new Set());
 
-  const onPressPracticalItem = useCallback((_id: string) => {
-    // Shell : brancher navigation / deep link vers l’écran du lien pratique.
+  useEffect(() => {
+    void getMobileVisitorId().then(setAnalyticsVisitorId);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      void refreshUnread();
+    }, [refreshUnread]),
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      try {
+        const loc = locale === 'ar' ? 'ar' : 'fr';
+        const remote = await fetchStoryChannels(loc);
+        if (!cancelled && remote.length > 0) {
+          setStoryChannels(remote);
+        } else if (!cancelled) {
+          setStoryChannels(storyChannelsForLocale(locale));
+        }
+      } catch {
+        if (!cancelled) setStoryChannels(storyChannelsForLocale(locale));
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [locale]);
+
+  /** Impressions « bande » stories (anneaux) — une fois par chaîne et session. */
+  useEffect(() => {
+    if (!analyticsVisitorId || storyChannels.length === 0) return;
+    for (const ch of storyChannels) {
+      if (feedTrackedIdsRef.current.has(ch.id)) continue;
+      feedTrackedIdsRef.current.add(ch.id);
+      void recordStoryEvent('feed_impression', {
+        channelId: ch.id,
+        visitorId: analyticsVisitorId,
+        viewport: 'mobile',
+      });
+    }
+  }, [analyticsVisitorId, storyChannels]);
+  const [dailyOverlay, setDailyOverlay] = useState<{
+    playedToday: boolean;
+    infoReadToday: boolean;
+  } | null>(null);
+
+  useFocusEffect(
+    useCallback(() => {
+      let alive = true;
+      void (async () => {
+        try {
+          const token = await getValidAccessToken();
+          const res = await fetchDailyChallengeToday(token);
+          if (!alive || !res.success) return;
+          const d = res.data;
+          if (!d.available || !d.challengeDate) {
+            if (alive) setDailyOverlay(null);
+            return;
+          }
+          const k = `daily_info_read_${d.challengeDate}`;
+          const ir = await AsyncStorage.getItem(k);
+          if (alive) {
+            setDailyOverlay({
+              playedToday: Boolean(d.allGamesPlayed ?? d.playedToday),
+              infoReadToday: ir === '1',
+            });
+          }
+        } catch {
+          if (alive) setDailyOverlay(null);
+        }
+      })();
+      return () => {
+        alive = false;
+      };
+    }, [getValidAccessToken]),
+  );
+
+  const stackCards = useMemo(() => {
+    const base = homeStackCardsForLocale(locale);
+    if (!dailyOverlay) return base;
+    return base.map((card, idx) => {
+      if (idx !== 0 || !card.dailyActions) return card;
+      return {
+        ...card,
+        dailyActions: {
+          playedToday: dailyOverlay.playedToday,
+          infoReadToday: dailyOverlay.infoReadToday,
+        },
+      };
+    });
+  }, [locale, dailyOverlay]);
+
+  const onPressPracticalItem = useCallback((id: string) => {
+    navigatePracticalLink((href) => router.push(href as never), id);
   }, []);
 
   // ── Sous-titre du bloc salutation ───────────────────────────────────────────
@@ -70,7 +161,9 @@ export default function IndexScreen() {
   // tronqué pendant le chargement.
   const userSubtitle = useMemo(() => {
     const pack = t('packStandardLabel');
-    if (!eligibilityProfile) return t('userSubtitle');
+    if (!user) return t('userSubtitle');
+    if (eligibilityLoading) return '';
+    if (!eligibilityProfile) return `${pack} · …`;
     if (eligibilityProfile.bacType === 'mission') {
       return `${pack} · ${t('bacMissionLabel')}`;
     }
@@ -83,7 +176,7 @@ export default function IndexScreen() {
       return `${pack} · ${filiereLabel}`;
     }
     return pack;
-  }, [eligibilityProfile, locale, t]);
+  }, [user, eligibilityLoading, eligibilityProfile, locale, t]);
 
   return (
     <View style={styles.root}>
@@ -92,9 +185,10 @@ export default function IndexScreen() {
       <View style={[styles.headerSafe, { paddingTop: insets.top }]}>
         <View style={styles.stickyHeader}>
           <HomeTopBar
-            unreadCount={mockUnreadNotifications}
-            onPressNotifications={() => {}}
-            onPressProfile={() => {}}
+            unreadCount={notifUnreadCount}
+            onPressNotifications={() => openDrawer()}
+            onPressProfile={() => router.push('/compte' as never)}
+            onPressMenu={openSidebar}
           />
         </View>
       </View>
@@ -123,6 +217,7 @@ export default function IndexScreen() {
             <HomeGreetingBlock
               firstName={(user?.firstName || user?.phone || '—') as string}
               subtitle={userSubtitle}
+              subtitleLoading={Boolean(user) && eligibilityLoading}
               greetingWord={t('greeting')}
               rtl={isRTL}
             />
@@ -138,29 +233,12 @@ export default function IndexScreen() {
         <HomeStackedPackCards
           cards={stackCards}
           width={stackCardW}
-          onPressDailyGame={() => Alert.alert(t('gameDailyTitle'), t('gameDailyBody'))}
-          onPressDailyInfo={() => Alert.alert(t('infoDailyTitle'), t('infoDailyBody'))}
+          onPressDailyGame={() => router.push('/daily-challenge')}
+          onPressDailyInfo={() => router.push('/daily-challenge?openInfo=1')}
           onPressPracticalLink={onPressPracticalItem}
         />
 
         <HomePracticalInfoSection width={stackCardW} onPressItem={onPressPracticalItem} />
-
-        <View style={styles.bannerRackFirst}>
-          <HeroEducationCarousel slides={heroSlides} width={stackCardW} />
-        </View>
-
-        <PlanOffersSection
-          title={t('planOffersTitle')}
-          linkLabel={t('planOffersLink')}
-          offers={packOffers}
-          onPressLink={() => {}}
-          onPressOffer={() => {}}
-        />
-
-        <Text style={[styles.infosTitle, isRTL && styles.infosTitleRtl]}>{t('newsTitle')}</Text>
-        <NewsCarousel items={newsItems} onPressItem={() => {}} />
-
-        <View style={styles.footerSpacer} />
       </ScrollView>
 
       <StoryViewerModal
@@ -169,6 +247,7 @@ export default function IndexScreen() {
         initialChannelIndex={storyViewer.index}
         onClose={() => setStoryViewer((s) => ({ ...s, open: false }))}
         onChannelFullyRead={markChannelRead}
+        analyticsVisitorId={analyticsVisitorId}
       />
     </View>
   );
@@ -226,30 +305,5 @@ const styles = StyleSheet.create({
     fontSize: 22,
     fontWeight: '800',
     letterSpacing: -0.4,
-  },
-  bannerRackFirst: {
-    marginTop: spacing.section,
-    alignItems: 'center',
-    alignSelf: 'stretch',
-  },
-  bannerRackNext: {
-    marginTop: spacing.md,
-    alignItems: 'center',
-    alignSelf: 'stretch',
-  },
-  infosTitle: {
-    color: brand.text,
-    fontSize: fontSize.md,
-    fontWeight: '800',
-    marginTop: spacing.section,
-    marginBottom: spacing.md,
-    letterSpacing: -0.2,
-  },
-  infosTitleRtl: {
-    textAlign: 'right',
-    writingDirection: 'rtl',
-  },
-  footerSpacer: {
-    height: spacing.xxl,
   },
 });

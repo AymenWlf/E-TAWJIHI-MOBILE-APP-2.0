@@ -1,5 +1,6 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpPostJson } from '@/services/http';
+import { fireAndForget } from '@/utils/fireAndForget';
 import { getMobileVisitorId } from '@/utils/visitorId';
 
 /**
@@ -84,7 +85,7 @@ export function recordEstablishmentListingImpressionsBatch(items: { id: number }
   );
   for (const it of fresh) {
     sessionListingTracked.add(it.id);
-    void recordEstablishmentImpression(it.id, 'listing');
+    fireAndForget(recordEstablishmentImpression(it.id, 'listing'));
   }
 }
 
@@ -96,5 +97,5 @@ export function recordEstablishmentDetailImpressionOnce(establishmentId: number)
   if (!Number.isFinite(establishmentId) || establishmentId <= 0) return;
   if (sessionDetailTracked.has(establishmentId)) return;
   sessionDetailTracked.add(establishmentId);
-  void recordEstablishmentImpression(establishmentId, 'detail');
+  fireAndForget(recordEstablishmentImpression(establishmentId, 'detail'));
 }

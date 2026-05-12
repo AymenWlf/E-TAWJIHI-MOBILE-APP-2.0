@@ -1,6 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Image, Linking, Pressable, StyleSheet, View } from 'react-native';
 
+import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
 import {
@@ -16,7 +17,6 @@ import {
   pickAnnouncementTitle,
   pickEstablishmentNamesPair,
   pickRegistrationUrlLabel,
-  STATUS_VISUALS,
 } from '@/utils/candidacyStatus';
 
 import { StatusBadge } from './StatusBadge';
@@ -50,15 +50,20 @@ export function CandidacyCard({ candidacy, onPress, onUpdateStatus, onOpenLink, 
 
   const deadline = formatDaysUntilClose(a?.daysUntilClose, locale);
 
-  // Coloration de la carte selon le statut de candidature.
-  const visual = STATUS_VISUALS[candidacy.status];
+  // Coloration de la carte selon le statut courant. `null` ⇒ palette
+  // neutre (l'utilisateur n'a pas encore choisi d'action).
+  const status = candidacy.status;
+  const cardBg = status?.colorBg ?? brand.white;
+  const cardBorder = status?.colorBorder ?? brand.border;
+  const accentColor = status?.colorFg ?? brand.primary;
+  const hasUpdateAction = (a?.availableStatuses?.length ?? 0) > 0;
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: visual.bg, borderColor: visual.border },
+        { backgroundColor: cardBg, borderColor: cardBorder },
         pressed && { opacity: 0.92 },
       ]}
     >
@@ -66,7 +71,7 @@ export function CandidacyCard({ candidacy, onPress, onUpdateStatus, onOpenLink, 
       <View
         style={[
           styles.accentBar,
-          { backgroundColor: visual.fg },
+          { backgroundColor: accentColor },
           isRTL && styles.accentBarRtl,
         ]}
       />
@@ -118,10 +123,7 @@ export function CandidacyCard({ candidacy, onPress, onUpdateStatus, onOpenLink, 
 
       {/* ── Type annonce + dates ── */}
       <View style={[styles.metaRow, isRTL && styles.rowRtl]}>
-        <View style={[styles.typePill, isRTL && styles.rowRtl]}>
-          <FontAwesome name="bookmark" size={10} color={brand.primary} />
-          <Text style={styles.typePillTxt}>{a?.announcementType ?? '—'}</Text>
-        </View>
+        <AnnouncementTypeChip type={a?.announcementType ?? null} variant="pill" isRTL={isRTL} />
         {a?.dateEnd ? (
           <View style={styles.deadline}>
             <FontAwesome name="calendar" size={10} color={brand.textMuted} />
@@ -212,17 +214,19 @@ export function CandidacyCard({ candidacy, onPress, onUpdateStatus, onOpenLink, 
           </Text>
         </Pressable>
 
-        <Pressable
-          onPress={onUpdateStatus}
-          style={({ pressed }) => [
-            styles.btn,
-            styles.btnSecondary,
-            pressed && { opacity: 0.85 },
-          ]}
-        >
-          <FontAwesome name="pencil" size={11} color={brand.primary} />
-          <Text style={styles.btnSecondaryTxt}>{t('inscStatusActionUpdate')}</Text>
-        </Pressable>
+        {hasUpdateAction && onUpdateStatus ? (
+          <Pressable
+            onPress={onUpdateStatus}
+            style={({ pressed }) => [
+              styles.btn,
+              styles.btnSecondary,
+              pressed && { opacity: 0.85 },
+            ]}
+          >
+            <FontAwesome name="pencil" size={11} color={brand.primary} />
+            <Text style={styles.btnSecondaryTxt}>{t('inscStatusActionUpdate')}</Text>
+          </Pressable>
+        ) : null}
 
         <Pressable
           onPress={onOpenTimeline}
@@ -324,16 +328,6 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
     alignItems: 'center',
   },
-  typePill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    backgroundColor: 'rgba(51,62,143,0.08)',
-    borderRadius: radius.full,
-  },
-  typePillTxt: { fontSize: fontSize.xs, color: brand.primary, fontWeight: '700' },
   deadline: {
     flexDirection: 'row',
     alignItems: 'center',

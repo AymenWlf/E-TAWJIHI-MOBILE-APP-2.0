@@ -2,6 +2,12 @@ import { buildApiUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
 import type { AppNotification, NotificationsListResponse } from '@/types/inscriptions';
 
+/**
+ * Émis pour aligner badge + liste in-app (push reçue, retour app au premier plan, polling léger).
+ * Pas lié au formulaire du bandeau système : uniquement données `/api/notifications`.
+ */
+export const NOTIFICATIONS_IN_APP_REFRESH_EVENT = 'notifications:in-app-refresh';
+
 type ListResponse = {
   success: boolean;
   data: AppNotification[];
@@ -69,4 +75,46 @@ export async function markAllNotificationsRead(accessToken: string): Promise<boo
   } catch {
     return false;
   }
+}
+
+/**
+ * Indique si une notification in-app pointe vers cette annonce concours (même logique que la navigation).
+ */
+export function appNotificationReferencesContestAnnouncement(
+  n: AppNotification,
+  contestAnnouncementId: number,
+): boolean {
+  const meta = (n.metadata ?? {}) as Record<string, unknown>;
+  const direct = Number(meta.announcement_id ?? meta.contest_announcement_id ?? 0);
+  if (Number.isFinite(direct) && direct === contestAnnouncementId) return true;
+  if (
+    meta.deep_link === 'community_qna' &&
+    String(meta.context_type ?? '') === 'contest_announcement' &&
+    Number(meta.context_id ?? 0) === contestAnnouncementId
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/**
+ * Marque comme lues les notifications non lues associées à l’annonce (ex. consultation page détail).
+ * Retourne le nombre de notifications effectivement marquées côté API.
+ */
+export async function markUnreadNotificationsForContestAnnouncement(
+  accessToken: string,
+  contestAnnouncementId: number,
+): Promise<number> {
+  const res = await fetchNotifications(accessToken, {
+    limit: 100,
+    offset: 0,
+    unreadOnly: true,
+  });
+  let marked = 0;
+  for (const n of res.items) {
+    if (!appNotificationReferencesContestAnnouncement(n, contestAnnouncementId)) continue;
+    const ok = await markNotificationRead(accessToken, n.id);
+    if (ok) marked += 1;
+  }
+  return marked;
 }

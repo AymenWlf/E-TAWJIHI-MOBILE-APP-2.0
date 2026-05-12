@@ -67,37 +67,46 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [refreshToken, setRefreshTokenState] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
-  const reloadMe = useCallback(async () => {
-    const token = await getValidAccessToken();
-    if (!token) {
-      setUser(null);
-      return;
-    }
-    const url = buildApiUrl('/api/me');
-    const res = await httpGetJson<{ success: boolean; data?: { user?: AuthUser } }>(url, {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setUser(res.data?.user ?? null);
-  }, []);
-
   const getValidAccessToken = useCallback(async (): Promise<string | null> => {
-    const token = accessToken ?? (await getAuthToken());
-    if (token) {
-      setAccessTokenState(token);
-      return token;
+    try {
+      const token = accessToken ?? (await getAuthToken());
+      if (token) {
+        setAccessTokenState(token);
+        return token;
+      }
+      const rt = refreshToken ?? (await getRefreshToken());
+      if (!rt) return null;
+      const r = await refreshWithToken(rt);
+      const nextAccess = r.data?.token ?? null;
+      const nextRefresh = r.data?.refreshToken ?? null;
+      if (!nextAccess || !nextRefresh) return null;
+      await setAuthToken(nextAccess);
+      await setRefreshToken(nextRefresh);
+      setAccessTokenState(nextAccess);
+      setRefreshTokenState(nextRefresh);
+      return nextAccess;
+    } catch {
+      /* Échec réseau sur /auth/refresh (ou stockage) : pas d’exception non gérée. */
+      return null;
     }
-    const rt = refreshToken ?? (await getRefreshToken());
-    if (!rt) return null;
-    const r = await refreshWithToken(rt);
-    const nextAccess = r.data?.token ?? null;
-    const nextRefresh = r.data?.refreshToken ?? null;
-    if (!nextAccess || !nextRefresh) return null;
-    await setAuthToken(nextAccess);
-    await setRefreshToken(nextRefresh);
-    setAccessTokenState(nextAccess);
-    setRefreshTokenState(nextRefresh);
-    return nextAccess;
   }, [accessToken, refreshToken]);
+
+  const reloadMe = useCallback(async () => {
+    try {
+      const token = await getValidAccessToken();
+      if (!token) {
+        setUser(null);
+        return;
+      }
+      const url = buildApiUrl('/api/me');
+      const res = await httpGetJson<{ success: boolean; data?: { user?: AuthUser } }>(url, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setUser(res.data?.user ?? null);
+    } catch {
+      /* Réseau / API indisponible : ne pas faire planter l’app ; l’UI reste utilisable. */
+    }
+  }, [getValidAccessToken]);
 
   const login = useCallback(async (phone: string, password: string): Promise<AuthUser> => {
     const res = await loginWithPhonePassword(phone, password);
@@ -167,6 +176,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         if (at || rt) {
           await reloadMe();
         }
+      } catch {
+        /* Stockage ou refresh initial : ne pas laisser l’écran blanc / erreur globale. */
       } finally {
         if (!cancelled) setIsLoading(false);
       }

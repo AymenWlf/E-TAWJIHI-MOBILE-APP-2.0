@@ -10,6 +10,7 @@ import { useShopCart } from '@/contexts/ShopCartContext';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { formatShopPrice, shopParsePriceString, shopPriceFormatOptsForCatalogOrCartLine } from '@/utils/shopFormatPrice';
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
+import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 
 export default function BoutiqueCartScreen() {
   const router = useRouter();
@@ -20,6 +21,10 @@ export default function BoutiqueCartScreen() {
       void hydrateImages();
     }
   }, [ready, hydrateImages]);
+
+  useEffect(() => {
+    void recordShopBoutiqueEvent('view_cart');
+  }, []);
 
   const subtotal = useMemo(
     () => lines.reduce((acc, l) => acc + shopParsePriceString(l.price) * l.quantity, 0),

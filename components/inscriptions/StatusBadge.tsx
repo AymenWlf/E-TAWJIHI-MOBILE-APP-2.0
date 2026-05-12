@@ -4,38 +4,58 @@ import { StyleSheet, View } from 'react-native';
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { fontSize, radius, spacing } from '@/theme/tokens';
-import type { CandidacyStatus } from '@/types/inscriptions';
-import { STATUS_VISUALS } from '@/utils/candidacyStatus';
+import type { CandidacyStatusType } from '@/types/inscriptions';
+import { pickStatusLabel } from '@/utils/candidacyStatus';
+
+type IconName = React.ComponentProps<typeof FontAwesome>['name'];
 
 type Props = {
-  status: CandidacyStatus;
+  /**
+   * Statut courant à afficher. Un objet `CandidacyStatusType` complet (les
+   * couleurs, l'icône et les libellés viennent du back). `null` ⇒ on
+   * rend un badge neutre « Aucun statut » (utile pour les candidatures
+   * sans statut explicite).
+   */
+  status: CandidacyStatusType | null;
   size?: 'sm' | 'md';
 };
 
+const NEUTRAL = {
+  bg: '#F3F4F6',
+  border: '#E5E7EB',
+  fg: '#6B7280',
+};
+
 export function StatusBadge({ status, size = 'md' }: Props) {
-  const { t } = useLocale();
-  const v = STATUS_VISUALS[status];
+  const { t, locale } = useLocale();
   const small = size === 'sm';
+
+  const bg = status?.colorBg ?? NEUTRAL.bg;
+  const border = status?.colorBorder ?? NEUTRAL.border;
+  const fg = status?.colorFg ?? NEUTRAL.fg;
+  const icon = (status?.icon ?? 'circle') as IconName;
+  const label = status ? pickStatusLabel(status, locale) : t('inscStatusNone');
+
   return (
     <View
       style={[
         styles.badge,
         {
-          backgroundColor: v.bg,
-          borderColor: v.border,
+          backgroundColor: bg,
+          borderColor: border,
           paddingHorizontal: small ? 8 : 10,
           paddingVertical: small ? 3 : 5,
         },
       ]}
     >
-      <FontAwesome name={v.icon} size={small ? 10 : 12} color={v.fg} />
+      <FontAwesome name={icon} size={small ? 10 : 12} color={fg} />
       <Text
         style={[
           styles.txt,
-          { color: v.fg, fontSize: small ? fontSize.xs : fontSize.sm },
+          { color: fg, fontSize: small ? fontSize.xs : fontSize.sm },
         ]}
       >
-        {t(v.labelKey)}
+        {label}
       </Text>
     </View>
   );

@@ -7,7 +7,6 @@ import {
   Alert,
   Platform,
   Pressable,
-  RefreshControl,
   ScrollView,
   StyleSheet,
   TextInput,
@@ -15,10 +14,12 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SidebarMenuIconButton } from '@/components/SidebarMenuIconButton';
 import {
   SearchablePickSheet,
   type SearchablePickItem,
 } from '@/components/schools/SearchablePickSheet';
+import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
 import { BirthDateField } from '@/components/ui/BirthDateField';
 import { SelectField } from '@/components/ui/SelectField';
 import { Text } from '@/components/ui/Text';
@@ -38,6 +39,7 @@ import { getUserProfile, updateUserProfile, type UserProfile } from '@/services/
 import { fetchUserOrders, type UserOrderSummary } from '@/services/userOrders';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { homeShell } from '@/theme/homeShell';
+import { formatOrderCreatedAtShort } from '@/utils/dateParis';
 import { errorMessage } from '@/utils/errorMessage';
 import { isValidEmail } from '@/utils/isValidEmail';
 
@@ -76,6 +78,8 @@ export default function CompteTabScreen() {
     diplomeEnCours: '',
     nomEtablissement: '',
     typeLycee: '',
+    massarCode: '',
+    studentCode: '',
 
     /* Tuteur */
     tuteur: '',
@@ -292,6 +296,8 @@ export default function CompteTabScreen() {
         diplomeEnCours: p?.diplomeEnCours ?? '',
         nomEtablissement: p?.nomEtablissement ?? '',
         typeLycee: p?.typeLycee ?? '',
+        massarCode: p?.massarCode ?? '',
+        studentCode: p?.studentCode ?? '',
 
         tuteur: p?.tuteur ?? '',
         nomTuteur: p?.nomTuteur ?? '',
@@ -344,11 +350,16 @@ export default function CompteTabScreen() {
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      await Promise.all([loadCities(), loadProfile(), loadOrders()]);
+      await Promise.all([
+        loadCities(),
+        isLoggedIn ? reloadMe() : Promise.resolve(),
+        loadProfile(),
+        loadOrders(),
+      ]);
     } finally {
       setRefreshing(false);
     }
-  }, [loadCities, loadProfile, loadOrders]);
+  }, [loadCities, loadProfile, loadOrders, isLoggedIn, reloadMe]);
 
   const save = useCallback(async () => {
     if (!isLoggedIn) return;
@@ -382,6 +393,8 @@ export default function CompteTabScreen() {
         diplomeEnCours: form.diplomeEnCours.trim(),
         nomEtablissement: form.nomEtablissement.trim(),
         typeLycee: form.typeLycee.trim(),
+        massarCode: form.massarCode.trim(),
+        studentCode: form.studentCode.trim(),
 
         /* Tuteur */
         tuteur: form.tuteur.trim(),
@@ -432,6 +445,7 @@ export default function CompteTabScreen() {
       <View style={[styles.headerSafe, { paddingTop: insets.top }]}>
         <View style={styles.hero}>
           <View style={[styles.heroTitleRow, isRTL && styles.heroTitleRowRtl]}>
+            <SidebarMenuIconButton color="#FFFFFF" />
             <View style={styles.heroTitleCol}>
               <Text style={[styles.heroTitle, isRTL && styles.heroTitleRtl]}>{t('accountTitle')}</Text>
               <Text style={[styles.heroSub, isRTL && styles.heroSubRtl]} numberOfLines={2}>
@@ -480,14 +494,8 @@ export default function CompteTabScreen() {
         keyboardShouldPersistTaps="handled"
         nestedScrollEnabled
         {...(Platform.OS === 'ios' ? { contentInsetAdjustmentBehavior: 'never' as const } : {})}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={Platform.OS === 'ios' ? homeShell.blue : undefined}
-            colors={Platform.OS === 'android' ? [homeShell.green, homeShell.blue] : undefined}
-          />
-        }>
+        {...(Platform.OS === 'android' ? { overScrollMode: 'always' as const } : {})}
+        refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {!isLoggedIn ? (
           <>
             <View style={styles.card}>
@@ -697,7 +705,34 @@ export default function CompteTabScreen() {
                     rtl={isRTL}
                     onPress={() => setAcademicField('specialite3')}
                   />
+                  <Field label={t('accountStudentCode')} hint={t('accountStudentCodeHint')} rtl={isRTL}>
+                    <TextInput
+                      value={form.studentCode}
+                      onChangeText={(v) => setForm((s) => ({ ...s, studentCode: v }))}
+                      placeholder={t('accountStudentCode')}
+                      placeholderTextColor={homeShell.cardMuted}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      textAlign={isRTL ? 'right' : 'left'}
+                      style={[styles.input, isRTL && styles.inputRtl]}
+                    />
+                  </Field>
                 </>
+              ) : null}
+
+              {form.bacType === 'normal' ? (
+                <Field label={t('accountMassarCode')} hint={t('accountMassarCodeHint')} rtl={isRTL}>
+                  <TextInput
+                    value={form.massarCode}
+                    onChangeText={(v) => setForm((s) => ({ ...s, massarCode: v }))}
+                    placeholder={t('accountMassarCode')}
+                    placeholderTextColor={homeShell.cardMuted}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                    textAlign={isRTL ? 'right' : 'left'}
+                    style={[styles.input, isRTL && styles.inputRtl]}
+                  />
+                </Field>
               ) : null}
 
               {form.bacType ? (
@@ -947,8 +982,11 @@ export default function CompteTabScreen() {
               setForm((s) => ({
                 ...s,
                 bacType: v,
-                ...(v === 'normal' ? { specialite1: '', specialite2: '', specialite3: '' } : {}),
-                ...(v === 'mission' ? { filiere: '' } : {}),
+                ...(v === 'normal'
+                  ? { specialite1: '', specialite2: '', specialite3: '', studentCode: '' }
+                  : {}),
+                ...(v === 'mission' ? { filiere: '', massarCode: '' } : {}),
+                ...(!v || v === '' ? { massarCode: '', studentCode: '' } : {}),
               }));
             }
             // Si le niveau change et n'est plus un niveau post-bac, on
@@ -1008,13 +1046,7 @@ function OrderRow({
   first: boolean;
 }) {
   const cfg = orderStatusConfig(order.status, locale);
-  const dateStr = order.createdAt
-    ? new Date(order.createdAt).toLocaleDateString(locale === 'ar' ? 'ar-MA' : 'fr-FR', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric',
-      })
-    : '—';
+  const dateStr = formatOrderCreatedAtShort(order.createdAt, locale);
 
   return (
     <View style={[styles.orderRow, first && styles.orderRowFirst, rtl && styles.orderRowRtl]}>

@@ -62,7 +62,21 @@ export type EstablishmentListItem = {
   isActive?: boolean;
   status?: string;
   universite?: string;
-  media?: { logo?: string | null; imageCouverture?: string | null };
+  /** Présent sur certains payloads enrichis (équivalent à `media.videoUrl`). */
+  videoUrl?: string | null;
+  media?: {
+    logo?: string | null;
+    imageCouverture?: string | null;
+    videoUrl?: string | null;
+    photos?: {
+      id?: string;
+      url?: string;
+      titre?: string;
+      fileName?: string;
+      description?: string;
+    }[];
+    documents?: { url?: string; titre?: string; type?: string }[];
+  };
   logo?: string | null;
   imageCouverture?: string | null;
   campus?: Record<string, unknown>[];
@@ -89,6 +103,14 @@ export type EstablishmentListItem = {
     siteWeb?: string | null;
     adresse?: string | null;
   };
+  /** Nombre d’utilisateurs qui suivent l’école (API liste / détail). */
+  followersCount?: number;
+  /** Questions + réponses publiques non masquées (Q&R établissement). */
+  communityQnaMessageCount?: number;
+  /** Référencement / sponsorisation — enrichi côté app depuis `/api/referencing/listing-placements`. */
+  referencingPlacementId?: number | null;
+  referencingGoalType?: 'traffic' | 'leadgen';
+  referencingDestinationUrl?: string | null;
 };
 
 /** Valeurs pré-calculées pour l’UI (liste + détail). */

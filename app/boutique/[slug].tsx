@@ -17,9 +17,12 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import RenderHtml from 'react-native-render-html';
 
+import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { Text } from '@/components/ui/Text';
 import { useShopCart } from '@/contexts/ShopCartContext';
+import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { fetchShopProductBySlug } from '@/services/shop';
+import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { ShopProductDetail } from '@/types/shop';
 import {
@@ -30,9 +33,11 @@ import {
   shopPromoDiscountPercent,
 } from '@/utils/shopFormatPrice';
 import { shopProductGalleryUrls, resolveShopImageUrl } from '@/utils/shopImageUrl';
+import { sharePayloadBoutiqueProductDetail } from '@/utils/sharePagePayloads';
 
 export default function ProductDetailScreen() {
   const router = useRouter();
+  const { presentShare } = useSharePreview();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { width } = useWindowDimensions();
   const { addLine, lines: cartLines, count: cartCount } = useShopCart();
@@ -61,6 +66,11 @@ export default function ProductDetailScreen() {
       .finally(() => setLoading(false));
   }, [slug]);
 
+  useEffect(() => {
+    if (!product) return;
+    void recordShopBoutiqueEvent('impression_detail', product.id);
+  }, [product?.id]);
+
   const images = useMemo(() => shopProductGalleryUrls(product?.images), [product]);
   const priceOpts = useMemo(() => shopPriceFormatOptsForCatalogOrCartLine(product), [product]);
   const promoPct = product ? shopPromoDiscountPercent(product.price, product.compareAtPrice) : null;
@@ -83,6 +93,7 @@ export default function ProductDetailScreen() {
         images: product.images,
         isFreeShipping: Boolean(product.isFreeShipping),
       });
+      void recordShopBoutiqueEvent('add_to_cart', product.id);
     } finally {
       setAddingToCart(false);
     }
@@ -166,6 +177,23 @@ export default function ProductDetailScreen() {
           >
             <FontAwesome name="chevron-left" size={15} color={brand.text} />
           </Pressable>
+          <View style={{ flex: 1 }} />
+          <ShareIconButton
+            color={brand.text}
+            style={{ ...styles.overlayBtn, marginEnd: spacing.sm }}
+            onPress={() => {
+              if (!product) return;
+              const thumb = images[0] && /^https?:\/\//i.test(images[0]) ? images[0] : undefined;
+              presentShare(
+                sharePayloadBoutiqueProductDetail({
+                  slug: product.slug,
+                  title: product.title,
+                  subtitle: formatShopPrice(product.price, product.currency, priceOpts),
+                  thumbUrl: thumb,
+                }),
+              );
+            }}
+          />
           <Pressable
             onPress={() => router.push('/boutique/cart' as any)}
             hitSlop={8}
