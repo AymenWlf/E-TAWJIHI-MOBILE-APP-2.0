@@ -97,16 +97,16 @@ export const mockStoryChannels: StoryChannel[] = RAW_STORY_CHANNELS.map((ch) => 
   };
 }).filter((ch) => ch.slides.length > 0);
 
-/** Cartes empilées accueil (swipe) — 1re carte : parcours orientation */
+/** Cartes empilées accueil (swipe) — 1re carte : parcours orientation + défi SNAKE (sans raccourci « info du jour »). */
 export const mockHomeStackCards: HomeStackCard[] = [
   {
     id: 'stack-1',
-    eyebrow: 'Votre inscription',
+    eyebrow: 'Plan personnel',
     packName: "Votre parcours d'orientation",
-    dailyActions: { playedToday: false, infoReadToday: false },
+    dailyActions: { playedToday: false },
     orientationProgress: {
       percent: 62,
-      label: "Progression d'orientation",
+      label: 'Avancement',
     },
     remainingOrientationTasks: [
       { id: 'o1', title: 'Compléter le questionnaire filière / ville', icon: 'clipboard' },
@@ -259,12 +259,12 @@ const mockNewsAr = [
 const mockHomeStackCardsAr: HomeStackCard[] = [
   {
     id: 'stack-1',
-    eyebrow: 'تسجيلك',
+    eyebrow: 'خطة شخصية',
     packName: 'مسار التوجيه الخاص بك',
-    dailyActions: { playedToday: false, infoReadToday: false },
+    dailyActions: { playedToday: false },
     orientationProgress: {
       percent: 62,
-      label: 'تقدّم التوجيه',
+      label: 'التقدّم',
     },
     remainingOrientationTasks: [
       { id: 'o1', title: 'إكمال استبيان المسار / المدينة', icon: 'clipboard' },

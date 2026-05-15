@@ -6,6 +6,7 @@ import {
   webPathContestAnnouncement,
   webPathEstablishment,
   webPathEvent,
+  webPathPlatformService,
 } from '@/utils/sharePublicUrls';
 
 type T = (key: HomeCopyKey) => string;
@@ -122,5 +123,18 @@ export function sharePayloadBoutiqueProductDetail(params: {
     subtitle: params.subtitle,
     webPath: webPathBoutiqueProduct(params.slug),
     thumbUrl: params.thumbUrl ?? undefined,
+  };
+}
+
+export function sharePayloadBoutiquePlatformServiceDetail(params: {
+  slug: string;
+  title: string;
+  subtitle?: string;
+}): SharePreviewPayload {
+  return {
+    kindLabelKey: 'shareKindBoutique',
+    title: params.title,
+    subtitle: params.subtitle,
+    webPath: webPathPlatformService(params.slug),
   };
 }

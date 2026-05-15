@@ -35,6 +35,8 @@ interface Props {
   selectedCheckCode: number;
   onClose: () => void;
   onSelect: (v: ShopVilleRow) => void;
+  /** Titre du bandeau (ex. livraison vs ville étudiant). */
+  sheetTitle?: string;
 }
 
 export function ShopVillePickerSheet({
@@ -42,6 +44,7 @@ export function ShopVillePickerSheet({
   selectedCheckCode,
   onClose,
   onSelect,
+  sheetTitle = 'Choisir une ville',
 }: Props) {
   const [query, setQuery] = useState('');
 
@@ -71,7 +74,7 @@ export function ShopVillePickerSheet({
 
           {/* Header */}
           <View style={styles.header}>
-            <Text style={styles.title}>Choisir une ville</Text>
+            <Text style={styles.title}>{sheetTitle}</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Fermer"
@@ -142,11 +145,11 @@ export function ShopVillePickerSheet({
                     >
                       {label}
                     </Text>
-                    <Text numberOfLines={1} style={styles.rowMeta}>
-                      {[item.region, item.price, item.delais]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </Text>
+                    {item.region?.trim() ? (
+                      <Text numberOfLines={1} style={styles.rowMeta}>
+                        {item.region.trim()}
+                      </Text>
+                    ) : null}
                   </View>
                   {active ? (
                     <FontAwesome name="check" size={14} color={brand.primary} />

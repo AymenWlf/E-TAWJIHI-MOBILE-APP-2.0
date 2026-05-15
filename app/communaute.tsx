@@ -63,8 +63,13 @@ import {
   type ContestAnnouncementCard,
 } from '@/services/contestAnnouncements';
 import { listEstablishments, type EstablishmentNormalized } from '@/services/establishments';
+import { fetchShopProducts } from '@/services/shop';
+import { fetchPlatformEvents, type PlatformEventBrief } from '@/services/platformEvents';
+import type { ShopProductListItem } from '@/types/shop';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
-import { webPathContestAnnouncement, webPathEstablishment } from '@/utils/sharePublicUrls';
+import { webPathBoutiqueProduct, webPathContestAnnouncement, webPathEstablishment, webPathEvent } from '@/utils/sharePublicUrls';
+import { resolvePlatformEventCoverUri } from '@/utils/platformEventCover';
+import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
 import { countNewGlobalWallMessages } from '@/utils/countNewGlobalWallMessages';
 import { pickDocumentIcon } from '@/utils/documents';
 import { WhatsAppStyleOfficialBody } from '@/utils/whatsappStyleBody';
@@ -120,7 +125,7 @@ function globalWallBodySnippet(body: string, maxLen = 52): string {
 }
 
 export default function CommunauteScreen() {
-  const { t, isRTL } = useLocale();
+  const { t, isRTL, locale } = useLocale();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
   const { width: windowW, height: windowH } = useWindowDimensions();
@@ -146,6 +151,16 @@ export default function CommunauteScreen() {
   const [establishmentsLoading, setEstablishmentsLoading] = useState(false);
   const [announcements, setAnnouncements] = useState<ContestAnnouncementCard[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
+  const [boutiqueProducts, setBoutiqueProducts] = useState<ShopProductListItem[]>([]);
+  const [boutiqueLoading, setBoutiqueLoading] = useState(false);
+  const [boutiqueSearchInput, setBoutiqueSearchInput] = useState('');
+  const [debouncedBoutiqueSearch, setDebouncedBoutiqueSearch] = useState('');
+  const [platformEventsAll, setPlatformEventsAll] = useState<PlatformEventBrief[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventSearchInput, setEventSearchInput] = useState('');
+  const [debouncedEventSearch, setDebouncedEventSearch] = useState('');
+  const [announcementSearchInput, setAnnouncementSearchInput] = useState('');
+  const [debouncedAnnouncementSearch, setDebouncedAnnouncementSearch] = useState('');
   const [composerBusy, setComposerBusy] = useState(false);
   /** `null` = nouvelle publication sur le fil ; sinon réponse sous le post choisi (« Répondre ici »). */
   const [replyTargetPostId, setReplyTargetPostId] = useState<number | null>(null);
@@ -172,6 +187,28 @@ export default function CommunauteScreen() {
     if (replyTargetPostId == null) return null;
     return orderedPosts.find((x) => x.id === replyTargetPostId) ?? null;
   }, [orderedPosts, replyTargetPostId]);
+
+  const filteredPlatformEvents = useMemo(() => {
+    const q = debouncedEventSearch.trim().toLowerCase();
+    if (!q) return platformEventsAll;
+    return platformEventsAll.filter((ev) => {
+      const a = (ev.title ?? '').toLowerCase();
+      const b = (ev.titleAr ?? '').toLowerCase();
+      return a.includes(q) || b.includes(q);
+    });
+  }, [platformEventsAll, debouncedEventSearch]);
+
+  const filteredAnnouncements = useMemo(() => {
+    const q = debouncedAnnouncementSearch.trim().toLowerCase();
+    if (!q) return announcements;
+    return announcements.filter((c) => {
+      const tit = (c.title ?? '').toLowerCase();
+      const titAr = (c.titleAr ?? '').toLowerCase();
+      const est = (c.establishment?.nom ?? '').toLowerCase();
+      const typ = (c.announcementType ?? '').toLowerCase();
+      return tit.includes(q) || titAr.includes(q) || est.includes(q) || typ.includes(q);
+    });
+  }, [announcements, debouncedAnnouncementSearch]);
 
   useEffect(() => {
     if (replyTargetPostId == null) return;
@@ -336,10 +373,33 @@ export default function CommunauteScreen() {
   }, [schoolSearchInput]);
 
   useEffect(() => {
+    const id = setTimeout(() => setDebouncedBoutiqueSearch(boutiqueSearchInput.trim()), 380);
+    return () => clearTimeout(id);
+  }, [boutiqueSearchInput]);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedEventSearch(eventSearchInput.trim()), 380);
+    return () => clearTimeout(id);
+  }, [eventSearchInput]);
+
+  useEffect(() => {
+    const id = setTimeout(() => setDebouncedAnnouncementSearch(announcementSearchInput.trim()), 380);
+    return () => clearTimeout(id);
+  }, [announcementSearchInput]);
+
+  useEffect(() => {
     if (!pickPageOpen) {
       setAttachModalStep('main');
       setSchoolSearchInput('');
       setDebouncedSchoolSearch('');
+      setBoutiqueSearchInput('');
+      setDebouncedBoutiqueSearch('');
+      setEventSearchInput('');
+      setDebouncedEventSearch('');
+      setAnnouncementSearchInput('');
+      setDebouncedAnnouncementSearch('');
+      setBoutiqueProducts([]);
+      setPlatformEventsAll([]);
     }
   }, [pickPageOpen]);
 
@@ -389,6 +449,49 @@ export default function CommunauteScreen() {
       cancelled = true;
     };
   }, [pickPageOpen, attachModalStep]);
+
+  useEffect(() => {
+    if (!pickPageOpen || attachModalStep !== 'boutique') return;
+    let cancelled = false;
+    setBoutiqueLoading(true);
+    void fetchShopProducts({
+      page: 1,
+      limit: 40,
+      search: debouncedBoutiqueSearch || undefined,
+    })
+      .then(({ items }) => {
+        if (!cancelled) setBoutiqueProducts(items);
+      })
+      .catch(() => {
+        if (!cancelled) setBoutiqueProducts([]);
+      })
+      .finally(() => {
+        if (!cancelled) setBoutiqueLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [pickPageOpen, attachModalStep, debouncedBoutiqueSearch]);
+
+  useEffect(() => {
+    if (!pickPageOpen || attachModalStep !== 'events') return;
+    let cancelled = false;
+    setEventsLoading(true);
+    void (async () => {
+      try {
+        const token = await getValidAccessToken();
+        const rows = await fetchPlatformEvents(token ?? undefined, 'all');
+        if (!cancelled) setPlatformEventsAll(rows);
+      } catch {
+        if (!cancelled) setPlatformEventsAll([]);
+      } finally {
+        if (!cancelled) setEventsLoading(false);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [pickPageOpen, attachModalStep, getValidAccessToken]);
 
   const load = useCallback(
     async (p: number, append: boolean) => {
@@ -466,9 +569,10 @@ export default function CommunauteScreen() {
   });
 
   const onRefresh = useCallback(() => {
+    if (refreshing) return;
     setRefreshing(true);
     void load(1, false);
-  }, [load]);
+  }, [load, refreshing]);
 
   /** Pages API = plus anciennes ; déclenché en scroll vers le haut (pas en bas). */
   const onLoadOlder = useCallback(() => {
@@ -758,6 +862,9 @@ export default function CommunauteScreen() {
             { paddingBottom: listBottomPad },
             orderedPosts.length === 0 && styles.listContentGrow,
           ]}
+          // iOS : bounce même si le fil est court → pull-to-refresh utilisable
+          alwaysBounceVertical
+          {...(Platform.OS === 'android' ? { overScrollMode: 'always' as const } : {})}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           onScroll={handleListScroll}
@@ -767,10 +874,17 @@ export default function CommunauteScreen() {
           maxToRenderPerBatch={12}
           windowSize={21}
           scrollEventThrottle={16}
-          refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <AppRefreshControl
+              refreshing={refreshing}
+              onRefresh={onRefresh}
+              title={Platform.OS === 'ios' ? t('globalWallPullToRefresh') : undefined}
+            />
+          }
           onStartReachedThreshold={0.25}
           onStartReached={() => {
-            if (!loading && posts.length > 0 && posts.length < total) void onLoadOlder();
+            if (refreshing || loading || loadingMore) return;
+            if (posts.length > 0 && posts.length < total) void onLoadOlder();
           }}
           ListHeaderComponent={
             loadingMore ? <ActivityIndicator style={styles.historyLoader} color={brand.primary} /> : null
@@ -1263,7 +1377,7 @@ export default function CommunauteScreen() {
                           ]}
                         >
                           <Text style={[styles.attachRowTitle, styles.attachMainLeafLabel, isRTL && styles.rtl]}>
-                            {t(entry.labelKey)}
+                            {t('globalWallAttachSeeDetails')}
                           </Text>
                           <FontAwesome
                             name={isRTL ? 'chevron-left' : 'chevron-right'}
@@ -1310,7 +1424,101 @@ export default function CommunauteScreen() {
                           ]}
                         >
                           <Text style={[styles.attachRowTitle, styles.attachMainLeafLabel, isRTL && styles.rtl]}>
-                            {t(entry.labelKey)}
+                            {t('globalWallAttachSeeDetails')}
+                          </Text>
+                          <FontAwesome
+                            name={isRTL ? 'chevron-left' : 'chevron-right'}
+                            size={12}
+                            color={brand.textMuted}
+                          />
+                        </Pressable>,
+                      ];
+                    }
+
+                    if (entry.submenu === 'boutique') {
+                      return [
+                        <Pressable
+                          key="main-boutique-listing"
+                          onPress={() => {
+                            setComposerLink({
+                              path: '/boutique',
+                              label: t('globalWallAttachBoutiqueListing'),
+                            });
+                            setPickPageOpen(false);
+                          }}
+                          style={({ pressed }) => [
+                            styles.attachRow,
+                            isRTL && styles.rowRtl,
+                            pressed && { opacity: 0.88 },
+                          ]}
+                        >
+                          <Text style={[styles.attachRowTitle, styles.attachMainLeafLabel, isRTL && styles.rtl]}>
+                            {t('globalWallAttachBoutiqueListing')}
+                          </Text>
+                          <FontAwesome
+                            name={isRTL ? 'chevron-left' : 'chevron-right'}
+                            size={12}
+                            color={brand.textMuted}
+                          />
+                        </Pressable>,
+                        <Pressable
+                          key="main-boutique-sub"
+                          onPress={() => setAttachModalStep('boutique')}
+                          style={({ pressed }) => [
+                            styles.attachRow,
+                            isRTL && styles.rowRtl,
+                            pressed && { opacity: 0.88 },
+                          ]}
+                        >
+                          <Text style={[styles.attachRowTitle, styles.attachMainLeafLabel, isRTL && styles.rtl]}>
+                            {t('globalWallAttachSeeDetails')}
+                          </Text>
+                          <FontAwesome
+                            name={isRTL ? 'chevron-left' : 'chevron-right'}
+                            size={12}
+                            color={brand.textMuted}
+                          />
+                        </Pressable>,
+                      ];
+                    }
+
+                    if (entry.submenu === 'events') {
+                      return [
+                        <Pressable
+                          key="main-events-listing"
+                          onPress={() => {
+                            setComposerLink({
+                              path: '/evenements',
+                              label: t('globalWallAttachEventsListing'),
+                            });
+                            setPickPageOpen(false);
+                          }}
+                          style={({ pressed }) => [
+                            styles.attachRow,
+                            isRTL && styles.rowRtl,
+                            pressed && { opacity: 0.88 },
+                          ]}
+                        >
+                          <Text style={[styles.attachRowTitle, styles.attachMainLeafLabel, isRTL && styles.rtl]}>
+                            {t('globalWallAttachEventsListing')}
+                          </Text>
+                          <FontAwesome
+                            name={isRTL ? 'chevron-left' : 'chevron-right'}
+                            size={12}
+                            color={brand.textMuted}
+                          />
+                        </Pressable>,
+                        <Pressable
+                          key="main-events-sub"
+                          onPress={() => setAttachModalStep('events')}
+                          style={({ pressed }) => [
+                            styles.attachRow,
+                            isRTL && styles.rowRtl,
+                            pressed && { opacity: 0.88 },
+                          ]}
+                        >
+                          <Text style={[styles.attachRowTitle, styles.attachMainLeafLabel, isRTL && styles.rtl]}>
+                            {t('globalWallAttachSeeDetails')}
                           </Text>
                           <FontAwesome
                             name={isRTL ? 'chevron-left' : 'chevron-right'}
@@ -1397,6 +1605,175 @@ export default function CommunauteScreen() {
                         />
                       </Pressable>
                     ))
+                  )}
+                </>
+              ) : attachModalStep === 'boutique' ? (
+                <>
+                  <Text style={[styles.attachSectionTitle, isRTL && styles.rtl]}>
+                    {t('globalWallPickBoutiqueSection')}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setComposerLink({
+                        path: '/boutique',
+                        label: t('globalWallAttachBoutiqueListing'),
+                      });
+                      setPickPageOpen(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.attachRow,
+                      isRTL && styles.rowRtl,
+                      pressed && { opacity: 0.88 },
+                    ]}
+                  >
+                    <Text style={[styles.attachRowTitle, styles.attachMainLeafLabel, isRTL && styles.rtl]}>
+                      {t('globalWallAttachBoutiqueListing')}
+                    </Text>
+                    <FontAwesome
+                      name={isRTL ? 'chevron-left' : 'chevron-right'}
+                      size={12}
+                      color={brand.textMuted}
+                    />
+                  </Pressable>
+                  <TextInput
+                    style={[styles.attachSearchInput, isRTL && styles.rtlInput]}
+                    placeholder={t('globalWallSearchBoutiquePlaceholder')}
+                    placeholderTextColor={brand.textMuted}
+                    value={boutiqueSearchInput}
+                    onChangeText={setBoutiqueSearchInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  {boutiqueLoading ? (
+                    <ActivityIndicator style={{ marginVertical: spacing.md }} color={brand.primary} />
+                  ) : boutiqueProducts.length === 0 ? (
+                    <Text style={[styles.attachEmpty, isRTL && styles.rtl]}>{t('globalWallEmpty')}</Text>
+                  ) : (
+                    boutiqueProducts.map((p) => (
+                      <Pressable
+                        key={p.id}
+                        onPress={() => {
+                          setComposerLink({
+                            path: webPathBoutiqueProduct(p.slug),
+                            label: p.title,
+                          });
+                          setPickPageOpen(false);
+                        }}
+                        style={({ pressed }) => [styles.attachRow, isRTL && styles.rowRtl, pressed && { opacity: 0.88 }]}
+                      >
+                        <Image
+                          source={{ uri: shopProductPrimaryImage(p.images) }}
+                          style={styles.attachRowLogo}
+                          resizeMode="contain"
+                        />
+                        <View style={styles.attachRowTxtCol}>
+                          <Text style={[styles.attachRowTitle, isRTL && styles.rtl]} numberOfLines={2}>
+                            {p.title}
+                          </Text>
+                          <Text style={[styles.attachRowSub, isRTL && styles.rtl]} numberOfLines={1}>
+                            {p.price}
+                            {p.currency ? ` ${p.currency}` : ''}
+                          </Text>
+                        </View>
+                        <FontAwesome
+                          name={isRTL ? 'chevron-left' : 'chevron-right'}
+                          size={12}
+                          color={brand.textMuted}
+                        />
+                      </Pressable>
+                    ))
+                  )}
+                </>
+              ) : attachModalStep === 'events' ? (
+                <>
+                  <Text style={[styles.attachSectionTitle, isRTL && styles.rtl]}>
+                    {t('globalWallPickEventsSection')}
+                  </Text>
+                  <Pressable
+                    onPress={() => {
+                      setComposerLink({
+                        path: '/evenements',
+                        label: t('globalWallAttachEventsListing'),
+                      });
+                      setPickPageOpen(false);
+                    }}
+                    style={({ pressed }) => [
+                      styles.attachRow,
+                      isRTL && styles.rowRtl,
+                      pressed && { opacity: 0.88 },
+                    ]}
+                  >
+                    <Text style={[styles.attachRowTitle, styles.attachMainLeafLabel, isRTL && styles.rtl]}>
+                      {t('globalWallAttachEventsListing')}
+                    </Text>
+                    <FontAwesome
+                      name={isRTL ? 'chevron-left' : 'chevron-right'}
+                      size={12}
+                      color={brand.textMuted}
+                    />
+                  </Pressable>
+                  <TextInput
+                    style={[styles.attachSearchInput, isRTL && styles.rtlInput]}
+                    placeholder={t('globalWallSearchEventsPlaceholder')}
+                    placeholderTextColor={brand.textMuted}
+                    value={eventSearchInput}
+                    onChangeText={setEventSearchInput}
+                    autoCapitalize="none"
+                    autoCorrect={false}
+                  />
+                  {eventsLoading ? (
+                    <ActivityIndicator style={{ marginVertical: spacing.md }} color={brand.primary} />
+                  ) : filteredPlatformEvents.length === 0 ? (
+                    <Text style={[styles.attachEmpty, isRTL && styles.rtl]}>{t('globalWallEmpty')}</Text>
+                  ) : (
+                    filteredPlatformEvents.map((ev) => {
+                      const title = locale === 'ar' && ev.titleAr?.trim() ? ev.titleAr.trim() : ev.title;
+                      let sub = '';
+                      try {
+                        sub = new Date(ev.startsAt).toLocaleString(locale === 'ar' ? 'ar-MA' : 'fr-FR', {
+                          day: 'numeric',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        });
+                      } catch {
+                        sub = ev.startsAt;
+                      }
+                      return (
+                        <Pressable
+                          key={ev.id}
+                          onPress={() => {
+                            setComposerLink({
+                              path: webPathEvent(ev.id),
+                              label: title,
+                            });
+                            setPickPageOpen(false);
+                          }}
+                          style={({ pressed }) => [styles.attachRow, isRTL && styles.rowRtl, pressed && { opacity: 0.88 }]}
+                        >
+                          <Image
+                            source={{ uri: resolvePlatformEventCoverUri(ev) }}
+                            style={styles.attachRowLogo}
+                            resizeMode="cover"
+                          />
+                          <View style={styles.attachRowTxtCol}>
+                            <Text style={[styles.attachRowTitle, isRTL && styles.rtl]} numberOfLines={2}>
+                              {title}
+                            </Text>
+                            {sub ? (
+                              <Text style={[styles.attachRowSub, isRTL && styles.rtl]} numberOfLines={1}>
+                                {sub}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <FontAwesome
+                            name={isRTL ? 'chevron-left' : 'chevron-right'}
+                            size={12}
+                            color={brand.textMuted}
+                          />
+                        </Pressable>
+                      );
+                    })
                   )}
                 </>
               ) : (

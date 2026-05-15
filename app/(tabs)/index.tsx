@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useFocusEffect, router } from 'expo-router';
 import {
   ActivityIndicator,
@@ -98,15 +97,14 @@ export default function IndexScreen() {
       });
     }
   }, [analyticsVisitorId, storyChannels]);
-  const [dailyOverlay, setDailyOverlay] = useState<{
-    playedToday: boolean;
-    infoReadToday: boolean;
-  } | null>(null);
+  const [dailyOverlay, setDailyOverlay] = useState<{ playedToday: boolean; streakDays?: number } | null>(null);
+  const [dailyLoading, setDailyLoading] = useState(true);
 
   useFocusEffect(
     useCallback(() => {
       let alive = true;
       void (async () => {
+        setDailyLoading(true);
         try {
           const token = await getValidAccessToken();
           const res = await fetchDailyChallengeToday(token);
@@ -116,38 +114,45 @@ export default function IndexScreen() {
             if (alive) setDailyOverlay(null);
             return;
           }
-          const k = `daily_info_read_${d.challengeDate}`;
-          const ir = await AsyncStorage.getItem(k);
+          const rawStreak = d.streak?.current;
+          const streakDays =
+            user != null && typeof rawStreak === 'number' && rawStreak > 0
+              ? Math.min(9999, Math.floor(rawStreak))
+              : undefined;
           if (alive) {
             setDailyOverlay({
               playedToday: Boolean(d.allGamesPlayed ?? d.playedToday),
-              infoReadToday: ir === '1',
+              ...(streakDays != null ? { streakDays } : {}),
             });
           }
         } catch {
           if (alive) setDailyOverlay(null);
+        } finally {
+          if (alive) setDailyLoading(false);
         }
       })();
       return () => {
         alive = false;
       };
-    }, [getValidAccessToken]),
+    }, [getValidAccessToken, user]),
   );
 
   const stackCards = useMemo(() => {
     const base = homeStackCardsForLocale(locale);
-    if (!dailyOverlay) return base;
     return base.map((card, idx) => {
       if (idx !== 0 || !card.dailyActions) return card;
       return {
         ...card,
         dailyActions: {
-          playedToday: dailyOverlay.playedToday,
-          infoReadToday: dailyOverlay.infoReadToday,
+          ...card.dailyActions,
+          loading: dailyLoading,
+          ...(dailyOverlay && !dailyLoading
+            ? { playedToday: dailyOverlay.playedToday, streakDays: dailyOverlay.streakDays }
+            : {}),
         },
       };
     });
-  }, [locale, dailyOverlay]);
+  }, [locale, dailyOverlay, dailyLoading]);
 
   const onPressPracticalItem = useCallback((id: string) => {
     navigatePracticalLink((href) => router.push(href as never), id);
@@ -234,7 +239,6 @@ export default function IndexScreen() {
           cards={stackCards}
           width={stackCardW}
           onPressDailyGame={() => router.push('/daily-challenge')}
-          onPressDailyInfo={() => router.push('/daily-challenge?openInfo=1')}
           onPressPracticalLink={onPressPracticalItem}
         />
 

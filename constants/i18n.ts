@@ -60,6 +60,9 @@ export type HomeCopyKey =
   | 'dailyChallengeZipPracticeResult'
   | 'dailyChallengeZipPracticeAgain'
   | 'dailyChallengeZipUndo'
+  | 'dailyChallengeZipHelpBtn'
+  | 'dailyChallengeZipHelpCooldown'
+  | 'dailyChallengeZipHelpNoHint'
   | 'dailyChallengeZipReset'
   | 'dailyChallengeZipInteractionHint'
   | 'dailyChallengeZipHowToPlay'
@@ -188,6 +191,8 @@ export type HomeCopyKey =
   | 'closeOverlayA11y'
   | 'dailyPlay'
   | 'dailyPlayed'
+  | 'homeDailyStreakOne'
+  | 'homeDailyStreakMany'
   | 'dailyRead'
   | 'dailyReadDone'
   | 'storyRingSuffixRead'
@@ -372,8 +377,23 @@ export type HomeCopyKey =
   | 'commonErrorTitle'
   | 'accountSectionOrders'
   | 'accountOrdersEmpty'
+  | 'accountOrdersEmptyProducts'
+  | 'accountOrdersEmptyServices'
   | 'accountOrdersLoading'
   | 'accountOrdersError'
+  | 'accountTabProfile'
+  | 'accountTabOrders'
+  | 'accountOrdersSegmentAll'
+  | 'accountOrdersSegmentProducts'
+  | 'accountOrdersSegmentServices'
+  | 'accountOrderViewDetail'
+  | 'accountOrderDetailTitle'
+  | 'accountOrderDetailNotFound'
+  | 'accountOrderPhysicalSection'
+  | 'accountOrderServicesSection'
+  | 'accountOrderPaymentSection'
+  | 'accountOrderRecapSection'
+  | 'accountOrderCompletedNote'
   | 'estNotFound'
   | 'shopEyebrow'
   | 'shopTitle'
@@ -381,16 +401,142 @@ export type HomeCopyKey =
   | 'shopSearchPlaceholder'
   | 'shopClearSearchA11y'
   | 'shopCartA11y'
+  | 'shopCartPayMethodsTitle'
+  | 'shopCartPayMethodCashDelivery'
+  | 'shopCartPayMethodOffice'
+  | 'shopCartPayMethodBankTransfer'
+  | 'shopCartPayMethodCashplus'
+  | 'shopCartPayDisclaimer'
+  | 'shopCartEyebrowBoutique'
+  | 'shopCartTitle'
+  | 'shopCartItemsOne'
+  | 'shopCartItemsMany'
+  | 'shopCartEmptyTitle'
+  | 'shopCartEmptyDesc'
+  | 'shopCartEmptyCta'
+  | 'shopCartPerUnit'
+  | 'shopCartQtyLabel'
+  | 'shopCartRemove'
+  | 'shopCartSummaryTitle'
+  | 'shopCartSubtotal'
+  | 'shopCartShippingLbl'
+  | 'shopCartShippingFreeAll'
+  | 'shopCartShippingNext'
+  | 'shopCartTotalEstimated'
+  | 'shopCartFooterTotal'
+  | 'shopCartGoCheckout'
+  | 'shopCheckoutEyebrowBoutique'
+  | 'shopCheckoutTitle'
+  | 'shopCheckoutItemsSummary'
+  | 'shopCheckoutErrSubmit'
+  | 'shopCheckoutErrGeneric'
+  | 'shopCheckoutDeliveryTitle'
+  | 'shopCheckoutDeliveryDesc'
+  | 'shopCheckoutDeliveryInfo'
+  | 'shopCheckoutDeliveryInfoFree'
+  | 'shopCheckoutContactTitle'
+  | 'shopCheckoutContactDesc'
+  | 'shopCheckoutLblEmail'
+  | 'shopCheckoutLblFullName'
+  | 'shopCheckoutLblPhone'
+  | 'shopCheckoutPhEmail'
+  | 'shopCheckoutPhName'
+  | 'shopCheckoutPhPhone'
+  | 'shopCheckoutLblStudentCity'
+  | 'shopCheckoutPickCity'
+  | 'shopCheckoutPaymentTitle'
+  | 'shopCheckoutPaymentDescMixed'
+  | 'shopCheckoutPaymentDescServices'
+  | 'shopCheckoutPayBank'
+  | 'shopCheckoutPayCashplus'
+  | 'shopCheckoutPayOffice'
+  | 'shopCheckoutPayOnDelivery'
+  | 'shopCheckoutAddrTitle'
+  | 'shopCheckoutAddrDesc'
+  | 'shopCheckoutLblCityShip'
+  | 'shopCheckoutLblAddress'
+  | 'shopCheckoutPhAddress'
+  | 'shopCheckoutNotesTitle'
+  | 'shopCheckoutNotesDesc'
+  | 'shopCheckoutPhNotes'
+  | 'shopCheckoutRecapTitle'
+  | 'shopCheckoutLblSubtotal'
+  | 'shopCheckoutLblShipping'
+  | 'shopCheckoutShipNoPhysical'
+  | 'shopCheckoutShipFree'
+  | 'shopCheckoutShipPickCity'
+  | 'shopCheckoutLblTotal'
+  | 'shopCheckoutConfirmBtn'
+  | 'shopCheckoutDisclaimerPod'
+  | 'shopCheckoutDisclaimerInstr'
+  | 'shopCheckoutDisclaimerSecure'
+  | 'shopCheckoutSheetCityShip'
+  | 'shopCheckoutSheetCityResidence'
+  | 'shopCheckoutStudentHintFree'
+  | 'shopCheckoutStudentHint'
+  | 'shopCheckoutStudentHintFreeShort'
+  | 'shopCheckoutVilleMetaFree'
+  | 'shopCheckoutVilleMetaFixed'
+  | 'shopCheckoutVilleMetaCatalog'
+  | 'shopCheckoutShipFreeBanner'
+  | 'shopCheckoutErrEmail'
+  | 'shopCheckoutErrFullName'
+  | 'shopCheckoutErrPhone'
+  | 'shopCheckoutErrStudyLevel'
+  | 'shopCheckoutErrBacType'
+  | 'shopCheckoutErrMissionSpecs'
+  | 'shopCheckoutErrFiliere'
+  | 'shopCheckoutErrStudentVille'
+  | 'shopCheckoutErrPayment'
+  | 'shopCheckoutErrShipCity'
+  | 'shopCheckoutErrAddress'
+  | 'shopThankEyebrowBoutique'
+  | 'shopThankCashplusCodeLbl'
+  | 'shopThankPaymentHeading'
+  | 'shopThankModalityBank'
+  | 'shopThankModalityCashplus'
+  | 'shopThankModalityOffice'
+  | 'shopThankModalityPayOnDelivery'
+  | 'shopThankLevelLine'
+  | 'shopThankBacLine'
+  | 'shopThankFiliereLine'
+  | 'shopThankMissionLine'
+  | 'shopThankStudentCityLine'
+  | 'shopThankDelayIndicative'
+  | 'shopThankCodCashTip'
+  | 'shopThankPickupPayOnSite'
+  | 'shopThankSummarySubtotalItems'
+  | 'shopThankSummaryShipLbl'
+  | 'shopThankSummaryShipFeesLbl'
+  | 'shopThankPickupBase'
+  | 'shopThankPickupTimePart'
   | 'shopFilterAll'
   | 'shopFilterProducts'
   | 'shopFilterPacks'
+  | 'shopFilterServices'
+  | 'shopServicesError'
+  | 'shopServicesEmpty'
+  | 'shopServicesSectionTitle'
+  | 'shopServicesSeeAll'
+  | 'shopServicesOpenWeb'
+  | 'shopServicesPopular'
+  | 'shopServicesFiliereAll'
+  | 'shopServicesEligibleYou'
+  | 'shopServicesFiliereMission'
+  | 'shopServicesFiliereReste'
+  | 'shopSearchServicesPlaceholder'
+  | 'shopServiceDetail'
+  | 'shopServicePromoChip'
   | 'shopErrorLoad'
   | 'shopLoading'
   | 'shopEmptyTitle'
   | 'shopEmptyDesc'
+  | 'shopEstablishmentsConcernedNotice'
   | 'shopBadgeProduct'
   | 'shopBadgePack'
+  | 'shopBadgeService'
   | 'shopBadgeFree'
+  | 'shopBadgeBestseller'
   | 'shopBadgeUnavailable'
   | 'shopOutOfStock'
   | 'shopAddA11y'
@@ -398,6 +544,64 @@ export type HomeCopyKey =
   | 'shopBuyNow'
   | 'shopBuyNowA11y'
   | 'shopViewProductA11y'
+  | 'shopViewServiceA11y'
+  | 'shopThankHeroTitle'
+  | 'shopThankHeroDesc'
+  | 'shopThankRefLabel'
+  | 'shopThankTotalLabel'
+  | 'shopThankNextStepsTitle'
+  | 'shopThankOrderNotFound'
+  | 'shopThankBankSectionTitle'
+  | 'shopThankBankNameLbl'
+  | 'shopThankBankRibLbl'
+  | 'shopThankBankHolderLbl'
+  | 'shopThankBankInstructionsTitle'
+  | 'shopThankBankUploadTitle'
+  | 'shopThankBankUploadHint'
+  | 'shopThankBankUploadPick'
+  | 'shopThankBankUploadBusy'
+  | 'shopThankBankUploadOk'
+  | 'shopThankBankUploadErr'
+  | 'shopThankBankViewReceipt'
+  | 'shopThankBankWhatsappHint'
+  | 'shopThankBankWhatsappOpen'
+  | 'shopThankCopy'
+  | 'shopThankCopied'
+  | 'shopThankCopyAllBank'
+  | 'shopThankCopyInstructions'
+  | 'shopThankBankCoordinTitle'
+  | 'shopThankWhatsappPrefill'
+  | 'shopThankCashplusAgencyHint'
+  | 'shopThankCashplusActivationHint'
+  | 'shopThankCashplusDelayHint'
+  | 'shopThankCashplusGotoAccountCta'
+  | 'shopThankWhatsappPrefillCashplus'
+  | 'shopThankPaymentHelpWhatsappTitle'
+  | 'shopThankWhatsappHintHelp'
+  | 'shopThankNextStep1Bank'
+  | 'shopThankNextStep2Bank'
+  | 'shopThankNextStep1Followup'
+  | 'shopThankNextStep2Followup'
+  | 'shopThankNextStep1Cod'
+  | 'shopThankNextStep2Cod'
+  | 'shopThankNextStep3Cod'
+  | 'shopThankBackShop'
+  | 'accountOrderReceiptLink'
+  | 'shopThankContactTitle'
+  | 'shopThankItemsTitle'
+  | 'shopThankDeliveryTitle'
+  | 'shopThankPickupTitle'
+  | 'shopThankOfficeMapsBtn'
+  | 'shopThankOfficeAddressLbl'
+  | 'shopThankOfficeHoursLbl'
+  | 'shopThankOfficePhoneLbl'
+  | 'shopThankOfficeCallHint'
+  | 'shopThankInstructionsTitle'
+  | 'shopEstCategoryPublic'
+  | 'shopEstCategoryMilitary'
+  | 'shopEstCategorySemiPublic'
+  | 'shopEstCategoryPrivate'
+  | 'shopEstCategoryOther'
   | 'tabHome'
   | 'tabEcoles'
   | 'tabInscriptions'
@@ -407,6 +611,7 @@ export type HomeCopyKey =
   | 'globalWallTitle'
   | 'globalWallIntro'
   | 'globalWallEmpty'
+  | 'globalWallPullToRefresh'
   | 'globalWallReplies'
   | 'globalWallReplyPlaceholder'
   | 'globalWallLoginToReply'
@@ -440,6 +645,13 @@ export type HomeCopyKey =
   | 'globalWallAttachBack'
   | 'globalWallAttachSchoolsListing'
   | 'globalWallAttachAnnouncementsListing'
+  | 'globalWallAttachSeeDetails'
+  | 'globalWallAttachBoutiqueListing'
+  | 'globalWallAttachEventsListing'
+  | 'globalWallPickBoutiqueSection'
+  | 'globalWallPickEventsSection'
+  | 'globalWallSearchBoutiquePlaceholder'
+  | 'globalWallSearchEventsPlaceholder'
   | 'globalWallPresetHome'
   | 'globalWallPresetSchools'
   | 'globalWallPresetFilieres'
@@ -838,6 +1050,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     dailyChallengeZipPracticeResult: 'Mode entraînement — score non enregistré sur le classement.',
     dailyChallengeZipPracticeAgain: 'Rejouer cette grille',
     dailyChallengeZipUndo: 'Annuler le dernier pas',
+    dailyChallengeZipHelpBtn: 'Aide — prochaine case',
+    dailyChallengeZipHelpCooldown: 'Patience {{s}} s',
+    dailyChallengeZipHelpNoHint: 'Indice indisponible pour cette position.',
     dailyChallengeZipReset: 'Recommencer',
     dailyChallengeZipInteractionHint:
       'Astuce : tu peux glisser sur la grille ; pour raccourcir, touche une case déjà sur ton tracé (hors glisser).',
@@ -981,6 +1196,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     closeOverlayA11y: 'Fermer',
     dailyPlay: 'Jouer',
     dailyPlayed: 'Joué',
+    homeDailyStreakOne: 'Série : 1 jour',
+    homeDailyStreakMany: 'Série : {{n}} jours',
     dailyRead: 'Lire',
     dailyReadDone: 'Lu',
     storyRingSuffixRead: ', déjà vue',
@@ -1166,8 +1383,23 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     commonErrorTitle: 'Erreur',
     accountSectionOrders: 'Mes commandes',
     accountOrdersEmpty: 'Aucune commande pour l\'instant.',
+    accountOrdersEmptyProducts: 'Aucun produit commandé. Consultez l\'onglet Services.',
+    accountOrdersEmptyServices: 'Aucun service commandé. Consultez l\'onglet Produits.',
     accountOrdersLoading: 'Chargement des commandes…',
     accountOrdersError: 'Impossible de charger les commandes.',
+    accountTabProfile: 'Mes informations',
+    accountTabOrders: 'Mes commandes',
+    accountOrdersSegmentAll: 'Tous',
+    accountOrdersSegmentProducts: 'Produits',
+    accountOrdersSegmentServices: 'Services',
+    accountOrderViewDetail: 'Voir le détail',
+    accountOrderDetailTitle: 'Détail commande',
+    accountOrderDetailNotFound: 'Commande introuvable.',
+    accountOrderPhysicalSection: 'Produits & livraison',
+    accountOrderServicesSection: 'Services orientation',
+    accountOrderPaymentSection: 'Paiement des services',
+    accountOrderRecapSection: 'Récapitulatif',
+    accountOrderCompletedNote: 'Commande terminée — récapitulatif ci-dessous.',
     estNotFound: 'Introuvable',
     shopEyebrow: 'E-Tawjihi',
     shopTitle: 'Boutique',
@@ -1175,16 +1407,154 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopSearchPlaceholder: 'Rechercher un produit, pack…',
     shopClearSearchA11y: 'Effacer la recherche',
     shopCartA11y: 'Panier',
+    shopCartPayMethodsTitle: 'Moyens de paiement possibles',
+    shopCartPayMethodCashDelivery: 'Espèces à la livraison (MAD)',
+    shopCartPayMethodOffice: 'Paiement au bureau',
+    shopCartPayMethodBankTransfer: 'Virement bancaire',
+    shopCartPayMethodCashplus: 'Cashplus',
+    shopCartPayDisclaimer:
+      'Carte bancaire non proposée en ligne — le choix du moyen de paiement se fait à la commande, après validation par E-Tawjihi.',
+    shopCartEyebrowBoutique: 'Boutique',
+    shopCartTitle: 'Panier',
+    shopCartItemsOne: '1 article',
+    shopCartItemsMany: '{n} articles',
+    shopCartEmptyTitle: 'Votre panier est vide',
+    shopCartEmptyDesc:
+      'Parcourez les produits et packs orientation, puis revenez ici pour passer commande.',
+    shopCartEmptyCta: 'Découvrir la boutique',
+    shopCartPerUnit: 'l’unité',
+    shopCartQtyLabel: 'Quantité',
+    shopCartRemove: 'Supprimer',
+    shopCartSummaryTitle: 'Récapitulatif',
+    shopCartSubtotal: 'Sous-total',
+    shopCartShippingLbl: 'Livraison',
+    shopCartShippingFreeAll: 'Offerte sur tout le panier',
+    shopCartShippingNext: 'À l’étape suivante',
+    shopCartTotalEstimated: 'Total estimé',
+    shopCartFooterTotal: 'Total',
+    shopCartGoCheckout: 'Passer à la caisse',
+    shopCheckoutEyebrowBoutique: 'Boutique',
+    shopCheckoutTitle: 'Commande',
+    shopCheckoutItemsSummary: '{n} article(s)',
+    shopCheckoutErrSubmit: 'Impossible de finaliser la commande. Réessayez.',
+    shopCheckoutErrGeneric: 'Une erreur est survenue.',
+    shopCheckoutDeliveryTitle: 'Livraison',
+    shopCheckoutDeliveryDesc: 'Livraison à domicile — paiement en espèces à la réception (MAD).',
+    shopCheckoutDeliveryInfo:
+      'Indiquez la ville de livraison et l’adresse pour calculer les frais de port.',
+    shopCheckoutDeliveryInfoFree: ' (livraison offerte sur ce panier).',
+    shopCheckoutContactTitle: 'Coordonnées',
+    shopCheckoutContactDesc: 'Pour vous contacter au sujet de la commande.',
+    shopCheckoutLblEmail: 'Email',
+    shopCheckoutLblFullName: 'Nom complet',
+    shopCheckoutLblPhone: 'Téléphone',
+    shopCheckoutPhEmail: 'vous@exemple.com',
+    shopCheckoutPhName: 'Prénom et nom',
+    shopCheckoutPhPhone: '06…',
+    shopCheckoutLblStudentCity: 'Ville de résidence',
+    shopCheckoutPickCity: 'Choisir une ville…',
+    shopCheckoutPaymentTitle: 'Modalité de paiement',
+    shopCheckoutPaymentDescMixed:
+      'Choisissez comment régler les services : virement, Cashplus, bureau, ou tout (services + produits) en espèces à la livraison.',
+    shopCheckoutPaymentDescServices:
+      'Après confirmation, les instructions détaillées s’affichent sur l’écran de remerciement selon votre choix.',
+    shopCheckoutPayBank: 'Virement bancaire',
+    shopCheckoutPayCashplus: 'Cashplus',
+    shopCheckoutPayOffice: 'Paiement au bureau',
+    shopCheckoutPayOnDelivery: 'Paiement à la livraison',
+    shopCheckoutAddrTitle: 'Adresse de livraison',
+    shopCheckoutAddrDesc: 'Pour l’envoi des produits physiques.',
+    shopCheckoutLblCityShip: 'Ville de livraison',
+    shopCheckoutLblAddress: 'Adresse complète',
+    shopCheckoutPhAddress: 'Rue, quartier, complément…',
+    shopCheckoutNotesTitle: 'Notes',
+    shopCheckoutNotesDesc: 'Optionnel — précisions pour l’équipe E-Tawjihi.',
+    shopCheckoutPhNotes: 'Précisions utiles…',
+    shopCheckoutRecapTitle: 'Récapitulatif',
+    shopCheckoutLblSubtotal: 'Sous-total',
+    shopCheckoutLblShipping: 'Livraison',
+    shopCheckoutShipNoPhysical: 'Sans envoi (services)',
+    shopCheckoutShipFree: 'Offert',
+    shopCheckoutShipPickCity: 'Choisir une ville',
+    shopCheckoutLblTotal: 'Total',
+    shopCheckoutConfirmBtn: 'Confirmer la commande',
+    shopCheckoutDisclaimerPod:
+      'Règlement prévu en espèces (MAD) à la livraison (produits physiques et services) — l’équipe peut vous confirmer par téléphone ou email.',
+    shopCheckoutDisclaimerInstr: 'Les instructions de paiement (RIB, Cashplus ou bureau) s’affichent après validation.',
+    shopCheckoutDisclaimerSecure: 'Données transmises de façon sécurisée — pas de paiement carte.',
+    shopCheckoutSheetCityShip: 'Ville de livraison',
+    shopCheckoutSheetCityResidence: 'Ville de résidence',
+    shopCheckoutStudentHintFree:
+      'Réf. tarifaire zone : {price} · {delais}. Livraison commande : offerte sur tout le panier.',
+    shopCheckoutStudentHint:
+      'Indicatif livraison pour cette zone : {price} · {delais}',
+    shopCheckoutStudentHintFreeShort: 'Livraison offerte sur tout le panier (au moins un article éligible).',
+    shopCheckoutVilleMetaFree:
+      'Tarif catalogue zone : {price} · délai indicatif : {delais} · frais facturés : offerts (panier éligible).',
+    shopCheckoutVilleMetaFixed:
+      'Tarif catalogue zone : {price} · délai indicatif : {delais} · frais facturés au panier : {fee} MAD (mode fixe boutique).',
+    shopCheckoutVilleMetaCatalog:
+      'Frais de livraison facturés : {fee} · délai indicatif : {delais}',
+    shopCheckoutShipFreeBanner: 'Livraison offerte sur tout le panier (au moins un article éligible).',
+    shopCheckoutErrEmail: 'Email invalide.',
+    shopCheckoutErrFullName: 'Indiquez votre nom complet.',
+    shopCheckoutErrPhone: 'Indiquez un numéro de téléphone.',
+    shopCheckoutErrStudyLevel: 'Indiquez votre niveau d’études.',
+    shopCheckoutErrBacType: 'Choisissez le type de bac.',
+    shopCheckoutErrMissionSpecs: 'Pour le Bac Mission, renseignez au moins deux spécialités.',
+    shopCheckoutErrFiliere: 'Indiquez la filière.',
+    shopCheckoutErrStudentVille: 'Sélectionnez votre ville dans la liste (référentiel livraison).',
+    shopCheckoutErrPayment: 'Choisissez une modalité de paiement.',
+    shopCheckoutErrShipCity: 'Sélectionnez votre ville de livraison.',
+    shopCheckoutErrAddress: 'Renseignez une adresse de livraison.',
+    shopThankEyebrowBoutique: 'Boutique',
+    shopThankCashplusCodeLbl: 'Code Cashplus',
+    shopThankPaymentHeading: 'Paiement — {label}',
+    shopThankModalityBank: 'Virement bancaire',
+    shopThankModalityCashplus: 'Cashplus',
+    shopThankModalityOffice: 'Paiement au bureau',
+    shopThankModalityPayOnDelivery: 'Paiement à la livraison',
+    shopThankLevelLine: 'Niveau : {v}',
+    shopThankBacLine: 'Bac : {v}',
+    shopThankFiliereLine: 'Filière / spécialité : {v}',
+    shopThankMissionLine: 'Spé. Mission : {v}',
+    shopThankStudentCityLine: 'Ville : {v}',
+    shopThankDelayIndicative: 'Délai indicatif : {delay}',
+    shopThankCodCashTip: 'Paiement en espèces (MAD) à la réception.',
+    shopThankPickupPayOnSite: 'Règlement sur place lors du retrait.',
+    shopThankSummarySubtotalItems: 'Sous-total articles',
+    shopThankSummaryShipLbl: 'Livraison',
+    shopThankSummaryShipFeesLbl: 'Frais de livraison',
+    shopThankPickupBase: 'Passage prévu : {date}',
+    shopThankPickupTimePart: ' à {time}',
     shopFilterAll: 'Tout',
     shopFilterProducts: 'Produits',
     shopFilterPacks: 'Packs',
+    shopFilterServices: 'Services',
+    shopServicesError: 'Impossible de charger les services.',
+    shopServicesEmpty: 'Aucun service à afficher pour le moment.',
+    shopServicesSectionTitle: 'Nos accompagnements',
+    shopServicesSeeAll: 'Voir tous les services',
+    shopServicesOpenWeb: 'Détails sur le site',
+    shopServicesPopular: 'Populaire',
+    shopServicesFiliereAll: 'Toutes filières',
+    shopServicesEligibleYou: 'Vous êtes éligible',
+    shopServicesFiliereMission: 'Bac Mission',
+    shopServicesFiliereReste: 'Autres filières',
+    shopSearchServicesPlaceholder: 'Rechercher un service…',
+    shopServiceDetail: 'Détail',
+    shopServicePromoChip: 'Promo',
     shopErrorLoad: 'Impossible de charger la boutique.',
     shopLoading: 'Chargement…',
     shopEmptyTitle: 'Aucun produit',
     shopEmptyDesc: 'Modifiez vos filtres ou revenez plus tard.',
+    shopEstablishmentsConcernedNotice:
+      'Vous pourrez personnaliser vos choix d’écoles parmi la liste proposée. Pour les écoles qui exigent le paiement de frais de préinscription, vous devez régler ces frais pour finaliser l’inscription. Pour les écoles soumises à des critères d’éligibilité, l’inscription n’est effectuée qu’en cas d’éligibilité.',
     shopBadgeProduct: 'Produit',
     shopBadgePack: 'Pack',
+    shopBadgeService: 'Service',
     shopBadgeFree: 'Livraison offerte',
+    shopBadgeBestseller: 'Best seller',
     shopBadgeUnavailable: 'Indisponible',
     shopOutOfStock: 'Rupture de stock',
     shopAddA11y: 'Ajouter au panier',
@@ -1192,6 +1562,75 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopBuyNow: 'Commander',
     shopBuyNowA11y: 'Commander maintenant',
     shopViewProductA11y: 'Voir le produit',
+    shopViewServiceA11y: 'Voir le service',
+    shopThankHeroTitle: 'Merci pour votre commande',
+    shopThankHeroDesc:
+      'Votre demande est bien prise en charge. Nous vous recontactons très bientôt sur les coordonnées indiquées.',
+    shopThankRefLabel: 'Référence',
+    shopThankTotalLabel: 'Total TTC',
+    shopThankNextStepsTitle: 'Prochaines étapes',
+    shopThankOrderNotFound: 'Commande introuvable ou session expirée.',
+    shopThankBankSectionTitle: 'Paiement par virement bancaire',
+    shopThankBankNameLbl: 'Banque',
+    shopThankBankRibLbl: 'RIB',
+    shopThankBankHolderLbl: 'Titulaire',
+    shopThankBankInstructionsTitle: 'Comment payer',
+    shopThankBankUploadTitle: 'Envoyer le justificatif (reçu)',
+    shopThankBankUploadHint:
+      'Après votre virement, joignez ici une photo ou un PDF du reçu. Il sera enregistré sur votre commande et visible dans Mon compte.',
+    shopThankBankUploadPick: 'Choisir un fichier (PDF, JPEG, PNG)',
+    shopThankBankUploadBusy: 'Envoi en cours…',
+    shopThankBankUploadOk: 'Justificatif enregistré.',
+    shopThankBankUploadErr: 'Envoi impossible. Réessayez ou utilisez WhatsApp.',
+    shopThankBankViewReceipt: 'Voir le justificatif',
+    shopThankBankWhatsappHint:
+      'Vous pouvez aussi nous envoyer le reçu sur WhatsApp au {phone}.',
+    shopThankBankWhatsappOpen: 'Ouvrir WhatsApp',
+    shopThankCopy: 'Copier',
+    shopThankCopied: 'Copié dans le presse-papiers.',
+    shopThankCopyAllBank: 'Copier toutes les coordonnées',
+    shopThankCopyInstructions: 'Copier les instructions',
+    shopThankBankCoordinTitle: 'Coordonnées pour le virement',
+    shopThankWhatsappPrefill:
+      'Bonjour, je joins le justificatif de virement pour ma commande n° {orderNumber}. Merci.',
+    shopThankCashplusAgencyHint:
+      'Présentez le code ci-dessous dans une agence Cashplus — idéalement la plus proche de chez vous — pour régler le montant de votre commande.',
+    shopThankCashplusActivationHint:
+      'Une fois le paiement effectué en agence, l’activation de votre accès se fera automatiquement dès que le paiement est pris en compte.',
+    shopThankCashplusDelayHint:
+      'Si l’activation tarde : ouvrez Mon compte → Mes commandes, puis téléversez le reçu Cashplus. Vous pouvez aussi nous écrire sur WhatsApp ci-dessous en indiquant votre n° de commande.',
+    shopThankCashplusGotoAccountCta: 'Ouvrir Mon compte — Mes commandes',
+    shopThankWhatsappPrefillCashplus:
+      'Bonjour, paiement Cashplus effectué pour la commande {orderNumber}. Merci de confirmer la réception ou d’indiquer la suite. Cordialement.',
+    shopThankPaymentHelpWhatsappTitle: 'Besoin d’aide ?',
+    shopThankWhatsappHintHelp:
+      'Écrivez-nous sur WhatsApp au {phone} en indiquant votre numéro de commande si besoin.',
+    shopThankNextStep1Bank: 'Conservez votre numéro de commande pour tout suivi.',
+    shopThankNextStep2Bank:
+      'Effectuez le virement puis déposez le reçu ci-dessus ou envoyez-le sur WhatsApp ; notre équipe validera votre paiement.',
+    shopThankNextStep1Followup: 'Conservez votre numéro de commande pour tout suivi.',
+    shopThankNextStep2Followup:
+      'Suivez les instructions de paiement ci-dessous ; l’équipe peut vous recontacter si besoin.',
+    shopThankNextStep1Cod: 'Nous vérifions votre commande et préparons la suite (livraison ou retrait).',
+    shopThankNextStep2Cod: "L'équipe E-Tawjihi vous contacte par téléphone ou email pour confirmer.",
+    shopThankNextStep3Cod: "Règlement en espèces à la livraison — pas de paiement carte dans l'app.",
+    shopThankBackShop: 'Retour à la boutique',
+    accountOrderReceiptLink: 'Reçu virement',
+    shopThankContactTitle: 'Coordonnées',
+    shopThankItemsTitle: 'Articles & montants',
+    shopThankDeliveryTitle: 'Livraison',
+    shopThankPickupTitle: 'Retrait au bureau',
+    shopThankOfficeMapsBtn: 'Voir sur Google Maps',
+    shopThankOfficeAddressLbl: 'Adresse du bureau',
+    shopThankOfficeHoursLbl: 'Horaires',
+    shopThankOfficePhoneLbl: 'Téléphone',
+    shopThankOfficeCallHint: 'Appelez pour confirmer votre date de passage.',
+    shopThankInstructionsTitle: 'Instructions',
+    shopEstCategoryPublic: 'Public',
+    shopEstCategoryMilitary: 'Militaire',
+    shopEstCategorySemiPublic: 'Semi-public',
+    shopEstCategoryPrivate: 'Privé',
+    shopEstCategoryOther: 'Autres',
     tabHome: 'Accueil',
     tabEcoles: 'Écoles',
     tabInscriptions: 'Inscriptions',
@@ -1202,6 +1641,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     globalWallIntro:
       'Messages de l’équipe E‑TAWJIHI et échanges. Répondez sous chaque publication (comme un groupe de discussion).',
     globalWallEmpty: 'Aucune publication pour le moment.',
+    globalWallPullToRefresh: 'Tirez pour actualiser',
     globalWallReplies: 'Réponses',
     globalWallReplyPlaceholder: 'Votre message…',
     globalWallLoginToReply: 'Connectez-vous pour répondre.',
@@ -1235,6 +1675,16 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     globalWallAttachBack: 'Retour',
     globalWallAttachSchoolsListing: 'Voir l’annuaire des écoles',
     globalWallAttachAnnouncementsListing: 'Voir toutes les annonces concours',
+    globalWallAttachSeeDetails: 'Voir les détails',
+    globalWallAttachListingPageLink: 'Joindre le lien de la page (liste complète)',
+    globalWallAttachSearchPickDetail: 'Ou rechercher et choisir une fiche précise :',
+    globalWallSearchAnnouncementsPlaceholder: 'Rechercher une annonce (titre, école…)…',
+    globalWallAttachBoutiqueListing: 'Voir le catalogue boutique',
+    globalWallAttachEventsListing: 'Voir l’agenda des événements',
+    globalWallPickBoutiqueSection: 'Choisir un produit',
+    globalWallPickEventsSection: 'Choisir un événement',
+    globalWallSearchBoutiquePlaceholder: 'Rechercher un produit ou pack…',
+    globalWallSearchEventsPlaceholder: 'Filtrer par titre…',
     globalWallPresetHome: 'Accueil',
     globalWallPresetSchools: 'Écoles supérieures',
     globalWallPresetFilieres: 'Filières',
@@ -1646,6 +2096,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     dailyChallengeZipPracticeResult: 'وضع تدريب — لا يُحفظ في التصنيف.',
     dailyChallengeZipPracticeAgain: 'إعادة هذه الشبكة',
     dailyChallengeZipUndo: 'تراجع عن آخر خطوة',
+    dailyChallengeZipHelpBtn: 'مساعدة — الخلية التالية',
+    dailyChallengeZipHelpCooldown: 'انتظر {{s}} ث',
+    dailyChallengeZipHelpNoHint: 'لا يتوفر تلميح لهذا الوضع.',
     dailyChallengeZipReset: 'إعادة البدء',
     dailyChallengeZipInteractionHint:
       'نصيحة: اسحب على الشبكة؛ للاختصار المسار المس خلية كانت على المسار الحالي (ليس أثناء السحب).',
@@ -1789,6 +2242,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     closeOverlayA11y: 'إغلاق',
     dailyPlay: 'العب',
     dailyPlayed: 'تم اللعب',
+    homeDailyStreakOne: 'سلسلة: يوم واحد',
+    homeDailyStreakMany: 'سلسلة: {{n}} أيام',
     dailyRead: 'اقرأ',
     dailyReadDone: 'مقروء',
     storyRingSuffixRead: '، تمت المشاهدة',
@@ -1974,8 +2429,23 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     commonErrorTitle: 'خطأ',
     accountSectionOrders: 'طلباتي',
     accountOrdersEmpty: 'لا توجد طلبات حتى الآن.',
+    accountOrdersEmptyProducts: 'لا توجد منتجات. راجع تبويب الخدمات.',
+    accountOrdersEmptyServices: 'لا توجد خدمات. راجع تبويب المنتجات.',
     accountOrdersLoading: 'جارٍ تحميل الطلبات…',
     accountOrdersError: 'تعذّر تحميل الطلبات.',
+    accountTabProfile: 'معلوماتي',
+    accountTabOrders: 'طلباتي',
+    accountOrdersSegmentAll: 'الكل',
+    accountOrdersSegmentProducts: 'منتجات',
+    accountOrdersSegmentServices: 'خدمات',
+    accountOrderViewDetail: 'عرض التفاصيل',
+    accountOrderDetailTitle: 'تفاصيل الطلب',
+    accountOrderDetailNotFound: 'الطلب غير موجود.',
+    accountOrderPhysicalSection: 'منتجات وتوصيل',
+    accountOrderServicesSection: 'خدمات التوجيه',
+    accountOrderPaymentSection: 'دفع الخدمات',
+    accountOrderRecapSection: 'ملخص',
+    accountOrderCompletedNote: 'الطلب مكتمل — الملخص أدناه.',
     estNotFound: 'غير موجود',
     shopEyebrow: 'E-Tawjihi',
     shopTitle: 'المتجر',
@@ -1983,16 +2453,150 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopSearchPlaceholder: 'ابحث عن منتج أو باقة…',
     shopClearSearchA11y: 'مسح البحث',
     shopCartA11y: 'السلة',
+    shopCartPayMethodsTitle: 'وسائل الدفع المتاحة',
+    shopCartPayMethodCashDelivery: 'نقدًا عند التسليم (درهم)',
+    shopCartPayMethodOffice: 'الدفع في المكتب',
+    shopCartPayMethodBankTransfer: 'تحويل بنكي',
+    shopCartPayMethodCashplus: 'كاش بلاس',
+    shopCartPayDisclaimer:
+      'البطاقة البنكية غير متاحة عبر الإنترنت — اختيار وسيلة الدفع يتم عند الطلب وبعد التأكيد من E-Tawjihi.',
+    shopCartEyebrowBoutique: 'المتجر',
+    shopCartTitle: 'السلة',
+    shopCartItemsOne: 'عنصر واحد',
+    shopCartItemsMany: '{n} عناصر',
+    shopCartEmptyTitle: 'سلتك فارغة',
+    shopCartEmptyDesc: 'تصفّح المنتجات وباقات التوجيه، ثم عد هنا لإتمام الطلب.',
+    shopCartEmptyCta: 'اكتشف المتجر',
+    shopCartPerUnit: 'للوحدة',
+    shopCartQtyLabel: 'الكمية',
+    shopCartRemove: 'حذف',
+    shopCartSummaryTitle: 'الملخص',
+    shopCartSubtotal: 'المجموع الفرعي',
+    shopCartShippingLbl: 'التوصيل',
+    shopCartShippingFreeAll: 'مجاني على كامل السلة',
+    shopCartShippingNext: 'في الخطوة التالية',
+    shopCartTotalEstimated: 'الإجمالي التقديري',
+    shopCartFooterTotal: 'الإجمالي',
+    shopCartGoCheckout: 'إتمام الطلب',
+    shopCheckoutEyebrowBoutique: 'المتجر',
+    shopCheckoutTitle: 'الطلب',
+    shopCheckoutItemsSummary: '{n} عنصر(ات)',
+    shopCheckoutErrSubmit: 'تعذّر إتمام الطلب. أعد المحاولة.',
+    shopCheckoutErrGeneric: 'حدث خطأ.',
+    shopCheckoutDeliveryTitle: 'التوصيل',
+    shopCheckoutDeliveryDesc: 'التوصيل للمنزل — الدفع نقدًا عند الاستلام (درهم).',
+    shopCheckoutDeliveryInfo: 'أدخل مدينة التوصيل والعنوان لحساب رسوم الشحن.',
+    shopCheckoutDeliveryInfoFree: ' (توصيل مجاني على هذه السلة).',
+    shopCheckoutContactTitle: 'بيانات التواصل',
+    shopCheckoutContactDesc: 'للتواصل معك بخصوص الطلب.',
+    shopCheckoutLblEmail: 'البريد الإلكتروني',
+    shopCheckoutLblFullName: 'الاسم الكامل',
+    shopCheckoutLblPhone: 'الهاتف',
+    shopCheckoutPhEmail: 'you@example.com',
+    shopCheckoutPhName: 'الاسم والنسب',
+    shopCheckoutPhPhone: '06…',
+    shopCheckoutLblStudentCity: 'مدينة الإقامة',
+    shopCheckoutPickCity: 'اختر مدينة…',
+    shopCheckoutPaymentTitle: 'طريقة الدفع',
+    shopCheckoutPaymentDescMixed:
+      'اختر كيفية دفع الخدمات: تحويل، كاش بلاس، مكتب، أو كل الطلب (خدمات + منتجات) نقدًا عند التسليم.',
+    shopCheckoutPaymentDescServices:
+      'بعد التأكيد تظهر التعليمات التفصيلية في شاشة الشكر حسب اختيارك.',
+    shopCheckoutPayBank: 'تحويل بنكي',
+    shopCheckoutPayCashplus: 'كاش بلاس',
+    shopCheckoutPayOffice: 'الدفع في المكتب',
+    shopCheckoutPayOnDelivery: 'الدفع عند التسليم',
+    shopCheckoutAddrTitle: 'عنوان التوصيل',
+    shopCheckoutAddrDesc: 'لإرسال المنتجات المادية.',
+    shopCheckoutLblCityShip: 'مدينة التوصيل',
+    shopCheckoutLblAddress: 'العنوان الكامل',
+    shopCheckoutPhAddress: 'الشارع، الحي، تفاصيل إضافية…',
+    shopCheckoutNotesTitle: 'ملاحظات',
+    shopCheckoutNotesDesc: 'اختياري — تفاصيل لفريق إي‑توجيهي.',
+    shopCheckoutPhNotes: 'ملاحظات مفيدة…',
+    shopCheckoutRecapTitle: 'الملخص',
+    shopCheckoutLblSubtotal: 'المجموع الفرعي',
+    shopCheckoutLblShipping: 'التوصيل',
+    shopCheckoutShipNoPhysical: 'بدون شحن (خدمات)',
+    shopCheckoutShipFree: 'مجاني',
+    shopCheckoutShipPickCity: 'اختر مدينة',
+    shopCheckoutLblTotal: 'الإجمالي',
+    shopCheckoutConfirmBtn: 'تأكيد الطلب',
+    shopCheckoutDisclaimerPod:
+      'الدفع نقدًا (درهم) عند التسليم (منتجات وخدمات) — قد يتواصل الفريق للتأكيد عبر الهاتف أو البريد.',
+    shopCheckoutDisclaimerInstr: 'تعليمات الدفع (التحويل، كاش بلاس أو المكتب) تظهر بعد التأكيد.',
+    shopCheckoutDisclaimerSecure: 'البيانات تُرسل بشكل آمن — لا يوجد دفع بالبطاقة في التطبيق.',
+    shopCheckoutSheetCityShip: 'مدينة التوصيل',
+    shopCheckoutSheetCityResidence: 'مدينة الإقامة',
+    shopCheckoutStudentHintFree:
+      'مرجع التسعير للمنطقة: {price} · {delais}. التوصيل: مجاني على كامل السلة.',
+    shopCheckoutStudentHint: 'مؤشر التوصيل لهذه المنطقة: {price} · {delais}',
+    shopCheckoutStudentHintFreeShort: 'توصيل مجاني على كامل السلة (عنصر مؤهل على الأقل).',
+    shopCheckoutVilleMetaFree:
+      'سعر الكتالوج للمنطقة: {price} · المدة التقديرية: {delais} · الرسوم المحتسبة: مجانية (سلة مؤهلة).',
+    shopCheckoutVilleMetaFixed:
+      'سعر الكتالوج للمنطقة: {price} · المدة التقديرية: {delais} · الرسوم على السلة: {fee} درهم (وضع ثابت للمتجر).',
+    shopCheckoutVilleMetaCatalog: 'رسوم التوصيل المحتسبة: {fee} · المدة التقديرية: {delais}',
+    shopCheckoutShipFreeBanner: 'توصيل مجاني على كامل السلة (عنصر مؤهل على الأقل).',
+    shopCheckoutErrEmail: 'البريد الإلكتروني غير صالح.',
+    shopCheckoutErrFullName: 'يرجى إدخال الاسم الكامل.',
+    shopCheckoutErrPhone: 'يرجى إدخال رقم الهاتف.',
+    shopCheckoutErrStudyLevel: 'يرجى إدخال المستوى الدراسي.',
+    shopCheckoutErrBacType: 'يرجى اختيار نوع البكالوريا.',
+    shopCheckoutErrMissionSpecs: 'لبكالوريا مهمة، أدخل تخصصين على الأقل.',
+    shopCheckoutErrFiliere: 'يرجى إدخال المسار / التخصص.',
+    shopCheckoutErrStudentVille: 'اختر مدينتك من القائمة (مرجع التوصيل).',
+    shopCheckoutErrPayment: 'يرجى اختيار طريقة الدفع.',
+    shopCheckoutErrShipCity: 'يرجى اختيار مدينة التوصيل.',
+    shopCheckoutErrAddress: 'يرجى إدخال عنوان التوصيل.',
+    shopThankEyebrowBoutique: 'المتجر',
+    shopThankCashplusCodeLbl: 'رمز كاش بلاس',
+    shopThankPaymentHeading: 'الدفع — {label}',
+    shopThankModalityBank: 'تحويل بنكي',
+    shopThankModalityCashplus: 'كاش بلاس',
+    shopThankModalityOffice: 'الدفع في المكتب',
+    shopThankModalityPayOnDelivery: 'الدفع عند التسليم',
+    shopThankLevelLine: 'المستوى : {v}',
+    shopThankBacLine: 'البكالوريا : {v}',
+    shopThankFiliereLine: 'المسار / التخصص : {v}',
+    shopThankMissionLine: 'تخصص المهمة : {v}',
+    shopThankStudentCityLine: 'المدينة : {v}',
+    shopThankDelayIndicative: 'المدة التقديرية : {delay}',
+    shopThankCodCashTip: 'الدفع نقدًا (درهم) عند الاستلام.',
+    shopThankPickupPayOnSite: 'الدفع في المكتب عند الاستلام.',
+    shopThankSummarySubtotalItems: 'المجموع الفرعي للمنتجات',
+    shopThankSummaryShipLbl: 'التوصيل',
+    shopThankSummaryShipFeesLbl: 'رسوم التوصيل',
+    shopThankPickupBase: 'موعد المرور : {date}',
+    shopThankPickupTimePart: ' في {time}',
     shopFilterAll: 'الكل',
     shopFilterProducts: 'منتجات',
     shopFilterPacks: 'باقات',
+    shopFilterServices: 'الخدمات',
+    shopServicesError: 'تعذّر تحميل الخدمات.',
+    shopServicesEmpty: 'لا توجد خدمات للعرض حاليًا.',
+    shopServicesSectionTitle: 'خدماتنا',
+    shopServicesSeeAll: 'عرض كل الخدمات',
+    shopServicesOpenWeb: 'التفاصيل على الموقع',
+    shopServicesPopular: 'الأكثر طلبًا',
+    shopServicesFiliereAll: 'كل الشعب',
+    shopServicesEligibleYou: 'أنت مؤهل',
+    shopServicesFiliereMission: 'بكالوريا مهمة',
+    shopServicesFiliereReste: 'باقي الشعب',
+    shopSearchServicesPlaceholder: 'ابحث عن خدمة…',
+    shopServiceDetail: 'التفاصيل',
+    shopServicePromoChip: 'عرض',
     shopErrorLoad: 'تعذّر تحميل المتجر.',
     shopLoading: 'جارٍ التحميل…',
     shopEmptyTitle: 'لا يوجد منتج',
     shopEmptyDesc: 'غيّر الفلاتر أو عد لاحقًا.',
+    shopEstablishmentsConcernedNotice:
+      'يمكنكم لاحقًا تخصيص اختيارات المدارس من القائمة المعروضة. بالنسبة للمدارس التي تشترط دفع رسوم التسجيل المسبق، يجب إتمام الدفع لإتمام التسجيل. وبالنسبة للمدارس التي تضع معايير أهلية، يُكمَل التسجيل فقط في حال استيفاء شروط الأهلية.',
     shopBadgeProduct: 'منتج',
     shopBadgePack: 'باقة',
+    shopBadgeService: 'خدمة',
     shopBadgeFree: 'توصيل مجاني',
+    shopBadgeBestseller: 'الأكثر مبيعًا',
     shopBadgeUnavailable: 'غير متوفر',
     shopOutOfStock: 'نفدت الكمية',
     shopAddA11y: 'أضف إلى السلة',
@@ -2000,6 +2604,71 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopBuyNow: 'اطلب الآن',
     shopBuyNowA11y: 'اطلب الآن',
     shopViewProductA11y: 'عرض المنتج',
+    shopViewServiceA11y: 'عرض الخدمة',
+    shopThankHeroTitle: 'شكرًا على طلبك',
+    shopThankHeroDesc: 'تم تسجيل طلبك. سنتواصل معك قريبًا على بيانات الاتصال التي أدخلتها.',
+    shopThankRefLabel: 'المرجع',
+    shopThankTotalLabel: 'الإجمالي شامل الضريبة',
+    shopThankNextStepsTitle: 'الخطوات التالية',
+    shopThankOrderNotFound: 'الطلب غير موجود أو انتهت الجلسة.',
+    shopThankBankSectionTitle: 'الدفع بالتحويل البنكي',
+    shopThankBankNameLbl: 'البنك',
+    shopThankBankRibLbl: 'رقم الحساب (RIB)',
+    shopThankBankHolderLbl: 'صاحب الحساب',
+    shopThankBankInstructionsTitle: 'كيفية الدفع',
+    shopThankBankUploadTitle: 'إرسال إيصال التحويل',
+    shopThankBankUploadHint:
+      'بعد التحويل، أرفق هنا صورة أو ملف PDF للإيصال. سيُحفظ مع طلبك ويظهر في حسابي.',
+    shopThankBankUploadPick: 'اختيار ملف (PDF أو صورة)',
+    shopThankBankUploadBusy: 'جارٍ الإرسال…',
+    shopThankBankUploadOk: 'تم حفظ الإيصال.',
+    shopThankBankUploadErr: 'تعذّر الإرسال. أعد المحاولة أو استخدم واتساب.',
+    shopThankBankViewReceipt: 'عرض الإيصال',
+    shopThankBankWhatsappHint: 'يمكنك أيضًا إرسال الإيصال عبر واتساب على الرقم {phone}.',
+    shopThankBankWhatsappOpen: 'فتح واتساب',
+    shopThankCopy: 'نسخ',
+    shopThankCopied: 'تم النسخ إلى الحافظة.',
+    shopThankCopyAllBank: 'نسخ كل الإحداثيات البنكية',
+    shopThankCopyInstructions: 'نسخ التعليمات',
+    shopThankBankCoordinTitle: 'إحداثيات التحويل البنكي',
+    shopThankWhatsappPrefill: 'مرحبًا، أرفق إيصال التحويل الخاص بطلبي رقم {orderNumber}. شكرًا.',
+    shopThankCashplusAgencyHint:
+      'قدّم الرمز أدناه في وكالة كاش بلاس (يفضّل الأقرب إليك) لدفع مبلغ طلبك.',
+    shopThankCashplusActivationHint:
+      'بعد الدفع في الوكالة، يُفعّل وصولك تلقائيًا بمجرد تسجيل الدفع.',
+    shopThankCashplusDelayHint:
+      'إذا تأخّر التفعيل: افتح حسابي ← طلباتي، ثم ارفع إيصال كاش بلاس. أو راسلنا على واتساب أدناه مع رقم طلبك.',
+    shopThankCashplusGotoAccountCta: 'فتح حسابي — طلباتي',
+    shopThankWhatsappPrefillCashplus:
+      'مرحبًا، تم الدفع عبر كاش بلاس للطلب رقم {orderNumber}. يرجى تأكيد الاستلام أو توضيح الخطوة التالية. شكرًا.',
+    shopThankPaymentHelpWhatsappTitle: 'تحتاج مساعدة؟',
+    shopThankWhatsappHintHelp:
+      'راسلنا على واتساب على الرقم {phone} مع ذكر رقم الطلب عند الحاجة.',
+    shopThankNextStep1Bank: 'احتفظ برقم طلبك لمتابعة الطلب.',
+    shopThankNextStep2Bank:
+      'نفّذ التحويل ثم أرفق الإيصال أعلاه أو أرسله عبر واتساب؛ سيقوم فريقنا بتأكيد الدفع.',
+    shopThankNextStep1Followup: 'احتفظ برقم طلبك لمتابعة الطلب.',
+    shopThankNextStep2Followup: 'اتبع تعليمات الدفع أدناه؛ قد يتواصل الفريق معك عند الحاجة.',
+    shopThankNextStep1Cod: 'نتحقق من طلبك ونجهّز الخطوة التالية (التوصيل أو الاستلام).',
+    shopThankNextStep2Cod: 'يتواصل فريق إي‑توجيهي معك عبر الهاتف أو البريد للتأكيد.',
+    shopThankNextStep3Cod: 'الدفع نقدًا عند التسليم — لا يوجد دفع بالبطاقة في التطبيق.',
+    shopThankBackShop: 'العودة إلى المتجر',
+    accountOrderReceiptLink: 'إيصال التحويل',
+    shopThankContactTitle: 'بيانات التواصل',
+    shopThankItemsTitle: 'المحتويات والمبالغ',
+    shopThankDeliveryTitle: 'التوصيل',
+    shopThankPickupTitle: 'الاستلام من المكتب',
+    shopThankOfficeMapsBtn: 'عرض الموقع على Google Maps',
+    shopThankOfficeAddressLbl: 'عنوان المكتب',
+    shopThankOfficeHoursLbl: 'أوقات العمل',
+    shopThankOfficePhoneLbl: 'الهاتف',
+    shopThankOfficeCallHint: 'اتصل لتأكيد تاريخ ووقت زيارتك.',
+    shopThankInstructionsTitle: 'التعليمات',
+    shopEstCategoryPublic: 'عمومي',
+    shopEstCategoryMilitary: 'عسكري',
+    shopEstCategorySemiPublic: 'شبه عمومي',
+    shopEstCategoryPrivate: 'خاص',
+    shopEstCategoryOther: 'أخرى',
     tabHome: 'الرئيسية',
     tabEcoles: 'المدارس',
     tabInscriptions: 'التسجيلات',
@@ -2010,6 +2679,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     globalWallIntro:
       'رسائل فريق E‑TAWJIHI والنقاشات. يمكنك الرد تحت كل منشور (مثل مجموعة محادثة).',
     globalWallEmpty: 'لا توجد منشورات حالياً.',
+    globalWallPullToRefresh: 'اسحب للتحديث',
     globalWallReplies: 'الردود',
     globalWallReplyPlaceholder: 'رسالتك…',
     globalWallLoginToReply: 'سجّل الدخول للرد.',
@@ -2043,6 +2713,16 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     globalWallAttachBack: 'رجوع',
     globalWallAttachSchoolsListing: 'دليل المدارس',
     globalWallAttachAnnouncementsListing: 'جميع إعلانات المباريات',
+    globalWallAttachSeeDetails: 'عرض التفاصيل',
+    globalWallAttachListingPageLink: 'إرفاق رابط الصفحة (القائمة الكاملة)',
+    globalWallAttachSearchPickDetail: 'أو ابحث واختر ملفًا محددًا:',
+    globalWallSearchAnnouncementsPlaceholder: 'بحث في إعلان (عنوان، مدرسة…)',
+    globalWallAttachBoutiqueListing: 'عرض متجر المنتجات',
+    globalWallAttachEventsListing: 'عرض أجندة الفعاليات',
+    globalWallPickBoutiqueSection: 'اختر منتجًا',
+    globalWallPickEventsSection: 'اختر فعالية',
+    globalWallSearchBoutiquePlaceholder: 'ابحث عن منتج أو حزمة…',
+    globalWallSearchEventsPlaceholder: 'تصفية حسب العنوان…',
     globalWallPresetHome: 'الرئيسية',
     globalWallPresetSchools: 'المدارس العليا',
     globalWallPresetFilieres: 'الشُعب',

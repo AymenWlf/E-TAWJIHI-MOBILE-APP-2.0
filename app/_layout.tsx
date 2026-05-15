@@ -122,9 +122,11 @@ function RootLayoutNav() {
             <Stack.Screen name="account-setup" options={{ headerShown: false }} />
             <Stack.Screen name="logout" options={{ headerShown: false }} />
             <Stack.Screen name="boutique/[slug]" options={{ headerShown: false }} />
+            <Stack.Screen name="boutique/service/[slug]" options={{ headerShown: false }} />
             <Stack.Screen name="boutique/cart" options={{ headerShown: false }} />
             <Stack.Screen name="boutique/checkout" options={{ headerShown: false }} />
             <Stack.Screen name="boutique/thank-you" options={{ headerShown: false }} />
+            <Stack.Screen name="compte/commande/[publicId]" options={{ headerShown: false }} />
             <Stack.Screen name="inscriptions/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="inscriptions/follow/[id]" options={{ headerShown: false }} />
             <Stack.Screen name="communaute" options={{ headerShown: false }} />

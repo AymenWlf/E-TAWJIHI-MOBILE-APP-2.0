@@ -287,15 +287,6 @@ export default function LoginScreen() {
             )}
           </View>
 
-          <Pressable
-            accessibilityRole="button"
-            style={styles.forgotRow}
-            onPress={() => router.replace('/forgot-password')}
-            hitSlop={8}
-          >
-            <Text style={[styles.forgotText, rtl && styles.rtl]}>{t('loginForgotPassword')}</Text>
-          </Pressable>
-
           {/* CTA */}
           <Pressable
             accessibilityRole="button"
@@ -541,21 +532,10 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
 
-  /* ── MOT DE PASSE OUBLIÉ ───────────────── */
-  forgotRow: {
-    alignSelf: 'flex-end',
-    marginTop: spacing.sm,
-    marginBottom: spacing.xl,
-  },
-  forgotText: {
-    fontSize: 13,
-    color: BLUE,
-    fontWeight: '800',
-  },
-
   /* ── CTA ───────────────────────────────── */
   cta: {
     height: 54,
+    marginTop: spacing.xl,
     borderRadius: 999,
     backgroundColor: BLUE,
     alignItems: 'center',

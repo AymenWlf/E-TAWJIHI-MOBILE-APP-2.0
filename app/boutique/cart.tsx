@@ -6,15 +6,30 @@ import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text';
+import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVisualThumb';
+import { ETAWJIHI_LOGO_COLOR } from '@/constants/brandAssets';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { formatShopPrice, shopParsePriceString, shopPriceFormatOptsForCatalogOrCartLine } from '@/utils/shopFormatPrice';
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
+import { isPlatformServiceCartLine } from '@/utils/platformServiceCart';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 
 export default function BoutiqueCartScreen() {
   const router = useRouter();
+  const { t, isRTL } = useLocale();
   const { lines, count, updateQuantity, removeLine, hydrateImages, ready } = useShopCart();
+
+  const payMethodLines = useMemo(
+    () => [
+      t('shopCartPayMethodCashDelivery'),
+      t('shopCartPayMethodOffice'),
+      t('shopCartPayMethodBankTransfer'),
+      t('shopCartPayMethodCashplus'),
+    ],
+    [t],
+  );
 
   useEffect(() => {
     if (ready) {
@@ -31,22 +46,26 @@ export default function BoutiqueCartScreen() {
     [lines],
   );
   const currency = lines[0]?.currency ?? 'MAD';
+  const cartWideFreeShipping = useMemo(
+    () => lines.length > 0 && lines.some((l) => l.isFreeShipping === true),
+    [lines],
+  );
 
   return (
-    <SafeAreaView style={styles.root} edges={['top']}>
+    <SafeAreaView style={[styles.root, isRTL && styles.rtlRoot]} edges={['top']}>
       <StatusBar style="dark" />
 
-      <View style={styles.topBar}>
+      <View style={[styles.topBar, isRTL && styles.rowRtl]}>
         <Pressable
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/boutique'))}
           style={({ pressed }) => [styles.backBtn, pressed && { opacity: 0.85 }]}
           hitSlop={6}
         >
-          <FontAwesome name="chevron-left" size={16} color={brand.text} />
+          <FontAwesome name={isRTL ? 'chevron-right' : 'chevron-left'} size={16} color={brand.text} />
         </Pressable>
         <View style={styles.topTitleWrap}>
-          <Text style={styles.eyebrow}>Boutique</Text>
-          <Text style={styles.topTitle}>Panier</Text>
+          <Text style={[styles.eyebrow, isRTL && styles.txtRtl]}>{t('shopCartEyebrowBoutique')}</Text>
+          <Text style={[styles.topTitle, isRTL && styles.txtRtl]}>{t('shopCartTitle')}</Text>
         </View>
         <View style={{ width: 40 }} />
       </View>
@@ -56,63 +75,86 @@ export default function BoutiqueCartScreen() {
           <View style={styles.emptyIcon}>
             <FontAwesome name="shopping-bag" size={36} color={brand.primary} />
           </View>
-          <Text style={styles.emptyTitle}>Votre panier est vide</Text>
-          <Text style={styles.emptyDesc}>
-            Parcourez les produits et packs orientation, puis revenez ici pour passer commande.
-          </Text>
+          <Text style={[styles.emptyTitle, isRTL && styles.txtRtl]}>{t('shopCartEmptyTitle')}</Text>
+          <Text style={[styles.emptyDesc, isRTL && styles.txtRtl]}>{t('shopCartEmptyDesc')}</Text>
           <Pressable
             style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.9 }]}
             onPress={() => router.replace('/(tabs)/boutique')}
           >
-            <Text style={styles.btnPrimaryTxt}>Découvrir la boutique</Text>
+            <Text style={styles.btnPrimaryTxt}>{t('shopCartEmptyCta')}</Text>
           </Pressable>
         </View>
       ) : (
         <>
           <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
-            <Text style={styles.itemCount}>
-              {count} article{count > 1 ? 's' : ''}
+            <Text style={[styles.itemCount, isRTL && styles.txtRtl]}>
+              {count === 1 ? t('shopCartItemsOne') : t('shopCartItemsMany').replace('{n}', String(count))}
             </Text>
 
             {lines.map((l) => {
               const lineTotal = shopParsePriceString(l.price) * l.quantity;
               const priceOpts = shopPriceFormatOptsForCatalogOrCartLine(l);
+              const isSvc = isPlatformServiceCartLine(l);
               return (
-                <View key={l.productId} style={styles.itemCard}>
-                  <Image source={{ uri: shopProductPrimaryImage(l.images) }} style={styles.itemImg} resizeMode="cover" />
+                <View key={`${l.lineKind ?? 'shop'}-${l.productId}`} style={[styles.itemCard, isRTL && styles.rowRtl]}>
+                  {isSvc ? (
+                    <PlatformServiceVisualThumb
+                      brandIcon={l.platformServiceBrandIcon}
+                      brandColor={l.platformServiceBrandColor}
+                      size={86}
+                      iconSize={32}
+                      surfaceColor={brand.primary}
+                      imageSource={ETAWJIHI_LOGO_COLOR}
+                    />
+                  ) : (
+                    <Image source={{ uri: shopProductPrimaryImage(l.images) }} style={styles.itemImg} resizeMode="cover" />
+                  )}
                   <View style={styles.itemBody}>
-                    <Text style={styles.itemTitle} numberOfLines={2}>
+                    <Text style={[styles.itemTitle, isRTL && styles.txtRtl]} numberOfLines={2}>
                       {l.title}
                     </Text>
-                    <View style={styles.itemMetaRow}>
-                      <View style={styles.itemTypeBadge}>
-                        <FontAwesome name={l.type === 'pack' ? 'cubes' : 'cube'} size={10} color={brand.primary} />
-                        <Text style={styles.itemTypeTxt}>{l.type === 'pack' ? 'Pack' : 'Produit'}</Text>
+                    <View style={[styles.itemMetaRow, isRTL && styles.rowRtl]}>
+                      <View style={[styles.itemTypeBadge, isRTL && styles.rowRtl]}>
+                        <FontAwesome
+                          name={isSvc ? 'briefcase' : l.type === 'pack' ? 'cubes' : 'cube'}
+                          size={10}
+                          color={brand.primary}
+                        />
+                        <Text style={[styles.itemTypeTxt, isRTL && styles.txtRtl]}>
+                          {isSvc ? t('shopBadgeService') : l.type === 'pack' ? t('shopBadgePack') : t('shopBadgeProduct')}
+                        </Text>
                       </View>
-                      <Text style={styles.itemUnit}>
-                        {formatShopPrice(l.price, l.currency, priceOpts)} l'unité
+                      <Text style={[styles.itemUnit, isRTL && styles.txtRtl]}>
+                        {formatShopPrice(l.price, l.currency, priceOpts)} {t('shopCartPerUnit')}
                       </Text>
                     </View>
 
-                    <View style={styles.qtyRow}>
-                      <View style={styles.qtyStepper}>
-                        <Pressable
-                          disabled={l.quantity <= 1}
-                          onPress={() => void updateQuantity(l.productId, l.quantity - 1)}
-                          style={({ pressed }) => [styles.qtyBtn, l.quantity <= 1 && styles.qtyBtnDisabled, pressed && { opacity: 0.85 }]}
-                        >
-                          <FontAwesome name="minus" size={11} color={brand.text} />
-                        </Pressable>
-                        <Text style={styles.qtyValue}>{l.quantity}</Text>
-                        <Pressable
-                          disabled={l.quantity >= 99}
-                          onPress={() => void updateQuantity(l.productId, l.quantity + 1)}
-                          style={({ pressed }) => [styles.qtyBtn, l.quantity >= 99 && styles.qtyBtnDisabled, pressed && { opacity: 0.85 }]}
-                        >
-                          <FontAwesome name="plus" size={11} color={brand.text} />
-                        </Pressable>
-                      </View>
-                      <Text style={styles.itemTotal}>
+                    <View style={[styles.qtyRow, isRTL && styles.rowRtl]}>
+                      {isSvc ? (
+                        <View style={[styles.qtyFixedWrap, isRTL && styles.rowRtl]}>
+                          <Text style={[styles.qtyFixedLbl, isRTL && styles.txtRtl]}>{t('shopCartQtyLabel')}</Text>
+                          <Text style={[styles.qtyFixedVal, isRTL && styles.txtRtl]}>1</Text>
+                        </View>
+                      ) : (
+                        <View style={[styles.qtyStepper, isRTL && styles.rowRtl]}>
+                          <Pressable
+                            disabled={l.quantity <= 1}
+                            onPress={() => void updateQuantity(l.productId, l.quantity - 1)}
+                            style={({ pressed }) => [styles.qtyBtn, l.quantity <= 1 && styles.qtyBtnDisabled, pressed && { opacity: 0.85 }]}
+                          >
+                            <FontAwesome name="minus" size={11} color={brand.text} />
+                          </Pressable>
+                          <Text style={styles.qtyValue}>{l.quantity}</Text>
+                          <Pressable
+                            disabled={l.quantity >= 99}
+                            onPress={() => void updateQuantity(l.productId, l.quantity + 1)}
+                            style={({ pressed }) => [styles.qtyBtn, l.quantity >= 99 && styles.qtyBtnDisabled, pressed && { opacity: 0.85 }]}
+                          >
+                            <FontAwesome name="plus" size={11} color={brand.text} />
+                          </Pressable>
+                        </View>
+                      )}
+                      <Text style={[styles.itemTotal, isRTL && styles.txtRtl]}>
                         {formatShopPrice(String(lineTotal), l.currency, priceOpts)}
                       </Text>
                     </View>
@@ -120,10 +162,10 @@ export default function BoutiqueCartScreen() {
                     <Pressable
                       onPress={() => void removeLine(l.productId)}
                       hitSlop={6}
-                      style={({ pressed }) => [styles.removeBtn, pressed && { opacity: 0.85 }]}
+                      style={({ pressed }) => [styles.removeBtn, isRTL && styles.rowRtl, pressed && { opacity: 0.85 }]}
                     >
                       <FontAwesome name="trash-o" size={12} color={brand.error} />
-                      <Text style={styles.removeTxt}>Supprimer</Text>
+                      <Text style={[styles.removeTxt, isRTL && styles.txtRtl]}>{t('shopCartRemove')}</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -131,58 +173,56 @@ export default function BoutiqueCartScreen() {
             })}
 
             <View style={styles.summaryCard}>
-              <Text style={styles.summaryTitle}>Récapitulatif</Text>
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLbl}>Sous-total</Text>
-                <Text style={styles.summaryVal}>{formatShopPrice(String(subtotal), currency)}</Text>
+              <Text style={[styles.summaryTitle, isRTL && styles.txtRtl]}>{t('shopCartSummaryTitle')}</Text>
+              <View style={[styles.summaryRow, isRTL && styles.rowRtl]}>
+                <Text style={[styles.summaryLbl, isRTL && styles.txtRtl]}>{t('shopCartSubtotal')}</Text>
+                <Text style={[styles.summaryVal, isRTL && styles.txtRtl]}>{formatShopPrice(String(subtotal), currency)}</Text>
               </View>
-              <View style={styles.summaryRow}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 }}>
+              <View style={[styles.summaryRow, isRTL && styles.rowRtl]}>
+                <View style={[styles.summaryShipLead, isRTL && styles.rowRtl]}>
                   <FontAwesome name="truck" size={11} color={brand.primary} />
-                  <Text style={styles.summaryLbl}>Livraison</Text>
+                  <Text style={[styles.summaryLbl, isRTL && styles.txtRtl]}>{t('shopCartShippingLbl')}</Text>
                 </View>
-                <Text style={styles.summaryNote}>À l'étape suivante</Text>
+                <Text style={[styles.summaryNote, isRTL && styles.txtRtl]}>
+                  {cartWideFreeShipping ? t('shopCartShippingFreeAll') : t('shopCartShippingNext')}
+                </Text>
               </View>
               <View style={styles.summaryDivider} />
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryTotalLbl}>Total estimé</Text>
-                <Text style={styles.summaryTotalVal}>{formatShopPrice(String(subtotal), currency)}</Text>
+              <View style={[styles.summaryRow, isRTL && styles.rowRtl]}>
+                <Text style={[styles.summaryTotalLbl, isRTL && styles.txtRtl]}>{t('shopCartTotalEstimated')}</Text>
+                <Text style={[styles.summaryTotalVal, isRTL && styles.txtRtl]}>{formatShopPrice(String(subtotal), currency)}</Text>
               </View>
 
               <View style={styles.payHints}>
-                <View style={styles.payHint}>
-                  <FontAwesome name="money" size={14} color={brand.success} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.payHintTitle}>À la livraison</Text>
-                    <Text style={styles.payHintTxt}>Espèces (MAD) à réception</Text>
-                  </View>
-                </View>
-                <View style={styles.payHint}>
-                  <FontAwesome name="building" size={13} color={brand.primary} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.payHintTitle}>Au bureau</Text>
-                    <Text style={styles.payHintTxt}>Retrait & règlement sur place</Text>
+                <View style={[styles.payHint, styles.payHintAlignTop, isRTL && styles.rowRtl]}>
+                  <FontAwesome name="list-ul" size={14} color={brand.primary} style={styles.payHintLeadIcon} />
+                  <View style={styles.payHintBody}>
+                    <Text style={[styles.payHintTitle, isRTL && styles.payHintTxtRtl]}>
+                      {t('shopCartPayMethodsTitle')}
+                    </Text>
+                    {payMethodLines.map((line, i) => (
+                      <Text key={`p-${i}`} style={[styles.payHintBullet, isRTL && styles.payHintTxtRtl]}>
+                        {'\u2022'} {line}
+                      </Text>
+                    ))}
                   </View>
                 </View>
               </View>
-              <Text style={styles.disclaimer}>
-                Carte bancaire : non proposée en ligne — règlement uniquement à la livraison ou au bureau, après validation par
-                E-Tawjihi.
-              </Text>
+              <Text style={[styles.disclaimer, isRTL && styles.txtRtl]}>{t('shopCartPayDisclaimer')}</Text>
             </View>
           </ScrollView>
 
-          <View style={styles.checkoutBar}>
+          <View style={[styles.checkoutBar, isRTL && styles.rowRtl]}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.checkoutBarLbl}>Total</Text>
-              <Text style={styles.checkoutBarTotal}>{formatShopPrice(String(subtotal), currency)}</Text>
+              <Text style={[styles.checkoutBarLbl, isRTL && styles.txtRtl]}>{t('shopCartFooterTotal')}</Text>
+              <Text style={[styles.checkoutBarTotal, isRTL && styles.txtRtl]}>{formatShopPrice(String(subtotal), currency)}</Text>
             </View>
             <Pressable
               onPress={() => router.push('/boutique/checkout' as any)}
-              style={({ pressed }) => [styles.checkoutBtn, pressed && { opacity: 0.92 }]}
+              style={({ pressed }) => [styles.checkoutBtn, isRTL && styles.rowRtl, pressed && { opacity: 0.92 }]}
             >
-              <Text style={styles.checkoutBtnTxt}>Passer à la caisse</Text>
-              <FontAwesome name="arrow-right" size={13} color={brand.white} />
+              <Text style={styles.checkoutBtnTxt}>{t('shopCartGoCheckout')}</Text>
+              <FontAwesome name={isRTL ? 'arrow-left' : 'arrow-right'} size={13} color={brand.white} />
             </Pressable>
           </View>
         </>
@@ -193,6 +233,9 @@ export default function BoutiqueCartScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: brand.backgroundSoft },
+  rtlRoot: { direction: 'rtl' },
+  rowRtl: { flexDirection: 'row-reverse' },
+  txtRtl: { textAlign: 'right', writingDirection: 'rtl' },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -253,6 +296,19 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: 8,
   },
+  qtyFixedWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.md,
+    backgroundColor: brand.backgroundSoft,
+    borderWidth: 1,
+    borderColor: brand.border,
+  },
+  qtyFixedLbl: { fontSize: 11, fontWeight: '700', color: brand.textMuted },
+  qtyFixedVal: { fontSize: fontSize.sm, fontWeight: '800', color: brand.text, minWidth: 12, textAlign: 'center' },
   qtyStepper: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -303,6 +359,7 @@ const styles = StyleSheet.create({
   summaryTitle: { fontSize: fontSize.md, fontWeight: '800', color: brand.text },
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   summaryLbl: { fontSize: fontSize.sm, color: brand.textSecondary },
+  summaryShipLead: { flexDirection: 'row', alignItems: 'center', gap: 6, flex: 1 },
   summaryVal: { fontSize: fontSize.sm, color: brand.text, fontWeight: '700' },
   summaryNote: { fontSize: 11, color: brand.textMuted, fontStyle: 'italic' },
   summaryDivider: { height: 1, backgroundColor: brand.border },
@@ -320,8 +377,12 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: brand.border,
   },
+  payHintAlignTop: { alignItems: 'flex-start' },
+  payHintLeadIcon: { marginTop: 2 },
+  payHintBody: { flex: 1, gap: 6 },
   payHintTitle: { fontSize: 12, fontWeight: '800', color: brand.text },
-  payHintTxt: { fontSize: 11, color: brand.textSecondary, marginTop: 2 },
+  payHintBullet: { fontSize: 11, lineHeight: 17, color: brand.textSecondary, fontWeight: '600' },
+  payHintTxtRtl: { textAlign: 'right', writingDirection: 'rtl' },
   disclaimer: {
     marginTop: 4,
     fontSize: 11,

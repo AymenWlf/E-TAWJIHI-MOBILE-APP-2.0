@@ -115,6 +115,14 @@ export function resolveChatbotUrl(rawUrl: string): ChatbotNavRecommendation | nu
         destLabelKey: 'shareKindBoutiqueProduct',
       };
     }
+    if (path === '/etablissements' || path === '/etablissements/') {
+      return {
+        url: path,
+        webUrl: `app:${path}`,
+        mobileHref: '/(tabs)/ecoles' as Href,
+        destLabelKey: 'tabEcoles',
+      };
+    }
     if (/^\/etablissements\/\d+\/[^/]+/i.test(path)) {
       return { url: path, webUrl: `app:${path}`, mobileHref: path as Href, destLabelKey: 'shareKindSchool' };
     }

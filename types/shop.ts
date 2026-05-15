@@ -4,15 +4,19 @@
  * `ShopProductPublicController` et `ShopOrderPublicController`.
  */
 
-export type ShopProductType = 'product' | 'pack';
+export type ShopProductType = 'product' | 'pack' | 'service';
 
-export type ShopOrderLineProductType = ShopProductType | 'service';
+export type ShopOrderLineProductType = ShopProductType;
 
 export interface ShopProductEstablishmentRef {
   id: number;
   nom: string;
   sigle: string | null;
   slug: string;
+  /** Public | Privé | Militaire | Semi-public — renvoyé par l’API fiche produit. */
+  type?: string | null;
+  /** Fichier ou URL logo établissement (API boutique). */
+  logo?: string | null;
 }
 
 export interface ShopProductListItem {
@@ -30,6 +34,7 @@ export interface ShopProductListItem {
   isFeatured: boolean;
   isNew: boolean;
   isPromo: boolean;
+  isBestseller?: boolean;
   isFreeShipping?: boolean;
   isOutOfStock?: boolean;
   ratingAverage: number | null;
@@ -79,6 +84,10 @@ export interface ShopOrderLine {
   quantity: number;
   lineTotal: string;
   productType: ShopOrderLineProductType;
+  /** Présent pour les lignes service plateforme (récap commande). */
+  platformServiceSlug?: string | null;
+  platformServiceBrandIcon?: string | null;
+  platformServiceBrandColor?: string | null;
   removedAt?: string | null;
   removalReason?: string | null;
   isUpsell?: boolean;
@@ -109,7 +118,56 @@ export interface ShopOrderPayload {
   createdAt: string | null;
   trafficSource?: string | null;
   lines: ShopOrderLine[];
+  /** Présent si la commande contient au moins un service et une modalité de paiement. */
+  servicePaymentFollowUp?: ShopOrderServicePaymentFollowUp | null;
+  /** Chemin relatif côté serveur (debug / admin). */
+  bankTransferReceiptPath?: string | null;
+  /** URL publique du justificatif (`/uploads/...`). */
+  bankTransferReceiptUrl?: string | null;
+  bankTransferReceiptUploadedAt?: string | null;
+  studentCity?: string | null;
+  studyLevel?: string | null;
+  bacType?: string | null;
+  filiere?: string | null;
+  specialiteMission1?: string | null;
+  specialiteMission2?: string | null;
+  specialiteMission3?: string | null;
+  servicePaymentModality?: string | null;
+  servicePaymentCashplusCode?: string | null;
 }
+
+export type ShopOrderServicePaymentFollowUp = {
+  modality: 'bank_transfer' | 'cashplus' | 'office' | 'pay_on_delivery';
+  modalityLabel: string;
+  bankInstructions?: string;
+  /** Texte d’instructions en arabe (API) ; secours FR si absent. */
+  bankInstructionsAr?: string | null;
+  cashplusCode?: string | null;
+  cashplusInstructions?: string;
+  cashplusInstructionsAr?: string | null;
+  officeAddress?: string;
+  officeMapsUrl?: string | null;
+  officeInstructions?: string;
+  officeInstructionsAr?: string | null;
+  officePhoneDisplay?: string;
+  officeTelHref?: string;
+  officeHoursFr?: string;
+  officeHoursAr?: string;
+  /** Modalité « paiement à la livraison » (panier mixte services + produits physiques). */
+  payOnDeliveryMessage?: string;
+  payOnDeliveryMessageAr?: string | null;
+  /** Détails affichage virement (API). */
+  bankWire?: {
+    bankName: string;
+    rib: string;
+    accountHolder: string;
+  };
+  whatsappPhoneDisplay?: string;
+  /** Indicatif+pays sans + pour wa.me (ex. 212655690632). */
+  whatsappWaMe?: string;
+};
+
+export type ShopCartLineKind = 'shop_product' | 'platform_service';
 
 /** Ligne stockée localement (AsyncStorage) — minimum requis pour reconstituer l'UI panier. */
 export interface ShopCartLine {
@@ -120,6 +178,12 @@ export interface ShopCartLine {
   currency: string;
   quantity: number;
   type: ShopProductType;
+  /** Lignes issues de `/api/platform-services` (commande avec `platformServiceSlug`). */
+  lineKind?: ShopCartLineKind;
+  platformServiceSlug?: string | null;
+  /** Identité visuelle du service (panier / récap). */
+  platformServiceBrandIcon?: string | null;
+  platformServiceBrandColor?: string | null;
   packPricingMode?: 'manual' | 'discount_from_sum' | null;
   images?: string[];
   isFreeShipping?: boolean;
@@ -134,8 +198,12 @@ export type ShopPublicSettings = {
 
 export type ShopDeliveryMode = 'cod_delivery' | 'pickup_office';
 
+export type ShopOrderCreateLineInput =
+  | { productId: number; quantity: number }
+  | { platformServiceSlug: string; quantity: number };
+
 export interface CreateShopOrderInput {
-  lines: { productId: number; quantity: number }[];
+  lines: ShopOrderCreateLineInput[];
   email: string;
   fullName: string;
   phone: string;
@@ -149,6 +217,15 @@ export interface CreateShopOrderInput {
   trafficSource?: string;
   analyticsVisitorId?: string;
   analyticsViewport?: 'mobile' | 'desktop';
+  /** Profil / service (requis si le panier contient un service). */
+  studyLevel?: string;
+  bacType?: string;
+  filiere?: string;
+  specialiteMission1?: string;
+  specialiteMission2?: string;
+  specialiteMission3?: string;
+  studentCity?: string;
+  servicePaymentModality?: 'bank_transfer' | 'cashplus' | 'office' | 'pay_on_delivery';
 }
 
 export interface CreateShopOrderResult {

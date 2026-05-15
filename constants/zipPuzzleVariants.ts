@@ -271,6 +271,83 @@ export function getZipGridPrefixIssue(
   return null;
 }
 
+/** Longueur L maximale telle que `path.slice(0, L)` est un préfixe valide (même règles que {@link getZipGridPrefixIssue}). */
+export function getZipSnakeCorrectPrefixLength(
+  zip: Pick<ZipPracticeVariant, 'rows' | 'cols' | 'cells' | 'wallsHorizontal' | 'wallsVertical'>,
+  path: number[],
+): number {
+  if (!path.length) return 0;
+  for (let L = path.length; L >= 1; L--) {
+    if (getZipGridPrefixIssue(zip, path.slice(0, L)) === null) return L;
+  }
+  return 0;
+}
+
+/**
+ * Prochaine case à jouer après le dernier préfixe correct : d’abord `solutionPath[L]`
+ * si la solution complète est valide ; sinon voisin unique portant le prochain numéro attendu, ou unique case vide (0).
+ */
+export function getZipSnakeNextHintCellIndex(
+  zip: Pick<ZipPracticeVariant, 'rows' | 'cols' | 'cells' | 'wallsHorizontal' | 'wallsVertical'> & {
+    solutionPath?: number[];
+  },
+  path: number[],
+): number | null {
+  const rows = zip.rows;
+  const cols = zip.cols;
+  if (rows < 1 || cols < 1) return null;
+  const n = rows * cols;
+  const cells = zip.cells;
+  if (cells.length !== n) return null;
+
+  const L = getZipSnakeCorrectPrefixLength(zip, path);
+  if (L >= n) return null;
+
+  const sp = zip.solutionPath;
+  if (Array.isArray(sp) && sp.length === n && scoreZipGridPath(zip, sp) === n) {
+    const next = sp[L];
+    return typeof next === 'number' && next >= 0 && next < n ? next : null;
+  }
+
+  let nextExpected = 1;
+  for (let i = 0; i < L; i++) {
+    const v = cells[path[i]!]!;
+    if (v > 0) nextExpected++;
+  }
+
+  if (L === 0) {
+    const ones: number[] = [];
+    for (let i = 0; i < n; i++) if (cells[i] === 1) ones.push(i);
+    if (ones.length === 0) return null;
+    return ones.sort((a, b) => a - b)[0] ?? null;
+  }
+
+  const lastIdx = path[L - 1]!;
+  const whLen = Math.max(0, (rows - 1) * cols);
+  const wvLen = Math.max(0, rows * Math.max(0, cols - 1));
+  const wh = normalizeWalls(zip.wallsHorizontal, whLen);
+  const wv = normalizeWalls(zip.wallsVertical, wvLen);
+
+  const neighbors: number[] = [];
+  const pushIf = (b: number) => {
+    if (b >= 0 && b < n && areAdjacentNoWall(lastIdx, b, rows, cols, wh, wv)) neighbors.push(b);
+  };
+  const c = lastIdx % cols;
+  pushIf(lastIdx - cols);
+  pushIf(lastIdx + cols);
+  if (c > 0) pushIf(lastIdx - 1);
+  if (c < cols - 1) pushIf(lastIdx + 1);
+
+  const numHits = neighbors.filter((j) => cells[j] === nextExpected);
+  if (numHits.length === 1) return numHits[0]!;
+  if (numHits.length > 1) return [...numHits].sort((a, b) => a - b)[0] ?? null;
+
+  const zeroHits = neighbors.filter((j) => cells[j] === 0);
+  if (zeroHits.length === 1) return zeroHits[0]!;
+
+  return null;
+}
+
 /**
  * Place m numéros (1…m) sur des cases du chemin à des étapes croissantes,
  * avec dispersion contrôlée par la graine (pas seulement équidistant).

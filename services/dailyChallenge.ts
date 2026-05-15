@@ -19,6 +19,8 @@ export type DailyChallengeZipPublic = {
   cells?: number[];
   wallsHorizontal?: number[];
   wallsVertical?: number[];
+  /** Présent côté serveur pour l’indice « prochaine case » (non exposé au client pour tricher autrement). */
+  solutionPath?: number[];
 };
 
 export type DailyChallengeGameEntry = {

@@ -61,9 +61,11 @@ export type ForgotPasswordResponse = {
   };
 };
 
-export async function forgotPasswordWithPhone(phone: string): Promise<ForgotPasswordResponse> {
-  const url = buildApiUrl('/api/forgot-password');
-  return await httpPostJson<ForgotPasswordResponse, { phone: string }>(url, { phone });
+export async function forgotPasswordWithPhone(_phone: string): Promise<ForgotPasswordResponse> {
+  return {
+    success: false,
+    message: 'La réinitialisation du mot de passe en ligne est désactivée.',
+  };
 }
 
 export async function setAuthToken(token: string): Promise<void> {

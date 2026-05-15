@@ -2,7 +2,7 @@
  * Pages du site partageables dans le fil communauté (chemins web publics).
  * `branch` → sous-menu avec recherche / liste détaillée.
  */
-export type GlobalWallAttachSubmenu = 'establishments' | 'announcements';
+export type GlobalWallAttachSubmenu = 'establishments' | 'announcements' | 'boutique' | 'events';
 
 export type GlobalWallAttachMainEntry =
   | { kind: 'leaf'; path: string; labelKey: GlobalWallAttachLabelKey }
@@ -26,8 +26,8 @@ export const GLOBAL_WALL_ATTACH_MAIN_ENTRIES: GlobalWallAttachMainEntry[] = [
   { kind: 'branch', labelKey: 'globalWallPresetSchools', submenu: 'establishments' },
   { kind: 'leaf', path: '/filieres', labelKey: 'globalWallPresetFilieres' },
   { kind: 'branch', labelKey: 'globalWallPresetContestAnnouncements', submenu: 'announcements' },
-  { kind: 'leaf', path: '/boutique', labelKey: 'globalWallPresetBoutique' },
-  { kind: 'leaf', path: '/evenements', labelKey: 'globalWallPresetEvents' },
+  { kind: 'branch', labelKey: 'globalWallPresetBoutique', submenu: 'boutique' },
+  { kind: 'branch', labelKey: 'globalWallPresetEvents', submenu: 'events' },
   { kind: 'leaf', path: '/blog', labelKey: 'globalWallPresetBlog' },
   { kind: 'leaf', path: '/secteurs', labelKey: 'globalWallPresetSecteurs' },
   { kind: 'leaf', path: '/services', labelKey: 'globalWallPresetServices' },

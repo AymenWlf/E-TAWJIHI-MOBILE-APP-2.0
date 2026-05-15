@@ -1,14 +1,17 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
+import { fetchPlatformServices } from '@/services/platformServices';
 import type {
   CreateShopOrderInput,
   CreateShopOrderResult,
+  ShopCartLine,
   ShopOrderPayload,
   ShopPagination,
   ShopProductDetail,
   ShopProductListItem,
   ShopPublicSettings,
 } from '@/types/shop';
+import { isPlatformServiceCartLine } from '@/utils/platformServiceCart';
 
 interface ApiListResponse<T> {
   success: boolean;
@@ -87,9 +90,18 @@ export async function fetchShopPublicSettings(): Promise<ShopPublicSettings> {
   }
 }
 
-export async function createShopOrder(body: CreateShopOrderInput): Promise<CreateShopOrderResult> {
+export async function createShopOrder(
+  body: CreateShopOrderInput,
+  accessToken?: string | null,
+): Promise<CreateShopOrderResult> {
   const url = buildApiUrl('/api/shop/orders');
-  const data = await httpPostJson<ApiDataResponse<CreateShopOrderResult>, CreateShopOrderInput>(url, body);
+  const headers: Record<string, string> = {};
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+  const data = await httpPostJson<ApiDataResponse<CreateShopOrderResult>, CreateShopOrderInput>(url, body, {
+    headers,
+  });
   if (!data.success || !data.data) {
     throw new Error(data.message || 'Erreur lors de la création de la commande');
   }
@@ -107,6 +119,30 @@ export async function fetchShopOrder(publicId: string, token: string): Promise<S
   }
 }
 
+export async function uploadShopOrderBankTransferReceipt(
+  publicId: string,
+  token: string,
+  file: { uri: string; name: string; type: string },
+): Promise<ShopOrderPayload> {
+  const url = buildApiUrl(`/api/shop/orders/${encodeURIComponent(publicId)}/bank-transfer-receipt`, { token });
+  const form = new FormData();
+  form.append('receipt', {
+    uri: file.uri,
+    name: file.name || 'justificatif.pdf',
+    type: file.type || 'application/octet-stream',
+  } as unknown as Blob);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: { Accept: 'application/json' },
+    body: form,
+  });
+  const json = (await res.json().catch(() => null)) as ApiDataResponse<ShopOrderPayload> & { message?: string };
+  if (!res.ok || !json?.success || !json.data) {
+    throw new Error(typeof json?.message === 'string' ? json.message : `HTTP ${res.status}`);
+  }
+  return json.data;
+}
+
 /**
  * Recharge depuis le catalogue les images / livraison gratuite manquantes des lignes panier
  * (utile pour les paniers persistés avant l'ajout des champs côté API).
@@ -115,7 +151,9 @@ export async function hydrateCartLinesImagesViaApi<T extends { slug: string; ima
   lines: T[],
 ): Promise<T[]> {
   if (lines.length === 0) return lines;
-  const needs = lines.filter((l) => !l.images || l.images.length === 0);
+  const needs = lines.filter(
+    (l) => !isPlatformServiceCartLine(l as unknown as ShopCartLine) && (!l.images || l.images.length === 0),
+  );
   if (needs.length === 0) return lines;
   const map = new Map<string, { images?: string[]; isFreeShipping?: boolean }>();
   await Promise.all(
@@ -128,6 +166,7 @@ export async function hydrateCartLinesImagesViaApi<T extends { slug: string; ima
   );
   if (map.size === 0) return lines;
   return lines.map((l) => {
+    if (isPlatformServiceCartLine(l as unknown as ShopCartLine)) return l;
     const hit = map.get(l.slug);
     if (!hit) return l;
     return {
@@ -135,5 +174,38 @@ export async function hydrateCartLinesImagesViaApi<T extends { slug: string; ima
       ...(hit.images && hit.images.length > 0 ? { images: hit.images } : {}),
       ...(hit.isFreeShipping !== undefined ? { isFreeShipping: hit.isFreeShipping } : {}),
     };
+  });
+}
+
+/**
+ * Complète les lignes « service plateforme » sans icône/couleur (paniers anciens ou avant migration).
+ */
+export async function mergePlatformServiceBrandingIntoCartLines(lines: ShopCartLine[]): Promise<ShopCartLine[]> {
+  const svcLines = lines.filter((l) => isPlatformServiceCartLine(l) && l.platformServiceSlug);
+  if (svcLines.length === 0) return lines;
+  const needs = svcLines.some(
+    (l) =>
+      isPlatformServiceCartLine(l) &&
+      (l.platformServiceBrandIcon == null || l.platformServiceBrandIcon === '' ||
+        l.platformServiceBrandColor == null || l.platformServiceBrandColor === ''),
+  );
+  if (!needs) return lines;
+  const list = await fetchPlatformServices();
+  const bySlug = new Map(list.map((s) => [s.slug, s]));
+  return lines.map((l) => {
+    if (!isPlatformServiceCartLine(l) || !l.platformServiceSlug) return l;
+    const s = bySlug.get(l.platformServiceSlug);
+    if (!s) return l;
+    const next = { ...l };
+    if (next.platformServiceBrandIcon == null || next.platformServiceBrandIcon === '') {
+      next.platformServiceBrandIcon = s.brandIcon;
+    }
+    if (next.platformServiceBrandColor == null || next.platformServiceBrandColor === '') {
+      next.platformServiceBrandColor = s.brandColor;
+    }
+    if (s.isFreeShipping !== undefined) {
+      next.isFreeShipping = s.isFreeShipping;
+    }
+    return next;
   });
 }

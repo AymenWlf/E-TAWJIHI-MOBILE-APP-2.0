@@ -38,6 +38,12 @@ export function webPathBoutiqueProduct(slug: string): string {
   return `/boutique/${encodeURIComponent(s)}`;
 }
 
+/** Ancre page services publics (même logique que l’app mobile `openServicesSite`). */
+export function webPathPlatformService(slug: string): string {
+  const s = String(slug ?? '').trim() || 'service';
+  return `/services#${encodeURIComponent(s)}`;
+}
+
 /** Fil d’info communauté (page web `GlobalWallPage`). */
 export function webPathCommunity(): string {
   return '/communaute';

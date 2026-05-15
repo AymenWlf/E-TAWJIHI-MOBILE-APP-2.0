@@ -14,6 +14,7 @@ export type ShopBoutiqueAnalyticsEvent =
 export async function recordShopBoutiqueEvent(
   event: ShopBoutiqueAnalyticsEvent,
   productId?: number,
+  platformServiceSlug?: string,
 ): Promise<void> {
   try {
     const visitorId = await getMobileVisitorId();
@@ -23,6 +24,7 @@ export async function recordShopBoutiqueEvent(
       visitorId: string;
       viewport: string;
       productId?: number;
+      platformServiceSlug?: string;
     } = {
       event,
       visitorId,
@@ -30,6 +32,10 @@ export async function recordShopBoutiqueEvent(
     };
     if (productId != null && productId > 0) {
       body.productId = productId;
+    }
+    const slug = typeof platformServiceSlug === 'string' ? platformServiceSlug.trim() : '';
+    if (slug.length > 0) {
+      body.platformServiceSlug = slug.length > 255 ? slug.slice(0, 255) : slug;
     }
     await httpPostJson<{ success: boolean }, typeof body>(url, body);
   } catch {

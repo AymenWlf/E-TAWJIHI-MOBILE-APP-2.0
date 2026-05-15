@@ -1,10 +1,11 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Linking,
   Platform,
   Pressable,
   ScrollView,
@@ -31,6 +32,8 @@ import {
   NIVEAU_ETUDE_OPTIONS,
   SPECIALITES_MISSION,
 } from '@/constants/academicSetup';
+import { getApiBaseUrl } from '@/constants/api';
+import type { HomeCopyKey } from '@/constants/i18n';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { invalidateEligibilityProfileCache } from '@/hooks/useEligibilityProfile';
@@ -42,11 +45,17 @@ import { homeShell } from '@/theme/homeShell';
 import { formatOrderCreatedAtShort } from '@/utils/dateParis';
 import { errorMessage } from '@/utils/errorMessage';
 import { isValidEmail } from '@/utils/isValidEmail';
+import { OrderServicePaymentSnippet } from '@/components/shop/OrderServicePaymentSnippet';
+import { formatShopPrice } from '@/utils/shopFormatPrice';
+import { isShopOrderCompleted, shopOrderStatusUi } from '@/utils/shopOrderStatusUi';
 
 export default function CompteTabScreen() {
-  const { user, getValidAccessToken, reloadMe, logout } = useAuth();
+  const router = useRouter();
+  const { user, isLoading: authLoading, getValidAccessToken, reloadMe, logout } = useAuth();
   const { t, isRTL, locale, setLocale } = useLocale();
   const insets = useSafeAreaInsets();
+  const [mainTab, setMainTab] = useState<'profile' | 'orders'>('profile');
+  const [ordersSegment, setOrdersSegment] = useState<'all' | 'products' | 'services'>('all');
   const [loading, setLoading] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -55,6 +64,7 @@ export default function CompteTabScreen() {
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
   const [orders, setOrders] = useState<UserOrderSummary[]>([]);
+  const [ordersLoadError, setOrdersLoadError] = useState<string | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersLoaded, setOrdersLoaded] = useState(false);
   const [form, setForm] = useState({
@@ -326,14 +336,18 @@ export default function CompteTabScreen() {
     const token = await getValidAccessToken();
     if (!token) { setOrdersLoaded(true); return; }
     setOrdersLoading(true);
+    setOrdersLoadError(null);
     try {
       const rows = await fetchUserOrders(token);
       setOrders(rows);
+    } catch (e) {
+      setOrders([]);
+      setOrdersLoadError(e instanceof Error ? e.message : t('accountOrdersError'));
     } finally {
       setOrdersLoading(false);
       setOrdersLoaded(true);
     }
-  }, [getValidAccessToken, isLoggedIn]);
+  }, [getValidAccessToken, isLoggedIn, t]);
 
   useEffect(() => {
     void loadCities();
@@ -346,6 +360,29 @@ export default function CompteTabScreen() {
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);
+
+  const productOrders = useMemo(
+    () =>
+      orders.filter((o) => {
+        if (o.hasPhysicalLines === true) return true;
+        if (o.hasServiceLines === true) return false;
+        return true;
+      }),
+    [orders],
+  );
+  const serviceOrders = useMemo(
+    () =>
+      orders.filter((o) => {
+        if (o.hasServiceLines === true) return true;
+        return false;
+      }),
+    [orders],
+  );
+  const visibleOrders = useMemo(() => {
+    if (ordersSegment === 'all') return orders;
+    if (ordersSegment === 'products') return productOrders;
+    return serviceOrders;
+  }, [ordersSegment, orders, productOrders, serviceOrders]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -480,6 +517,18 @@ export default function CompteTabScreen() {
               </Pressable>
             </View>
           </View>
+          {isLoggedIn && profileLoaded ? (
+            <AccountTabsRow
+              tabs={[
+                { id: 'profile' as const, label: t('accountTabProfile'), icon: 'user' },
+                { id: 'orders' as const, label: t('accountTabOrders'), icon: 'shopping-bag' },
+              ]}
+              active={mainTab}
+              onChange={setMainTab}
+              isRTL={isRTL}
+              variant="hero"
+            />
+          ) : null}
         </View>
       </View>
 
@@ -496,7 +545,12 @@ export default function CompteTabScreen() {
         {...(Platform.OS === 'ios' ? { contentInsetAdjustmentBehavior: 'never' as const } : {})}
         {...(Platform.OS === 'android' ? { overScrollMode: 'always' as const } : {})}
         refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-        {!isLoggedIn ? (
+        {authLoading ? (
+          <View style={styles.center}>
+            <ActivityIndicator color={homeShell.blue} size="large" />
+            <Text style={[styles.loadingHint, isRTL && styles.txtRtl]}>{t('setupLoading')}</Text>
+          </View>
+        ) : !isLoggedIn ? (
           <>
             <View style={styles.card}>
               <View style={[styles.cardHead, isRTL && styles.cardHeadRtl]}>
@@ -547,6 +601,8 @@ export default function CompteTabScreen() {
               </View>
             </View>
 
+            {mainTab === 'profile' ? (
+              <>
             <View style={styles.card}>
               <View style={styles.sectionHead}>
                 <FontAwesome name="id-card-o" size={16} color={homeShell.greenDark} />
@@ -878,37 +934,6 @@ export default function CompteTabScreen() {
               />
             </View>
 
-            <View style={styles.card}>
-              <View style={[styles.sectionHead, isRTL && styles.sectionHeadRtl]}>
-                <FontAwesome name="shopping-bag" size={16} color={homeShell.greenDark} />
-                <Text style={[styles.sectionTitle, isRTL ? styles.sectionTitleRtl : styles.sectionTitleLtr]}>
-                  {t('accountSectionOrders')}
-                </Text>
-              </View>
-
-              {ordersLoading && !ordersLoaded ? (
-                <View style={styles.ordersCenter}>
-                  <ActivityIndicator color={homeShell.blue} size="small" />
-                  <Text style={[styles.ordersHint, isRTL && styles.txtRtl]}>{t('accountOrdersLoading')}</Text>
-                </View>
-              ) : orders.length === 0 ? (
-                <View style={styles.ordersCenter}>
-                  <FontAwesome name="inbox" size={28} color={homeShell.borderOnWhite} />
-                  <Text style={[styles.ordersHint, isRTL && styles.txtRtl]}>{t('accountOrdersEmpty')}</Text>
-                </View>
-              ) : (
-                orders.map((order, idx) => (
-                  <OrderRow
-                    key={order.publicId}
-                    order={order}
-                    rtl={isRTL}
-                    locale={locale}
-                    first={idx === 0}
-                  />
-                ))
-              )}
-            </View>
-
             <Pressable
               accessibilityRole="button"
               onPress={save}
@@ -946,6 +971,62 @@ export default function CompteTabScreen() {
                 </>
               )}
             </Pressable>
+              </>
+            ) : (
+              <View style={styles.card}>
+                <AccountTabsRow
+                  tabs={[
+                    { id: 'all' as const, label: t('accountOrdersSegmentAll'), icon: 'list' },
+                    { id: 'products' as const, label: t('accountOrdersSegmentProducts'), icon: 'cube' },
+                    { id: 'services' as const, label: t('accountOrdersSegmentServices'), icon: 'graduation-cap' },
+                  ]}
+                  active={ordersSegment}
+                  onChange={setOrdersSegment}
+                  isRTL={isRTL}
+                  variant="soft"
+                />
+
+                {ordersLoading && !ordersLoaded ? (
+                  <View style={styles.ordersCenter}>
+                    <ActivityIndicator color={homeShell.blue} size="small" />
+                    <Text style={[styles.ordersHint, isRTL && styles.txtRtl]}>{t('accountOrdersLoading')}</Text>
+                  </View>
+                ) : ordersLoadError ? (
+                  <View style={styles.ordersCenter}>
+                    <FontAwesome name="exclamation-circle" size={28} color="#DC2626" />
+                    <Text style={[styles.ordersHint, styles.ordersError, isRTL && styles.txtRtl]}>
+                      {ordersLoadError}
+                    </Text>
+                    <Pressable onPress={() => void loadOrders()} style={styles.ordersRetryBtn}>
+                      <Text style={styles.ordersRetryTxt}>{t('inscRetry')}</Text>
+                    </Pressable>
+                  </View>
+                ) : visibleOrders.length === 0 ? (
+                  <View style={styles.ordersCenter}>
+                    <FontAwesome name="inbox" size={28} color={homeShell.borderOnWhite} />
+                    <Text style={[styles.ordersHint, isRTL && styles.txtRtl]}>
+                      {orders.length > 0 && ordersSegment === 'products' && serviceOrders.length > 0
+                        ? t('accountOrdersEmptyProducts')
+                        : orders.length > 0 && ordersSegment === 'services' && productOrders.length > 0
+                          ? t('accountOrdersEmptyServices')
+                          : t('accountOrdersEmpty')}
+                    </Text>
+                  </View>
+                ) : (
+                  visibleOrders.map((order, idx) => (
+                    <OrderRow
+                      key={order.publicId}
+                      order={order}
+                      rtl={isRTL}
+                      locale={locale}
+                      first={idx === 0}
+                      t={t}
+                      onPress={() => router.push(`/compte/commande/${order.publicId}`)}
+                    />
+                  ))
+                )}
+              </View>
+            )}
           </>
         )}
       </ScrollView>
@@ -1005,31 +1086,57 @@ export default function CompteTabScreen() {
   );
 }
 
-// ─── Order status helper ────────────────────────────────────────────────────
+type AccountTabVariant = 'hero' | 'soft';
 
-function orderStatusConfig(
-  status: string,
-  locale: string,
-): { label: string; color: string; bg: string } {
-  const ar = locale === 'ar';
-  switch (status.toLowerCase()) {
-    case 'pending':
-      return { label: ar ? 'قيد الانتظار' : 'En attente', color: '#92400E', bg: '#FEF3C7' };
-    case 'confirmed':
-      return { label: ar ? 'مؤكدة' : 'Confirmée', color: homeShell.blue, bg: '#EFF6FF' };
-    case 'processing':
-      return { label: ar ? 'قيد التجهيز' : 'En préparation', color: homeShell.blue, bg: '#DBEAFE' };
-    case 'shipped':
-      return { label: ar ? 'تم الشحن' : 'Expédiée', color: '#1D4ED8', bg: '#DBEAFE' };
-    case 'delivered':
-      return { label: ar ? 'تم التسليم' : 'Livrée', color: homeShell.greenDark, bg: '#DCFCE7' };
-    case 'cancelled':
-      return { label: ar ? 'ملغاة' : 'Annulée', color: brand.error, bg: '#FEE2E2' };
-    case 'refunded':
-      return { label: ar ? 'مسترجعة' : 'Remboursée', color: brand.textMuted, bg: '#F1F5F9' };
-    default:
-      return { label: status, color: brand.textMuted, bg: '#F1F5F9' };
-  }
+function AccountTabsRow<T extends string>({
+  tabs,
+  active,
+  onChange,
+  isRTL,
+  variant = 'hero',
+}: {
+  tabs: { id: T; label: string; icon: React.ComponentProps<typeof FontAwesome>['name'] }[];
+  active: T;
+  onChange: (id: T) => void;
+  isRTL: boolean;
+  variant?: AccountTabVariant;
+}) {
+  const onHero = variant === 'hero';
+  return (
+    <View style={[styles.tabsRow, !onHero && styles.tabsRowSoft]}>
+      {tabs.map(({ id, label, icon }) => {
+        const isActive = active === id;
+        const iconColor = isActive
+          ? brand.primary
+          : onHero
+            ? brand.white
+            : 'rgba(51,62,143,0.55)';
+        return (
+          <Pressable
+            key={id}
+            onPress={() => onChange(id)}
+            style={({ pressed }) => [
+              styles.tab,
+              isActive && styles.tabActive,
+              pressed && !isActive && { opacity: 0.85 },
+            ]}
+          >
+            <FontAwesome name={icon} size={13} color={iconColor} />
+            <Text
+              style={[
+                styles.tabTxt,
+                onHero ? styles.tabTxtHero : styles.tabTxtSoft,
+                isActive && styles.tabTxtActive,
+                isRTL && styles.txtRtl,
+              ]}
+              numberOfLines={1}>
+              {label}
+            </Text>
+          </Pressable>
+        );
+      })}
+    </View>
+  );
 }
 
 // ─── OrderRow ───────────────────────────────────────────────────────────────
@@ -1039,19 +1146,50 @@ function OrderRow({
   rtl,
   locale,
   first,
+  t,
+  onPress,
 }: {
   order: UserOrderSummary;
   rtl: boolean;
   locale: string;
   first: boolean;
+  t: (k: HomeCopyKey) => string;
+  onPress: () => void;
 }) {
-  const cfg = orderStatusConfig(order.status, locale);
+  const cfg = shopOrderStatusUi(order.status, locale);
   const dateStr = formatOrderCreatedAtShort(order.createdAt, locale);
+  const showPaymentSnippet =
+    order.hasServiceLines === true &&
+    !isShopOrderCompleted(order.status) &&
+    order.status !== 'cancelled' &&
+    order.servicePaymentCard != null;
+  const receiptUrl =
+    order.servicePaymentModality === 'bank_transfer' && order.bankTransferReceiptUrl
+      ? `${getApiBaseUrl().replace(/\/$/, '')}${order.bankTransferReceiptUrl}`
+      : null;
 
   return (
-    <View style={[styles.orderRow, first && styles.orderRowFirst, rtl && styles.orderRowRtl]}>
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.orderRow,
+        first && styles.orderRowFirst,
+        rtl && styles.orderRowRtl,
+        pressed && { opacity: 0.88 },
+      ]}
+    >
       <View style={styles.orderIconWrap}>
-        <FontAwesome name="shopping-bag" size={13} color={homeShell.cardMuted} />
+        <FontAwesome
+          name={
+            order.hasServiceLines && order.hasPhysicalLines
+              ? 'shopping-bag'
+              : order.hasServiceLines
+                ? 'graduation-cap'
+                : 'shopping-bag'
+          }
+          size={13}
+          color={homeShell.cardMuted}
+        />
       </View>
       <View style={{ flex: 1, minWidth: 0, gap: 3 }}>
         {/* top line: order number + date */}
@@ -1070,17 +1208,28 @@ function OrderRow({
             </Text>
           </View>
         ) : null}
-        {/* bottom line: total + badge */}
+        {showPaymentSnippet ? (
+          <OrderServicePaymentSnippet card={order.servicePaymentCard!} rtl={rtl} t={t} compact />
+        ) : null}
+        {receiptUrl ? (
+          <Pressable
+            onPress={() => void Linking.openURL(receiptUrl)}
+            style={({ pressed }) => [styles.orderReceiptLink, pressed && { opacity: 0.85 }]}
+          >
+            <FontAwesome name="paperclip" size={11} color={brand.primary} />
+            <Text style={styles.orderReceiptLinkTxt}>{t('accountOrderReceiptLink')}</Text>
+          </Pressable>
+        ) : null}
         <View style={[styles.orderBottomLine, rtl && styles.orderBottomLineRtl]}>
-          <Text style={styles.orderTotal}>
-            {order.total} {order.currency}
-          </Text>
+          <Text style={styles.orderTotal}>{formatShopPrice(order.total, order.currency)}</Text>
           <View style={[styles.orderStatusBadge, { backgroundColor: cfg.bg }]}>
             <Text style={[styles.orderStatusTxt, { color: cfg.color }]}>{cfg.label}</Text>
           </View>
         </View>
+        <Text style={[styles.orderDetailLink, rtl && styles.txtRtl]}>{t('accountOrderViewDetail')}</Text>
       </View>
-    </View>
+      <FontAwesome name={rtl ? 'chevron-left' : 'chevron-right'} size={12} color={homeShell.cardMuted} />
+    </Pressable>
   );
 }
 
@@ -1180,6 +1329,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
     paddingBottom: spacing.lg,
+    gap: spacing.md,
   },
   heroTitleRow: {
     flexDirection: 'row',
@@ -1577,6 +1727,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     textAlign: 'center',
   },
+  ordersError: { color: '#DC2626' },
+  ordersRetryBtn: {
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.full,
+    backgroundColor: homeShell.blue,
+  },
+  ordersRetryTxt: { color: brand.white, fontWeight: '800', fontSize: fontSize.sm },
   orderRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1629,6 +1788,19 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: homeShell.cardMuted,
   },
+  orderReceiptLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    alignSelf: 'flex-start',
+    marginTop: 2,
+  },
+  orderReceiptLinkTxt: {
+    fontSize: fontSize.xs,
+    fontWeight: '800',
+    color: brand.primary,
+    textDecorationLine: 'underline',
+  },
   orderBottomLine: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1655,6 +1827,50 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.2,
   },
+  orderBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    justifyContent: 'flex-end',
+  },
+  orderBadgesRowRtl: {
+    justifyContent: 'flex-start',
+  },
+  orderDetailLink: {
+    fontSize: 12,
+    fontWeight: '700',
+    color: brand.primary,
+    marginTop: 2,
+  },
+  /* Tabs — même style que Mes inscriptions */
+  tabsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.12)',
+    padding: 4,
+    borderRadius: radius.full,
+  },
+  tabsRowSoft: {
+    backgroundColor: 'rgba(51,62,143,0.08)',
+    marginBottom: spacing.md,
+  },
+  tab: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 5,
+    flex: 1,
+    minWidth: 0,
+    paddingVertical: 9,
+    paddingHorizontal: 6,
+    borderRadius: radius.full,
+  },
+  tabActive: { backgroundColor: brand.white },
+  tabTxt: { fontWeight: '700', fontSize: fontSize.xs },
+  tabTxtHero: { color: brand.white },
+  tabTxtSoft: { color: 'rgba(51,62,143,0.55)' },
+  tabTxtActive: { color: brand.primary, fontWeight: '800' },
   primaryBtn: {
     flexDirection: 'row',
     alignItems: 'center',

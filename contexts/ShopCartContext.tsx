@@ -2,13 +2,14 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 
 import type { ShopCartLine } from '@/types/shop';
 import { cartItemCount, clearCart, loadCart, saveCart, upsertCartLine } from '@/utils/shopCartStorage';
-import { hydrateCartLinesImagesViaApi } from '@/services/shop';
+import { isPlatformServiceCartLine } from '@/utils/platformServiceCart';
+import { hydrateCartLinesImagesViaApi, mergePlatformServiceBrandingIntoCartLines } from '@/services/shop';
 
 type ShopCartContextValue = {
   lines: ShopCartLine[];
   count: number;
   ready: boolean;
-  /** Cumule la quantité si la ligne existe déjà ; sinon ajoute. */
+  /** Cumule la quantité si la ligne existe déjà ; sinon ajoute. Les services plateforme restent à quantité 1. */
   addLine: (line: ShopCartLine) => Promise<void>;
   updateQuantity: (productId: number, quantity: number) => Promise<void>;
   removeLine: (productId: number) => Promise<void>;
@@ -45,9 +46,11 @@ export function ShopCartProvider({ children }: { children: React.ReactNode }) {
 
   const addLine = useCallback<ShopCartContextValue['addLine']>(
     async (line) => {
+      const rawQty = Math.floor(line.quantity || 1);
+      const qty = isPlatformServiceCartLine(line) ? 1 : Math.min(MAX_LINE_QTY, Math.max(1, rawQty));
       const merged = upsertCartLine(lines, {
         ...line,
-        quantity: Math.min(MAX_LINE_QTY, Math.max(1, Math.floor(line.quantity || 1))),
+        quantity: qty,
       });
       await persist(merged);
     },
@@ -56,8 +59,14 @@ export function ShopCartProvider({ children }: { children: React.ReactNode }) {
 
   const updateQuantity = useCallback<ShopCartContextValue['updateQuantity']>(
     async (productId, quantity) => {
-      const q = Math.min(MAX_LINE_QTY, Math.max(1, Math.floor(quantity)));
-      const next = lines.map((l) => (l.productId === productId ? { ...l, quantity: q } : l));
+      const next = lines.map((l) => {
+        if (l.productId !== productId) return l;
+        if (isPlatformServiceCartLine(l)) {
+          return { ...l, quantity: 1 };
+        }
+        const q = Math.min(MAX_LINE_QTY, Math.max(1, Math.floor(quantity)));
+        return { ...l, quantity: q };
+      });
       await persist(next);
     },
     [lines, persist],
@@ -78,10 +87,10 @@ export function ShopCartProvider({ children }: { children: React.ReactNode }) {
 
   const hydrateImages = useCallback<ShopCartContextValue['hydrateImages']>(async () => {
     if (lines.length === 0) return;
-    if (!lines.some((l) => !l.images || l.images.length === 0)) return;
-    const hydrated = await hydrateCartLinesImagesViaApi(lines);
-    const changed = JSON.stringify(lines) !== JSON.stringify(hydrated);
-    if (changed) await persist(hydrated);
+    let next = await mergePlatformServiceBrandingIntoCartLines(lines);
+    next = await hydrateCartLinesImagesViaApi(next);
+    const changed = JSON.stringify(lines) !== JSON.stringify(next);
+    if (changed) await persist(next);
   }, [lines, persist]);
 
   const value = useMemo<ShopCartContextValue>(

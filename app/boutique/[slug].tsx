@@ -14,17 +14,20 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import RenderHtml from 'react-native-render-html';
 
+import { EstablishmentRowLogoThumb } from '@/components/shop/EstablishmentRowLogoThumb';
 import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { Text } from '@/components/ui/Text';
 import { useShopCart } from '@/contexts/ShopCartContext';
+import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { fetchShopProductBySlug } from '@/services/shop';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { ShopProductDetail } from '@/types/shop';
+import { getShopPathAfterBuyNow } from '@/utils/shopCartStorage';
 import {
   formatShopPrice,
   shopFormatPromoDiscountPercentLabel,
@@ -34,10 +37,16 @@ import {
 } from '@/utils/shopFormatPrice';
 import { shopProductGalleryUrls, resolveShopImageUrl } from '@/utils/shopImageUrl';
 import { sharePayloadBoutiqueProductDetail } from '@/utils/sharePagePayloads';
+import {
+  establishmentSectionTitleKey,
+  splitEstablishmentsByDisplayCategory,
+} from '@/utils/establishmentDisplayCategories';
 
 export default function ProductDetailScreen() {
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { presentShare } = useSharePreview();
+  const { t, isRTL, locale } = useLocale();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { width } = useWindowDimensions();
   const { addLine, lines: cartLines, count: cartCount } = useShopCart();
@@ -77,6 +86,11 @@ export default function ProductDetailScreen() {
   const hasPromo = product ? shopHasPromotionalPrice(product.price, product.compareAtPrice) : false;
   const isOut = product?.isOutOfStock === true;
 
+  const establishmentSections = useMemo(() => {
+    if (!product?.establishments?.length) return [];
+    return splitEstablishmentsByDisplayCategory(product.establishments);
+  }, [product?.establishments]);
+
   const handleAdd = useCallback(async () => {
     if (!product || isOut) return;
     setAddingToCart(true);
@@ -102,7 +116,8 @@ export default function ProductDetailScreen() {
   const handleBuyNow = useCallback(async () => {
     if (!product || isOut) return;
     await handleAdd();
-    router.push('/boutique/checkout' as any);
+    const path = await getShopPathAfterBuyNow();
+    router.push(path as any);
   }, [product, isOut, handleAdd, router]);
 
   const onGalleryScroll = useCallback(
@@ -116,31 +131,35 @@ export default function ProductDetailScreen() {
   /* ─── Loading ─── */
   if (loading) {
     return (
-      <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
-        <StatusBar style="dark" />
-        <View style={styles.navBar}>
-          <Pressable onPress={() => router.back()} hitSlop={8} style={styles.navBtn}>
-            <FontAwesome name="chevron-left" size={15} color={brand.text} />
-          </Pressable>
-        </View>
+      <View style={styles.root}>
+        <StatusBar style="light" backgroundColor={brand.primary} />
+        <SafeAreaView edges={['top']} style={styles.statusBarTint}>
+          <View style={[styles.navBar, styles.navBarOnPrimary]}>
+            <Pressable onPress={() => router.back()} hitSlop={8} style={styles.navBtnOnPrimary}>
+              <FontAwesome name="chevron-left" size={15} color={brand.white} />
+            </Pressable>
+          </View>
+        </SafeAreaView>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={brand.primary} />
           <Text style={styles.loadingTxt}>Chargement…</Text>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
   /* ─── Error ─── */
   if (fetchError || !product) {
     return (
-      <SafeAreaView style={styles.root} edges={['top', 'bottom']}>
-        <StatusBar style="dark" />
-        <View style={styles.navBar}>
-          <Pressable onPress={() => router.back()} hitSlop={8} style={styles.navBtn}>
-            <FontAwesome name="chevron-left" size={15} color={brand.text} />
-          </Pressable>
-        </View>
+      <View style={styles.root}>
+        <StatusBar style="light" backgroundColor={brand.primary} />
+        <SafeAreaView edges={['top']} style={styles.statusBarTint}>
+          <View style={[styles.navBar, styles.navBarOnPrimary]}>
+            <Pressable onPress={() => router.back()} hitSlop={8} style={styles.navBtnOnPrimary}>
+              <FontAwesome name="chevron-left" size={15} color={brand.white} />
+            </Pressable>
+          </View>
+        </SafeAreaView>
         <View style={styles.centered}>
           <View style={styles.errorIcon}>
             <FontAwesome name="exclamation-circle" size={28} color={brand.error} />
@@ -153,7 +172,7 @@ export default function ProductDetailScreen() {
             <Text style={styles.errorBackTxt}>Retour à la boutique</Text>
           </Pressable>
         </View>
-      </SafeAreaView>
+      </View>
     );
   }
 
@@ -163,7 +182,11 @@ export default function ProductDetailScreen() {
 
   return (
     <View style={styles.root}>
-      <StatusBar style="light" />
+      <StatusBar style="light" backgroundColor={brand.primary} />
+      <View
+        pointerEvents="none"
+        style={[styles.statusBarFill, { height: insets.top }]}
+      />
 
       {/* ── Overlay nav (back + cart) ── */}
       <SafeAreaView edges={['top']} style={styles.galleryOverlay} pointerEvents="box-none">
@@ -212,7 +235,14 @@ export default function ProductDetailScreen() {
       </SafeAreaView>
 
       {/* ── Scroll body ── */}
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false} bounces>
+      <ScrollView
+        style={styles.scrollBody}
+        showsVerticalScrollIndicator={false}
+        bounces={false}
+        alwaysBounceVertical={false}
+        alwaysBounceHorizontal={false}
+        overScrollMode="never"
+      >
 
         {/* Gallery */}
         <View style={[styles.gallery, { height: width }]}>
@@ -232,14 +262,21 @@ export default function ProductDetailScreen() {
             )}
           />
 
-          {/* Promo badge on gallery */}
-          {promoPct != null ? (
-            <View style={styles.galPromoBadge}>
-              <Text style={styles.galPromoBadgeTxt}>
-                −{shopFormatPromoDiscountPercentLabel(promoPct)}%
-              </Text>
-            </View>
-          ) : null}
+          {/* Promo + best seller (galerie) */}
+          <View style={styles.galBadgeStack}>
+            {promoPct != null ? (
+              <View style={styles.galPromoBadge}>
+                <Text style={styles.galPromoBadgeTxt}>
+                  −{shopFormatPromoDiscountPercentLabel(promoPct)}%
+                </Text>
+              </View>
+            ) : null}
+            {product.isBestseller ? (
+              <View style={styles.galBestsellerBadge}>
+                <Text style={styles.galBestsellerBadgeTxt}>{t('shopBadgeBestseller')}</Text>
+              </View>
+            ) : null}
+          </View>
 
           {/* Out overlay */}
           {isOut ? (
@@ -288,6 +325,11 @@ export default function ProductDetailScreen() {
             {product.isNew ? (
               <View style={[styles.badge, styles.badgeNew]}>
                 <Text style={styles.badgeNewTxt}>Nouveau</Text>
+              </View>
+            ) : null}
+            {product.isBestseller ? (
+              <View style={[styles.badge, styles.badgeBestseller]}>
+                <Text style={styles.badgeBestsellerTxt}>{t('shopBadgeBestseller')}</Text>
               </View>
             ) : null}
             {product.isFreeShipping ? (
@@ -442,16 +484,63 @@ export default function ProductDetailScreen() {
             </>
           ) : null}
 
-          {/* ── Establishments ── */}
+          {/* ── Establishments (par type : public, militaire, etc.) ── */}
           {product.establishments && product.establishments.length > 0 ? (
             <>
               <View style={styles.divider} />
-              <Text style={styles.sectionTitle}>Établissements concernés</Text>
-              <View style={styles.estabRow}>
-                {product.establishments.map((e) => (
-                  <View key={e.id} style={styles.estabChip}>
-                    <FontAwesome name="university" size={11} color={brand.primary} />
-                    <Text style={styles.estabTxt}>{e.sigle ?? e.nom}</Text>
+              <Text style={styles.sectionTitle}>
+                {locale === 'ar' ? 'المؤسسات المعنية' : 'Établissements concernés'}
+              </Text>
+              <Text style={styles.establishmentsCount}>
+                {locale === 'ar'
+                  ? `${product.establishments.length} مؤسسة`
+                  : `${product.establishments.length} établissement${product.establishments.length > 1 ? 's' : ''}`}
+              </Text>
+              <Text style={[styles.establishmentsNotice, isRTL && styles.txtRtl]}>
+                {t('shopEstablishmentsConcernedNotice')}
+              </Text>
+              <View style={styles.establishmentsWrap}>
+                {establishmentSections.map((section) => (
+                  <View key={section.key} style={styles.establishmentCategoryBlock}>
+                    <Text style={[styles.establishmentCategoryTitle, isRTL && styles.txtRtl]}>
+                      {t(establishmentSectionTitleKey(section.key))}
+                    </Text>
+                    {section.items.map((e) => {
+                      const slugPart =
+                        e.slug && String(e.slug).trim().length > 0 ? String(e.slug).trim() : 'fiche';
+                      return (
+                        <Pressable
+                          key={e.id}
+                          style={({ pressed }) => [
+                            styles.establishmentRow,
+                            isRTL && styles.establishmentRowRtl,
+                            pressed && { opacity: 0.88 },
+                          ]}
+                          onPress={() =>
+                            router.push(`/etablissements/${e.id}/${encodeURIComponent(slugPart)}` as any)
+                          }
+                          accessibilityRole="button"
+                          accessibilityLabel={`${e.nom}, fiche établissement`}
+                        >
+                          <EstablishmentRowLogoThumb logo={e.logo} nom={e.nom} sigle={e.sigle} />
+                          <View style={styles.establishmentBody}>
+                            <Text style={[styles.establishmentNom, isRTL && styles.txtRtl]} numberOfLines={2}>
+                              {e.nom}
+                            </Text>
+                            {e.sigle ? (
+                              <Text style={[styles.establishmentMeta, isRTL && styles.txtRtl]} numberOfLines={1}>
+                                {e.sigle}
+                              </Text>
+                            ) : null}
+                          </View>
+                          <FontAwesome
+                            name={isRTL ? 'chevron-left' : 'chevron-right'}
+                            size={12}
+                            color={brand.textMuted}
+                          />
+                        </Pressable>
+                      );
+                    })}
                   </View>
                 ))}
               </View>
@@ -521,6 +610,16 @@ export default function ProductDetailScreen() {
 ───────────────────────────────────────────────────────── */
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: brand.white },
+  statusBarTint: { backgroundColor: brand.primary },
+  statusBarFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: brand.primary,
+    zIndex: 10,
+  },
+  scrollBody: { flex: 1, zIndex: 0 },
 
   /* Nav bar (loading/error states) */
   navBar: {
@@ -536,6 +635,19 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     backgroundColor: brand.backgroundSoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  navBarOnPrimary: {
+    backgroundColor: brand.primary,
+    borderBottomWidth: 0,
+    borderBottomColor: 'transparent',
+  },
+  navBtnOnPrimary: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255,255,255,0.22)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -617,17 +729,28 @@ const styles = StyleSheet.create({
     backgroundColor: brand.backgroundSoft,
     position: 'relative',
   },
-  galPromoBadge: {
+  galBadgeStack: {
     position: 'absolute',
     top: 14,
     left: 14,
+    gap: 6,
+    zIndex: 5,
+    alignItems: 'flex-start',
+  },
+  galPromoBadge: {
     backgroundColor: '#EF4444',
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: radius.sm,
-    zIndex: 5,
   },
   galPromoBadgeTxt: { color: brand.white, fontSize: 12, fontWeight: '900' },
+  galBestsellerBadge: {
+    backgroundColor: '#F59E0B',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.sm,
+  },
+  galBestsellerBadgeTxt: { color: brand.white, fontSize: 11, fontWeight: '900', letterSpacing: 0.2 },
   galOutOverlay: {
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(15,23,42,0.52)',
@@ -717,6 +840,12 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(21,143,101,0.18)',
   },
   badgeNewTxt: { color: brand.emerald, fontSize: 11, fontWeight: '800' },
+  badgeBestseller: {
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.35)',
+  },
+  badgeBestsellerTxt: { color: '#B45309', fontSize: 11, fontWeight: '800' },
   badgeFree: {
     backgroundColor: 'rgba(21,143,101,0.07)',
     borderWidth: 1,
@@ -865,20 +994,50 @@ const styles = StyleSheet.create({
   },
   packQtyTxt: { color: brand.white, fontSize: 12, fontWeight: '900' },
 
-  /* Establishments */
-  estabRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
-  estabChip: {
+  txtRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+
+  /* Establishments (fiche produit — groupés par type) */
+  establishmentsCount: {
+    fontSize: 12,
+    color: brand.textMuted,
+    fontWeight: '600',
+    marginBottom: 4,
+  },
+  establishmentsNotice: {
+    fontSize: 12,
+    lineHeight: 18,
+    color: brand.textMuted,
+    fontWeight: '500',
+    marginBottom: spacing.sm,
+  },
+  establishmentsWrap: { gap: 12 },
+  establishmentCategoryBlock: { gap: 6 },
+  establishmentCategoryTitle: {
+    fontSize: 12,
+    fontWeight: '900',
+    color: brand.textSecondary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: 2,
+  },
+  establishmentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(51,62,143,0.06)',
-    borderWidth: 1,
-    borderColor: 'rgba(51,62,143,0.14)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
+    gap: 10,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+    backgroundColor: brand.backgroundSoft,
     borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: brand.border,
   },
-  estabTxt: { color: brand.primary, fontSize: 12, fontWeight: '700' },
+  establishmentRowRtl: { flexDirection: 'row-reverse' },
+  establishmentBody: { flex: 1, minWidth: 0 },
+  establishmentNom: { fontSize: 14, fontWeight: '800', color: brand.text, lineHeight: 18 },
+  establishmentMeta: { fontSize: 12, color: brand.textMuted, fontWeight: '600', marginTop: 2 },
 
   /* Footer */
   footer: {

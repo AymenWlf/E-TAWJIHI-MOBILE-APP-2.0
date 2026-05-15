@@ -37,7 +37,7 @@ import {
   type DailyChallengeQuestion,
   type DailyChallengeTodayData,
 } from '@/services/dailyChallenge';
-import { getZipGridPrefixIssue, scoreZipGridPath } from '@/constants/zipPuzzleVariants';
+import { getZipGridPrefixIssue, getZipSnakeNextHintCellIndex, scoreZipGridPath } from '@/constants/zipPuzzleVariants';
 import { isDevApiBaseUrl } from '@/constants/api';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
@@ -234,7 +234,10 @@ function onTapZipGridCell(
   return [...path, cellIdx];
 }
 
-/** Pendant le glisser : même règles que le tap (raccourcir si on repasse sur une case déjà dans le chemin). */
+/** Pendant un glisser continu : pas de retour vers une case déjà visitée si la tête est ≥ 2 pas plus loin (doigt levé → tap pour raccourcir). */
+const ZIP_DRAG_MIN_STEPS_AHEAD_TO_BLOCK_REVISIT = 2;
+
+/** Pendant le glisser : raccourcir d’au plus une case en arrière ; sinon ignorer jusqu’au relâchement. */
 function onDragZipGridCell(
   zip: NonNullable<DailyChallengeGameEntry['zip']>,
   path: number[],
@@ -256,6 +259,10 @@ function onDragZipGridCell(
   }
   const pos = path.indexOf(cellIdx);
   if (pos !== -1) {
+    const stepsFromTouchedToHead = path.length - 1 - pos;
+    if (stepsFromTouchedToHead >= ZIP_DRAG_MIN_STEPS_AHEAD_TO_BLOCK_REVISIT) {
+      return path;
+    }
     return path.slice(0, pos + 1);
   }
   if (!zipGridAdjacent(last, cellIdx, cols, wh, wv)) return path;
@@ -377,6 +384,11 @@ export default function DailyChallengeScreen() {
   );
   const startedAt = useRef<number>(0);
   const [zipOrder, setZipOrder] = useState<number[]>([]);
+  const [zipHintHighlightIdx, setZipHintHighlightIdx] = useState<number | null>(null);
+  const [zipHelpCooldownLeftSec, setZipHelpCooldownLeftSec] = useState(0);
+  const [zipHelpNoHintVisible, setZipHelpNoHintVisible] = useState(false);
+  const zipHelpNextAllowedAtRef = useRef(0);
+  const zipHintClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [shuffledZipItems, setShuffledZipItems] = useState<Array<{ id: number; text: string }>>([]);
   const lastDragZipCell = useRef<number | null>(null);
   const zipAutoSubmittedRef = useRef(false);
@@ -760,6 +772,41 @@ export default function DailyChallengeScreen() {
   }, [step, activeGame?.type, activeGame?.zip, zipOrder]);
 
   useEffect(() => {
+    setZipHintHighlightIdx(null);
+  }, [zipOrder]);
+
+  useEffect(() => {
+    return () => {
+      if (zipHintClearTimerRef.current) {
+        clearTimeout(zipHintClearTimerRef.current);
+        zipHintClearTimerRef.current = null;
+      }
+    };
+  }, []);
+
+  useEffect(() => {
+    if (step !== 'quiz' || activeGame?.type !== 'zip') {
+      setZipHelpCooldownLeftSec(0);
+      return;
+    }
+    const id = setInterval(() => {
+      const left = Math.ceil((zipHelpNextAllowedAtRef.current - Date.now()) / 1000);
+      setZipHelpCooldownLeftSec(left > 0 ? left : 0);
+    }, 200);
+    return () => clearInterval(id);
+  }, [step, activeGame?.type]);
+
+  useEffect(() => {
+    zipHelpNextAllowedAtRef.current = 0;
+    setZipHelpCooldownLeftSec(0);
+    setZipHintHighlightIdx(null);
+    if (zipHintClearTimerRef.current) {
+      clearTimeout(zipHintClearTimerRef.current);
+      zipHintClearTimerRef.current = null;
+    }
+  }, [zipTick]);
+
+  useEffect(() => {
     if (zipOrder.length === 0) zipAutoSubmittedRef.current = false;
   }, [zipOrder.length]);
 
@@ -890,6 +937,41 @@ export default function DailyChallengeScreen() {
     if (!activeGame?.zip || !isZipGridV2(activeGame.zip)) return;
     setZipOrder((prev) => onDragZipGridCell(activeGame.zip!, prev, cellIdx));
   }, [activeGame]);
+
+  const onZipHelpPress = useCallback(() => {
+    if (!activeGame?.zip || !isZipGridV2(activeGame.zip) || submitting) return;
+    const z = activeGame.zip;
+    const rows = z.rows ?? 0;
+    const cols = z.cols ?? 0;
+    const n = rows * cols;
+    if (n < 1 || zipOrder.length >= n) return;
+    const now = Date.now();
+    if (now < zipHelpNextAllowedAtRef.current) return;
+    const hint = getZipSnakeNextHintCellIndex(
+      {
+        rows,
+        cols,
+        cells: z.cells!,
+        wallsHorizontal: z.wallsHorizontal ?? [],
+        wallsVertical: z.wallsVertical ?? [],
+        solutionPath: z.solutionPath,
+      },
+      zipOrder,
+    );
+    if (hint == null) {
+      setZipHelpNoHintVisible(true);
+      setTimeout(() => setZipHelpNoHintVisible(false), 2600);
+      return;
+    }
+    setZipHintHighlightIdx(hint);
+    zipHelpNextAllowedAtRef.current = now + 5000;
+    setZipHelpCooldownLeftSec(5);
+    if (zipHintClearTimerRef.current) clearTimeout(zipHintClearTimerRef.current);
+    zipHintClearTimerRef.current = setTimeout(() => {
+      setZipHintHighlightIdx(null);
+      zipHintClearTimerRef.current = null;
+    }, 3500);
+  }, [activeGame, zipOrder, submitting]);
 
   const zipGridLayout = useMemo(() => {
     if (step !== 'quiz' || activeGame?.type !== 'zip' || !activeGame.zip || !isZipGridV2(activeGame.zip)) {
@@ -1166,7 +1248,8 @@ export default function DailyChallengeScreen() {
 
       {step === 'load' ? (
         <View style={styles.center}>
-          <ActivityIndicator color={brand.primary} />
+          <ActivityIndicator color={brand.primary} size="large" />
+          <Text style={[styles.loadingHint, isRTL && styles.rtl]}>{t('setupLoading')}</Text>
         </View>
       ) : (
         <View style={styles.mainFlex}>
@@ -1543,6 +1626,36 @@ export default function DailyChallengeScreen() {
                       <FontAwesome name="undo" size={14} color={brand.primary} />
                       <Text style={styles.zipCompactBtnTxt}>{t('dailyChallengeZipUndo')}</Text>
                     </Pressable>
+                    {isZipGridV2(activeGame.zip) ? (
+                      <Pressable
+                        style={[
+                          styles.zipCompactBtn,
+                          styles.zipHelpBtn,
+                          (submitting ||
+                            zipOrder.length >= (activeGame.zip.rows ?? 0) * (activeGame.zip.cols ?? 0) ||
+                            zipHelpCooldownLeftSec > 0) &&
+                            styles.btnDis,
+                        ]}
+                        disabled={
+                          submitting ||
+                          zipOrder.length >= (activeGame.zip.rows ?? 0) * (activeGame.zip.cols ?? 0) ||
+                          zipHelpCooldownLeftSec > 0
+                        }
+                        onPress={onZipHelpPress}
+                        accessibilityLabel={
+                          zipHelpCooldownLeftSec > 0
+                            ? t('dailyChallengeZipHelpCooldown').replace('{{s}}', String(zipHelpCooldownLeftSec))
+                            : t('dailyChallengeZipHelpBtn')
+                        }
+                      >
+                        <FontAwesome name="lightbulb-o" size={14} color="#b45309" />
+                        <Text style={styles.zipHelpBtnTxt}>
+                          {zipHelpCooldownLeftSec > 0
+                            ? t('dailyChallengeZipHelpCooldown').replace('{{s}}', String(zipHelpCooldownLeftSec))
+                            : t('dailyChallengeZipHelpBtn')}
+                        </Text>
+                      </Pressable>
+                    ) : null}
                     {__DEV__ ? (
                       <Pressable
                         style={[styles.zipCompactBtn, styles.zipDevResetBtn]}
@@ -1563,6 +1676,9 @@ export default function DailyChallengeScreen() {
                     ) : null}
                   </View>
                 </View>
+                {zipHelpNoHintVisible && isZipGridV2(activeGame.zip) ? (
+                  <Text style={[styles.zipHelpNoHintTxt, isRTL && styles.rtl]}>{t('dailyChallengeZipHelpNoHint')}</Text>
+                ) : null}
               </View>
               {(() => {
                 const zip = activeGame.zip;
@@ -1640,6 +1756,7 @@ export default function DailyChallengeScreen() {
                                     styles.zipGridCell,
                                     { width: cellSize, height: cellSize },
                                     onP && (zipPathError ? styles.zipGridCellPathErr : styles.zipGridCellPath),
+                                    zipHintHighlightIdx === idx && styles.zipGridCellHint,
                                     wallR && styles.zipGridWallR,
                                     wallB && styles.zipGridWallB,
                                   ]}
@@ -2180,7 +2297,8 @@ const styles = StyleSheet.create({
   langPillTxtActive: { color: brand.primary },
   /** Libellé « FR » toujours en lecture gauche-droite sous interface arabe. */
   langPillFrLbl: { writingDirection: 'ltr' },
-  center: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl },
+  loadingHint: { fontSize: fontSize.sm, color: brand.textMuted, fontWeight: '600', textAlign: 'center' },
   scroll: { padding: spacing.lg },
   scrollContentQuiz: { flexGrow: 1 },
   /** Résultat : pas de padding hérité du hub (évite bande claire au-dessus des confettis). */
@@ -2811,6 +2929,14 @@ const styles = StyleSheet.create({
     backgroundColor: brand.white,
   },
   zipCompactBtnTxt: { fontSize: fontSize.sm, fontWeight: '700', color: brand.primary },
+  zipHelpBtn: { borderColor: '#f59e0b', backgroundColor: 'rgba(254, 243, 199, 0.35)' },
+  zipHelpBtnTxt: { fontSize: fontSize.sm, fontWeight: '800', color: '#b45309' },
+  zipHelpNoHintTxt: {
+    marginTop: spacing.xs,
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: '#b91c1c',
+  },
   zipDevResetBtn: { backgroundColor: brand.warning, borderColor: '#B45309' },
   zipDevResetBtnTxt: { fontSize: fontSize.sm, fontWeight: '700', color: brand.white },
   zipPlayHint: { fontSize: fontSize.xs, color: brand.textMuted, marginTop: spacing.sm, lineHeight: 18 },
@@ -2898,6 +3024,15 @@ const styles = StyleSheet.create({
     textShadowRadius: 4,
   },
   zipGridCellPathErr: { backgroundColor: 'rgba(254, 242, 242, 0.5)', borderColor: '#dc2626', borderWidth: StyleSheet.hairlineWidth },
+  zipGridCellHint: {
+    borderWidth: 3,
+    borderColor: '#f59e0b',
+    shadowColor: '#f59e0b',
+    shadowOpacity: 0.55,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 0 },
+    elevation: 4,
+  },
   zipGridWallR: { borderRightWidth: 4, borderRightColor: '#0f172a' },
   zipGridWallB: { borderBottomWidth: 4, borderBottomColor: '#0f172a' },
   zipGridNum: { fontSize: fontSize.xl, fontWeight: '800', color: brand.text },

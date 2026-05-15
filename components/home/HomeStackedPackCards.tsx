@@ -1,6 +1,14 @@
 import type { ComponentProps } from 'react';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { Modal, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Modal,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  useWindowDimensions,
+  View,
+} from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { Gesture, GestureDetector, Pressable as GHPressable } from 'react-native-gesture-handler';
@@ -19,6 +27,7 @@ import Animated, {
 
 import { PaginationDots } from '@/components/home/PaginationDots';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import type { HomeCopyKey } from '@/constants/i18n';
 import { getPracticalLinkDef } from '@/constants/practicalLinks';
 import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
@@ -39,7 +48,7 @@ export type HomeStackCard = {
   /** Sous-titre sous l’eyebrow ; omis si absent. */
   packLabel?: string;
   packName?: string;
-  /** Ignorés si `dailyActions` est défini (remplacés par les boutons jeu / info). */
+  /** Ignorés si `dailyActions` est défini (remplacés par le bouton défi quotidien, et optionnellement « info du jour »). */
   validityLabel?: string;
   validityValue?: string;
   hint?: string;
@@ -49,10 +58,16 @@ export type HomeStackCard = {
     label?: string;
   };
   remainingOrientationTasks?: OrientationParcoursTask[];
-  /** Jeu quotidien + information du jour (1re carte) : surbrillance si non joué / non lu. */
+  /**
+   * Défi quotidien (SNAKE) sur la carte accueil.
+   * `includeDailyInfo` : affiche aussi le raccourci « Information du jour » (désactivé sur la carte parcours).
+   */
   dailyActions?: {
     playedToday: boolean;
-    infoReadToday: boolean;
+    /** Série (jours consécutifs), renseignée par l’API défi du jour si > 0. */
+    streakDays?: number;
+    includeDailyInfo?: boolean;
+    infoReadToday?: boolean;
   };
 };
 
@@ -188,6 +203,12 @@ function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+function formatHomeDailyStreakLine(streakDays: number | undefined, t: (key: HomeCopyKey) => string): string {
+  if (streakDays == null || streakDays < 1) return '';
+  if (streakDays === 1) return t('homeDailyStreakOne');
+  return t('homeDailyStreakMany').replace(/\{\{n\}\}/g, String(streakDays));
+}
+
 function OrientationStepsStrip({
   percent,
   tasks,
@@ -275,7 +296,7 @@ function DailyActionsBlock({
   onPressDailyGame?: () => void;
   onPressDailyInfo?: () => void;
 }) {
-  const { t } = useLocale();
+  const { t, isRTL } = useLocale();
   const padV = Math.max(10, Math.round(layout.boxPad * 0.72));
   const padH = Math.max(8, Math.round(layout.boxPad * 0.58));
   const iconSz = Math.max(17, Math.round(layout.iconSize * 1.12));
@@ -283,79 +304,123 @@ function DailyActionsBlock({
   const badgeFs = Math.max(9, layout.validityLabel);
   const radius = Math.max(10, layout.boxRadius);
 
-  const gamePending = !daily.playedToday;
-  const infoPending = !daily.infoReadToday;
+  const gameLoading = daily.loading === true;
+  const gamePending = !gameLoading && !daily.playedToday;
+  const showInfo = Boolean(daily.includeDailyInfo && onPressDailyInfo);
+  const infoPending = showInfo && !daily.infoReadToday;
+  const streakLine = formatHomeDailyStreakLine(daily.streakDays, t);
+  const a11yStreak = streakLine ? `, ${streakLine}` : '';
+  const playedCheckSize = Math.max(22, Math.round(iconSz + 5));
 
   return (
-    <View style={styles.dailyActionsWrap}>
+    <View style={[styles.dailyActionsWrap, !showInfo && styles.dailyActionsWrapGameOnly]}>
       <GHPressable
         onPress={onPressDailyGame}
-        disabled={!onPressDailyGame}
+        disabled={!onPressDailyGame || gameLoading}
         accessibilityRole="button"
-        accessibilityLabel={t('gameDailyTitle')}
+        accessibilityState={{ disabled: gameLoading }}
+        accessibilityLabel={
+          gameLoading
+            ? t('setupLoading')
+            : gamePending
+              ? `${t('gameDailyTitle')}${a11yStreak}`
+              : `${t('dailyPlayed')}${a11yStreak ? `, ${streakLine}` : ''}`
+        }
         style={({ pressed }) => [
           styles.dailyMini,
+          !showInfo && styles.dailyMiniFullWidth,
           {
             paddingVertical: padV,
             paddingHorizontal: padH,
             borderRadius: radius,
           },
-          gamePending ? styles.dailyMiniHighlight : styles.dailyMiniDone,
-          pressed && onPressDailyGame ? { opacity: 0.88 } : null,
+          gameLoading
+            ? styles.dailyMiniLoading
+            : gamePending
+              ? styles.dailyMiniHighlight
+              : styles.dailyMiniGrayPlayed,
+          pressed && onPressDailyGame && !gameLoading ? { opacity: 0.88 } : null,
         ]}>
-        <FontAwesome
-          name="trophy"
-          size={iconSz}
-          color={gamePending ? homeShell.greenDark : brand.textMuted}
-          style={styles.dailyMiniIcon}
-        />
+        {!gamePending && !gameLoading ? (
+          <View
+            style={[styles.dailyPlayedCheckBadgeBase, isRTL ? { left: 8 } : { right: 8 }]}
+            pointerEvents="none">
+            <FontAwesome name="check-circle" size={playedCheckSize} color={homeShell.greenDark} />
+          </View>
+        ) : null}
+        {gameLoading ? (
+          <ActivityIndicator size="small" color={homeShell.blue} style={styles.dailyMiniIcon} />
+        ) : (
+          <FontAwesome
+            name="trophy"
+            size={iconSz}
+            color={gamePending ? homeShell.greenDark : brand.textMuted}
+            style={styles.dailyMiniIcon}
+          />
+        )}
         <Text
-          style={[styles.dailyMiniTitle, { fontSize: titleFs, lineHeight: Math.round(titleFs * 1.22) }]}
+          style={[
+            styles.dailyMiniTitle,
+            { fontSize: titleFs, lineHeight: Math.round(titleFs * 1.22) },
+            (gameLoading || !gamePending) && styles.dailyMiniTitleMuted,
+            isRTL && styles.orientationLblRtl,
+          ]}
           numberOfLines={2}>
-          {t('gameDailyTitle')}
+          {gameLoading ? t('setupLoading') : t('gameDailyTitle')}
         </Text>
+        {streakLine ? (
+          <Text
+            style={[
+              gamePending ? styles.dailyStreakLine : styles.dailyStreakLinePlayed,
+              { fontSize: badgeFs },
+              isRTL && styles.orientationLblRtl,
+            ]}
+            numberOfLines={1}>
+            {streakLine}
+          </Text>
+        ) : null}
         {gamePending ? (
           <View style={styles.dailyMiniBadge}>
             <Text style={[styles.dailyMiniBadgeTxt, { fontSize: badgeFs }]}>{t('dailyPlay')}</Text>
           </View>
-        ) : (
-          <Text style={[styles.dailyMiniHint, { fontSize: badgeFs }]}>{t('dailyPlayed')}</Text>
-        )}
+        ) : null}
       </GHPressable>
-      <GHPressable
-        onPress={onPressDailyInfo}
-        disabled={!onPressDailyInfo}
-        accessibilityRole="button"
-        accessibilityLabel={t('infoDailyTitle')}
-        style={({ pressed }) => [
-          styles.dailyMini,
-          {
-            paddingVertical: padV,
-            paddingHorizontal: padH,
-            borderRadius: radius,
-          },
-          infoPending ? styles.dailyMiniHighlight : styles.dailyMiniDone,
-          pressed && onPressDailyInfo ? { opacity: 0.88 } : null,
-        ]}>
-        <FontAwesome
-          name="newspaper-o"
-          size={iconSz}
-          color={infoPending ? homeShell.greenDark : brand.textMuted}
-          style={styles.dailyMiniIcon}
-        />
-        <Text
-          style={[styles.dailyMiniTitle, { fontSize: titleFs, lineHeight: Math.round(titleFs * 1.22) }]}
-          numberOfLines={2}>
-          {t('infoDailyTitle')}
-        </Text>
-        {infoPending ? (
-          <View style={styles.dailyMiniBadge}>
-            <Text style={[styles.dailyMiniBadgeTxt, { fontSize: badgeFs }]}>{t('dailyRead')}</Text>
-          </View>
-        ) : (
-          <Text style={[styles.dailyMiniHint, { fontSize: badgeFs }]}>{t('dailyReadDone')}</Text>
-        )}
-      </GHPressable>
+      {showInfo ? (
+        <GHPressable
+          onPress={onPressDailyInfo}
+          disabled={!onPressDailyInfo}
+          accessibilityRole="button"
+          accessibilityLabel={t('infoDailyTitle')}
+          style={({ pressed }) => [
+            styles.dailyMini,
+            {
+              paddingVertical: padV,
+              paddingHorizontal: padH,
+              borderRadius: radius,
+            },
+            infoPending ? styles.dailyMiniHighlight : styles.dailyMiniDone,
+            pressed && onPressDailyInfo ? { opacity: 0.88 } : null,
+          ]}>
+          <FontAwesome
+            name="newspaper-o"
+            size={iconSz}
+            color={infoPending ? homeShell.greenDark : brand.textMuted}
+            style={styles.dailyMiniIcon}
+          />
+          <Text
+            style={[styles.dailyMiniTitle, { fontSize: titleFs, lineHeight: Math.round(titleFs * 1.22) }]}
+            numberOfLines={2}>
+            {t('infoDailyTitle')}
+          </Text>
+          {infoPending ? (
+            <View style={styles.dailyMiniBadge}>
+              <Text style={[styles.dailyMiniBadgeTxt, { fontSize: badgeFs }]}>{t('dailyRead')}</Text>
+            </View>
+          ) : (
+            <Text style={[styles.dailyMiniHint, { fontSize: badgeFs }]}>{t('dailyReadDone')}</Text>
+          )}
+        </GHPressable>
+      ) : null}
     </View>
   );
 }
@@ -976,7 +1041,9 @@ export function HomeStackedPackCards({
           const dailyGameHandler =
             isTop && card.dailyActions != null ? onPressDailyGame : undefined;
           const dailyInfoHandler =
-            isTop && card.dailyActions != null ? onPressDailyInfo : undefined;
+            isTop && card.dailyActions != null && card.dailyActions.includeDailyInfo === true
+              ? onPressDailyInfo
+              : undefined;
 
           return isTop ? (
             <GestureDetector key={`deck-top-${card.id}`} gesture={panGesture}>
@@ -1229,12 +1296,20 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 0,
   },
+  /** Une seule tuile (défi) : pleine largeur, même hauteur que la rangée à deux tuiles. */
+  dailyActionsWrapGameOnly: {
+    justifyContent: 'center',
+  },
   dailyMini: {
     flex: 1,
     minWidth: 0,
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dailyMiniFullWidth: {
+    flexGrow: 1,
+    maxWidth: '100%',
   },
   dailyMiniIcon: {
     marginBottom: 6,
@@ -1245,6 +1320,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.15,
     textAlign: 'center',
     width: '100%',
+  },
+  dailyMiniLoading: {
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: brand.border,
+    backgroundColor: brand.backgroundSoft,
+    opacity: 0.92,
   },
   dailyMiniHighlight: {
     borderWidth: 1.5,
@@ -1260,6 +1341,35 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: brand.border,
     backgroundColor: brand.backgroundSoft,
+  },
+  /** Défi déjà joué : bouton grisé ; la coche verte est en pastille (voir dailyPlayedCheckBadge). */
+  dailyMiniGrayPlayed: {
+    position: 'relative',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(148, 163, 184, 0.65)',
+    backgroundColor: 'rgba(241, 245, 249, 0.95)',
+  },
+  dailyPlayedCheckBadgeBase: {
+    position: 'absolute',
+    top: 6,
+    zIndex: 2,
+  },
+  dailyMiniTitleMuted: {
+    color: brand.textMuted,
+  },
+  dailyStreakLine: {
+    marginTop: 4,
+    fontWeight: '700',
+    color: homeShell.greenDark,
+    textAlign: 'center',
+    width: '100%',
+  },
+  dailyStreakLinePlayed: {
+    marginTop: 4,
+    fontWeight: '700',
+    color: brand.textSecondary,
+    textAlign: 'center',
+    width: '100%',
   },
   dailyMiniBadge: {
     marginTop: 6,
