@@ -1,7 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter, useFocusEffect } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState, type ComponentProps, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -35,7 +35,16 @@ import {
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
-import { createShopOrder, fetchShopPublicSettings } from '@/services/shop';
+import { createShopOrder, fetchShopPublicSettings, hydrateCartLinesPricesViaApi } from '@/services/shop';
+import { checkPlatformServicePurchaseEligibility } from '@/services/platformServices';
+import { isPlatformServiceCartLine } from '@/utils/platformServiceCart';
+import type { ShopPromoDiscountType } from '@/services/shopPromo';
+import {
+  fetchShopAutoApplyPromo,
+  rejectMultipleShopPromoCodesInInput,
+  shopCartLinesToPromoPayload,
+  validateShopPromoCode,
+} from '@/services/shopPromo';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 import { getUserProfile } from '@/services/userProfile';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -45,7 +54,6 @@ import {
   shopParsePriceString,
   shopPriceFormatOptsForCatalogOrCartLine,
 } from '@/utils/shopFormatPrice';
-import { isPlatformServiceCartLine } from '@/utils/platformServiceCart';
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
 import { saveShopOrderAccessToken } from '@/utils/shopOrderTokenStorage';
 import { getMobileVisitorId } from '@/utils/visitorId';
@@ -97,10 +105,96 @@ function fillCheckoutTpl(template: string, vars: Record<string, string>): string
   return s;
 }
 
+type CheckoutFieldKey =
+  | 'email'
+  | 'fullName'
+  | 'phone'
+  | 'studyLevel'
+  | 'bacType'
+  | 'filiere'
+  | 'specialiteMission1'
+  | 'specialiteMission2'
+  | 'studentCity'
+  | 'servicePayment'
+  | 'deliveryCity'
+  | 'addressLine';
+
+function collectCheckoutValidationErrors(params: {
+  email: string;
+  fullName: string;
+  phone: string;
+  hasAnyService: boolean;
+  hasPhysicalProducts: boolean;
+  studyLevel: string;
+  bacType: string;
+  filiere: string;
+  specialiteMission1: string;
+  specialiteMission2: string;
+  studentVilleCheckCode: number;
+  studentCity: string;
+  servicePayment: string;
+  selectedVilleCheckCode: number;
+  city: string;
+  addressLine: string;
+  t: (key: string) => string;
+}): { errors: Set<CheckoutFieldKey>; firstMessage: string | null } {
+  const errors = new Set<CheckoutFieldKey>();
+  let firstMessage: string | null = null;
+  const add = (key: CheckoutFieldKey, message: string) => {
+    errors.add(key);
+    if (firstMessage === null) firstMessage = message;
+  };
+
+  if (!params.email.trim() || !/.+@.+\..+/.test(params.email.trim())) {
+    add('email', params.t('shopCheckoutErrEmail'));
+  }
+  if (!params.fullName.trim()) {
+    add('fullName', params.t('shopCheckoutErrFullName'));
+  }
+  if (!params.phone.trim()) {
+    add('phone', params.t('shopCheckoutErrPhone'));
+  }
+
+  if (params.hasAnyService) {
+    if (!params.studyLevel.trim()) {
+      add('studyLevel', params.t('shopCheckoutErrStudyLevel'));
+    }
+    if (isBacStudyProfileLevel(params.studyLevel)) {
+      if (!params.bacType) {
+        add('bacType', params.t('shopCheckoutErrBacType'));
+      } else if (params.bacType === 'mission') {
+        if (!params.specialiteMission1.trim() || !params.specialiteMission2.trim()) {
+          if (!params.specialiteMission1.trim()) add('specialiteMission1', params.t('shopCheckoutErrMissionSpecs'));
+          if (!params.specialiteMission2.trim()) add('specialiteMission2', params.t('shopCheckoutErrMissionSpecs'));
+        }
+      } else if (!params.filiere.trim()) {
+        add('filiere', params.t('shopCheckoutErrFiliere'));
+      }
+    }
+    if (params.studentVilleCheckCode <= 0 || !params.studentCity.trim()) {
+      add('studentCity', params.t('shopCheckoutErrStudentVille'));
+    }
+    if (!params.servicePayment) {
+      add('servicePayment', params.t('shopCheckoutErrPayment'));
+    }
+  }
+
+  if (params.hasPhysicalProducts) {
+    if (params.selectedVilleCheckCode <= 0 || !params.city.trim()) {
+      add('deliveryCity', params.t('shopCheckoutErrShipCity'));
+    }
+    if (!params.addressLine.trim()) {
+      add('addressLine', params.t('shopCheckoutErrAddress'));
+    }
+  }
+
+  return { errors, firstMessage };
+}
+
 export default function BoutiqueCheckoutScreen() {
   const router = useRouter();
   const { locale, isRTL, t } = useLocale();
-  const { lines, count, clear } = useShopCart();
+  const { lines, count, clear, replaceLines } = useShopCart();
   const { user, getValidAccessToken } = useAuth();
 
   const userFullName = [user?.firstName, user?.lastName].filter(Boolean).join(' ');
@@ -115,6 +209,26 @@ export default function BoutiqueCheckoutScreen() {
   const [fixedShippingFee, setFixedShippingFee] = useState('19.00');
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Set<CheckoutFieldKey>>(() => new Set());
+
+  const clearFieldError = useCallback((key: CheckoutFieldKey) => {
+    setFieldErrors((prev) => {
+      if (!prev.has(key)) return prev;
+      const next = new Set(prev);
+      next.delete(key);
+      return next;
+    });
+  }, []);
+
+  const fieldHasError = useCallback((key: CheckoutFieldKey) => fieldErrors.has(key), [fieldErrors]);
+  const [promoCode, setPromoCode] = useState('');
+  const [promoDiscount, setPromoDiscount] = useState(0);
+  const [promoEligibleSubtotal, setPromoEligibleSubtotal] = useState<number | null>(null);
+  const [promoDiscountType, setPromoDiscountType] = useState<ShopPromoDiscountType | null>(null);
+  const [promoDiscountValue, setPromoDiscountValue] = useState<string | null>(null);
+  const [promoMessage, setPromoMessage] = useState<string | null>(null);
+  const [promoValidating, setPromoValidating] = useState(false);
+  const promoManualEditRef = useRef(false);
   const [showDeliveryVilleModal, setShowDeliveryVilleModal] = useState(false);
   const [showStudentVilleModal, setShowStudentVilleModal] = useState(false);
 
@@ -363,7 +477,150 @@ export default function BoutiqueCheckoutScreen() {
         ? Number.parseFloat(String(fixedShippingFee).replace(',', '.')) || 0
         : parseShopVillePriceAmount(selectedVille.price)
       : 0;
-  const total = subtotal + shippingAmount;
+  const articlesAfterPromo = Math.max(0, subtotal - promoDiscount);
+  const total = Math.max(0, articlesAfterPromo + shippingAmount);
+
+  const clearPromo = useCallback(() => {
+    promoManualEditRef.current = false;
+    setPromoCode('');
+    setPromoDiscount(0);
+    setPromoEligibleSubtotal(null);
+    setPromoDiscountType(null);
+    setPromoDiscountValue(null);
+    setPromoMessage(null);
+  }, []);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (lines.length === 0) return;
+      let cancelled = false;
+      void (async () => {
+        const priced = await hydrateCartLinesPricesViaApi(lines);
+        if (cancelled) return;
+        if (JSON.stringify(priced) !== JSON.stringify(lines)) {
+          await replaceLines(priced);
+        }
+      })();
+      return () => {
+        cancelled = true;
+      };
+    }, [lines, replaceLines]),
+  );
+
+  const applyPromoCode = useCallback(async () => {
+    const code = promoCode.trim();
+    if (!code) {
+      setPromoMessage(t('shopCheckoutPromoErrEnter'));
+      setPromoDiscount(0);
+      return;
+    }
+    const multiErr = rejectMultipleShopPromoCodesInInput(code);
+    if (multiErr) {
+      setPromoDiscount(0);
+      setPromoMessage(multiErr);
+      return;
+    }
+    promoManualEditRef.current = true;
+    setPromoValidating(true);
+    setPromoMessage(null);
+    setPromoDiscount(0);
+    try {
+      const accessToken = user ? await getValidAccessToken() : null;
+      const res = await validateShopPromoCode(
+        {
+          code,
+          lines: shopCartLinesToPromoPayload(lines),
+          phone: phone.trim() || undefined,
+          email: email.trim() || undefined,
+        },
+        accessToken,
+      );
+      if (res.valid) {
+        const disc = Number.parseFloat(res.discountAmount) || 0;
+        const eligible = res.eligibleSubtotal ? Number.parseFloat(res.eligibleSubtotal) : null;
+        setPromoDiscount(disc);
+        setPromoEligibleSubtotal(eligible != null && !Number.isNaN(eligible) ? eligible : null);
+        setPromoDiscountType(res.discountType ?? null);
+        setPromoDiscountValue(res.discountValue ?? null);
+        setPromoCode(res.code);
+        if (res.discountType === 'percent' && res.discountValue && eligible != null && !Number.isNaN(eligible)) {
+          setPromoMessage(
+            t('shopCheckoutPromoAppliedPercent')
+              .replace('{pct}', res.discountValue.replace(/\.00$/, ''))
+              .replace('{base}', formatShopPrice(String(eligible), currency)),
+          );
+        } else if (res.discountType === 'fixed' && res.discountValue) {
+          setPromoMessage(
+            t('shopCheckoutPromoAppliedFixed')
+              .replace('{amount}', formatShopPrice(res.discountValue, currency)),
+          );
+        } else {
+          setPromoMessage(res.message);
+        }
+      } else {
+        setPromoDiscount(0);
+        setPromoEligibleSubtotal(null);
+        setPromoDiscountType(null);
+        setPromoDiscountValue(null);
+        setPromoMessage(res.message);
+      }
+    } catch {
+      setPromoDiscount(0);
+      setPromoEligibleSubtotal(null);
+      setPromoDiscountType(null);
+      setPromoDiscountValue(null);
+      setPromoMessage(t('shopCheckoutPromoErrValidate'));
+    } finally {
+      setPromoValidating(false);
+    }
+  }, [promoCode, lines, phone, email, currency, t, user, getValidAccessToken]);
+
+  /** Recalcule la remise si le sous-total change (ex. après synchro prix catalogue). */
+  useEffect(() => {
+    const code = promoCode.trim();
+    if (!code || lines.length === 0 || subtotal <= 0) return;
+    const tid = setTimeout(() => {
+      void applyPromoCode();
+    }, 400);
+    return () => clearTimeout(tid);
+  }, [subtotal]);
+
+  useEffect(() => {
+    if (lines.length === 0 || promoManualEditRef.current) return;
+    let cancelled = false;
+    void (async () => {
+      try {
+        const accessToken = user ? await getValidAccessToken() : null;
+        const res = await fetchShopAutoApplyPromo(
+          {
+            lines: shopCartLinesToPromoPayload(lines),
+            phone: phone.trim() || undefined,
+            email: email.trim() || undefined,
+          },
+          accessToken,
+        );
+        if (cancelled) return;
+        if (res.valid && res.autoApplied) {
+          const disc = Number.parseFloat(res.discountAmount) || 0;
+          const eligible = res.eligibleSubtotal ? Number.parseFloat(res.eligibleSubtotal) : null;
+          setPromoDiscount(disc);
+          setPromoEligibleSubtotal(eligible != null && !Number.isNaN(eligible) ? eligible : null);
+          setPromoDiscountType(res.discountType ?? null);
+          setPromoDiscountValue(res.discountValue ?? null);
+          setPromoCode(res.code);
+          setPromoMessage(res.message);
+        } else if (!promoCode.trim()) {
+          setPromoDiscount(0);
+          setPromoMessage(null);
+        }
+      } catch {
+        /* ignore */
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [lines, phone, email, promoCode, user, getValidAccessToken]);
 
   const deliveryIntroText = useMemo(
     () => t('shopCheckoutDeliveryInfo') + (cartWideFreeShipping ? t('shopCheckoutDeliveryInfoFree') : ''),
@@ -454,56 +711,55 @@ export default function BoutiqueCheckoutScreen() {
 
   const onSubmit = async () => {
     setError(null);
-    if (!email.trim() || !/.+@.+\..+/.test(email.trim())) {
-      setError(t('shopCheckoutErrEmail'));
+    const validation = collectCheckoutValidationErrors({
+      email,
+      fullName,
+      phone,
+      hasAnyService,
+      hasPhysicalProducts,
+      studyLevel,
+      bacType,
+      filiere,
+      specialiteMission1,
+      specialiteMission2,
+      studentVilleCheckCode,
+      studentCity,
+      servicePayment,
+      selectedVilleCheckCode,
+      city,
+      addressLine,
+      t,
+    });
+    if (validation.errors.size > 0) {
+      setFieldErrors(validation.errors);
+      const msg = validation.firstMessage ?? t('shopCheckoutErrGeneric');
+      setError(msg);
+      Alert.alert(t('commonErrorTitle'), msg);
       return;
     }
-    if (!fullName.trim()) {
-      setError(t('shopCheckoutErrFullName'));
-      return;
-    }
-    if (!phone.trim()) {
-      setError(t('shopCheckoutErrPhone'));
-      return;
-    }
+    setFieldErrors(new Set());
 
-    if (hasAnyService) {
-      if (!studyLevel.trim()) {
-        setError(t('shopCheckoutErrStudyLevel'));
-        return;
-      }
-      if (isBacStudyProfileLevel(studyLevel)) {
-        if (!bacType) {
-          setError(t('shopCheckoutErrBacType'));
+    const serviceSlugs = lines
+      .filter(isPlatformServiceCartLine)
+      .map((l) => String((l.platformServiceSlug ?? l.slug) ?? '').trim())
+      .filter(Boolean);
+    if (serviceSlugs.length > 0) {
+      try {
+        const accessToken = user ? await getValidAccessToken() : null;
+        const elig = await checkPlatformServicePurchaseEligibility(
+          { slugs: serviceSlugs, phone: phone.trim() || undefined },
+          accessToken,
+        );
+        if (!elig.allowed) {
+          const msg = elig.message ?? t('shopCheckoutErrGeneric');
+          setError(msg);
+          Alert.alert(t('commonErrorTitle'), msg);
           return;
         }
-        if (bacType === 'mission') {
-          if (!specialiteMission1.trim() || !specialiteMission2.trim()) {
-            setError(t('shopCheckoutErrMissionSpecs'));
-            return;
-          }
-        } else if (!filiere.trim()) {
-          setError(t('shopCheckoutErrFiliere'));
-          return;
-        }
-      }
-      if (studentVilleCheckCode <= 0 || !studentCity.trim()) {
-        setError(t('shopCheckoutErrStudentVille'));
-        return;
-      }
-      if (!servicePayment) {
-        setError(t('shopCheckoutErrPayment'));
-        return;
-      }
-    }
-
-    if (hasPhysicalProducts) {
-      if (selectedVilleCheckCode <= 0 || !city.trim()) {
-        setError(t('shopCheckoutErrShipCity'));
-        return;
-      }
-      if (!addressLine.trim()) {
-        setError(t('shopCheckoutErrAddress'));
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : t('shopCheckoutErrGeneric');
+        setError(msg);
+        Alert.alert(t('commonErrorTitle'), msg);
         return;
       }
     }
@@ -544,6 +800,7 @@ export default function BoutiqueCheckoutScreen() {
               servicePaymentModality: servicePayment as ServicePaymentChoice,
             }
           : {}),
+        promoCode: promoCode.trim() || undefined,
       }, accessToken);
       await saveShopOrderAccessToken(result.publicId, result.accessToken);
       await clear();
@@ -602,34 +859,46 @@ export default function BoutiqueCheckoutScreen() {
           ) : null}
 
           <SectionCard isRtl={isRTL} title={t('shopCheckoutContactTitle')} desc={t('shopCheckoutContactDesc')}>
-            <Field isRtl={isRTL} label={t('shopCheckoutLblEmail')}>
+            <Field isRtl={isRTL} label={t('shopCheckoutLblEmail')} required>
               <AppTextInput
                 value={email}
-                onChangeText={setEmail}
+                onChangeText={(v) => {
+                  setEmail(v);
+                  clearFieldError('email');
+                }}
                 placeholder={t('shopCheckoutPhEmail')}
                 textRtl={isRTL}
                 autoCapitalize="none"
                 keyboardType="email-address"
                 autoComplete="email"
+                style={fieldHasError('email') ? styles.inputFieldError : undefined}
               />
             </Field>
-            <Field isRtl={isRTL} label={t('shopCheckoutLblFullName')}>
+            <Field isRtl={isRTL} label={t('shopCheckoutLblFullName')} required>
               <AppTextInput
                 value={fullName}
-                onChangeText={setFullName}
+                onChangeText={(v) => {
+                  setFullName(v);
+                  clearFieldError('fullName');
+                }}
                 placeholder={t('shopCheckoutPhName')}
                 textRtl={isRTL}
                 autoComplete="name"
+                style={fieldHasError('fullName') ? styles.inputFieldError : undefined}
               />
             </Field>
-            <Field isRtl={isRTL} label={t('shopCheckoutLblPhone')}>
+            <Field isRtl={isRTL} label={t('shopCheckoutLblPhone')} required>
               <AppTextInput
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(v) => {
+                  setPhone(v);
+                  clearFieldError('phone');
+                }}
                 placeholder={t('shopCheckoutPhPhone')}
                 textRtl={isRTL}
                 keyboardType="phone-pad"
                 autoComplete="tel"
+                style={fieldHasError('phone') ? styles.inputFieldError : undefined}
               />
             </Field>
 
@@ -639,6 +908,8 @@ export default function BoutiqueCheckoutScreen() {
                   label={t('setupStudyLevel')}
                   value={labelFor(studyLevel, checkoutAcademicConfig.studyLevel.items)}
                   rtl={isRTL}
+                  required
+                  hasError={fieldHasError('studyLevel')}
                   onPress={() => setAcademicField('studyLevel')}
                 />
                 {showBacBlock ? (
@@ -647,6 +918,8 @@ export default function BoutiqueCheckoutScreen() {
                       label={t('setupBacType')}
                       value={labelFor(bacType, checkoutAcademicConfig.bacType.items)}
                       rtl={isRTL}
+                      required
+                      hasError={fieldHasError('bacType')}
                       onPress={() => setAcademicField('bacType')}
                     />
                     {bacType === 'normal' ? (
@@ -654,6 +927,8 @@ export default function BoutiqueCheckoutScreen() {
                         label={t('setupFiliere')}
                         value={labelFor(filiere, checkoutAcademicConfig.filiere.items)}
                         rtl={isRTL}
+                        required
+                        hasError={fieldHasError('filiere')}
                         onPress={() => setAcademicField('filiere')}
                       />
                     ) : null}
@@ -663,12 +938,16 @@ export default function BoutiqueCheckoutScreen() {
                           label={t('setupSpecialite1')}
                           value={labelFor(specialiteMission1, checkoutAcademicConfig.specialiteMission1.items)}
                           rtl={isRTL}
+                          required
+                          hasError={fieldHasError('specialiteMission1')}
                           onPress={() => setAcademicField('specialiteMission1')}
                         />
                         <SelectField
                           label={t('setupSpecialite2')}
                           value={labelFor(specialiteMission2, checkoutAcademicConfig.specialiteMission2.items)}
                           rtl={isRTL}
+                          required
+                          hasError={fieldHasError('specialiteMission2')}
                           onPress={() => setAcademicField('specialiteMission2')}
                         />
                         <SelectField
@@ -681,10 +960,15 @@ export default function BoutiqueCheckoutScreen() {
                     ) : null}
                   </>
                 ) : null}
-                <Field isRtl={isRTL} label={t('shopCheckoutLblStudentCity')}>
+                <Field isRtl={isRTL} label={t('shopCheckoutLblStudentCity')} required>
                   <Pressable
                     onPress={() => setShowStudentVilleModal(true)}
-                    style={[styles.input, styles.selectLike, isRTL && styles.rowRtl]}
+                    style={[
+                      styles.input,
+                      styles.selectLike,
+                      fieldHasError('studentCity') && styles.inputError,
+                      isRTL && styles.rowRtl,
+                    ]}
                   >
                     <Text
                       style={[styles.selectTxt, !selectedStudentVille && styles.selectTxtPlaceholder, isRTL && styles.txtRtl]}
@@ -712,17 +996,25 @@ export default function BoutiqueCheckoutScreen() {
                 hasPhysicalProducts ? t('shopCheckoutPaymentDescMixed') : t('shopCheckoutPaymentDescServices')
               }
             >
-              <View style={styles.payGrid}>
+              <Text style={[styles.label, isRTL && styles.txtRtl]}>
+                {t('shopCheckoutPaymentTitle')}
+                <Text style={styles.requiredMark}> *</Text>
+              </Text>
+              <View style={[styles.payGrid, fieldHasError('servicePayment') && styles.payGridError]}>
                 {servicePaymentOptions.map((p) => {
                   const active = servicePayment === p.id;
                   return (
                     <Pressable
                       key={p.id}
-                      onPress={() => setServicePayment(p.id)}
+                      onPress={() => {
+                        setServicePayment(p.id);
+                        clearFieldError('servicePayment');
+                      }}
                       style={({ pressed }) => [
                         styles.payCard,
                         isRTL && styles.rowRtl,
                         active && styles.payCardActive,
+                        fieldHasError('servicePayment') && !active && styles.payCardError,
                         pressed && { opacity: 0.9 },
                       ]}
                     >
@@ -739,12 +1031,17 @@ export default function BoutiqueCheckoutScreen() {
 
           {hasPhysicalProducts ? (
             <SectionCard isRtl={isRTL} title={t('shopCheckoutAddrTitle')} desc={t('shopCheckoutAddrDesc')}>
-              <Field isRtl={isRTL} label={t('shopCheckoutLblCityShip')}>
+              <Field isRtl={isRTL} label={t('shopCheckoutLblCityShip')} required>
                 <Pressable
                   onPress={() => {
                     setShowDeliveryVilleModal(true);
                   }}
-                  style={[styles.input, styles.selectLike, isRTL && styles.rowRtl]}
+                  style={[
+                    styles.input,
+                    styles.selectLike,
+                    fieldHasError('deliveryCity') && styles.inputError,
+                    isRTL && styles.rowRtl,
+                  ]}
                 >
                   <Text
                     style={[styles.selectTxt, !selectedVille && styles.selectTxtPlaceholder, isRTL && styles.txtRtl]}
@@ -758,11 +1055,19 @@ export default function BoutiqueCheckoutScreen() {
               {deliveryVilleMetaText ? (
                 <Text style={[styles.metaHint, isRTL && styles.txtRtl]}>{deliveryVilleMetaText}</Text>
               ) : null}
-              <Field isRtl={isRTL} label={t('shopCheckoutLblAddress')}>
+              <Field isRtl={isRTL} label={t('shopCheckoutLblAddress')} required>
                 <TextInput
-                  style={[styles.input, styles.inputMulti, isRTL && styles.inputRtl]}
+                  style={[
+                    styles.input,
+                    styles.inputMulti,
+                    fieldHasError('addressLine') && styles.inputError,
+                    isRTL && styles.inputRtl,
+                  ]}
                   value={addressLine}
-                  onChangeText={setAddressLine}
+                  onChangeText={(v) => {
+                    setAddressLine(v);
+                    clearFieldError('addressLine');
+                  }}
                   placeholder={t('shopCheckoutPhAddress')}
                   placeholderTextColor={brand.textMuted}
                   multiline
@@ -821,10 +1126,96 @@ export default function BoutiqueCheckoutScreen() {
               );
             })}
             <View style={styles.summaryDivider} />
+            <View style={styles.promoBox}>
+              <View style={[styles.promoTitleRow, isRTL && styles.rowRtl]}>
+                <FontAwesome name="tag" size={14} color={brand.textMuted} />
+                <Text style={[styles.promoTitle, isRTL && styles.txtRtl]}>{t('shopCheckoutPromoTitle')}</Text>
+              </View>
+              <Text style={[styles.promoHint, isRTL && styles.txtRtl]}>{t('shopCheckoutPromoHint')}</Text>
+              <View style={[styles.promoInputRow, isRTL && styles.rowRtl]}>
+                <TextInput
+                  style={[styles.input, styles.promoInput, isRTL && styles.inputRtl]}
+                  value={promoCode}
+                  onChangeText={(v) => {
+                    promoManualEditRef.current = true;
+                    setPromoCode(v.toUpperCase());
+                    if (promoDiscount > 0) {
+                      setPromoDiscount(0);
+                      setPromoMessage(null);
+                    }
+                  }}
+                  placeholder={t('shopCheckoutPromoPh')}
+                  placeholderTextColor={brand.textMuted}
+                  autoCapitalize="characters"
+                  autoCorrect={false}
+                />
+                <Pressable
+                  onPress={() => void applyPromoCode()}
+                  disabled={promoValidating}
+                  style={({ pressed }) => [
+                    styles.promoApplyBtn,
+                    (promoValidating || pressed) && { opacity: 0.7 },
+                  ]}
+                >
+                  {promoValidating ? (
+                    <ActivityIndicator size="small" color={brand.primary} />
+                  ) : (
+                    <Text style={styles.promoApplyBtnTxt}>{t('shopCheckoutPromoApply')}</Text>
+                  )}
+                </Pressable>
+                {(promoDiscount > 0 || promoCode.trim()) ? (
+                  <Pressable onPress={clearPromo} style={styles.promoRemoveBtn}>
+                    <Text style={styles.promoRemoveBtnTxt}>{t('shopCheckoutPromoRemove')}</Text>
+                  </Pressable>
+                ) : null}
+              </View>
+              {promoMessage ? (
+                <Text
+                  style={[
+                    styles.promoFeedback,
+                    isRTL && styles.txtRtl,
+                    promoDiscount > 0 ? styles.promoFeedbackOk : styles.promoFeedbackErr,
+                  ]}
+                >
+                  {promoMessage}
+                </Text>
+              ) : null}
+            </View>
+            <View style={styles.summaryDivider} />
             <View style={[styles.summaryRow, isRTL && styles.rowRtl]}>
               <Text style={[styles.summaryLbl, isRTL && styles.txtRtl]}>{t('shopCheckoutLblSubtotal')}</Text>
               <Text style={[styles.summaryVal, isRTL && styles.txtRtl]}>{formatShopPrice(String(subtotal), currency)}</Text>
             </View>
+            {promoDiscount > 0 ? (
+              <View style={[styles.summaryRow, isRTL && styles.rowRtl]}>
+                <Text style={[styles.summaryLbl, styles.promoDiscountLbl, isRTL && styles.txtRtl]}>
+                  {promoDiscountType === 'percent' && promoDiscountValue
+                    ? t('shopCheckoutLblDiscountPercent')
+                        .replace('{code}', promoCode)
+                        .replace('{pct}', promoDiscountValue.replace(/\.00$/, ''))
+                    : t('shopCheckoutLblDiscount').replace('{code}', promoCode)}
+                </Text>
+                <Text style={[styles.summaryVal, styles.promoDiscountVal, isRTL && styles.txtRtl]}>
+                  −{formatShopPrice(String(promoDiscount), currency)}
+                </Text>
+              </View>
+            ) : null}
+            {promoDiscount > 0 && promoEligibleSubtotal != null && promoEligibleSubtotal < subtotal - 0.009 ? (
+              <Text style={[styles.promoScopedHint, isRTL && styles.txtRtl]}>
+                {t('shopCheckoutPromoScopedHint').replace(
+                  '{base}',
+                  formatShopPrice(String(promoEligibleSubtotal), currency),
+                )}
+              </Text>
+            ) : null}
+            {promoDiscount > 0 ? (
+              <View style={[styles.summaryRow, isRTL && styles.rowRtl]}>
+                <Text style={[styles.summaryLbl, isRTL && styles.txtRtl]}>{t('shopCheckoutLblArticlesNet')}</Text>
+                <Text style={[styles.summaryVal, isRTL && styles.txtRtl]}>
+                  {formatShopPrice(String(articlesAfterPromo), currency)}
+                </Text>
+              </View>
+            ) : null}
             <View style={[styles.summaryRow, isRTL && styles.rowRtl]}>
               <Text style={[styles.summaryLbl, isRTL && styles.txtRtl]}>{t('shopCheckoutLblShipping')}</Text>
               <Text style={[styles.summaryVal, isRTL && styles.txtRtl]}>{shippingSummaryText}</Text>
@@ -870,6 +1261,7 @@ export default function BoutiqueCheckoutScreen() {
         onSelect={(v) => {
           setSelectedVilleCheckCode(v.checkCode);
           setCity(shopVilleListLabel(v));
+          clearFieldError('deliveryCity');
           setShowDeliveryVilleModal(false);
         }}
       />
@@ -881,6 +1273,7 @@ export default function BoutiqueCheckoutScreen() {
         onSelect={(v) => {
           setStudentVilleCheckCode(v.checkCode);
           setStudentCity(shopVilleListLabel(v));
+          clearFieldError('studentCity');
           setShowStudentVilleModal(false);
         }}
       />
@@ -899,11 +1292,13 @@ export default function BoutiqueCheckoutScreen() {
             if (!field) return;
             if (field === 'studyLevel') {
               setStudyLevel(v);
+              clearFieldError('studyLevel');
               return;
             }
             if (field === 'bacType') {
               const next = (v === 'normal' || v === 'mission' ? v : '') as 'normal' | 'mission' | '';
               setBacType(next);
+              clearFieldError('bacType');
               if (next === '') {
                 setFiliere('');
                 setSpecialiteMission1('');
@@ -911,6 +1306,7 @@ export default function BoutiqueCheckoutScreen() {
                 setSpecialiteMission3('');
               } else if (next === 'mission') {
                 setFiliere('');
+                clearFieldError('filiere');
               } else {
                 setSpecialiteMission1('');
                 setSpecialiteMission2('');
@@ -920,14 +1316,17 @@ export default function BoutiqueCheckoutScreen() {
             }
             if (field === 'filiere') {
               setFiliere(v);
+              clearFieldError('filiere');
               return;
             }
             if (field === 'specialiteMission1') {
               setSpecialiteMission1(v);
+              clearFieldError('specialiteMission1');
               return;
             }
             if (field === 'specialiteMission2') {
               setSpecialiteMission2(v);
+              clearFieldError('specialiteMission2');
               return;
             }
             setSpecialiteMission3(v);
@@ -973,10 +1372,23 @@ function SectionCard({
   );
 }
 
-function Field({ label, children, isRtl }: { label: string; children: ReactNode; isRtl?: boolean }) {
+function Field({
+  label,
+  children,
+  isRtl,
+  required,
+}: {
+  label: string;
+  children: ReactNode;
+  isRtl?: boolean;
+  required?: boolean;
+}) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={[styles.label, isRtl && styles.txtRtl]}>{label}</Text>
+      <Text style={[styles.label, isRtl && styles.txtRtl]}>
+        {label}
+        {required ? <Text style={styles.requiredMark}> *</Text> : null}
+      </Text>
       {children}
     </View>
   );
@@ -1050,6 +1462,29 @@ const styles = StyleSheet.create({
     letterSpacing: 0.4,
     color: brand.textMuted,
     textTransform: 'uppercase',
+  },
+  requiredMark: { color: '#DC2626', fontWeight: '800' },
+  inputFieldError: {
+    borderColor: '#DC2626',
+    borderWidth: 2,
+    backgroundColor: '#FEF2F2',
+  },
+  inputError: {
+    borderColor: '#DC2626',
+    borderWidth: 2,
+    backgroundColor: '#FEF2F2',
+  },
+  payGridError: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#FECACA',
+    padding: 6,
+    backgroundColor: '#FEF2F2',
+  },
+  payCardError: {
+    borderColor: '#DC2626',
+    borderWidth: 2,
+    backgroundColor: '#FEF2F2',
   },
   input: {
     backgroundColor: brand.white,
@@ -1137,6 +1572,51 @@ const styles = StyleSheet.create({
   summaryLbl: { fontSize: fontSize.sm, color: brand.textSecondary },
   summaryVal: { fontSize: fontSize.sm, color: brand.text, fontWeight: '700' },
   summaryDivider: { height: 1, backgroundColor: brand.border, marginVertical: 4 },
+  promoBox: {
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    borderColor: brand.border,
+    backgroundColor: brand.backgroundSoft,
+    padding: spacing.md,
+    gap: 8,
+  },
+  promoTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  promoTitle: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    color: brand.textMuted,
+    textTransform: 'uppercase',
+  },
+  promoHint: { fontSize: 11, lineHeight: 16, color: brand.textMuted, fontWeight: '600' },
+  promoInputRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 8 },
+  promoInput: { flex: 1, minWidth: 120, minHeight: 42, paddingVertical: 10 },
+  promoApplyBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: brand.primary,
+    minWidth: 88,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  promoApplyBtnTxt: { fontSize: 12, fontWeight: '800', color: brand.primary },
+  promoRemoveBtn: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: 11,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: brand.border,
+  },
+  promoRemoveBtnTxt: { fontSize: 12, fontWeight: '700', color: brand.textSecondary },
+  promoFeedback: { fontSize: 11, fontWeight: '600', lineHeight: 16 },
+  promoFeedbackOk: { color: '#047857' },
+  promoFeedbackErr: { color: '#991B1B' },
+  promoDiscountLbl: { color: '#047857' },
+  promoDiscountVal: { color: '#047857', fontWeight: '800' },
+  promoScopedHint: { fontSize: fontSize.xs, color: brand.textMuted, marginTop: -4, marginBottom: 4, lineHeight: 16 },
   summaryTotalLbl: { fontSize: fontSize.md, fontWeight: '800', color: brand.text },
   summaryTotalVal: { fontSize: fontSize.lg, fontWeight: '800', color: brand.primary },
 

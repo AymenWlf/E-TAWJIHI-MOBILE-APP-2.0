@@ -25,10 +25,12 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
+import { usePlatformServiceCatalogEntitlements } from '@/hooks/usePlatformServiceCatalogEntitlements';
 import {
   fetchPlatformServices,
   platformServiceLocalizedDescription,
   platformServiceLocalizedFeatures,
+  type PlatformServiceCatalogEntitlement,
   type PlatformServiceItem,
 } from '@/services/platformServices';
 import { fetchShopProducts } from '@/services/shop';
@@ -47,6 +49,14 @@ import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
 import { platformServiceCartProductId } from '@/utils/platformServiceCart';
 import { getShopPathAfterBuyNow } from '@/utils/shopCartStorage';
 import { platformServiceVisibleForProfile } from '@/utils/platformServiceFilieresFilter';
+import { PlatformServiceEntitlementStatus } from '@/components/shop/PlatformServiceEntitlementStatus';
+import {
+  platformServiceCatalogCardInactive,
+  platformServiceCatalogDisplayPrices,
+  platformServiceCatalogPriceMode,
+  platformServiceEntitlementCtaLabel,
+  sortPlatformServicesForCatalog,
+} from '@/utils/platformServiceEntitlementUi';
 import type { EligibilityProfile } from '@/utils/eligibility';
 import {
   platformServiceCurrency,
@@ -79,7 +89,7 @@ export default function BoutiqueTabScreen() {
   const insets = useSafeAreaInsets();
   const { t, isRTL, locale, setLocale } = useLocale();
   const { presentShare } = useSharePreview();
-  const { count: cartCount, addLine, lines: cartLines } = useShopCart();
+  const { count: cartCount, addLine, removeLine, lines: cartLines } = useShopCart();
   const { profile: eligibilityProfile, loading: eligibilityProfileLoading } = useEligibilityProfile();
 
   const [items, setItems] = useState<ShopProductListItem[]>([]);
@@ -101,6 +111,22 @@ export default function BoutiqueTabScreen() {
   const searchRef = useRef<TextInput>(null);
   const inCartIds = useMemo(() => new Set(cartLines.map((l) => l.productId)), [cartLines]);
 
+  const cartPlatformServiceSlugs = useMemo(
+    () =>
+      cartLines
+        .map((l) => l.platformServiceSlug?.trim() || (l.lineKind === 'platform_service' ? l.slug?.trim() : ''))
+        .filter((s): s is string => Boolean(s)),
+    [cartLines],
+  );
+  const { bySlug: serviceEntitlementsBySlug, loading: entitlementsLoading } =
+    usePlatformServiceCatalogEntitlements(cartPlatformServiceSlugs);
+
+  const serviceNameBySlug = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const s of serviceItems) map.set(s.slug, s.name);
+    return map;
+  }, [serviceItems]);
+
   const servicesForUser = useMemo(
     () =>
       serviceItems.filter((s) =>
@@ -113,21 +139,25 @@ export default function BoutiqueTabScreen() {
 
   const filteredServices = useMemo(() => {
     const q = debouncedSearch.trim().toLowerCase();
-    if (!q) return servicesForUser;
-    return servicesForUser.filter((s) => {
-      const locFeats = platformServiceLocalizedFeatures(s, locale);
-      return (
-        s.name.toLowerCase().includes(q) ||
-        (s.description && s.description.toLowerCase().includes(q)) ||
-        locFeats.some((f) => f.toLowerCase().includes(q)) ||
-        s.features.some((f) => f.toLowerCase().includes(q)) ||
-        s.featuresAr.some((f) => f.toLowerCase().includes(q))
-      );
-    });
-  }, [servicesForUser, debouncedSearch, locale]);
+    const matched = !q
+      ? servicesForUser
+      : servicesForUser.filter((s) => {
+          const locFeats = platformServiceLocalizedFeatures(s, locale);
+          return (
+            s.name.toLowerCase().includes(q) ||
+            (s.description && s.description.toLowerCase().includes(q)) ||
+            locFeats.some((f) => f.toLowerCase().includes(q)) ||
+            s.features.some((f) => f.toLowerCase().includes(q)) ||
+            s.featuresAr.some((f) => f.toLowerCase().includes(q))
+          );
+        });
+    return sortPlatformServicesForCatalog(matched, serviceEntitlementsBySlug, entitlementsLoading);
+  }, [servicesForUser, debouncedSearch, locale, serviceEntitlementsBySlug, entitlementsLoading]);
 
-  const addPlatformServiceToCart = useCallback(
+  const putPlatformServiceInCart = useCallback(
     async (s: PlatformServiceItem) => {
+      const ent = serviceEntitlementsBySlug[s.slug];
+      if (ent && !ent.purchasable) return;
       const unit = platformServiceEffectiveUnitPriceString(s);
       const currency = platformServiceCurrency(s.currency);
       await addLine({
@@ -147,16 +177,31 @@ export default function BoutiqueTabScreen() {
       });
       void recordShopBoutiqueEvent('add_to_cart', undefined, s.slug);
     },
-    [addLine],
+    [addLine, serviceEntitlementsBySlug],
+  );
+
+  const addPlatformServiceToCart = useCallback(
+    async (s: PlatformServiceItem) => {
+      const productId = platformServiceCartProductId(s.slug);
+      if (inCartIds.has(productId)) {
+        await removeLine(productId);
+        return;
+      }
+      await putPlatformServiceInCart(s);
+    },
+    [inCartIds, removeLine, putPlatformServiceInCart],
   );
 
   const buyPlatformServiceNow = useCallback(
     async (s: PlatformServiceItem) => {
-      await addPlatformServiceToCart(s);
+      const productId = platformServiceCartProductId(s.slug);
+      if (!inCartIds.has(productId)) {
+        await putPlatformServiceInCart(s);
+      }
       const path = await getShopPathAfterBuyNow();
       router.push(path as any);
     },
-    [addPlatformServiceToCart, router],
+    [inCartIds, putPlatformServiceInCart, router],
   );
 
   useEffect(() => {
@@ -241,6 +286,10 @@ export default function BoutiqueTabScreen() {
   const handleAdd = useCallback(
     async (p: ShopProductListItem) => {
       if (p.isOutOfStock) return;
+      if (inCartIds.has(p.id)) {
+        await removeLine(p.id);
+        return;
+      }
       await addLine({
         productId: p.id,
         slug: p.slug,
@@ -255,29 +304,31 @@ export default function BoutiqueTabScreen() {
       });
       void recordShopBoutiqueEvent('add_to_cart', p.id);
     },
-    [addLine],
+    [addLine, removeLine, inCartIds],
   );
 
   const handleBuyNow = useCallback(
     async (p: ShopProductListItem) => {
       if (p.isOutOfStock) return;
-      await addLine({
-        productId: p.id,
-        slug: p.slug,
-        title: p.title,
-        price: p.price,
-        currency: p.currency,
-        quantity: 1,
-        type: p.type,
-        packPricingMode: p.packPricingMode ?? null,
-        images: p.images,
-        isFreeShipping: Boolean(p.isFreeShipping),
-      });
-      void recordShopBoutiqueEvent('add_to_cart', p.id);
+      if (!inCartIds.has(p.id)) {
+        await addLine({
+          productId: p.id,
+          slug: p.slug,
+          title: p.title,
+          price: p.price,
+          currency: p.currency,
+          quantity: 1,
+          type: p.type,
+          packPricingMode: p.packPricingMode ?? null,
+          images: p.images,
+          isFreeShipping: Boolean(p.isFreeShipping),
+        });
+        void recordShopBoutiqueEvent('add_to_cart', p.id);
+      }
       const path = await getShopPathAfterBuyNow();
       router.push(path as any);
     },
-    [addLine, router],
+    [addLine, router, inCartIds],
   );
 
   const renderHero = useCallback(
@@ -481,6 +532,9 @@ export default function BoutiqueTabScreen() {
                   isRTL={isRTL}
                   eligibilityProfile={eligibilityProfile}
                   eligibilityProfileLoading={eligibilityProfileLoading}
+                  entitlement={serviceEntitlementsBySlug[s.slug]}
+                  entitlementsLoading={entitlementsLoading}
+                  serviceNameBySlug={serviceNameBySlug}
                   inCart={inCartIds.has(platformServiceCartProductId(s.slug))}
                   onOpenDetail={() => router.push(`/boutique/service/${encodeURIComponent(s.slug)}` as any)}
                   onAddCart={() => void addPlatformServiceToCart(s)}
@@ -524,6 +578,9 @@ export default function BoutiqueTabScreen() {
     addPlatformServiceToCart,
     buyPlatformServiceNow,
     inCartIds,
+    serviceEntitlementsBySlug,
+    entitlementsLoading,
+    serviceNameBySlug,
   ]);
 
   const listingHeaderElement = useMemo(() => renderListingHeader(), [renderListingHeader]);
@@ -573,6 +630,9 @@ export default function BoutiqueTabScreen() {
         isRTL={isRTL}
         eligibilityProfile={eligibilityProfile}
         eligibilityProfileLoading={eligibilityProfileLoading}
+        entitlement={serviceEntitlementsBySlug[s.slug]}
+        entitlementsLoading={entitlementsLoading}
+        serviceNameBySlug={serviceNameBySlug}
         inCart={inCartIds.has(platformServiceCartProductId(s.slug))}
         onOpenDetail={() => router.push(`/boutique/service/${encodeURIComponent(s.slug)}` as any)}
         onAddCart={() => void addPlatformServiceToCart(s)}
@@ -588,6 +648,9 @@ export default function BoutiqueTabScreen() {
       isRTL,
       locale,
       router,
+      serviceEntitlementsBySlug,
+      entitlementsLoading,
+      serviceNameBySlug,
       t,
     ],
   );
@@ -699,6 +762,9 @@ function ServiceCompactCard({
   isRTL,
   eligibilityProfile,
   eligibilityProfileLoading,
+  entitlement,
+  entitlementsLoading = false,
+  serviceNameBySlug = new Map<string, string>(),
   inCart,
   onOpenDetail,
   onAddCart,
@@ -711,6 +777,9 @@ function ServiceCompactCard({
   isRTL: boolean;
   eligibilityProfile: EligibilityProfile | null;
   eligibilityProfileLoading: boolean;
+  entitlement?: PlatformServiceCatalogEntitlement;
+  entitlementsLoading?: boolean;
+  serviceNameBySlug?: Map<string, string>;
   inCart: boolean;
   onOpenDetail: () => void;
   onAddCart: () => void;
@@ -726,9 +795,14 @@ function ServiceCompactCard({
   const cur = platformServiceCurrency(s.currency);
   const sale = s.promotionalPrice;
   const list = s.price;
-  const hasPromo = sale && list ? shopHasPromotionalPrice(sale, list) : false;
-  const displayAmount = platformServiceEffectiveUnitPriceString(s);
-  const compareAmount = hasPromo ? list : null;
+  const hasPromo = Boolean(sale && list && shopHasPromotionalPrice(sale, list));
+  const inactive = platformServiceCatalogCardInactive(entitlement, entitlementsLoading);
+  const priceMode = platformServiceCatalogPriceMode(entitlement, entitlementsLoading, hasPromo);
+  const { primary: pricePrimary, compare: priceCompare } = platformServiceCatalogDisplayPrices(
+    list,
+    sale,
+    priceMode,
+  );
   const feats = platformServiceLocalizedFeatures(s, locale).slice(0, 3);
   const localizedDesc = platformServiceLocalizedDescription(s, locale);
 
@@ -742,6 +816,7 @@ function ServiceCompactCard({
 
   const showEligibilityBadge = !eligibilityProfileLoading;
 
+  const purchasable = !entitlementsLoading && entitlement?.purchasable !== false;
   useEffect(() => {
     void recordShopBoutiqueEvent('impression_listing', undefined, s.slug);
   }, [s.slug]);
@@ -750,6 +825,7 @@ function ServiceCompactCard({
     <View
       style={[
         styles.svcCompactOuter,
+        inactive && styles.svcCompactOuterInactive,
         isStack
           ? styles.svcCompactOuterStack
           : [
@@ -771,26 +847,33 @@ function ServiceCompactCard({
         <View style={styles.svcCompactAccent} />
         <View style={[styles.svcCompactBody, isStack && styles.svcCompactBodyStack]}>
           <View style={[styles.svcCompactHeroRow, isRTL && styles.svcCompactHeroRowRtl]}>
-            <View style={styles.svcCompactIconCircle}>
+            <View style={[styles.svcCompactIconCircle, inactive && styles.svcCompactIconCircleInactive]}>
               <Image
                 source={ETAWJIHI_LOGO_TRANSPARENT}
-                style={{ width: 22, height: 22, tintColor: brand.primary }}
+                style={{ width: 22, height: 22, tintColor: inactive ? '#94A3B8' : brand.primary }}
                 resizeMode="contain"
                 accessibilityIgnoresInvertColors
               />
             </View>
             <View style={styles.svcCompactTitleCol}>
               <View style={[styles.svcCompactTitleRow, isRTL && styles.svcCompactTitleRowRtl]}>
-                <Text style={[styles.svcCompactName, isRTL && styles.txtRtl]} numberOfLines={isStack ? 3 : 2}>
+                <Text
+                  style={[
+                    styles.svcCompactName,
+                    inactive && styles.svcCompactNameInactive,
+                    isRTL && styles.txtRtl,
+                  ]}
+                  numberOfLines={isStack ? 3 : 2}
+                >
                   {s.name}
                 </Text>
-                {s.popular ? (
+                {!inactive && s.popular ? (
                   <View style={[styles.svcCompactPopularChip, isRTL && styles.svcCompactPopularChipRtl]}>
                     <FontAwesome name="star" size={8} color="#B45309" />
                     <Text style={styles.svcCompactPopularChipTxt}>{t('shopServicesPopular')}</Text>
                   </View>
                 ) : null}
-                {s.isBestseller ? (
+                {!inactive && s.isBestseller ? (
                   <View style={[styles.svcCompactBestsellerChip, isRTL && styles.svcCompactBestsellerChipRtl]}>
                     <FontAwesome name="trophy" size={8} color={brand.white} />
                     <Text style={styles.svcCompactBestsellerChipTxt}>{t('shopBadgeBestseller')}</Text>
@@ -822,6 +905,15 @@ function ServiceCompactCard({
                   </Text>
                 </View>
               ) : null}
+              <PlatformServiceEntitlementStatus
+                entitlement={entitlement}
+                entitlementsLoading={entitlementsLoading}
+                serviceNameBySlug={serviceNameBySlug}
+                locale={locale}
+                isRTL={isRTL}
+                t={(key) => t(key as Parameters<typeof t>[0])}
+                variant="compact"
+              />
             </View>
           </View>
 
@@ -849,25 +941,35 @@ function ServiceCompactCard({
             </View>
           ) : null}
 
-          <View style={styles.svcCompactPriceBlock}>
-            <View style={styles.svcCompactPriceLabels}>
-              {hasPromo ? (
-                <View style={styles.svcCompactPromoBadge}>
-                  <Text style={styles.svcCompactPromoBadgeTxt}>{t('shopServicePromoChip')}</Text>
-                </View>
-              ) : null}
-              <View style={[styles.svcCompactPriceRow, isRTL && styles.svcCompactPriceRowRtl]}>
-                <Text style={[styles.svcCompactPrice, hasPromo && styles.priceSale]}>
-                  {formatShopPrice(displayAmount, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </Text>
-                {compareAmount ? (
-                  <Text style={styles.priceCompare}>
-                    {formatShopPrice(compareAmount, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </Text>
+          {priceMode !== 'hidden' ? (
+            <View style={styles.svcCompactPriceBlock}>
+              <View style={styles.svcCompactPriceLabels}>
+                {priceMode === 'promo-primary-only' && hasPromo ? (
+                  <View style={styles.svcCompactPromoBadge}>
+                    <Text style={styles.svcCompactPromoBadgeTxt}>{t('shopServicePromoChip')}</Text>
+                  </View>
                 ) : null}
+                <View style={[styles.svcCompactPriceRow, isRTL && styles.svcCompactPriceRowRtl]}>
+                  <Text
+                    style={[
+                      styles.svcCompactPrice,
+                      inactive && styles.svcCompactPriceInactive,
+                      (hasPromo && priceMode === 'standard') || priceMode === 'promo-primary-only'
+                        ? styles.priceSale
+                        : undefined,
+                    ]}
+                  >
+                    {formatShopPrice(pricePrimary, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </Text>
+                  {priceCompare && priceMode === 'standard' ? (
+                    <Text style={styles.priceCompare}>
+                      {formatShopPrice(priceCompare, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    </Text>
+                  ) : null}
+                </View>
               </View>
             </View>
-          </View>
+          ) : null}
 
           <View style={styles.svcCompactDetailBtn}>
             <FontAwesome name="file-text-o" size={12} color={brand.primary} />
@@ -880,18 +982,56 @@ function ServiceCompactCard({
       <View style={[styles.svcCompactActionsBar, isStack && styles.svcCompactActionsBarStack]}>
         <View style={[styles.svcCompactActions, isRTL && styles.svcCompactActionsRtl]}>
           <Pressable
-            onPress={() => void onAddCart()}
-            style={({ pressed }) => [styles.svcCompactIconBtn, inCart && styles.svcCompactIconBtnIn, pressed && { opacity: 0.88 }]}
-            accessibilityLabel={t('shopAddA11y')}
+            onPress={() => {
+              if (!purchasable && !inCart) return;
+              void onAddCart();
+            }}
+            disabled={(!purchasable && !inCart) || entitlementsLoading}
+            style={({ pressed }) => [
+              styles.svcCompactIconBtn,
+              inCart && styles.svcCompactIconBtnIn,
+              (!purchasable && !inCart) || entitlementsLoading
+                ? styles.svcCompactIconBtnDisabled
+                : undefined,
+              pressed && purchasable && !entitlementsLoading && { opacity: 0.88 },
+            ]}
+            accessibilityLabel={
+              !purchasable && !inCart
+                ? t('shopEntitlementNotPurchasable')
+                : inCart
+                  ? t('shopRemoveFromCartA11y')
+                  : t('shopAddA11y')
+            }
           >
-            <FontAwesome name={inCart ? 'check' : 'shopping-cart'} size={14} color={inCart ? brand.white : brand.primary} />
+            <FontAwesome
+              name={inCart ? 'check' : 'shopping-cart'}
+              size={14}
+              color={!purchasable && !inCart ? '#94A3B8' : inCart ? brand.white : brand.primary}
+            />
           </Pressable>
           <Pressable
-            onPress={() => void onBuyNow()}
-            style={({ pressed }) => [styles.svcCompactBuyBtn, pressed && { opacity: 0.9 }]}
-            accessibilityLabel={t('shopBuyNowA11y')}
+            onPress={() => {
+              if (!purchasable && !inCart) return;
+              void onBuyNow();
+            }}
+            disabled={(!purchasable && !inCart) || entitlementsLoading}
+            style={({ pressed }) => [
+              styles.svcCompactBuyBtn,
+              ((!purchasable && !inCart) || entitlementsLoading) && styles.svcCompactBuyBtnDisabled,
+              pressed && purchasable && !entitlementsLoading && { opacity: 0.9 },
+            ]}
+            accessibilityLabel={
+              !purchasable && !inCart ? t('shopEntitlementNotPurchasable') : t('shopBuyNowA11y')
+            }
           >
-            <Text style={styles.svcCompactBuyTxt}>{t('shopBuyNow')}</Text>
+            <Text
+              style={[
+                styles.svcCompactBuyTxt,
+                ((!purchasable && !inCart) || entitlementsLoading) && styles.svcCompactBuyTxtDisabled,
+              ]}
+            >
+              {platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'shopBuyNow')}
+            </Text>
           </Pressable>
         </View>
       </View>
@@ -1029,7 +1169,7 @@ function ProductCard({
               inCart && styles.addBtnIn,
               pressed && { opacity: 0.85 },
             ]}
-            accessibilityLabel={inCart ? t('shopAddedA11y') : t('shopAddA11y')}
+            accessibilityLabel={inCart ? t('shopRemoveFromCartA11y') : t('shopAddA11y')}
           >
             <FontAwesome
               name={inCart ? 'check' : 'shopping-cart'}
@@ -1397,10 +1537,17 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     marginBottom: spacing.md,
   },
+  svcCompactOuterInactive: {
+    backgroundColor: '#F1F5F9',
+    opacity: 0.9,
+  },
   svcCompactAccent: {
     height: 2,
     width: '100%',
     backgroundColor: 'rgba(51,62,143,0.35)',
+  },
+  svcCompactAccentInactive: {
+    backgroundColor: '#CBD5E1',
   },
   svcCompactBody: {
     padding: spacing.sm + 2,
@@ -1426,6 +1573,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  svcCompactIconCircleInactive: {
+    backgroundColor: '#F1F5F9',
+  },
   svcCompactTitleCol: {
     flex: 1,
     minWidth: 0,
@@ -1448,6 +1598,9 @@ const styles = StyleSheet.create({
     color: brand.text,
     lineHeight: 20,
     letterSpacing: -0.2,
+  },
+  svcCompactNameInactive: {
+    color: '#94A3B8',
   },
   svcCompactPopularChip: {
     flexDirection: 'row',
@@ -1596,11 +1749,21 @@ const styles = StyleSheet.create({
   svcCompactPriceRowRtl: {
     flexDirection: 'row-reverse',
   },
+  svcCompactPriceInactive: {
+    color: '#94A3B8',
+  },
   svcCompactPrice: {
     fontSize: 17,
     fontWeight: '800',
     color: brand.primary,
     letterSpacing: -0.3,
+  },
+  svcIncludedPriceHint: {
+    marginTop: spacing.sm,
+    fontSize: 13,
+    fontWeight: '800',
+    color: brand.emerald,
+    lineHeight: 18,
   },
   svcCompactDetailBtn: {
     marginTop: spacing.sm,
@@ -1646,6 +1809,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: brand.white,
   },
+  svcCompactIconBtnDisabled: {
+    opacity: 0.55,
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
   svcCompactIconBtnIn: {
     backgroundColor: brand.emerald,
     borderColor: brand.emerald,
@@ -1663,6 +1831,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.1,
+  },
+  svcCompactBuyBtnDisabled: {
+    backgroundColor: '#CBD5E1',
+  },
+  svcCompactBuyTxtDisabled: {
+    color: '#F8FAFC',
   },
 
   /* Error */

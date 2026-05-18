@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { OrderPromoApplyBlock } from '@/components/shop/OrderPromoApplyBlock';
 import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVisualThumb';
 import { Text } from '@/components/ui/Text';
 import { getApiBaseUrl } from '@/constants/api';
@@ -92,6 +93,10 @@ export default function AccountOrderDetailScreen() {
   );
 
   const statusUi = order ? shopOrderStatusUi(order.status, locale) : null;
+  const promoDiscount =
+    order?.promoDiscountAmount && parseFloat(String(order.promoDiscountAmount).replace(',', '.')) > 0
+      ? order.promoDiscountAmount
+      : null;
 
   const onPickReceipt = useCallback(async () => {
     if (!publicId || !order) return;
@@ -318,6 +323,21 @@ export default function AccountOrderDetailScreen() {
               <Text style={styles.sumVal}>{formatShopPrice(order.shippingFee, order.currency)}</Text>
             </View>
           ) : null}
+          {promoDiscount ? (
+            <View style={[styles.sumRow, isRTL && styles.rowRtl]}>
+              <Text style={[styles.sumLbl, styles.promoLbl]}>
+                {t('accountOrderPromoDiscount')}
+                {order.promoCodeLabel?.trim() ? ` (${order.promoCodeLabel.trim()})` : ''}
+              </Text>
+              <Text style={[styles.sumVal, styles.promoVal]}>−{formatShopPrice(promoDiscount, order.currency)}</Text>
+            </View>
+          ) : null}
+          <OrderPromoApplyBlock
+            publicId={publicId}
+            order={order}
+            isRTL={isRTL}
+            onOrderUpdated={setOrder}
+          />
           <View style={[styles.sumRow, isRTL && styles.rowRtl]}>
             <Text style={styles.sumTotalLbl}>{t('shopThankTotalLabel')}</Text>
             <Text style={styles.sumTotalVal}>{formatShopPrice(order.total, order.currency)}</Text>
@@ -485,4 +505,6 @@ const styles = StyleSheet.create({
   sumVal: { fontWeight: '600', color: homeShell.cardText },
   sumTotalLbl: { fontWeight: '800', color: homeShell.cardText },
   sumTotalVal: { fontWeight: '800', color: brand.primary, fontSize: fontSize.md },
+  promoLbl: { color: '#166534' },
+  promoVal: { color: '#166534', fontWeight: '700' },
 });

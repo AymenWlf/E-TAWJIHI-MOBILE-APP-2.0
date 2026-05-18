@@ -352,6 +352,160 @@ export type HomeCopyKey =
   | 'accountSubtitle'
   | 'accountLoginCta'
   | 'accountSectionProfile'
+  | 'accountSectionActiveServices'
+  | 'accountActiveServicesLoading'
+  | 'accountActiveServicesError'
+  | 'accountActiveServicesEmpty'
+  | 'accountActiveServicesEndDate'
+  | 'accountActiveServicesNoEndDate'
+  | 'accountActiveServicesDaysRemaining'
+  | 'accountActiveServicesOneDayLeft'
+  | 'accountActiveServicesEndsToday'
+  | 'accountActiveServicesContract'
+  | 'accountActiveServicesPrice'
+  | 'accountActiveServicesPromo'
+  | 'accountActiveServicesPaymentComplete'
+  | 'accountActiveServicesPaymentIncomplete'
+  | 'accountActiveServicesRemaining'
+  | 'accountActiveServicesPaid'
+  | 'accountActiveServicesTotal'
+  | 'accountActiveServicesTransactions'
+  | 'accountActiveServicesNoTransactions'
+  | 'accountActiveServicesTxDate'
+  | 'accountActiveServicesTxMethod'
+  | 'accountActiveServicesTxStatus'
+  | 'accountActiveServicesDownloadReceipt'
+  | 'accountActiveServicesReceiptSoonTitle'
+  | 'accountActiveServicesReceiptSoonBody'
+  | 'referralTeaserTitle'
+  | 'referralTeaserSubtitle'
+  | 'referralTeaserCta'
+  | 'referralPageTitle'
+  | 'referralBalanceLabel'
+  | 'referralPointsUnit'
+  | 'referralPendingPoints'
+  | 'referralYourCode'
+  | 'referralYourLink'
+  | 'referralCopyCode'
+  | 'referralCopyLink'
+  | 'referralCopied'
+  | 'referralShareWhatsApp'
+  | 'referralHowItWorks'
+  | 'referralStep1Title'
+  | 'referralStep1Body'
+  | 'referralStep2Title'
+  | 'referralStep2Body'
+  | 'referralStep3Title'
+  | 'referralStep3Body'
+  | 'referralStep4Title'
+  | 'referralStep4Body'
+  | 'referralInvitesTitle'
+  | 'referralInviteCompleted'
+  | 'referralInviteNotCompleted'
+  | 'referralPointsEarned'
+  | 'referralPointsPendingLabel'
+  | 'referralHistoryTitle'
+  | 'referralLedgerProfile'
+  | 'referralLedgerOrder'
+  | 'referralLedgerBonus'
+  | 'referralLedgerSpend'
+  | 'referralPartnersTitle'
+  | 'referralPartnersHint'
+  | 'referralRedeemSoon'
+  | 'referralShareMessage'
+  | 'referralInvitesEmpty'
+  | 'referralViewAllInvites'
+  | 'referralPointsSoonNote'
+  | 'referralPageSubtitle'
+  | 'referralReferredDiscountHint'
+  | 'referralReferredDiscountBadge'
+  | 'referralReferredDiscountShopLine'
+  | 'referralLockedTitle'
+  | 'referralLockedBody'
+  | 'referralLockedCta'
+  | 'referralTiersTitle'
+  | 'referralTiersSubtitle'
+  | 'referralQualifiedCount'
+  | 'referralTierBadge'
+  | 'referralTierUnlocked'
+  | 'referralTierRemaining'
+  | 'referralTierThreshold'
+  | 'referralTeaserQualifiedLabel'
+  | 'referralTeaserAllUnlocked'
+  | 'referralStep3BodyNew'
+  | 'referralStep4BodyNew'
+  | 'referralTierPickReward'
+  | 'referralTierYourReward'
+  | 'referralTierPickProduct'
+  | 'referralTierChoiceHint'
+  | 'referralTierGeneratePromo'
+  | 'referralTierPromoTitle'
+  | 'referralTierPromoUsed'
+  | 'referralTierPromoAvailable'
+  | 'referralTierPromoHint'
+  | 'referralTierPromoError'
+  | 'referralTierGoShop'
+  | 'referralSingleRewardHint'
+  | 'referralRewardTakenBadge'
+  | 'referralRewardTakenOnOtherTier'
+  | 'loyaltyTeaserTitle'
+  | 'loyaltyTeaserSubtitle'
+  | 'loyaltyTeaserCta'
+  | 'loyaltyTeaserNextReward'
+  | 'loyaltyPageTitle'
+  | 'loyaltyBalanceLabel'
+  | 'loyaltyPointsUnit'
+  | 'loyaltyPendingPoints'
+  | 'loyaltyHowItWorks'
+  | 'loyaltyEarnRate'
+  | 'loyaltyRateBadge'
+  | 'loyaltyStep1Title'
+  | 'loyaltyStep1Body'
+  | 'loyaltyStep2Title'
+  | 'loyaltyStep2Body'
+  | 'loyaltyStep3Title'
+  | 'loyaltyStep3Body'
+  | 'loyaltyStep4Title'
+  | 'loyaltyStep4Body'
+  | 'loyaltyRewardsTitle'
+  | 'loyaltyRewardsHint'
+  | 'loyaltyTierLabel'
+  | 'loyaltyRedeemCta'
+  | 'loyaltyRedeemLocked'
+  | 'loyaltyRedeemInactive'
+  | 'loyaltyRedeemSoonTitle'
+  | 'loyaltyRedeemSoonBody'
+  | 'loyaltyRedeemConfirmTitle'
+  | 'loyaltyRedeemConfirmBody'
+  | 'loyaltyRedeemSuccessTitle'
+  | 'loyaltyRedeemSuccessBody'
+  | 'loyaltyRedeemAlreadyUsed'
+  | 'loyaltyRedeemInsufficient'
+  | 'loyaltyRedeemError'
+  | 'loyaltyRedeemCancel'
+  | 'loyaltyAlreadyRedeemedLabel'
+  | 'loyaltyPointsToUnlock'
+  | 'loyaltyNextRewardBar'
+  | 'loyaltyGroupProducts'
+  | 'loyaltyGroupServices'
+  | 'loyaltyCatalogLoading'
+  | 'loyaltyCatalogError'
+  | 'loyaltyCatalogRetry'
+  | 'loyaltyCatalogEmpty'
+  | 'loyaltyHistoryTitle'
+  | 'loyaltyLedgerEarn'
+  | 'loyaltyLedgerSpend'
+  | 'loyaltyLedgerWelcome'
+  | 'loyaltyPointsGoal'
+  | 'loyaltyViewAllRewards'
+  | 'loyaltyViewAllCount'
+  | 'loyaltyCatalogPageTitle'
+  | 'loyaltyCatalogPageSubtitle'
+  | 'loyaltyTimelineBalanceFoot'
+  | 'loyaltyEarnRulesTitle'
+  | 'loyaltyEarnRulesSelf'
+  | 'loyaltyEarnRulesReferrer'
+  | 'loyaltyPerMadSuffix'
   | 'accountSectionAcademic'
   | 'accountMassarCode'
   | 'accountStudentCode'
@@ -383,6 +537,8 @@ export type HomeCopyKey =
   | 'accountOrdersError'
   | 'accountTabProfile'
   | 'accountTabOrders'
+  | 'accountOrdersOpenBadgeA11y'
+  | 'accountOrdersOpenCount'
   | 'accountOrdersSegmentAll'
   | 'accountOrdersSegmentProducts'
   | 'accountOrdersSegmentServices'
@@ -394,6 +550,14 @@ export type HomeCopyKey =
   | 'accountOrderPaymentSection'
   | 'accountOrderRecapSection'
   | 'accountOrderCompletedNote'
+  | 'accountOrderPromoAddTitle'
+  | 'accountOrderPromoPlaceholder'
+  | 'accountOrderPromoApply'
+  | 'accountOrderPromoApplying'
+  | 'accountOrderPromoHint'
+  | 'accountOrderPromoLockedHint'
+  | 'accountOrderPromoDiscount'
+  | 'accountOrderPromoApplied'
   | 'estNotFound'
   | 'shopEyebrow'
   | 'shopTitle'
@@ -461,6 +625,19 @@ export type HomeCopyKey =
   | 'shopCheckoutPhNotes'
   | 'shopCheckoutRecapTitle'
   | 'shopCheckoutLblSubtotal'
+  | 'shopCheckoutPromoTitle'
+  | 'shopCheckoutPromoHint'
+  | 'shopCheckoutPromoPh'
+  | 'shopCheckoutPromoApply'
+  | 'shopCheckoutPromoRemove'
+  | 'shopCheckoutLblDiscount'
+  | 'shopCheckoutLblDiscountPercent'
+  | 'shopCheckoutLblArticlesNet'
+  | 'shopCheckoutPromoAppliedPercent'
+  | 'shopCheckoutPromoAppliedFixed'
+  | 'shopCheckoutPromoScopedHint'
+  | 'shopCheckoutPromoErrEnter'
+  | 'shopCheckoutPromoErrValidate'
   | 'shopCheckoutLblShipping'
   | 'shopCheckoutShipNoPhysical'
   | 'shopCheckoutShipFree'
@@ -527,6 +704,16 @@ export type HomeCopyKey =
   | 'shopSearchServicesPlaceholder'
   | 'shopServiceDetail'
   | 'shopServicePromoChip'
+  | 'shopEntitlementAlreadyOwned'
+  | 'shopEntitlementIncluded'
+  | 'shopEntitlementIncludedVia'
+  | 'shopEntitlementBlocked'
+  | 'shopEntitlementRequiresPrerequisite'
+  | 'shopEntitlementUpgradeAvailable'
+  | 'shopEntitlementNotPurchasable'
+  | 'shopEntitlementChecking'
+  | 'shopEntitlementIncludedNoPurchase'
+  | 'shopEntitlementIncludedPriceHint'
   | 'shopErrorLoad'
   | 'shopLoading'
   | 'shopEmptyTitle'
@@ -541,6 +728,7 @@ export type HomeCopyKey =
   | 'shopOutOfStock'
   | 'shopAddA11y'
   | 'shopAddedA11y'
+  | 'shopRemoveFromCartA11y'
   | 'shopBuyNow'
   | 'shopBuyNowA11y'
   | 'shopViewProductA11y'
@@ -1163,7 +1351,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsSectorNoResults: 'Aucun secteur trouvé',
     schoolsDiplomaLabel: 'Diplôme délivré',
     schoolsAllDiplomas: 'Tous',
-    schoolsFeesLabel: 'Frais scolarité (MAD / an)',
+    schoolsFeesLabel: 'Frais scolarité (Dhs / an)',
     schoolsMin: 'Min',
     schoolsMax: 'Max',
     schoolsToggleRecommended: 'Recommandées uniquement',
@@ -1358,6 +1546,173 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountSubtitle: 'Consultez et mettez à jour vos informations.',
     accountLoginCta: 'Se connecter',
     accountSectionProfile: 'Profil',
+    accountSectionActiveServices: 'Mes services actifs',
+    accountActiveServicesLoading: 'Chargement de vos services…',
+    accountActiveServicesError: 'Impossible de charger vos services.',
+    accountActiveServicesEmpty: 'Aucun service actif pour le moment.',
+    accountActiveServicesEndDate: 'Fin d\'accès',
+    accountActiveServicesNoEndDate: 'Accès sans date de fin',
+    accountActiveServicesDaysRemaining: '{{count}} jours restants',
+    accountActiveServicesOneDayLeft: '1 jour restant',
+    accountActiveServicesEndsToday: 'Se termine aujourd\'hui',
+    accountActiveServicesContract: 'Contrat',
+    accountActiveServicesPrice: 'Montant',
+    accountActiveServicesPromo: 'Promo',
+    accountActiveServicesPaymentComplete: 'Paiement complet',
+    accountActiveServicesPaymentIncomplete: 'Paiement non complet',
+    accountActiveServicesRemaining: 'Reste à payer',
+    accountActiveServicesPaid: 'Payé',
+    accountActiveServicesTotal: 'Total',
+    accountActiveServicesTransactions: 'Paiements enregistrés',
+    accountActiveServicesNoTransactions: 'Aucun paiement enregistré pour ce service.',
+    accountActiveServicesTxDate: 'Date',
+    accountActiveServicesTxMethod: 'Moyen',
+    accountActiveServicesTxStatus: 'Statut',
+    accountActiveServicesDownloadReceipt: 'Télécharger le reçu',
+    accountActiveServicesReceiptSoonTitle: 'Reçu de paiement',
+    accountActiveServicesReceiptSoonBody:
+      'Le téléchargement du reçu sera disponible prochainement. En attendant, contactez votre conseiller si vous avez besoin d’une attestation.',
+    referralTeaserTitle: 'Programme parrainage & cadeaux',
+    referralTeaserSubtitle: 'Invitez vos proches et débloquez des cadeaux à chaque palier.',
+    referralTeaserCta: 'Voir le programme parrainage & cadeaux',
+    referralPageTitle: 'Programme parrainage & cadeaux',
+    referralPageSubtitle:
+      'Invitez vos proches : chaque achat TAWJIH PLUS compte pour débloquer vos récompenses.',
+    referralReferredDiscountHint:
+      'Vos parrainés bénéficient de {{percent}} de réduction en boutique avec votre code.',
+    referralReferredDiscountBadge: '{{percent}} en boutique',
+    referralReferredDiscountShopLine: 'en boutique',
+    referralLockedTitle: 'Programme parrainage & cadeaux verrouillé',
+    referralLockedBody:
+      'Un service {{service}} actif est requis pour partager votre code et débloquer vos récompenses.',
+    referralLockedCta: 'Voir les services',
+    referralTiersTitle: 'Vos paliers récompenses',
+    referralTiersSubtitle: 'Parrainés ayant acheté {{service}}',
+    referralQualifiedCount: '{{count}} parrainé(s) qualifié(s)',
+    referralTierBadge: 'Palier {{n}}',
+    referralTierUnlocked: 'Débloqué',
+    referralTierRemaining: 'Encore {{count}}',
+    referralTierThreshold: 'Objectif : {{count}} parrainés',
+    referralTeaserQualifiedLabel: 'parrainés qualifiés',
+    referralTeaserAllUnlocked: 'Tous les paliers débloqués',
+    referralTierPickReward: 'Choisissez votre récompense',
+    referralTierYourReward: 'Votre récompense',
+    referralTierPickProduct: 'Sélectionnez un produit avant de générer le code.',
+    referralTierChoiceHint: '{{count}} récompenses au choix une fois le palier débloqué',
+    referralTierGeneratePromo: 'Générer mon code promo 100 %',
+    referralTierPromoTitle: 'Votre code promo',
+    referralTierPromoUsed: 'Code utilisé',
+    referralTierPromoAvailable: 'Code disponible — 1 utilisation',
+    referralTierPromoHint: 'Code à 100 % sur le produit sélectionné, valable une seule fois en boutique.',
+    referralTierPromoError: 'Impossible de générer le code. Réessayez.',
+    referralTierGoShop: 'Utiliser en boutique',
+    referralSingleRewardHint: 'Une seule récompense au choix : palier 1 ou palier 2.',
+    referralRewardTakenBadge: 'Récompense prise',
+    referralRewardTakenOnOtherTier: 'Récompense déjà prise sur le palier {{tier}}',
+    referralBalanceLabel: 'Mes points',
+    referralPointsUnit: 'pts',
+    referralPendingPoints: '{{count}} pts en attente de validation',
+    referralYourCode: 'Mon code',
+    referralYourLink: 'Mon lien',
+    referralCopyCode: 'Copier le code',
+    referralCopyLink: 'Copier le lien',
+    referralCopied: 'Copié dans le presse-papiers',
+    referralShareWhatsApp: 'Partager sur WhatsApp',
+    referralHowItWorks: 'Comment ça marche',
+    referralStep1Title: 'Partagez',
+    referralStep1Body: 'Envoyez votre code ou lien à un ami ou un membre de votre famille.',
+    referralStep2Title: 'Il s’inscrit',
+    referralStep2Body: 'Votre parrainé crée son compte avec votre code et complète son profil.',
+    referralStep3Title: 'Il achète',
+    referralStep3Body: 'Points bonus quand il passe une commande ou un service orientation.',
+    referralStep3BodyNew:
+      'Lorsque votre parrainé achète TAWJIH PLUS, il est comptabilisé pour vos paliers.',
+    referralStep4Title: 'Récompenses',
+    referralStep4Body: 'Utilisez vos points sur la boutique E-Tawjihi ou chez nos partenaires.',
+    referralStep4BodyNew:
+      '5 parrainés → livre concours · 10 → pack complet (selon la configuration active).',
+    referralInvitesTitle: 'Mes parrainés',
+    referralInviteCompleted: 'Parrainage complété',
+    referralInviteNotCompleted: 'Pas encore complété',
+    referralPointsEarned: '+{{count}} pts',
+    referralPointsPendingLabel: '{{count}} pts en attente',
+    referralHistoryTitle: 'Historique des points',
+    referralLedgerProfile: 'Profil parrainé complété',
+    referralLedgerOrder: 'Commande parrainé',
+    referralLedgerBonus: 'Bonus parrainage',
+    referralLedgerSpend: 'Utilisation boutique',
+    referralPartnersTitle: 'Récompenses partenaires',
+    referralPartnersHint: 'Échangez vos points contre des offres chez nos partenaires.',
+    referralRedeemSoon: 'Bientôt disponible',
+    referralShareMessage:
+      'Salut ! Je t’invite sur E-Tawjihi pour ton orientation. Utilise mon code {{code}} ({{percent}}% de remise boutique) ou ce lien : {{link}}',
+    referralInvitesEmpty:
+      'Aucun parrainé pour le moment. Partagez votre code pour inviter vos amis.',
+    referralViewAllInvites: 'Voir tous mes parrainés',
+    referralPointsSoonNote:
+      'Parrainage actif : votre code et le suivi des parrainés sont en ligne. Le crédit des points de récompense arrive dans une prochaine mise à jour.',
+    loyaltyTeaserTitle: 'Programme parrainage & cadeaux',
+    loyaltyTeaserSubtitle: 'Invitez vos proches et débloquez des cadeaux à chaque palier.',
+    loyaltyTeaserCta: 'Voir le programme parrainage & cadeaux',
+    loyaltyTeaserNextReward: 'Prochain palier',
+    loyaltyPageTitle: 'Fidélité',
+    loyaltyBalanceLabel: 'Mes points',
+    loyaltyPointsUnit: 'pts',
+    loyaltyPendingPoints: '{{count}} pts en attente après vos commandes',
+    loyaltyHowItWorks: 'Comment ça marche',
+    loyaltyEarnRate: '{{rate}} pts / Dhs — chaque dirham dépensé en boutique (commande confirmée).',
+    loyaltyRateBadge: '{{rate}} pts / Dhs',
+    loyaltyStep1Title: 'Achetez',
+    loyaltyStep1Body: 'Passez commande sur la boutique E-Tawjihi (livres, packs, etc.).',
+    loyaltyStep2Title: 'Cumulez',
+    loyaltyStep2Body: 'Vos points sont crédités après validation du paiement.',
+    loyaltyStep3Title: 'Débloquez',
+    loyaltyStep3Body: 'Atteignez les paliers pour échanger contre un produit ou un service réel.',
+    loyaltyStep4Title: 'Parrainez',
+    loyaltyStep4Body: 'Invitez vos proches avec votre code : leur progression est suivie dans votre espace parrainage.',
+    loyaltyRewardsTitle: 'Paliers récompenses',
+    loyaltyRewardsHint: 'Produits et services de votre catalogue, classés par points requis.',
+    loyaltyTierLabel: 'P{{n}}',
+    loyaltyRedeemCta: 'Échanger',
+    loyaltyRedeemLocked: 'Verrouillé',
+    loyaltyRedeemInactive: 'Déblocage suspendu',
+    loyaltyRedeemSoonTitle: 'Bientôt disponible',
+    loyaltyRedeemSoonBody:
+      'L’échange de points sera activé prochainement. En attendant, explorez le produit ou le service.',
+    loyaltyRedeemConfirmTitle: 'Échanger cette récompense ?',
+    loyaltyRedeemConfirmBody:
+      '« {{title}} » sera débloquée pour {{count}} {{unit}}. Cette récompense ne peut être utilisée qu’une seule fois.',
+    loyaltyRedeemSuccessTitle: 'Récompense échangée',
+    loyaltyRedeemSuccessBody:
+      '« {{title}} » est débloquée. {{count}} {{unit}} ont été déduits de votre solde.',
+    loyaltyRedeemAlreadyUsed: 'Vous avez déjà échangé cette récompense.',
+    loyaltyRedeemInsufficient: 'Solde de points insuffisant.',
+    loyaltyRedeemError: 'Impossible d’échanger cette récompense. Réessayez plus tard.',
+    loyaltyRedeemCancel: 'Annuler',
+    loyaltyAlreadyRedeemedLabel: 'Déjà échangé',
+    loyaltyPointsToUnlock: 'Encore {{count}} pts',
+    loyaltyNextRewardBar: 'Prochain : {{title}} — encore {{count}} pts',
+    loyaltyGroupProducts: 'Produits boutique',
+    loyaltyGroupServices: 'Services orientation',
+    loyaltyCatalogLoading: 'Chargement du catalogue…',
+    loyaltyCatalogError: 'Impossible de charger les récompenses.',
+    loyaltyCatalogRetry: 'Réessayer',
+    loyaltyCatalogEmpty: 'Aucune récompense disponible pour le moment.',
+    loyaltyHistoryTitle: 'Historique des points',
+    loyaltyLedgerEarn: 'Points gagnés (achat)',
+    loyaltyLedgerSpend: 'Échange récompense',
+    loyaltyLedgerWelcome: 'Bonus de bienvenue',
+    loyaltyPointsGoal: 'Objectif : {{count}} {{unit}}',
+    loyaltyViewAllRewards: 'Voir tout le catalogue',
+    loyaltyViewAllCount: '{{count}} récompenses',
+    loyaltyCatalogPageTitle: 'Catalogue récompenses',
+    loyaltyCatalogPageSubtitle:
+      'Débloquez chaque palier en cumulant des points. Les récompenses verrouillées s’activent à l’objectif indiqué.',
+    loyaltyTimelineBalanceFoot: 'Vous avez {{balance}} {{unit}}',
+    loyaltyEarnRulesTitle: 'Comment gagner des points',
+    loyaltyEarnRulesSelf: 'Vos actions',
+    loyaltyEarnRulesReferrer: 'Quand vos parrainés avancent (1/5 des points de l’action)',
+    loyaltyPerMadSuffix: '/ Dhs',
     accountSectionAcademic: 'Infos académiques',
     accountMassarCode: 'Code Massar',
     accountStudentCode: 'Code étudiant',
@@ -1389,6 +1744,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountOrdersError: 'Impossible de charger les commandes.',
     accountTabProfile: 'Mes informations',
     accountTabOrders: 'Mes commandes',
+    accountOrdersOpenBadgeA11y: '{{count}} commandes en cours',
+    accountOrdersOpenCount: '{{count}} en cours',
     accountOrdersSegmentAll: 'Tous',
     accountOrdersSegmentProducts: 'Produits',
     accountOrdersSegmentServices: 'Services',
@@ -1400,6 +1757,16 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountOrderPaymentSection: 'Paiement des services',
     accountOrderRecapSection: 'Récapitulatif',
     accountOrderCompletedNote: 'Commande terminée — récapitulatif ci-dessous.',
+    accountOrderPromoAddTitle: 'Code promo',
+    accountOrderPromoPlaceholder: 'Saisir le code',
+    accountOrderPromoApply: 'Appliquer',
+    accountOrderPromoApplying: 'Application…',
+    accountOrderPromoHint:
+      'Vous pouvez ajouter un code tant que la commande est en attente ou en cours de traitement.',
+    accountOrderPromoLockedHint:
+      'Code promo verrouillé : la commande n’est plus en attente ni en cours de traitement.',
+    accountOrderPromoDiscount: 'Remise code promo',
+    accountOrderPromoApplied: 'Code promo appliqué.',
     estNotFound: 'Introuvable',
     shopEyebrow: 'E-Tawjihi',
     shopTitle: 'Boutique',
@@ -1408,7 +1775,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopClearSearchA11y: 'Effacer la recherche',
     shopCartA11y: 'Panier',
     shopCartPayMethodsTitle: 'Moyens de paiement possibles',
-    shopCartPayMethodCashDelivery: 'Espèces à la livraison (MAD)',
+    shopCartPayMethodCashDelivery: 'Espèces à la livraison (Dhs)',
     shopCartPayMethodOffice: 'Paiement au bureau',
     shopCartPayMethodBankTransfer: 'Virement bancaire',
     shopCartPayMethodCashplus: 'Cashplus',
@@ -1439,7 +1806,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCheckoutErrSubmit: 'Impossible de finaliser la commande. Réessayez.',
     shopCheckoutErrGeneric: 'Une erreur est survenue.',
     shopCheckoutDeliveryTitle: 'Livraison',
-    shopCheckoutDeliveryDesc: 'Livraison à domicile — paiement en espèces à la réception (MAD).',
+    shopCheckoutDeliveryDesc: 'Livraison à domicile — paiement en espèces à la réception (Dhs).',
     shopCheckoutDeliveryInfo:
       'Indiquez la ville de livraison et l’adresse pour calculer les frais de port.',
     shopCheckoutDeliveryInfoFree: ' (livraison offerte sur ce panier).',
@@ -1472,6 +1839,20 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCheckoutPhNotes: 'Précisions utiles…',
     shopCheckoutRecapTitle: 'Récapitulatif',
     shopCheckoutLblSubtotal: 'Sous-total',
+    shopCheckoutPromoTitle: 'Code promo',
+    shopCheckoutPromoHint:
+      'Un seul code par commande. Si le code est lié à certains articles, la remise ne s’applique qu’à ceux-ci.',
+    shopCheckoutPromoPh: 'ETW-XXXX',
+    shopCheckoutPromoApply: 'Appliquer',
+    shopCheckoutPromoRemove: 'Retirer',
+    shopCheckoutLblDiscount: 'Remise ({code})',
+    shopCheckoutLblDiscountPercent: 'Remise {pct} % ({code})',
+    shopCheckoutLblArticlesNet: 'Total articles',
+    shopCheckoutPromoAppliedPercent: '−{pct} % appliqué sur {base} (articles éligibles).',
+    shopCheckoutPromoAppliedFixed: 'Remise fixe de {amount} sur les articles éligibles.',
+    shopCheckoutPromoScopedHint: 'La remise ne porte que sur {base} (articles liés au code).',
+    shopCheckoutPromoErrEnter: 'Saisissez un code promo',
+    shopCheckoutPromoErrValidate: 'Impossible de valider le code',
     shopCheckoutLblShipping: 'Livraison',
     shopCheckoutShipNoPhysical: 'Sans envoi (services)',
     shopCheckoutShipFree: 'Offert',
@@ -1479,7 +1860,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCheckoutLblTotal: 'Total',
     shopCheckoutConfirmBtn: 'Confirmer la commande',
     shopCheckoutDisclaimerPod:
-      'Règlement prévu en espèces (MAD) à la livraison (produits physiques et services) — l’équipe peut vous confirmer par téléphone ou email.',
+      'Règlement prévu en espèces (Dhs) à la livraison (produits physiques et services) — l’équipe peut vous confirmer par téléphone ou email.',
     shopCheckoutDisclaimerInstr: 'Les instructions de paiement (RIB, Cashplus ou bureau) s’affichent après validation.',
     shopCheckoutDisclaimerSecure: 'Données transmises de façon sécurisée — pas de paiement carte.',
     shopCheckoutSheetCityShip: 'Ville de livraison',
@@ -1492,7 +1873,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCheckoutVilleMetaFree:
       'Tarif catalogue zone : {price} · délai indicatif : {delais} · frais facturés : offerts (panier éligible).',
     shopCheckoutVilleMetaFixed:
-      'Tarif catalogue zone : {price} · délai indicatif : {delais} · frais facturés au panier : {fee} MAD (mode fixe boutique).',
+      'Tarif catalogue zone : {price} · délai indicatif : {delais} · frais facturés au panier : {fee} Dhs (mode fixe boutique).',
     shopCheckoutVilleMetaCatalog:
       'Frais de livraison facturés : {fee} · délai indicatif : {delais}',
     shopCheckoutShipFreeBanner: 'Livraison offerte sur tout le panier (au moins un article éligible).',
@@ -1520,7 +1901,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopThankMissionLine: 'Spé. Mission : {v}',
     shopThankStudentCityLine: 'Ville : {v}',
     shopThankDelayIndicative: 'Délai indicatif : {delay}',
-    shopThankCodCashTip: 'Paiement en espèces (MAD) à la réception.',
+    shopThankCodCashTip: 'Paiement en espèces (Dhs) à la réception.',
     shopThankPickupPayOnSite: 'Règlement sur place lors du retrait.',
     shopThankSummarySubtotalItems: 'Sous-total articles',
     shopThankSummaryShipLbl: 'Livraison',
@@ -1544,6 +1925,16 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopSearchServicesPlaceholder: 'Rechercher un service…',
     shopServiceDetail: 'Détail',
     shopServicePromoChip: 'Promo',
+    shopEntitlementAlreadyOwned: 'Déjà actif sur votre compte',
+    shopEntitlementIncluded: 'Déjà inclus dans votre offre',
+    shopEntitlementIncludedVia: 'Inclus avec {name}',
+    shopEntitlementBlocked: 'Non disponible à l’achat',
+    shopEntitlementRequiresPrerequisite: 'Prérequis requis',
+    shopEntitlementUpgradeAvailable: 'Upgrade possible',
+    shopEntitlementNotPurchasable: 'Achat indisponible',
+    shopEntitlementChecking: 'Vérification de votre éligibilité…',
+    shopEntitlementIncludedNoPurchase: 'Inclus dans votre offre — sans achat séparé',
+    shopEntitlementIncludedPriceHint: 'Déjà inclus dans votre offre — pas d’achat séparé',
     shopErrorLoad: 'Impossible de charger la boutique.',
     shopLoading: 'Chargement…',
     shopEmptyTitle: 'Aucun produit',
@@ -1559,6 +1950,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopOutOfStock: 'Rupture de stock',
     shopAddA11y: 'Ajouter au panier',
     shopAddedA11y: 'Déjà au panier',
+    shopRemoveFromCartA11y: 'Retirer du panier',
     shopBuyNow: 'Commander',
     shopBuyNowA11y: 'Commander maintenant',
     shopViewProductA11y: 'Voir le produit',
@@ -2404,6 +2796,164 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountSubtitle: 'اطّلع على معلوماتك وقم بتحديثها.',
     accountLoginCta: 'تسجيل الدخول',
     accountSectionProfile: 'الملف الشخصي',
+    accountSectionActiveServices: 'خدماتي النشطة',
+    accountActiveServicesLoading: 'جارٍ تحميل الخدمات…',
+    accountActiveServicesError: 'تعذّر تحميل الخدمات.',
+    accountActiveServicesEmpty: 'لا توجد خدمة نشطة حالياً.',
+    accountActiveServicesEndDate: 'نهاية الوصول',
+    accountActiveServicesNoEndDate: 'وصول بدون تاريخ نهاية',
+    accountActiveServicesDaysRemaining: '{{count}} يوماً متبقياً',
+    accountActiveServicesOneDayLeft: 'يوم واحد متبقٍ',
+    accountActiveServicesEndsToday: 'ينتهي اليوم',
+    accountActiveServicesContract: 'العقد',
+    accountActiveServicesPrice: 'المبلغ',
+    accountActiveServicesPromo: 'عرض',
+    accountActiveServicesPaymentComplete: 'الدفع مكتمل',
+    accountActiveServicesPaymentIncomplete: 'الدفع غير مكتمل',
+    accountActiveServicesRemaining: 'المتبقي للدفع',
+    accountActiveServicesPaid: 'المدفوع',
+    accountActiveServicesTotal: 'الإجمالي',
+    accountActiveServicesTransactions: 'الدفعات المسجّلة',
+    accountActiveServicesNoTransactions: 'لا توجد دفعة مسجّلة لهذه الخدمة.',
+    accountActiveServicesTxDate: 'التاريخ',
+    accountActiveServicesTxMethod: 'الوسيلة',
+    accountActiveServicesTxStatus: 'الحالة',
+    accountActiveServicesDownloadReceipt: 'تحميل الإيصال',
+    accountActiveServicesReceiptSoonTitle: 'إيصال الدفع',
+    accountActiveServicesReceiptSoonBody:
+      'سيتوفر تحميل الإيصال قريباً. إلى ذلك الحين، تواصل مع مستشارك إذا احتجت إلى إثبات الدفع.',
+    referralTeaserTitle: 'برنامج الإحالة والمكافآت',
+    referralTeaserSubtitle: 'ادعُ أصدقاءك وافتح مكافآت وهدايا عند كل مستوى.',
+    referralTeaserCta: 'عرض برنامج الإحالة والمكافآت',
+    referralPageTitle: 'برنامج الإحالة والمكافآت',
+    referralPageSubtitle: 'ادعُ أصدقاءك: كل شراء TAWJIH PLUS يقربك من مكافآتك.',
+    referralReferredDiscountHint: 'يحصل أصدقاؤك المدعوون على خصم {{percent}} في المتجر عند استخدام رمزك.',
+    referralReferredDiscountBadge: 'خصم {{percent}} في المتجر',
+    referralReferredDiscountShopLine: 'في المتجر',
+    referralLockedTitle: 'برنامج الإحالة والمكافآت مقفل',
+    referralLockedBody: 'يلزم خدمة {{service}} نشطة لمشاركة رمزك وفتح المكافآت.',
+    referralLockedCta: 'عرض الخدمات',
+    referralTiersTitle: 'مستويات المكافآت',
+    referralTiersSubtitle: 'مدعويك الذين اشتروا {{service}}',
+    referralQualifiedCount: '{{count}} مدعو مؤهل',
+    referralTierBadge: 'المستوى {{n}}',
+    referralTierUnlocked: 'مفعّل',
+    referralTierRemaining: 'متبقي {{count}}',
+    referralTierThreshold: 'الهدف: {{count}} مدعوين',
+    referralTeaserQualifiedLabel: 'مؤهل (TAWJIH PLUS)',
+    referralTeaserAllUnlocked: 'كل المستويات مفعّلة',
+    referralTierPickReward: 'اختر مكافأتك',
+    referralTierYourReward: 'مكافأتك',
+    referralTierPickProduct: 'اختر منتجاً قبل إنشاء الرمز.',
+    referralTierChoiceHint: '{{count}} مكافآت للاختيار عند تفعيل المستوى',
+    referralTierGeneratePromo: 'إنشاء رمز ترويجي 100٪',
+    referralTierPromoTitle: 'رمزك الترويجي',
+    referralTierPromoUsed: 'تم استخدام الرمز',
+    referralTierPromoAvailable: 'الرمز متاح — استخدام واحد',
+    referralTierPromoHint: 'خصم 100٪ على المنتج المختار، استخدام واحد في المتجر.',
+    referralTierPromoError: 'تعذّر إنشاء الرمز. أعد المحاولة.',
+    referralTierGoShop: 'الذهاب إلى المتجر',
+    referralSingleRewardHint: 'مكافأة واحدة فقط: المستوى 1 أو 2.',
+    referralRewardTakenBadge: 'تم اختيار المكافأة',
+    referralRewardTakenOnOtherTier: 'المكافأة مأخوذة من المستوى {{tier}}',
+    referralStep3BodyNew: 'عند شراء مدعوك TAWJIH PLUS يُحتسب في مستوياتك.',
+    referralStep4BodyNew: '5 مدعوين → كتاب · 10 → الباقة الكاملة (قابل للتعديل).',
+    referralBalanceLabel: 'نقاطي',
+    referralPointsUnit: 'نقطة',
+    referralPendingPoints: '{{count}} نقطة قيد التحقق',
+    referralYourCode: 'رمزي',
+    referralYourLink: 'رابطي',
+    referralCopyCode: 'نسخ الرمز',
+    referralCopyLink: 'نسخ الرابط',
+    referralCopied: 'تم النسخ',
+    referralShareWhatsApp: 'مشاركة عبر واتساب',
+    referralHowItWorks: 'كيف يعمل',
+    referralStep1Title: 'شارك',
+    referralStep1Body: 'أرسل رمزك أو رابطك لصديق أو لأحد أفراد عائلتك.',
+    referralStep2Title: 'يسجّل',
+    referralStep2Body: 'يُنشئ صديقك المدعو حسابه برمزك ويكمل ملفه.',
+    referralStep3Title: 'يتقدّم',
+    referralStep3Body: 'نقاط إضافية عند الطلب أو شراء خدمة توجيه.',
+    referralStep4Title: 'تربح',
+    referralStep4Body: 'استخدم نقاطك في متجر E-Tawjihi أو عند شركائنا.',
+    referralInvitesTitle: 'مدعويني',
+    referralInviteCompleted: 'إحالة مكتملة',
+    referralInviteNotCompleted: 'لم يكتمل بعد',
+    referralPointsEarned: '+{{count}} نقطة',
+    referralPointsPendingLabel: '{{count}} نقطة قيد الانتظار',
+    referralHistoryTitle: 'سجل النقاط',
+    referralLedgerProfile: 'ملف مدعو مكتمل',
+    referralLedgerOrder: 'طلب مدعو',
+    referralLedgerBonus: 'مكافأة إحالة',
+    referralLedgerSpend: 'استخدام المتجر',
+    referralPartnersTitle: 'مكافآت الشركاء',
+    referralPartnersHint: 'استبدل نقاطك بعروض عند شركائنا.',
+    referralRedeemSoon: 'قريباً',
+    referralShareMessage:
+      'مرحباً! أدعوك إلى E-Tawjihi للتوجيه. استخدم رمزي {{code}} (خصم {{percent}} في المتجر) أو هذا الرابط: {{link}}',
+    referralInvitesEmpty: 'لا يوجد مدعوون بعد. شارك رمزك لدعوة أصدقائك.',
+    referralViewAllInvites: 'عرض كل مدعويني',
+    referralPointsSoonNote:
+      'الإحالة نشطة: رمزك ومتابعة مدعويك متاحة. سيُفعّل رصيد نقاط المكافآت في تحديث قادم.',
+    loyaltyTeaserTitle: 'برنامج الإحالة والمكافآت',
+    loyaltyTeaserSubtitle: 'ادعُ أصدقاءك وافتح مكافآت وهدايا عند كل مستوى.',
+    loyaltyTeaserCta: 'عرض برنامج الإحالة والمكافآت',
+    loyaltyTeaserNextReward: 'المستوى التالي',
+    loyaltyPageTitle: 'الولاء',
+    loyaltyBalanceLabel: 'نقاطي',
+    loyaltyPointsUnit: 'نقطة',
+    loyaltyPendingPoints: '{{count}} نقطة قيد الانتظار بعد طلباتك',
+    loyaltyHowItWorks: 'كيف يعمل',
+    loyaltyEarnRate: '{{rate}} نقطة / درهم — لكل درهم في المتجر (بعد تأكيد الطلب).',
+    loyaltyRateBadge: '{{rate}} نقطة / درهم',
+    loyaltyStep1Title: 'اشترِ',
+    loyaltyStep1Body: 'اطلب من متجر E-Tawjihi (كتب، حزم، إلخ).',
+    loyaltyStep2Title: 'اجمع',
+    loyaltyStep2Body: 'تُضاف نقاطك بعد تأكيد الدفع.',
+    loyaltyStep3Title: 'افتح',
+    loyaltyStep3Body: 'بلغ المستويات لاستبدال منتج أو خدمة حقيقية.',
+    loyaltyStep4Title: 'ادعُ',
+    loyaltyStep4Body: 'شارك رمزك: تُتابع تقدّم مدعويك في مساحة الإحالة.',
+    loyaltyRewardsTitle: 'مستويات المكافآت',
+    loyaltyRewardsHint: 'منتجات وخدمات من كتالوجكم، مرتبة حسب النقاط المطلوبة.',
+    loyaltyTierLabel: 'م{{n}}',
+    loyaltyRedeemCta: 'استبدال',
+    loyaltyRedeemLocked: 'مقفل',
+    loyaltyRedeemInactive: 'التفعيل موقوف',
+    loyaltyRedeemSoonTitle: 'قريباً',
+    loyaltyRedeemSoonBody: 'سيُفعّل استبدال النقاط قريباً. إلى ذلك الحين، اكتشف المنتج أو الخدمة.',
+    loyaltyRedeemConfirmTitle: 'استبدال هذه المكافأة؟',
+    loyaltyRedeemConfirmBody:
+      '« {{title}} » ستُفعَّل مقابل {{count}} {{unit}}. لا يمكن استخدام هذه المكافأة إلا مرة واحدة.',
+    loyaltyRedeemSuccessTitle: 'تم الاستبدال',
+    loyaltyRedeemSuccessBody: '« {{title}} » مفعّلة. خُصم {{count}} {{unit}} من رصيدك.',
+    loyaltyRedeemAlreadyUsed: 'لقد استبدلت هذه المكافأة مسبقاً.',
+    loyaltyRedeemInsufficient: 'رصيد النقاط غير كافٍ.',
+    loyaltyRedeemError: 'تعذّر الاستبدال. حاول لاحقاً.',
+    loyaltyRedeemCancel: 'إلغاء',
+    loyaltyAlreadyRedeemedLabel: 'مستبدلة',
+    loyaltyPointsToUnlock: 'باقي {{count}} نقطة',
+    loyaltyNextRewardBar: 'التالي: {{title}} — باقي {{count}} نقطة',
+    loyaltyGroupProducts: 'منتجات المتجر',
+    loyaltyGroupServices: 'خدمات التوجيه',
+    loyaltyCatalogLoading: 'جاري تحميل الكتالوج…',
+    loyaltyCatalogError: 'تعذّر تحميل المكافآت.',
+    loyaltyCatalogRetry: 'إعادة المحاولة',
+    loyaltyCatalogEmpty: 'لا توجد مكافآت متاحة حالياً.',
+    loyaltyHistoryTitle: 'سجل النقاط',
+    loyaltyLedgerEarn: 'نقاط مكتسبة (شراء)',
+    loyaltyLedgerSpend: 'استبدال مكافأة',
+    loyaltyLedgerWelcome: 'مكافأة ترحيب',
+    loyaltyPointsGoal: 'الهدف: {{count}} {{unit}}',
+    loyaltyViewAllRewards: 'عرض الكتالوج كاملاً',
+    loyaltyViewAllCount: '{{count}} مكافأة',
+    loyaltyCatalogPageTitle: 'كتالوج المكافآت',
+    loyaltyCatalogPageSubtitle: 'افتح كل مستوى بجمع النقاط. المكافآت المقفلة تُفعّل عند بلوغ الهدف.',
+    loyaltyTimelineBalanceFoot: 'لديك {{balance}} {{unit}}',
+    loyaltyEarnRulesTitle: 'كيف تربح النقاط',
+    loyaltyEarnRulesSelf: 'أفعالك',
+    loyaltyEarnRulesReferrer: 'عند تقدّم مدعويك (خُمس نقاط الفعل)',
+    loyaltyPerMadSuffix: '/ درهم',
     accountSectionAcademic: 'المعلومات الأكاديمية',
     accountMassarCode: 'رمز مسار',
     accountStudentCode: 'رمز التلميذ',
@@ -2435,6 +2985,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountOrdersError: 'تعذّر تحميل الطلبات.',
     accountTabProfile: 'معلوماتي',
     accountTabOrders: 'طلباتي',
+    accountOrdersOpenBadgeA11y: '{{count}} طلبات قيد المعالجة',
+    accountOrdersOpenCount: '{{count}} قيد المعالجة',
     accountOrdersSegmentAll: 'الكل',
     accountOrdersSegmentProducts: 'منتجات',
     accountOrdersSegmentServices: 'خدمات',
@@ -2446,6 +2998,15 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountOrderPaymentSection: 'دفع الخدمات',
     accountOrderRecapSection: 'ملخص',
     accountOrderCompletedNote: 'الطلب مكتمل — الملخص أدناه.',
+    accountOrderPromoAddTitle: 'رمز ترويجي',
+    accountOrderPromoPlaceholder: 'أدخل الرمز',
+    accountOrderPromoApply: 'تطبيق',
+    accountOrderPromoApplying: 'جاري التطبيق…',
+    accountOrderPromoHint: 'يمكنك إضافة رمز ما دام الطلب قيد الانتظار أو المعالجة.',
+    accountOrderPromoLockedHint:
+      'الرمز الترويجي مقفل : الطلب لم يعد قيد الانتظار أو المعالجة.',
+    accountOrderPromoDiscount: 'خصم الرمز الترويجي',
+    accountOrderPromoApplied: 'تم تطبيق الرمز الترويجي.',
     estNotFound: 'غير موجود',
     shopEyebrow: 'E-Tawjihi',
     shopTitle: 'المتجر',
@@ -2516,6 +3077,20 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCheckoutPhNotes: 'ملاحظات مفيدة…',
     shopCheckoutRecapTitle: 'الملخص',
     shopCheckoutLblSubtotal: 'المجموع الفرعي',
+    shopCheckoutPromoTitle: 'رمز ترويجي',
+    shopCheckoutPromoHint:
+      'رمز واحد لكل طلب. إذا كان الرمز مرتبطًا بمنتجات محددة، تُطبَّق الخصم عليها فقط.',
+    shopCheckoutPromoPh: 'ETW-XXXX',
+    shopCheckoutPromoApply: 'تطبيق',
+    shopCheckoutPromoRemove: 'إزالة',
+    shopCheckoutLblDiscount: 'خصم ({code})',
+    shopCheckoutLblDiscountPercent: 'خصم {pct} % ({code})',
+    shopCheckoutLblArticlesNet: 'مجموع المنتجات',
+    shopCheckoutPromoAppliedPercent: '−{pct} % على {base} (منتجات مشمولة).',
+    shopCheckoutPromoAppliedFixed: 'خصم ثابت {amount} على المنتجات المشمولة.',
+    shopCheckoutPromoScopedHint: 'الخصم يخص {base} فقط (منتجات مرتبطة بالرمز).',
+    shopCheckoutPromoErrEnter: 'أدخل رمزًا ترويجيًا',
+    shopCheckoutPromoErrValidate: 'تعذّر التحقق من الرمز',
     shopCheckoutLblShipping: 'التوصيل',
     shopCheckoutShipNoPhysical: 'بدون شحن (خدمات)',
     shopCheckoutShipFree: 'مجاني',
@@ -2586,6 +3161,16 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopSearchServicesPlaceholder: 'ابحث عن خدمة…',
     shopServiceDetail: 'التفاصيل',
     shopServicePromoChip: 'عرض',
+    shopEntitlementAlreadyOwned: 'مفعّل مسبقًا على حسابك',
+    shopEntitlementIncluded: 'مشمول في عرضك الحالي',
+    shopEntitlementIncludedVia: 'مشمول مع {name}',
+    shopEntitlementBlocked: 'غير متاح للشراء',
+    shopEntitlementRequiresPrerequisite: 'شرط مسبق مطلوب',
+    shopEntitlementUpgradeAvailable: 'ترقية باقتك',
+    shopEntitlementNotPurchasable: 'الشراء غير متاح',
+    shopEntitlementChecking: 'جارٍ التحقق من أهليتك…',
+    shopEntitlementIncludedNoPurchase: 'مشمول في عرضك — دون شراء منفصل',
+    shopEntitlementIncludedPriceHint: 'مشمول في عرضك — لا حاجة لشراء منفصل',
     shopErrorLoad: 'تعذّر تحميل المتجر.',
     shopLoading: 'جارٍ التحميل…',
     shopEmptyTitle: 'لا يوجد منتج',
@@ -2601,6 +3186,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopOutOfStock: 'نفدت الكمية',
     shopAddA11y: 'أضف إلى السلة',
     shopAddedA11y: 'موجود في السلة',
+    shopRemoveFromCartA11y: 'إزالة من السلة',
     shopBuyNow: 'اطلب الآن',
     shopBuyNowA11y: 'اطلب الآن',
     shopViewProductA11y: 'عرض المنتج',

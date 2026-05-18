@@ -24,12 +24,21 @@ export async function loginWithPhonePassword(phone: string, password: string): P
   });
 }
 
-export async function registerWithPhonePassword(phone: string, password: string): Promise<LoginResponse> {
+export async function registerWithPhonePassword(
+  phone: string,
+  password: string,
+  referralCode?: string | null,
+): Promise<LoginResponse> {
   const url = buildApiUrl('/api/register');
-  return await httpPostJson<LoginResponse, { phone: string; password: string }>(url, {
+  const body: { phone: string; password: string; referralCode?: string } = {
     phone,
     password,
-  });
+  };
+  const code = (referralCode ?? '').trim();
+  if (code.length > 0) {
+    body.referralCode = code;
+  }
+  return await httpPostJson<LoginResponse, typeof body>(url, body);
 }
 
 export type RefreshResponse = {

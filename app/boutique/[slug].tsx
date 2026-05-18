@@ -49,7 +49,7 @@ export default function ProductDetailScreen() {
   const { t, isRTL, locale } = useLocale();
   const { slug } = useLocalSearchParams<{ slug: string }>();
   const { width } = useWindowDimensions();
-  const { addLine, lines: cartLines, count: cartCount } = useShopCart();
+  const { addLine, removeLine, lines: cartLines, count: cartCount } = useShopCart();
 
   const [product, setProduct] = useState<ShopProductDetail | null>(null);
   const [loading, setLoading] = useState(true);
@@ -95,6 +95,10 @@ export default function ProductDetailScreen() {
     if (!product || isOut) return;
     setAddingToCart(true);
     try {
+      if (inCart) {
+        await removeLine(product.id);
+        return;
+      }
       await addLine({
         productId: product.id,
         slug: product.slug,
@@ -111,14 +115,33 @@ export default function ProductDetailScreen() {
     } finally {
       setAddingToCart(false);
     }
-  }, [product, isOut, addLine]);
+  }, [product, isOut, inCart, addLine, removeLine]);
 
   const handleBuyNow = useCallback(async () => {
     if (!product || isOut) return;
-    await handleAdd();
-    const path = await getShopPathAfterBuyNow();
-    router.push(path as any);
-  }, [product, isOut, handleAdd, router]);
+    setAddingToCart(true);
+    try {
+      if (!inCart) {
+        await addLine({
+          productId: product.id,
+          slug: product.slug,
+          title: product.title,
+          price: product.price,
+          currency: product.currency,
+          quantity: 1,
+          type: product.type,
+          packPricingMode: product.packPricingMode ?? null,
+          images: product.images,
+          isFreeShipping: Boolean(product.isFreeShipping),
+        });
+        void recordShopBoutiqueEvent('add_to_cart', product.id);
+      }
+      const path = await getShopPathAfterBuyNow();
+      router.push(path as any);
+    } finally {
+      setAddingToCart(false);
+    }
+  }, [product, isOut, inCart, addLine, router]);
 
   const onGalleryScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -568,7 +591,7 @@ export default function ProductDetailScreen() {
                 inCart && styles.addBtnActive,
                 pressed && { opacity: 0.85 },
               ]}
-              accessibilityLabel={inCart ? 'Déjà au panier' : 'Ajouter au panier'}
+              accessibilityLabel={inCart ? t('shopRemoveFromCartA11y') : t('shopAddA11y')}
             >
               {addingToCart ? (
                 <ActivityIndicator

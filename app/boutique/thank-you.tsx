@@ -225,6 +225,9 @@ export default function BoutiqueThankYouScreen() {
   }
 
   const shippingNum = Number.parseFloat(order.shippingFee || '0');
+  const promoCodeLabel = order.promoCodeLabel?.trim() ?? '';
+  const promoDiscountNum = Number.parseFloat(String(order.promoDiscountAmount ?? '0').replace(',', '.'));
+  const hasPromoApplied = promoCodeLabel !== '' && Number.isFinite(promoDiscountNum) && promoDiscountNum > 0;
   const hasShippableItems = order.lines.some((l) => l.productType !== 'service');
   const shippingLabel =
     order.deliveryMode === 'pickup_office'
@@ -645,6 +648,16 @@ export default function BoutiqueThankYouScreen() {
             <Text style={[styles.summaryLbl, isRTL && styles.txtRtl]}>{t('shopThankSummarySubtotalItems')}</Text>
             <Text style={[styles.summaryVal, isRTL && styles.txtRtl]}>{formatShopPrice(order.subtotal, order.currency)}</Text>
           </View>
+          {hasPromoApplied ? (
+            <View style={[styles.summaryRow, isRTL && styles.rowRtl]}>
+              <Text style={[styles.summaryLbl, styles.promoDiscountLbl, isRTL && styles.txtRtl]}>
+                {t('shopCheckoutLblDiscount').replace('{code}', promoCodeLabel)}
+              </Text>
+              <Text style={[styles.summaryVal, styles.promoDiscountVal, isRTL && styles.txtRtl]}>
+                −{formatShopPrice(String(promoDiscountNum), order.currency)}
+              </Text>
+            </View>
+          ) : null}
           {hasShippableItems ? (
             <View style={[styles.summaryRow, isRTL && styles.rowRtl]}>
               <Text style={[styles.summaryLbl, isRTL && styles.txtRtl]}>
@@ -1179,6 +1192,8 @@ const styles = StyleSheet.create({
   summaryRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   summaryLbl: { color: brand.textSecondary, fontSize: fontSize.sm },
   summaryVal: { color: brand.text, fontSize: fontSize.sm, fontWeight: '700' },
+  promoDiscountLbl: { color: '#047857' },
+  promoDiscountVal: { color: '#047857', fontWeight: '800' },
   summaryDivider: { height: 1, backgroundColor: brand.border, marginVertical: 4 },
   summaryTotalLbl: { fontSize: fontSize.md, fontWeight: '800', color: brand.text },
   summaryTotalVal: { fontSize: fontSize.lg, fontWeight: '800', color: brand.primary },

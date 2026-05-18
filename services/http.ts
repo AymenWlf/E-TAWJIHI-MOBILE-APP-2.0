@@ -1,8 +1,22 @@
-export type ApiError = {
-  message: string;
+export type ApiError = Error & {
   status?: number;
   url?: string;
 };
+
+function networkHint(): string {
+  const origin =
+    typeof window !== 'undefined' && typeof window.location?.origin === 'string' ? window.location.origin : undefined;
+  return origin
+    ? ` (origin: ${origin}) — API démarrée ? CORS OK ? Sinon définir EXPO_PUBLIC_API_BASE_URL.`
+    : ' — API locale sur :8001 ? iPhone physique : EXPO_PUBLIC_DEV_API_HOST=<IP du Mac> ou EXPO_PUBLIC_API_BASE_URL.';
+}
+
+function throwApiError(message: string, url: string, status?: number): never {
+  const err = new Error(message) as ApiError;
+  err.url = url;
+  if (status !== undefined) err.status = status;
+  throw err;
+}
 
 async function requestJson<T>(url: string, init: RequestInit): Promise<T> {
   let res: Response;
@@ -15,19 +29,12 @@ async function requestJson<T>(url: string, init: RequestInit): Promise<T> {
       },
     });
   } catch (_e: unknown) {
-    const origin =
-      typeof window !== 'undefined' && typeof window.location?.origin === 'string' ? window.location.origin : undefined;
-    const hint = origin
-      ? ` (origin: ${origin}) — API démarrée ? CORS OK ? Sinon définir EXPO_PUBLIC_API_BASE_URL.`
-      : ` — API locale sur :8001 ? iPhone physique : EXPO_PUBLIC_DEV_API_HOST=<IP du Mac> ou EXPO_PUBLIC_API_BASE_URL.`;
-    const err: ApiError = { message: `Failed to fetch: ${url}${hint}`, url };
-    throw err;
+    throwApiError(`Failed to fetch: ${url}${networkHint()}`, url);
   }
 
   if (!res.ok) {
     const text = await res.text().catch(() => '');
-    const err: ApiError = { message: text || `HTTP ${res.status}`, status: res.status, url };
-    throw err;
+    throwApiError(text || `HTTP ${res.status}`, url, res.status);
   }
   return (await res.json()) as T;
 }

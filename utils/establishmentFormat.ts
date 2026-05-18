@@ -84,7 +84,7 @@ export function formatFraisScolarite(e: EstablishmentListItem): string {
       `${x.toLocaleString('fr-FR', {
         minimumFractionDigits: 0,
         maximumFractionDigits: 0,
-      })} MAD`;
+      })} Dhs`;
     if (mn != null && mx != null && mn !== mx) return `${fmt(mn)} – ${fmt(mx)} / an`;
     const one = mn ?? mx!;
     return `${fmt(one)} / an`;

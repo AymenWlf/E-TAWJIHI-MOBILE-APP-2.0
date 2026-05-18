@@ -1,6 +1,7 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
-import { fetchPlatformServices } from '@/services/platformServices';
+import { fetchPlatformServices, type PlatformServiceItem } from '@/services/platformServices';
+import { platformServiceEffectiveUnitPriceString } from '@/utils/platformServicePrice';
 import type {
   CreateShopOrderInput,
   CreateShopOrderResult,
@@ -147,6 +148,69 @@ export async function uploadShopOrderBankTransferReceipt(
  * Recharge depuis le catalogue les images / livraison gratuite manquantes des lignes panier
  * (utile pour les paniers persistés avant l'ajout des champs côté API).
  */
+/**
+ * Recharge prix catalogue et livraison gratuite (évite sous-total à 0 si panier persisté obsolète).
+ */
+export async function hydrateCartLinesPricesViaApi(lines: ShopCartLine[]): Promise<ShopCartLine[]> {
+  if (lines.length === 0) return lines;
+
+  const productSlugs = lines
+    .filter((l) => !isPlatformServiceCartLine(l) && l.slug.trim() !== '')
+    .map((l) => l.slug);
+  const serviceSlugs = lines
+    .filter((l) => isPlatformServiceCartLine(l))
+    .map((l) => (l.platformServiceSlug ?? l.slug).trim())
+    .filter(Boolean);
+
+  const productMap = new Map<string, ShopProductDetail>();
+  await Promise.all(
+    [...new Set(productSlugs)].map(async (slug) => {
+      const detail = await fetchShopProductBySlug(slug);
+      if (detail) productMap.set(slug, detail);
+    }),
+  );
+
+  let serviceBySlug = new Map<string, PlatformServiceItem>();
+  if (serviceSlugs.length > 0) {
+    const list = await fetchPlatformServices();
+    serviceBySlug = new Map(list.map((s) => [s.slug, s]));
+  }
+
+  let changed = false;
+  const next = lines.map((l) => {
+    if (isPlatformServiceCartLine(l)) {
+      const slug = (l.platformServiceSlug ?? l.slug).trim();
+      const svc = serviceBySlug.get(slug);
+      if (!svc) return l;
+      const price = platformServiceEffectiveUnitPriceString(svc);
+      const currency = svc.currency || l.currency;
+      if (price === l.price && currency === l.currency && l.isFreeShipping === svc.isFreeShipping) return l;
+      changed = true;
+      return {
+        ...l,
+        price,
+        currency,
+        ...(svc.isFreeShipping !== undefined ? { isFreeShipping: svc.isFreeShipping } : {}),
+      };
+    }
+    const detail = productMap.get(l.slug);
+    if (!detail) return l;
+    const price = detail.price;
+    const currency = detail.currency || l.currency;
+    if (price === l.price && currency === l.currency && l.isFreeShipping === detail.isFreeShipping) return l;
+    changed = true;
+    return {
+      ...l,
+      price,
+      currency,
+      packPricingMode: detail.packPricingMode ?? l.packPricingMode,
+      ...(detail.isFreeShipping !== undefined ? { isFreeShipping: detail.isFreeShipping } : {}),
+    };
+  });
+
+  return changed ? next : lines;
+}
+
 export async function hydrateCartLinesImagesViaApi<T extends { slug: string; images?: string[]; isFreeShipping?: boolean }>(
   lines: T[],
 ): Promise<T[]> {

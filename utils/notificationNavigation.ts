@@ -9,6 +9,15 @@ import type { AppNotification } from '@/types/inscriptions';
 export function navigateFromAppNotification(n: AppNotification): boolean {
   const meta = (n.metadata ?? {}) as Record<string, unknown>;
 
+  if (meta.deep_link === 'referral' || String(n.type ?? '').startsWith('referral_')) {
+    const route =
+      typeof meta.route === 'string' && meta.route.trim() !== ''
+        ? meta.route.trim()
+        : '/compte/fidelite';
+    router.push(route as never);
+    return true;
+  }
+
   if (meta.deep_link === 'community_qna') {
     const ct = String(meta.context_type ?? '');
     const cid = Number(meta.context_id ?? 0);

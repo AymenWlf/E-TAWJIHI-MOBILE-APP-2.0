@@ -27,13 +27,13 @@ import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import {
-  ANNEES_BAC_OPTIONS,
   BAC_TYPES,
   FILIERE_BAC_OPTIONS,
   type LabeledOption,
   NIVEAU_ETUDE_OPTIONS,
   SPECIALITES_MISSION,
 } from '@/constants/academicSetup';
+import { anneesBacOptionsForLocale } from '@/utils/bacSchoolYearLabels';
 import { listCities, type CityRow } from '@/services/referenceData';
 import { completeAccountSetup, type AccountSetupPayload } from '@/services/accountSetup';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -179,11 +179,13 @@ function Chip({
   active,
   onPress,
   rtl,
+  wide = false,
 }: {
   label: string;
   active: boolean;
   onPress: () => void;
   rtl?: boolean;
+  wide?: boolean;
 }) {
   return (
     <Pressable
@@ -191,11 +193,22 @@ function Chip({
       onPress={onPress}
       style={({ pressed }) => [
         styles.chip,
+        wide && styles.chipWide,
         active && styles.chipActive,
         pressed && { opacity: 0.9 },
       ]}
     >
-      <Text style={[styles.chipText, active && styles.chipTextActive, rtl && styles.rtl]}>{label}</Text>
+      <Text
+        style={[
+          styles.chipText,
+          wide && styles.chipTextWide,
+          wide && rtl && styles.chipTextWideRtl,
+          active && styles.chipTextActive,
+          rtl && styles.rtl,
+        ]}
+      >
+        {label}
+      </Text>
     </Pressable>
   );
 }
@@ -207,6 +220,7 @@ function PickerRow({
   options,
   rtl,
   locale,
+  wideChips = false,
 }: {
   label: string;
   value: string;
@@ -214,6 +228,8 @@ function PickerRow({
   options: LabeledOption[];
   rtl: boolean;
   locale: 'fr' | 'ar';
+  /** Libellés longs (ex. année du bac avec contexte pédagogique). */
+  wideChips?: boolean;
 }) {
   return (
     <View style={styles.block}>
@@ -235,6 +251,7 @@ function PickerRow({
                 active={value === o.value}
                 onPress={() => onChange(o.value)}
                 rtl={rtl}
+                wide={wideChips}
               />
             ))}
         </ScrollView>
@@ -246,6 +263,8 @@ function PickerRow({
 export default function AccountSetupScreen() {
   const { isRTL, locale, setLocale, t } = useLocale();
   const rtl = isRTL;
+  const bacLocale = locale === 'ar' ? 'ar' : 'fr';
+  const anneesBacOptions = useMemo(() => anneesBacOptionsForLocale(bacLocale), [bacLocale]);
   const { user, getValidAccessToken, reloadMe } = useAuth();
 
   const scrollRef = useRef<ScrollView>(null);
@@ -634,9 +653,10 @@ export default function AccountSetupScreen() {
                     label={t('setupBacAnnee')}
                     value={data.bacAnnee}
                     onChange={(v) => setData((s) => ({ ...s, bacAnnee: v }))}
-                    options={ANNEES_BAC_OPTIONS}
+                    options={anneesBacOptions}
                     rtl={rtl}
                     locale={locale}
+                    wideChips
                   />
                 </>
               )}
@@ -1495,11 +1515,19 @@ const styles = StyleSheet.create({
     borderColor: brand.border,
     backgroundColor: 'white',
   },
+  chipWide: {
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    borderRadius: radius.lg,
+    maxWidth: 320,
+  },
   chipActive: {
     backgroundColor: 'rgba(37,99,235,0.10)',
     borderColor: 'rgba(37,99,235,0.35)',
   },
   chipText: { color: brand.text, fontWeight: '700' },
+  chipTextWide: { fontSize: fontSize.sm, lineHeight: Math.round(fontSize.sm * 1.35), textAlign: 'left' },
+  chipTextWideRtl: { textAlign: 'right' },
   chipTextActive: { color: BLUE },
 
   select: {

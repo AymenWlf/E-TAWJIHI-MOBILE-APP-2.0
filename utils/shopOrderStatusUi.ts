@@ -53,8 +53,18 @@ export function shopDeliveryFulfillmentUi(status: string | null | undefined, loc
   }
 }
 
-export function isShopOrderCompleted(status: string): boolean {
+/** Commande clôturée : terminée ou annulée. */
+export function isShopOrderClosed(status: string): boolean {
   return status === 'completed' || status === 'cancelled';
+}
+
+/** @deprecated Préférer `isShopOrderClosed` (même logique). */
+export function isShopOrderCompleted(status: string): boolean {
+  return isShopOrderClosed(status);
+}
+
+export function countOpenShopOrders(orders: { status: string }[]): number {
+  return orders.filter((o) => !isShopOrderClosed(o.status)).length;
 }
 
 export function orderHasActiveServiceLines(
@@ -67,4 +77,29 @@ export function orderHasActivePhysicalLines(
   lines: { productType: string; removedAt?: string | null }[],
 ): boolean {
   return lines.some((l) => !l.removedAt && l.productType !== 'service');
+}
+
+/** Statuts permettant d’ajouter un code promo après création (aligné backend). */
+export const SHOP_ORDER_STATUSES_ALLOWING_PROMO_APPLY = [
+  'pending_review',
+  'pending_payment',
+  'injoignable_1',
+  'injoignable_2',
+  'raccroche',
+  'whatsapp_sent',
+] as const;
+
+export function isOrderStatusAllowingPromoApply(status: string): boolean {
+  return (SHOP_ORDER_STATUSES_ALLOWING_PROMO_APPLY as readonly string[]).includes(status);
+}
+
+export function canApplyPromoToOrder(order: {
+  status: string;
+  promoCodeLabel?: string | null;
+}): boolean {
+  if ((order.promoCodeLabel ?? '').trim() !== '') {
+    return false;
+  }
+
+  return isOrderStatusAllowingPromoApply(order.status);
 }

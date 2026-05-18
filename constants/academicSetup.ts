@@ -2,8 +2,8 @@ export type LabeledOption = { value: string; label: string; labelAr?: string };
 
 export const NIVEAU_ETUDE_OPTIONS: LabeledOption[] = [
   { value: '', label: 'Sélectionnez un niveau...', labelAr: 'اختر مستوى...' },
-  { value: '1ère année du bac', label: '1ère année du bac', labelAr: 'الأولى باك' },
-  { value: '2ème année du bac', label: '2ème année du bac', labelAr: 'الثانية باك' },
+  { value: '1ère année Baccalauréat', label: '1ère année Baccalauréat', labelAr: 'الأولى باك' },
+  { value: '2ème année Baccalauréat', label: '2ème année Baccalauréat', labelAr: 'الثانية باك' },
   { value: 'BAC+1', label: 'BAC+1', labelAr: 'باك+1' },
   { value: 'BAC+2', label: 'BAC+2', labelAr: 'باك+2' },
   { value: 'BAC+3', label: 'BAC+3', labelAr: 'باك+3' },
@@ -59,6 +59,9 @@ export const FILIERE_BAC_OPTIONS: LabeledOption[] = [
  * proposées dans le setup et utilisées pour évaluer l'éligibilité aux annonces.
  * Aligné avec la liste du web admin (`E-TAWJIHI-GLOBAL-FRONT/constants/academicSetup.ts`).
  */
+/**
+ * Années scolaires du bac — alignées sur `E-TAWJIHI-GLOBAL-FRONT/src/constants/academicSetup.ts`.
+ */
 export const ANNEES_BAC_OPTIONS: LabeledOption[] = [
   { value: '', label: 'Sélectionnez une année...', labelAr: 'اختر السنة...' },
   { value: '2026-2027', label: '2026-2027', labelAr: '2026-2027' },
@@ -67,6 +70,8 @@ export const ANNEES_BAC_OPTIONS: LabeledOption[] = [
   { value: '2023-2024', label: '2023-2024', labelAr: '2023-2024' },
   { value: '2022-2023', label: '2022-2023', labelAr: '2022-2023' },
   { value: '2021-2022', label: '2021-2022', labelAr: '2021-2022' },
+  { value: '2020-2021', label: '2020-2021', labelAr: '2020-2021' },
+  { value: '2019-2020', label: '2019-2020', labelAr: '2019-2020' },
   { value: 'Autre', label: 'Autre', labelAr: 'أخرى' },
 ];
 

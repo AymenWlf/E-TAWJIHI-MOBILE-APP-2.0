@@ -22,7 +22,7 @@ type AuthContextValue = {
   refreshToken: string | null;
   isLoading: boolean;
   login: (phone: string, password: string) => Promise<AuthUser>;
-  register: (phone: string, password: string) => Promise<AuthUser>;
+  register: (phone: string, password: string, referralCode?: string | null) => Promise<AuthUser>;
   logout: () => Promise<void>;
   getValidAccessToken: () => Promise<string | null>;
   reloadMe: () => Promise<void>;
@@ -125,8 +125,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return nextUser ?? {};
   }, []);
 
-  const register = useCallback(async (phone: string, password: string): Promise<AuthUser> => {
-    const res = await registerWithPhonePassword(phone, password);
+  const register = useCallback(
+    async (phone: string, password: string, referralCode?: string | null): Promise<AuthUser> => {
+    const res = await registerWithPhonePassword(phone, password, referralCode);
     const at = extractToken(res);
     const rt = extractRefreshToken(res);
     // Only the access token is required — refreshToken may be absent on some server versions

@@ -94,3 +94,25 @@ export async function uploadUserOrderBankTransferReceipt(
   }
   return json.data;
 }
+
+export async function applyUserOrderPromo(
+  accessToken: string,
+  publicId: string,
+  promoCode: string,
+): Promise<ShopOrderPayload> {
+  const url = buildApiUrl(`/api/user/orders/${encodeURIComponent(publicId)}/apply-promo`);
+  const res = await fetch(url, {
+    method: 'POST',
+    headers: {
+      Accept: 'application/json',
+      'Content-Type': 'application/json',
+      Authorization: `Bearer ${accessToken}`,
+    },
+    body: JSON.stringify({ promoCode: promoCode.trim() }),
+  });
+  const json = (await res.json().catch(() => null)) as ApiDataResponse<ShopOrderPayload> & { message?: string };
+  if (!res.ok || !json?.success || !json.data) {
+    throw new Error(typeof json?.message === 'string' ? json.message : `HTTP ${res.status}`);
+  }
+  return json.data;
+}

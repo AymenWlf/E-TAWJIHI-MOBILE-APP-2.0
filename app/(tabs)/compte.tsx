@@ -1,4 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useFocusEffect } from '@react-navigation/native';
 import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useState } from 'react';
@@ -25,13 +26,13 @@ import { BirthDateField } from '@/components/ui/BirthDateField';
 import { SelectField } from '@/components/ui/SelectField';
 import { Text } from '@/components/ui/Text';
 import {
-  ANNEES_BAC_OPTIONS,
   BAC_TYPES,
   FILIERE_BAC_OPTIONS,
   type LabeledOption,
   NIVEAU_ETUDE_OPTIONS,
   SPECIALITES_MISSION,
 } from '@/constants/academicSetup';
+import { anneesBacOptionsForLocale } from '@/utils/bacSchoolYearLabels';
 import { getApiBaseUrl } from '@/constants/api';
 import type { HomeCopyKey } from '@/constants/i18n';
 import { useAuth } from '@/contexts/AuthContext';
@@ -40,6 +41,18 @@ import { invalidateEligibilityProfileCache } from '@/hooks/useEligibilityProfile
 import { listCities, type CityRow } from '@/services/referenceData';
 import { getUserProfile, updateUserProfile, type UserProfile } from '@/services/userProfile';
 import { fetchUserOrders, type UserOrderSummary } from '@/services/userOrders';
+import {
+  fetchUserActiveServices,
+  type UserActiveCommercialService,
+} from '@/services/userActiveServices';
+import { ActiveServicesPanel } from '@/components/account/ActiveServicesPanel';
+import { LoyaltyTeaserCard } from '@/components/account/LoyaltyTeaserCard';
+import { useUserReferral } from '@/hooks/useUserReferral';
+import {
+  getReferralRequiredServiceName,
+  getReferralRequiredServiceSlug,
+  isReferralProgramUnlocked,
+} from '@/services/userReferral';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { homeShell } from '@/theme/homeShell';
 import { formatOrderCreatedAtShort } from '@/utils/dateParis';
@@ -47,7 +60,7 @@ import { errorMessage } from '@/utils/errorMessage';
 import { isValidEmail } from '@/utils/isValidEmail';
 import { OrderServicePaymentSnippet } from '@/components/shop/OrderServicePaymentSnippet';
 import { formatShopPrice } from '@/utils/shopFormatPrice';
-import { isShopOrderCompleted, shopOrderStatusUi } from '@/utils/shopOrderStatusUi';
+import { countOpenShopOrders, isShopOrderClosed, shopOrderStatusUi } from '@/utils/shopOrderStatusUi';
 
 export default function CompteTabScreen() {
   const router = useRouter();
@@ -67,6 +80,10 @@ export default function CompteTabScreen() {
   const [ordersLoadError, setOrdersLoadError] = useState<string | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
   const [ordersLoaded, setOrdersLoaded] = useState(false);
+  const [activeServices, setActiveServices] = useState<UserActiveCommercialService[]>([]);
+  const [activeServicesLoading, setActiveServicesLoading] = useState(false);
+  const [activeServicesLoadError, setActiveServicesLoadError] = useState<string | null>(null);
+  const [activeServicesLoaded, setActiveServicesLoaded] = useState(false);
   const [form, setForm] = useState({
     /* Profil */
     nom: '',
@@ -155,6 +172,11 @@ export default function CompteTabScreen() {
     [locale],
   );
 
+  const anneesBacPickItems = useMemo(
+    () => toPickItems(anneesBacOptionsForLocale(locale === 'ar' ? 'ar' : 'fr')),
+    [locale, toPickItems],
+  );
+
   /** Liste des relations Tuteur (Père/Mère/Autre) localisée. */
   const tuteurOptions = useMemo<LabeledOption[]>(
     () => [
@@ -200,7 +222,7 @@ export default function CompteTabScreen() {
       },
       bacAnnee: {
         title: t('setupBacAnnee'),
-        items: toPickItems(ANNEES_BAC_OPTIONS),
+        items: anneesBacPickItems,
         value: form.bacAnnee,
       },
       specialite1: {
@@ -229,7 +251,7 @@ export default function CompteTabScreen() {
         value: form.tuteur,
       },
     }),
-    [t, toPickItems, form, specialiteOptions, typeLyceeOptions, tuteurOptions],
+    [t, toPickItems, anneesBacPickItems, form, specialiteOptions, typeLyceeOptions, tuteurOptions],
   );
 
   /**
@@ -251,6 +273,19 @@ export default function CompteTabScreen() {
     if (n) return n;
     return user?.phone ?? user?.email ?? '';
   }, [form.nom, form.prenom, isRTL, user?.email, user?.phone]);
+
+  const { data: referralProgram, reload: reloadReferral } = useUserReferral(isLoggedIn);
+  const referralUnlocked = isReferralProgramUnlocked(referralProgram);
+  const referralRequiredServiceName = getReferralRequiredServiceName(referralProgram);
+
+  const openReferralServicesCta = useCallback(() => {
+    const slug = getReferralRequiredServiceSlug(referralProgram);
+    if (slug) {
+      router.push(`/boutique/service/${slug}`);
+      return;
+    }
+    router.push('/boutique');
+  }, [referralProgram, router]);
 
   /**
    * Le « Diplôme en cours » n'a de sens que pour les étudiants du supérieur
@@ -328,8 +363,31 @@ export default function CompteTabScreen() {
       setProfile(null);
       setOrders([]);
       setOrdersLoaded(false);
+      setActiveServices([]);
+      setActiveServicesLoaded(false);
     }
   }, [isLoggedIn]);
+
+  const loadActiveServices = useCallback(async () => {
+    if (!isLoggedIn) return;
+    const token = await getValidAccessToken();
+    if (!token) {
+      setActiveServicesLoaded(true);
+      return;
+    }
+    setActiveServicesLoading(true);
+    setActiveServicesLoadError(null);
+    try {
+      const rows = await fetchUserActiveServices(token);
+      setActiveServices(rows);
+    } catch (e) {
+      setActiveServices([]);
+      setActiveServicesLoadError(e instanceof Error ? e.message : t('accountActiveServicesError'));
+    } finally {
+      setActiveServicesLoading(false);
+      setActiveServicesLoaded(true);
+    }
+  }, [getValidAccessToken, isLoggedIn, t]);
 
   const loadOrders = useCallback(async () => {
     if (!isLoggedIn) return;
@@ -360,6 +418,21 @@ export default function CompteTabScreen() {
   useEffect(() => {
     void loadOrders();
   }, [loadOrders]);
+
+  useEffect(() => {
+    void loadActiveServices();
+  }, [loadActiveServices]);
+
+  useFocusEffect(
+    useCallback(() => {
+      if (!isLoggedIn) return;
+      void loadOrders();
+      void loadActiveServices();
+      void reloadReferral();
+    }, [isLoggedIn, loadOrders, loadActiveServices, reloadReferral]),
+  );
+
+  const openOrdersCount = useMemo(() => countOpenShopOrders(orders), [orders]);
 
   const productOrders = useMemo(
     () =>
@@ -396,7 +469,7 @@ export default function CompteTabScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, [loadCities, loadProfile, loadOrders, isLoggedIn, reloadMe]);
+  }, [loadCities, loadProfile, loadOrders, loadActiveServices, isLoggedIn, reloadMe]);
 
   const save = useCallback(async () => {
     if (!isLoggedIn) return;
@@ -521,7 +594,13 @@ export default function CompteTabScreen() {
             <AccountTabsRow
               tabs={[
                 { id: 'profile' as const, label: t('accountTabProfile'), icon: 'user' },
-                { id: 'orders' as const, label: t('accountTabOrders'), icon: 'shopping-bag' },
+                {
+                  id: 'orders' as const,
+                  label: t('accountTabOrders'),
+                  icon: 'shopping-bag',
+                  badgeCount: openOrdersCount,
+                  badgeA11y: t('accountOrdersOpenBadgeA11y').replace('{{count}}', String(openOrdersCount)),
+                },
               ]}
               active={mainTab}
               onChange={setMainTab}
@@ -603,6 +682,31 @@ export default function CompteTabScreen() {
 
             {mainTab === 'profile' ? (
               <>
+            <LoyaltyTeaserCard
+              rtl={isRTL}
+              locale={locale}
+              referralCode={referralProgram?.referralCode}
+              referralLink={referralProgram?.referralLink}
+              referredDiscountPercent={referralProgram?.referredDiscountPercent}
+              tierProgress={referralProgram?.tierProgress}
+              locked={Boolean(referralProgram) && !referralUnlocked}
+              requiredServiceName={referralRequiredServiceName}
+              t={t}
+              onPress={() => router.push('/compte/fidelite')}
+              onLockedCtaPress={openReferralServicesCta}
+            />
+
+            <ActiveServicesPanel
+              services={activeServices}
+              loading={activeServicesLoading}
+              loaded={activeServicesLoaded}
+              error={activeServicesLoadError}
+              rtl={isRTL}
+              locale={locale}
+              t={t}
+              onRetry={() => void loadActiveServices()}
+            />
+
             <View style={styles.card}>
               <View style={styles.sectionHead}>
                 <FontAwesome name="id-card-o" size={16} color={homeShell.greenDark} />
@@ -795,7 +899,7 @@ export default function CompteTabScreen() {
                 <SelectField
                   label={t('setupBacAnnee')}
                   hint={t('setupBacAnneeHelp')}
-                  value={form.bacAnnee}
+                  value={labelFor(form.bacAnnee, academicConfig.bacAnnee.items)}
                   rtl={isRTL}
                   onPress={() => setAcademicField('bacAnnee')}
                 />
@@ -986,6 +1090,12 @@ export default function CompteTabScreen() {
                   variant="soft"
                 />
 
+                {openOrdersCount > 0 ? (
+                  <Text style={[styles.ordersOpenCount, isRTL && styles.txtRtl]}>
+                    {t('accountOrdersOpenCount').replace('{{count}}', String(openOrdersCount))}
+                  </Text>
+                ) : null}
+
                 {ordersLoading && !ordersLoaded ? (
                   <View style={styles.ordersCenter}>
                     <ActivityIndicator color={homeShell.blue} size="small" />
@@ -1095,7 +1205,13 @@ function AccountTabsRow<T extends string>({
   isRTL,
   variant = 'hero',
 }: {
-  tabs: { id: T; label: string; icon: React.ComponentProps<typeof FontAwesome>['name'] }[];
+  tabs: {
+    id: T;
+    label: string;
+    icon: React.ComponentProps<typeof FontAwesome>['name'];
+    badgeCount?: number;
+    badgeA11y?: string;
+  }[];
   active: T;
   onChange: (id: T) => void;
   isRTL: boolean;
@@ -1104,13 +1220,14 @@ function AccountTabsRow<T extends string>({
   const onHero = variant === 'hero';
   return (
     <View style={[styles.tabsRow, !onHero && styles.tabsRowSoft]}>
-      {tabs.map(({ id, label, icon }) => {
+      {tabs.map(({ id, label, icon, badgeCount = 0, badgeA11y }) => {
         const isActive = active === id;
         const iconColor = isActive
           ? brand.primary
           : onHero
             ? brand.white
             : 'rgba(51,62,143,0.55)';
+        const showBadge = badgeCount > 0;
         return (
           <Pressable
             key={id}
@@ -1120,18 +1237,48 @@ function AccountTabsRow<T extends string>({
               isActive && styles.tabActive,
               pressed && !isActive && { opacity: 0.85 },
             ]}
+            accessibilityLabel={showBadge && badgeA11y ? `${label}, ${badgeA11y}` : label}
           >
-            <FontAwesome name={icon} size={13} color={iconColor} />
-            <Text
-              style={[
-                styles.tabTxt,
-                onHero ? styles.tabTxtHero : styles.tabTxtSoft,
-                isActive && styles.tabTxtActive,
-                isRTL && styles.txtRtl,
-              ]}
-              numberOfLines={1}>
-              {label}
-            </Text>
+            {showBadge ? (
+              <View style={[styles.tabWithBadge, isRTL && styles.rowRtl]}>
+                <View style={[styles.tabIconLabel, isRTL && styles.rowRtl]}>
+                  <FontAwesome name={icon} size={13} color={iconColor} />
+                  <Text
+                    style={[
+                      styles.tabTxt,
+                      onHero ? styles.tabTxtHero : styles.tabTxtSoft,
+                      isActive && styles.tabTxtActive,
+                      styles.tabLabelShrink,
+                      isRTL && styles.txtRtl,
+                    ]}
+                    numberOfLines={1}>
+                    {label}
+                  </Text>
+                </View>
+                <View
+                  style={[styles.tabBadge, styles.tabBadgeOrders]}
+                  accessibilityElementsHidden
+                  importantForAccessibility="no-hide-descendants">
+                  <Text style={styles.tabBadgeTxt}>
+                    {badgeCount > 99 ? '99+' : badgeCount}
+                  </Text>
+                </View>
+              </View>
+            ) : (
+              <>
+                <FontAwesome name={icon} size={13} color={iconColor} />
+                <Text
+                  style={[
+                    styles.tabTxt,
+                    onHero ? styles.tabTxtHero : styles.tabTxtSoft,
+                    isActive && styles.tabTxtActive,
+                    isRTL && styles.txtRtl,
+                  ]}
+                  numberOfLines={1}>
+                  {label}
+                </Text>
+              </>
+            )}
           </Pressable>
         );
       })}
@@ -1160,8 +1307,7 @@ function OrderRow({
   const dateStr = formatOrderCreatedAtShort(order.createdAt, locale);
   const showPaymentSnippet =
     order.hasServiceLines === true &&
-    !isShopOrderCompleted(order.status) &&
-    order.status !== 'cancelled' &&
+    !isShopOrderClosed(order.status) &&
     order.servicePaymentCard != null;
   const receiptUrl =
     order.servicePaymentModality === 'bank_transfer' && order.bankTransferReceiptUrl
@@ -1716,6 +1862,12 @@ const styles = StyleSheet.create({
     writingDirection: 'ltr',
     textAlign: 'left',
   },
+  ordersOpenCount: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: homeShell.cardMuted,
+    marginBottom: spacing.sm,
+  },
   ordersCenter: {
     paddingVertical: spacing.lg,
     alignItems: 'center',
@@ -1867,6 +2019,39 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   tabActive: { backgroundColor: brand.white },
+  rowRtl: { flexDirection: 'row-reverse' },
+  tabWithBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    flex: 1,
+    minWidth: 0,
+  },
+  tabIconLabel: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  tabLabelShrink: { flexShrink: 1 },
+  tabBadge: {
+    backgroundColor: '#059669',
+    minWidth: 16,
+    height: 16,
+    paddingHorizontal: 4,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  tabBadgeOrders: {
+    minWidth: 15,
+    height: 15,
+    paddingHorizontal: 3,
+  },
+  tabBadgeTxt: { color: brand.white, fontSize: 9, fontWeight: '800' },
   tabTxt: { fontWeight: '700', fontSize: fontSize.xs },
   tabTxtHero: { color: brand.white },
   tabTxtSoft: { color: 'rgba(51,62,143,0.55)' },

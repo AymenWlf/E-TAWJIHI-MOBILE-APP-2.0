@@ -89,7 +89,7 @@ export type DailyChallengeSubmitResponse = {
     longestStreak?: number;
     freezesRemaining?: number;
     streakNotices?: Array<{ type: string; date?: string; freezesRemaining?: number; streak?: number }>;
-    badgesEarned: Array<{ code: string; labelFr: string; labelAr: string | null }>;
+    badgesEarned: Array<{ code: string; labelFr: string; labelAr: string | null; pointsEarned?: number }>;
   };
 };
 

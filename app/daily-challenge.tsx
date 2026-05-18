@@ -379,7 +379,9 @@ export default function DailyChallengeScreen() {
   const [iceExplainOpen, setIceExplainOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitResult, setSubmitResult] = useState<DailyChallengeTodayData['myAttempt'] | null>(null);
-  const [badgesEarned, setBadgesEarned] = useState<Array<{ code: string; labelFr: string; labelAr: string | null }>>(
+  const [badgesEarned, setBadgesEarned] = useState<
+    Array<{ code: string; labelFr: string; labelAr: string | null; pointsEarned?: number }>
+  >(
     [],
   );
   const startedAt = useRef<number>(0);
@@ -1990,6 +1992,7 @@ export default function DailyChallengeScreen() {
                         <View key={b.code} style={styles.resultBadgeChip}>
                           <Text style={[styles.resultBadgeChipTxt, isRTL && styles.rtl]} numberOfLines={1}>
                             {locale === 'ar' && (b.labelAr?.trim() ?? '') !== '' ? b.labelAr! : b.labelFr}
+                            {(b.pointsEarned ?? 0) > 0 ? ` · +${b.pointsEarned} pts` : ''}
                           </Text>
                         </View>
                       ))}

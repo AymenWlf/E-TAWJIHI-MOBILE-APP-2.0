@@ -221,6 +221,7 @@ type ContestPushData = {
   type?: string;
   contestId?: number | string;
   route?: string;
+  referral_event?: string;
 };
 
 /**
@@ -239,6 +240,19 @@ async function handleNotificationTap(
       typeof data.route === 'string' && data.route.trim() !== ''
         ? data.route.trim()
         : '/daily-challenge';
+    try {
+      router.push(route as Parameters<typeof router.push>[0]);
+    } catch {
+      /* noop */
+    }
+    return;
+  }
+
+  if (data.type === 'referral') {
+    const route =
+      typeof data.route === 'string' && data.route.trim() !== ''
+        ? data.route.trim()
+        : '/compte/fidelite';
     try {
       router.push(route as Parameters<typeof router.push>[0]);
     } catch {

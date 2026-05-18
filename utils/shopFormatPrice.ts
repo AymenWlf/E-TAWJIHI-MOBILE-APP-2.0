@@ -30,6 +30,26 @@ function shopParseAmountString(raw: string): number {
   return Number.parseFloat(t);
 }
 
+const DHS_CURRENCY_ALIASES = new Set(['MAD', 'DHS', 'DH', '']);
+
+/** Libellé devise affiché dans l’app (charte : Dhs, pas MAD). */
+export function shopDisplayCurrency(currency?: string): string {
+  const c = String(currency ?? 'MAD')
+    .trim()
+    .toUpperCase();
+  if (DHS_CURRENCY_ALIASES.has(c)) return 'Dhs';
+  return String(currency ?? 'MAD').trim() || 'Dhs';
+}
+
+/** Code ISO pour Intl.NumberFormat (MAD = dirham marocain). */
+export function shopIntlCurrencyCode(currency?: string): string {
+  const c = String(currency ?? 'MAD')
+    .trim()
+    .toUpperCase();
+  if (DHS_CURRENCY_ALIASES.has(c)) return 'MAD';
+  return c || 'MAD';
+}
+
 function manualFormat(n: number, currency: string, intl?: ShopPriceIntlOptions): string {
   const min = intl?.minimumFractionDigits ?? 2;
   const max = intl?.maximumFractionDigits ?? 2;
@@ -43,20 +63,23 @@ function manualFormat(n: number, currency: string, intl?: ShopPriceIntlOptions):
 
 export function formatShopPrice(amount: string | number, currency = 'MAD', intl?: ShopPriceIntlOptions): string {
   const n = typeof amount === 'number' ? amount : shopParseAmountString(amount);
-  if (Number.isNaN(n)) return `${amount} ${currency}`;
+  const displayCur = shopDisplayCurrency(currency);
+  const intlCode = shopIntlCurrencyCode(currency);
+  if (Number.isNaN(n)) return `${amount} ${displayCur}`;
   try {
     if (typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function') {
-      return new Intl.NumberFormat('fr-FR', {
+      const formatted = new Intl.NumberFormat('fr-FR', {
         style: 'currency',
-        currency,
+        currency: intlCode,
         minimumFractionDigits: intl?.minimumFractionDigits ?? 2,
         maximumFractionDigits: intl?.maximumFractionDigits ?? 2,
       }).format(n);
+      return formatted.replace(/\s*MAD\s*$/i, `\u00A0${displayCur}`);
     }
   } catch {
     /* fallback manuel ci-dessous */
   }
-  return manualFormat(n, currency, intl);
+  return manualFormat(n, displayCur, intl);
 }
 
 export function shopHasPromotionalPrice(price: string, compareAtPrice: string | null | undefined): boolean {

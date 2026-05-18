@@ -1,6 +1,6 @@
 import { buildApiUrl } from '@/constants/api';
 import type { AppLocale } from '@/constants/i18n';
-import { httpGetJson } from '@/services/http';
+import { httpGetJson, httpPostJson } from '@/services/http';
 
 export type PlatformServiceEstablishment = {
   id: number;
@@ -159,4 +159,59 @@ export async function fetchPlatformServiceBySlug(slug: string): Promise<Platform
   const list = await fetchPlatformServices();
   const s = String(slug ?? '').trim();
   return list.find((x) => x.slug === s) ?? null;
+}
+
+export type PlatformServiceCatalogEntitlementStatus =
+  | 'available'
+  | 'upgrade_available'
+  | 'already_owned'
+  | 'included'
+  | 'blocked'
+  | 'requires_prerequisite'
+  | 'not_found';
+
+export type PlatformServiceCatalogEntitlement = {
+  status: PlatformServiceCatalogEntitlementStatus;
+  purchasable: boolean;
+  message: string | null;
+  code: string | null;
+  upgradeFromSlugs: string[];
+  includedViaSlug: string | null;
+};
+
+export async function fetchPlatformServiceCatalogEntitlements(
+  params: { phone?: string; cartSlugs?: string[] },
+  accessToken?: string | null,
+): Promise<Record<string, PlatformServiceCatalogEntitlement>> {
+  const search = new URLSearchParams();
+  if (params.phone?.trim()) search.set('phone', params.phone.trim());
+  const cart = (params.cartSlugs ?? []).map((s) => s.trim()).filter(Boolean);
+  if (cart.length > 0) search.set('cart', cart.join(','));
+  const qs = search.toString();
+  const url = buildApiUrl(`/api/platform-services/catalog-entitlements${qs ? `?${qs}` : ''}`);
+  const headers: Record<string, string> = {};
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  const res = await httpGetJson<{
+    success: boolean;
+    data?: { bySlug?: Record<string, PlatformServiceCatalogEntitlement> };
+  }>(url, { headers });
+  if (!res.success || !res.data?.bySlug) return {};
+  return res.data.bySlug;
+}
+
+export async function checkPlatformServicePurchaseEligibility(
+  payload: { slugs: string[]; phone?: string },
+  accessToken?: string | null,
+): Promise<{ allowed: boolean; message: string | null }> {
+  const url = buildApiUrl('/api/platform-services/purchase-eligibility');
+  const headers: Record<string, string> = {};
+  if (accessToken) headers.Authorization = `Bearer ${accessToken}`;
+  const res = await httpPostJson<
+    { success: boolean; data: { allowed: boolean; message: string | null } },
+    typeof payload
+  >(url, payload, { headers });
+  if (!res.success || !res.data) {
+    throw new Error('Vérification impossible');
+  }
+  return { allowed: res.data.allowed, message: res.data.message ?? null };
 }

@@ -111,6 +111,8 @@ export interface ShopOrderPayload {
   pickupDate?: string | null;
   pickupTime?: string | null;
   subtotal: string;
+  promoDiscountAmount?: string;
+  promoCodeLabel?: string | null;
   shippingFee: string;
   referenceShippingFee?: string | null;
   total: string;
@@ -226,6 +228,8 @@ export interface CreateShopOrderInput {
   specialiteMission3?: string;
   studentCity?: string;
   servicePaymentModality?: 'bank_transfer' | 'cashplus' | 'office' | 'pay_on_delivery';
+  /** Code promo validé au checkout (un seul par commande). */
+  promoCode?: string;
 }
 
 export interface CreateShopOrderResult {

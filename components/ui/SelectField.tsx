@@ -28,6 +28,10 @@ export type SelectFieldProps = {
   value: string;
   /** Direction du texte (RTL en arabe). */
   rtl?: boolean;
+  /** Affiche un astérisque après le libellé. */
+  required?: boolean;
+  /** Bordure rouge (validation échouée). */
+  hasError?: boolean;
   /** Callback lorsqu'on appuie sur le champ. */
   onPress: () => void;
   /** Désactive l'interaction et grise le champ. */
@@ -41,6 +45,8 @@ export function SelectField({
   hint,
   value,
   rtl = false,
+  required = false,
+  hasError = false,
   onPress,
   disabled = false,
   style,
@@ -48,7 +54,10 @@ export function SelectField({
   return (
     <View style={styles.field}>
       <View style={styles.labelRow}>
-        <Text style={[styles.label, rtl ? styles.labelRtl : styles.labelLtr]}>{label}</Text>
+        <Text style={[styles.label, rtl ? styles.labelRtl : styles.labelLtr]}>
+          {label}
+          {required ? <Text style={styles.requiredMark}> *</Text> : null}
+        </Text>
       </View>
 
       <Pressable
@@ -60,6 +69,7 @@ export function SelectField({
         style={({ pressed }) => [
           styles.input,
           rtl && styles.inputRtl,
+          hasError && styles.inputError,
           pressed && !disabled && { opacity: 0.85 },
           disabled && { opacity: 0.6 },
           style,
@@ -115,6 +125,12 @@ const styles = StyleSheet.create({
     gap: 10,
   },
   inputRtl: { flexDirection: 'row-reverse' },
+  inputError: {
+    borderColor: '#DC2626',
+    borderWidth: 2,
+    backgroundColor: '#FEF2F2',
+  },
+  requiredMark: { color: '#DC2626', fontWeight: '800' },
   inputText: {
     flex: 1,
     color: homeShell.cardText,

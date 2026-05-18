@@ -24,10 +24,14 @@ export function NotificationsDrawerProvider({ children }: { children: React.Reac
       setUnreadCount(0);
       return;
     }
-    const token = await getValidAccessToken();
-    if (!token) return;
-    const c = await fetchUnreadCount(token);
-    setUnreadCount(c);
+    try {
+      const token = await getValidAccessToken();
+      if (!token) return;
+      const c = await fetchUnreadCount(token);
+      setUnreadCount(c);
+    } catch {
+      /* Réseau / API indisponible : ne pas faire planter l’app (badge à 0). */
+    }
   }, [user, getValidAccessToken]);
 
   useEffect(() => {

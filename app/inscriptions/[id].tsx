@@ -412,7 +412,7 @@ export default function InscriptionDetailScreen() {
       ? `${Number(data.preRegistrationFee).toLocaleString('fr-FR', {
           minimumFractionDigits: 0,
           maximumFractionDigits: 2,
-        })} MAD`
+        })} Dhs`
       : null;
 
   const siblingBlocks = splitSiblingsAroundCurrent(

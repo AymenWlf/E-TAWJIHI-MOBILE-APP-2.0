@@ -21,8 +21,10 @@ import { ETAWJIHI_LOGO_COLOR, ETAWJIHI_LOGO_TRANSPARENT } from '@/constants/bran
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
+import { usePlatformServiceCatalogEntitlements } from '@/hooks/usePlatformServiceCatalogEntitlements';
 import {
   fetchPlatformServiceBySlug,
+  fetchPlatformServices,
   platformServiceLocalizedDescription,
   platformServiceLocalizedFeatures,
   type PlatformServiceItem,
@@ -47,6 +49,11 @@ import {
   splitEstablishmentsByDisplayCategory,
 } from '@/utils/establishmentDisplayCategories';
 import { shopServiceFiliereBadgeKey } from '@/utils/platformServiceFilieresFilter';
+import { PlatformServiceEntitlementStatus } from '@/components/shop/PlatformServiceEntitlementStatus';
+import {
+  platformServiceEntitlementCtaLabel,
+  platformServiceShouldShowCatalogPrice,
+} from '@/utils/platformServiceEntitlementUi';
 
 export default function PlatformServiceDetailScreen() {
   const router = useRouter();
@@ -56,7 +63,18 @@ export default function PlatformServiceDetailScreen() {
   const { presentShare } = useSharePreview();
   const { slug: slugParam } = useLocalSearchParams<{ slug: string }>();
   const slug = typeof slugParam === 'string' ? slugParam : Array.isArray(slugParam) ? slugParam[0] : '';
-  const { addLine, lines: cartLines, count: cartCount } = useShopCart();
+  const { addLine, removeLine, lines: cartLines, count: cartCount } = useShopCart();
+
+  const cartPlatformServiceSlugs = useMemo(
+    () =>
+      cartLines
+        .map((l) => l.platformServiceSlug?.trim() || (l.lineKind === 'platform_service' ? l.slug?.trim() : ''))
+        .filter((s): s is string => Boolean(s)),
+    [cartLines],
+  );
+  const { bySlug: serviceEntitlementsBySlug, loading: entitlementsLoading } =
+    usePlatformServiceCatalogEntitlements(cartPlatformServiceSlugs);
+  const [serviceNames, setServiceNames] = useState<Map<string, string>>(new Map());
 
   const [service, setService] = useState<PlatformServiceItem | null>(null);
   const [loading, setLoading] = useState(true);
@@ -115,14 +133,32 @@ export default function PlatformServiceDetailScreen() {
     }
   }, [service?.slug]);
 
+  useEffect(() => {
+    void fetchPlatformServices().then((list) => {
+      const map = new Map<string, string>();
+      for (const s of list) map.set(s.slug, s.name);
+      setServiceNames(map);
+    });
+  }, []);
+
+  const entitlement = slug ? serviceEntitlementsBySlug[slug] : undefined;
+  const purchasable = !entitlementsLoading && entitlement?.purchasable !== false;
+  const showPrice = platformServiceShouldShowCatalogPrice(entitlement);
+
   const handleAdd = useCallback(async () => {
     if (!service) return;
+    if (!purchasable) return;
     setAddingToCart(true);
     try {
+      const productId = platformServiceCartProductId(service.slug);
+      if (inCart) {
+        await removeLine(productId);
+        return;
+      }
       const unit = platformServiceEffectiveUnitPriceString(service);
       const currency = platformServiceCurrency(service.currency);
       await addLine({
-        productId: platformServiceCartProductId(service.slug),
+        productId,
         slug: service.slug,
         title: service.name,
         price: unit,
@@ -140,14 +176,39 @@ export default function PlatformServiceDetailScreen() {
     } finally {
       setAddingToCart(false);
     }
-  }, [service, addLine]);
+  }, [service, inCart, addLine, removeLine, purchasable]);
 
   const handleBuyNow = useCallback(async () => {
     if (!service) return;
-    await handleAdd();
-    const path = await getShopPathAfterBuyNow();
-    router.push(path as any);
-  }, [service, handleAdd, router]);
+    if (!purchasable) return;
+    setAddingToCart(true);
+    try {
+      if (!inCart) {
+        const unit = platformServiceEffectiveUnitPriceString(service);
+        const currency = platformServiceCurrency(service.currency);
+        await addLine({
+          productId: platformServiceCartProductId(service.slug),
+          slug: service.slug,
+          title: service.name,
+          price: unit,
+          currency,
+          quantity: 1,
+          type: 'service',
+          lineKind: 'platform_service',
+          platformServiceSlug: service.slug,
+          images: [],
+          isFreeShipping: Boolean(service.isFreeShipping),
+          platformServiceBrandIcon: service.brandIcon,
+          platformServiceBrandColor: service.brandColor,
+        });
+        void recordShopBoutiqueEvent('add_to_cart', undefined, service.slug);
+      }
+      const path = await getShopPathAfterBuyNow();
+      router.push(path as any);
+    } finally {
+      setAddingToCart(false);
+    }
+  }, [service, inCart, addLine, router, purchasable]);
 
   if (loading) {
     return (
@@ -320,27 +381,43 @@ export default function PlatformServiceDetailScreen() {
 
           <Text style={styles.title}>{service.name}</Text>
 
+          <PlatformServiceEntitlementStatus
+            entitlement={entitlement}
+            entitlementsLoading={entitlementsLoading}
+            serviceNameBySlug={serviceNames}
+            locale={locale}
+            isRTL={isRTL}
+            t={t}
+            variant="full"
+          />
+
           {localizedDescription ? (
             <Text style={[styles.desc, isRTL && styles.descRtl]}>{localizedDescription}</Text>
           ) : null}
 
-          <View style={styles.priceCard}>
-            <View style={styles.priceRow}>
-              <Text style={[styles.price, hasPromo && styles.priceSale]}>
-                {formatShopPrice(unitStr, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-              </Text>
-              {hasPromo && list ? (
-                <Text style={styles.priceCompare}>
-                  {formatShopPrice(list, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+          {showPrice ? (
+            <View style={styles.priceCard}>
+              <View style={styles.priceRow}>
+                <Text style={[styles.price, hasPromo && styles.priceSale]}>
+                  {formatShopPrice(unitStr, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </Text>
-              ) : null}
-              {promoPct != null ? (
-                <View style={styles.promoChip}>
-                  <Text style={styles.promoChipTxt}>−{shopFormatPromoDiscountPercentLabel(promoPct)}%</Text>
-                </View>
-              ) : null}
+                {hasPromo && list ? (
+                  <Text style={styles.priceCompare}>
+                    {formatShopPrice(list, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                  </Text>
+                ) : null}
+                {promoPct != null ? (
+                  <View style={styles.promoChip}>
+                    <Text style={styles.promoChipTxt}>−{shopFormatPromoDiscountPercentLabel(promoPct)}%</Text>
+                  </View>
+                ) : null}
+              </View>
             </View>
-          </View>
+          ) : entitlement?.status === 'included' || entitlement?.status === 'already_owned' ? (
+            <Text style={[styles.includedPriceHint, isRTL && styles.descRtl]}>
+              {t('shopEntitlementIncludedPriceHint')}
+            </Text>
+          ) : null}
 
           {localizedFeatures.length > 0 ? (
             <>
@@ -427,25 +504,63 @@ export default function PlatformServiceDetailScreen() {
         <View style={styles.footerBtns}>
           <Pressable
             onPress={() => void handleAdd()}
-            disabled={addingToCart}
-            style={({ pressed }) => [styles.addBtn, inCart && styles.addBtnIn, pressed && { opacity: 0.88 }]}
+            disabled={addingToCart || entitlementsLoading || !purchasable}
+            style={({ pressed }) => [
+              styles.addBtn,
+              inCart && purchasable && styles.addBtnIn,
+              (!purchasable || entitlementsLoading) && styles.addBtnDisabled,
+              pressed && purchasable && !entitlementsLoading && { opacity: 0.88 },
+            ]}
+            accessibilityLabel={
+              !purchasable
+                ? t('shopEntitlementNotPurchasable')
+                : inCart
+                  ? t('shopRemoveFromCartA11y')
+                  : t('shopAddA11y')
+            }
           >
             {addingToCart ? (
-              <ActivityIndicator size="small" color={inCart ? brand.white : brand.primary} />
+              <ActivityIndicator size="small" color={!purchasable ? '#94A3B8' : inCart ? brand.white : brand.primary} />
             ) : (
               <>
-                <FontAwesome name={inCart ? 'check' : 'shopping-cart'} size={15} color={inCart ? brand.white : brand.primary} />
-                <Text style={[styles.addBtnTxt, inCart && styles.addBtnTxtIn]}>{inCart ? 'Au panier' : 'Panier'}</Text>
+                <FontAwesome
+                  name={inCart && purchasable ? 'check' : 'shopping-cart'}
+                  size={15}
+                  color={!purchasable ? '#94A3B8' : inCart && purchasable ? brand.white : brand.primary}
+                />
+                <Text
+                  style={[
+                    styles.addBtnTxt,
+                    inCart && purchasable && styles.addBtnTxtIn,
+                    !purchasable && styles.addBtnTxtDisabled,
+                  ]}
+                >
+                  {!purchasable
+                    ? platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'Panier')
+                    : inCart
+                      ? 'Au panier'
+                      : 'Panier'}
+                </Text>
               </>
             )}
           </Pressable>
           <Pressable
             onPress={() => void handleBuyNow()}
-            disabled={addingToCart}
-            style={({ pressed }) => [styles.buyBtn, pressed && { opacity: 0.9 }]}
+            disabled={addingToCart || entitlementsLoading || !purchasable}
+            style={({ pressed }) => [
+              styles.buyBtn,
+              (!purchasable || entitlementsLoading) && styles.buyBtnDisabled,
+              pressed && purchasable && !entitlementsLoading && { opacity: 0.9 },
+            ]}
           >
-            <Text style={styles.buyBtnTxt}>{service.cta}</Text>
-            <FontAwesome name="arrow-right" size={13} color={brand.white} />
+            <Text style={[styles.buyBtnTxt, (!purchasable || entitlementsLoading) && styles.buyBtnTxtDisabled]}>
+              {entitlement?.status === 'upgrade_available' || !purchasable
+                ? platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'shopBuyNow')
+                : service.cta}
+            </Text>
+            {!purchasable || entitlementsLoading ? null : (
+              <FontAwesome name="arrow-right" size={13} color={brand.white} />
+            )}
           </Pressable>
         </View>
       </SafeAreaView>
@@ -687,6 +802,45 @@ const styles = StyleSheet.create({
   establishmentBody: { flex: 1, minWidth: 0 },
   establishmentNom: { fontSize: 14, fontWeight: '800', color: brand.text, lineHeight: 18 },
   establishmentMeta: { fontSize: 12, color: brand.textMuted, fontWeight: '600', marginTop: 2 },
+  entitlementBox: {
+    flexDirection: 'row',
+    gap: 10,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    marginTop: spacing.md,
+    backgroundColor: 'rgba(51,62,143,0.06)',
+    borderColor: 'rgba(51,62,143,0.14)',
+  },
+  entitlementBoxSuccess: {
+    backgroundColor: 'rgba(16,185,129,0.1)',
+    borderColor: 'rgba(16,185,129,0.25)',
+  },
+  entitlementBoxDanger: {
+    backgroundColor: 'rgba(239,68,68,0.08)',
+    borderColor: 'rgba(239,68,68,0.22)',
+  },
+  entitlementBoxWarning: {
+    backgroundColor: 'rgba(245,158,11,0.12)',
+    borderColor: 'rgba(245,158,11,0.28)',
+  },
+  entitlementBoxInfo: {
+    backgroundColor: 'rgba(14,165,233,0.1)',
+    borderColor: 'rgba(14,165,233,0.22)',
+  },
+  entitlementTxt: { flex: 1, fontSize: 13, fontWeight: '700', color: brand.text, lineHeight: 19 },
+  entitlementLoadingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: spacing.sm,
+  },
+  includedPriceHint: {
+    marginTop: spacing.sm,
+    fontSize: 14,
+    fontWeight: '800',
+    color: brand.success,
+  },
   hintBox: {
     flexDirection: 'row',
     gap: 10,
@@ -722,8 +876,10 @@ const styles = StyleSheet.create({
     backgroundColor: brand.white,
   },
   addBtnIn: { backgroundColor: brand.success, borderColor: brand.success },
+  addBtnDisabled: { borderColor: '#CBD5E1', backgroundColor: '#F8FAFC' },
   addBtnTxt: { fontSize: 13, fontWeight: '900', color: brand.primary },
   addBtnTxtIn: { color: brand.white },
+  addBtnTxtDisabled: { color: '#94A3B8' },
   buyBtn: {
     flex: 1,
     height: 48,
@@ -735,4 +891,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buyBtnTxt: { color: brand.white, fontSize: 14, fontWeight: '900' },
+  buyBtnDisabled: { backgroundColor: '#CBD5E1' },
+  buyBtnTxtDisabled: { color: '#F1F5F9' },
 });

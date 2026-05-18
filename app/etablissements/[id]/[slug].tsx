@@ -635,7 +635,7 @@ export default function EstablishmentDetailScreen() {
               <Text style={[styles.body, isRTL && styles.txtRtl]}>
                 {data.boursesDisponibles ? t('estScholarshipsAvailable') : '—'}
                 {data.bourseMin != null || data.bourseMax != null
-                  ? ` · ${fmtMaybeNum(data.bourseMin)} → ${fmtMaybeNum(data.bourseMax)} MAD`
+                  ? ` · ${fmtMaybeNum(data.bourseMin)} → ${fmtMaybeNum(data.bourseMax)} Dhs`
                   : ''}
               </Text>
               {data.typesBourse && data.typesBourse.length ? (

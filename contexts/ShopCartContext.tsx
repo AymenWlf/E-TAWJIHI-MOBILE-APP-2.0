@@ -3,7 +3,11 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useS
 import type { ShopCartLine } from '@/types/shop';
 import { cartItemCount, clearCart, loadCart, saveCart, upsertCartLine } from '@/utils/shopCartStorage';
 import { isPlatformServiceCartLine } from '@/utils/platformServiceCart';
-import { hydrateCartLinesImagesViaApi, mergePlatformServiceBrandingIntoCartLines } from '@/services/shop';
+import {
+  hydrateCartLinesImagesViaApi,
+  hydrateCartLinesPricesViaApi,
+  mergePlatformServiceBrandingIntoCartLines,
+} from '@/services/shop';
 
 type ShopCartContextValue = {
   lines: ShopCartLine[];
@@ -16,6 +20,8 @@ type ShopCartContextValue = {
   clear: () => Promise<void>;
   /** Recharge les images manquantes via le catalogue (no-op si tout est déjà présent). */
   hydrateImages: () => Promise<void>;
+  /** Remplace le panier (ex. après synchro prix catalogue au checkout). */
+  replaceLines: (next: ShopCartLine[]) => Promise<void>;
 };
 
 const ShopCartContext = createContext<ShopCartContextValue | null>(null);
@@ -89,9 +95,17 @@ export function ShopCartProvider({ children }: { children: React.ReactNode }) {
     if (lines.length === 0) return;
     let next = await mergePlatformServiceBrandingIntoCartLines(lines);
     next = await hydrateCartLinesImagesViaApi(next);
+    next = await hydrateCartLinesPricesViaApi(next);
     const changed = JSON.stringify(lines) !== JSON.stringify(next);
     if (changed) await persist(next);
   }, [lines, persist]);
+
+  const replaceLines = useCallback<ShopCartContextValue['replaceLines']>(
+    async (next) => {
+      await persist(next);
+    },
+    [persist],
+  );
 
   const value = useMemo<ShopCartContextValue>(
     () => ({
@@ -103,8 +117,9 @@ export function ShopCartProvider({ children }: { children: React.ReactNode }) {
       removeLine,
       clear,
       hydrateImages,
+      replaceLines,
     }),
-    [lines, ready, addLine, updateQuantity, removeLine, clear, hydrateImages],
+    [lines, ready, addLine, updateQuantity, removeLine, clear, hydrateImages, replaceLines],
   );
 
   return <ShopCartContext.Provider value={value}>{children}</ShopCartContext.Provider>;
