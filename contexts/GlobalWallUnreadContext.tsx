@@ -9,7 +9,7 @@ import React, {
   useState,
   type ReactNode,
 } from 'react';
-import { AppState, type AppStateStatus } from 'react-native';
+import { AppState, InteractionManager, type AppStateStatus } from 'react-native';
 
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -17,6 +17,7 @@ import {
   GLOBAL_WALL_PAGE_SIZE,
   type GlobalWallPost,
 } from '@/services/globalWall';
+import { GLOBAL_WALL_MOBILE_ENABLED } from '@/constants/mobileFeatureFlags';
 import { countNewGlobalWallMessages } from '@/utils/countNewGlobalWallMessages';
 
 const STORAGE_KEY = 'etawjihi.globalWall.page1Snapshot';
@@ -66,7 +67,24 @@ type GlobalWallUnreadContextValue = {
 
 const GlobalWallUnreadContext = createContext<GlobalWallUnreadContextValue | null>(null);
 
+const DISABLED_WALL_CTX: GlobalWallUnreadContextValue = {
+  unreadCount: 0,
+  registerGlobalWallPage1Seen: async () => {},
+  refreshUnread: async () => {},
+};
+
 export function GlobalWallUnreadProvider({ children }: { children: ReactNode }) {
+  if (!GLOBAL_WALL_MOBILE_ENABLED) {
+    return (
+      <GlobalWallUnreadContext.Provider value={DISABLED_WALL_CTX}>
+        {children}
+      </GlobalWallUnreadContext.Provider>
+    );
+  }
+  return <GlobalWallUnreadProviderActive>{children}</GlobalWallUnreadProviderActive>;
+}
+
+function GlobalWallUnreadProviderActive({ children }: { children: ReactNode }) {
   const { user, getValidAccessToken } = useAuth();
   const pathname = usePathname() ?? '';
   const onCommunityScreen = pathname.includes('communaute');
@@ -124,7 +142,7 @@ export function GlobalWallUnreadProvider({ children }: { children: ReactNode }) 
     } catch {
       await persistSnapshot(res.data.items);
     }
-  }, [user, getValidAccessToken, onCommunityScreen, persistSnapshot]);
+  }, [user?.id, getValidAccessToken, onCommunityScreen, persistSnapshot]);
 
   useEffect(() => {
     if (!user) {
@@ -136,26 +154,29 @@ export function GlobalWallUnreadProvider({ children }: { children: ReactNode }) 
       setUnreadCount(0);
       return;
     }
-    void refreshUnread();
-  }, [user, onCommunityScreen, refreshUnread]);
+    const task = InteractionManager.runAfterInteractions(() => {
+      void refreshUnread();
+    });
+    return () => task.cancel();
+  }, [user?.id, onCommunityScreen, refreshUnread]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     const id = setInterval(() => {
       void refreshUnread();
     }, 28_000);
     return () => clearInterval(id);
-  }, [user, refreshUnread]);
+  }, [user?.id, refreshUnread]);
 
   useEffect(() => {
-    if (!user) return;
+    if (!user?.id) return;
     const sub = AppState.addEventListener('change', (next: AppStateStatus) => {
       if (next === 'active') {
         void refreshUnread();
       }
     });
     return () => sub.remove();
-  }, [user, refreshUnread]);
+  }, [user?.id, refreshUnread]);
 
   const value = useMemo(
     (): GlobalWallUnreadContextValue => ({

@@ -14,19 +14,25 @@ import {
   View,
 } from 'react-native';
 
+import {
+  EstablishmentDetailLoadingSkeleton,
+  EstablishmentEligibilityLoadingSkeleton,
+} from '@/components/schools/EstablishmentDetailLoadingSkeleton';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
-import { CommunityQnaSection } from '@/components/community/CommunityQnaSection';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
-import { ContestAnnouncementQnaBottomSheet } from '@/components/inscriptions/ContestAnnouncementQnaBottomSheet';
+import { AnnouncementCardSkeletonStack } from '@/components/inscriptions/AnnouncementCardSkeleton';
+import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { ContestYoutubeTutorial } from '@/components/inscriptions/ContestYoutubeTutorial';
 import {
   EligibilityBadge,
   EligibilitySummary,
 } from '@/components/inscriptions/EligibilityViews';
+import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { EstablishmentCampusSection } from '@/components/schools/EstablishmentCampusSection';
 import { EstablishmentDescriptionHtml } from '@/components/schools/EstablishmentDescriptionHtml';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
@@ -64,22 +70,25 @@ import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
 
 export default function EstablishmentDetailScreen() {
   const router = useRouter();
-  const { isRTL, t, locale, setLocale } = useLocale();
+  const { isRTL, t, locale } = useLocale();
   const { presentShare } = useSharePreview();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const { user, getValidAccessToken } = useAuth();
+  const {
+    isInscriptionsLocked,
+    isInscriptionsAccessPending,
+    openTawjihPlusProduct,
+    applyServerInscriptionsAccess,
+    resolveInscriptionsAccessWithoutServer,
+  } = useTawjihPlusAccessContext();
+  const announcementsLocked =
+    !isInscriptionsAccessPending && isInscriptionsLocked;
   const { profile: eligibilityProfile, loading: eligibilityProfileLoading } = useEligibilityProfile();
   const isLoggedIn = Boolean(user);
-  const params = useLocalSearchParams<{ id?: string; slug?: string; qnaQ?: string | string[] }>();
+  const params = useLocalSearchParams<{ id?: string; slug?: string }>();
   const id = useMemo(() => Number(params.id ?? 0), [params.id]);
   const slug = (params.slug ?? '').toString();
-  const highlightQuestionId = useMemo(() => {
-    const raw = params.qnaQ;
-    const s = Array.isArray(raw) ? raw[0] : raw;
-    const n = Number(s ?? 0);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  }, [params.qnaQ]);
   const [data, setData] = useState<EstablishmentNormalized | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -87,9 +96,6 @@ export default function EstablishmentDetailScreen() {
   /* Annonces publiées de cet établissement (concours, résultats, bourses…). */
   const [announcements, setAnnouncements] = useState<ContestAnnouncementCard[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
-  const [announcementQnaSheet, setAnnouncementQnaSheet] = useState<{ id: number; title: string } | null>(null);
-  const closeAnnouncementQnaSheet = useCallback(() => setAnnouncementQnaSheet(null), []);
-
   // Suivi école
   const [isFollowing, setIsFollowing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
@@ -212,21 +218,35 @@ export default function EstablishmentDetailScreen() {
     if (!Number.isFinite(id) || id <= 0) return;
     let cancelled = false;
     setAnnouncementsLoading(true);
-    void fetchContestAnnouncementsByEstablishment(id)
-      .then((items) => {
+    void (async () => {
+      try {
+        const token = isLoggedIn ? await getValidAccessToken() : null;
+        const result = await fetchContestAnnouncementsByEstablishment(id, {
+          accessToken: token,
+        });
         if (cancelled) return;
-        setAnnouncements(items);
-        // Tracking analytique : enregistre une impression « listing » par
-        // annonce affichée sur la fiche école (dédupliqué par session).
-        recordContestListingImpressionsBatch(items);
-      })
-      .finally(() => {
+        applyServerInscriptionsAccess(result.inscriptionsFullAccess);
+        setAnnouncements(result.items);
+        recordContestListingImpressionsBatch(result.items);
+      } catch {
+        if (!cancelled) {
+          setAnnouncements([]);
+          resolveInscriptionsAccessWithoutServer();
+        }
+      } finally {
         if (!cancelled) setAnnouncementsLoading(false);
-      });
+      }
+    })();
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [
+    applyServerInscriptionsAccess,
+    getValidAccessToken,
+    id,
+    isLoggedIn,
+    resolveInscriptionsAccessWithoutServer,
+  ]);
 
   const campusRows = useMemo(() => mapCampusForDisplay(data?.campus), [data?.campus]);
   const uni = useMemo(() => (data ? universityName(data, { rtl: isRTL }) : ''), [data, isRTL]);
@@ -293,76 +313,53 @@ export default function EstablishmentDetailScreen() {
     return { photoUris, videoRaw, brochureUrl };
   }, [data]);
 
+  const renderTopBar = () => (
+    <View style={[styles.topBar, { paddingTop: insets.top + 6 }, isRTL && styles.rowRtl]}>
+      <Pressable
+        onPress={() => router.back()}
+        style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.8 }]}
+        accessibilityLabel={t('loginBack')}
+      >
+        <FontAwesome
+          name={isRTL ? 'chevron-right' : 'chevron-left'}
+          size={16}
+          color={brand.white}
+        />
+      </Pressable>
+      <Text style={[styles.topBarTitle, isRTL && styles.txtRtl]} numberOfLines={1}>
+        {t('estDetailTitle')}
+      </Text>
+      {id > 0 ? (
+        <ShareIconButton
+          color={brand.white}
+          style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}
+          onPress={() =>
+            presentShare(
+              sharePayloadEstablishmentDetail({
+                id,
+                slug: slug || 'fiche',
+                title: data ? primaryName : t('estDetailTitle'),
+                subtitle: data ? secondaryLine || undefined : undefined,
+                thumbUrl: data?.displayLogoUrl,
+              }),
+            )
+          }
+        />
+      ) : (
+        <View style={styles.topBarSpacer} />
+      )}
+      <HeroLangSwitch />
+    </View>
+  );
+
   return (
-    <View style={styles.safe}>
+    <View style={styles.root}>
       <StatusBar style="light" />
       <Stack.Screen options={{ headerShown: false }} />
-      {/** Bleu jusqu’aux icônes de statut (plus de bande grise comme sur la liste Écoles). */}
-      <View style={[styles.headerSafe, { paddingTop: insets.top }]}>
-        <View style={[styles.header, isRTL && styles.headerRtl]}>
-          <Pressable
-            onPress={() => router.back()}
-            hitSlop={10}
-            style={styles.backBtn}
-            accessibilityLabel={t('loginBack')}
-          >
-            <FontAwesome name={isRTL ? 'angle-right' : 'angle-left'} size={22} color={homeShell.text} />
-          </Pressable>
-          <Text style={[styles.headerTitle, isRTL && styles.txtRtl]} numberOfLines={1}>
-            {t('estDetailTitle')}
-          </Text>
-          {id > 0 ? (
-            <ShareIconButton
-              color={homeShell.text}
-              style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}
-              onPress={() =>
-                presentShare(
-                  sharePayloadEstablishmentDetail({
-                    id,
-                    slug: slug || 'fiche',
-                    title: data ? primaryName : t('estDetailTitle'),
-                    subtitle: data ? secondaryLine || undefined : undefined,
-                    thumbUrl: data?.displayLogoUrl,
-                  }),
-                )
-              }
-            />
-          ) : null}
-          <View
-            style={[styles.langSwitch, isRTL && styles.langSwitchRtl]}
-            accessibilityRole="tablist"
-            accessibilityLabel={t('languageSwitcher')}>
-            <Pressable
-              onPress={() => setLocale('fr')}
-              style={({ pressed }) => [
-                styles.langPill,
-                locale === 'fr' && styles.langPillActive,
-                pressed && styles.langPillPressed,
-              ]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: locale === 'fr' }}>
-              <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>{t('langFr')}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setLocale('ar')}
-              style={({ pressed }) => [
-                styles.langPill,
-                locale === 'ar' && styles.langPillActive,
-                pressed && styles.langPillPressed,
-              ]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: locale === 'ar' }}>
-              <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>{t('langAr')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </View>
-
+      {renderTopBar()}
       <View style={styles.main}>
       {loading ? (
-        <View style={[styles.center, { paddingBottom: insets.bottom }]}>
-          <ActivityIndicator color={homeShell.green} />
-        </View>
+        <EstablishmentDetailLoadingSkeleton isRTL={isRTL} bottomInset={insets.bottom} style={styles.scroll} />
       ) : err ? (
         <View style={[styles.center, { paddingBottom: insets.bottom }]}>
           <Text style={styles.errTxt}>{err}</Text>
@@ -399,6 +396,15 @@ export default function EstablishmentDetailScreen() {
               ) : (
                 <EligibilityBadge result={eligibility} size="sm" />
               )}
+              {id > 0 ? (
+                <DiagnosticEstablishmentCompatibilityBadge
+                  establishmentId={id}
+                  establishmentType={data?.type}
+                  size="md"
+                  isRTL={isRTL}
+                  locale={locale === 'ar' ? 'ar' : 'fr'}
+                />
+              ) : null}
             </View>
 
             {/* Bouton Suivre / Ne plus suivre l'école (et accès rapide à la timeline si déjà suivie). */}
@@ -557,9 +563,7 @@ export default function EstablishmentDetailScreen() {
           {showEligibilitySection ? (
             <Section title={t('inscDetailEligibility')} rtl={isRTL}>
               {isLoggedIn && eligibilityProfileLoading ? (
-                <View style={styles.announcementsLoading}>
-                  <ActivityIndicator color={brand.primary} />
-                </View>
+                <EstablishmentEligibilityLoadingSkeleton isRTL={isRTL} />
               ) : (
                 <EligibilitySummary
                   result={eligibility}
@@ -572,10 +576,8 @@ export default function EstablishmentDetailScreen() {
 
           {/* Annonces de l'école (concours, résultats, bourses…). */}
           <Section title={t('estDetailAnnouncements')} rtl={isRTL}>
-            {announcementsLoading ? (
-              <View style={styles.announcementsLoading}>
-                <ActivityIndicator color={brand.primary} />
-              </View>
+            {announcementsLoading || isInscriptionsAccessPending ? (
+              <AnnouncementCardSkeletonStack count={2} isRTL={isRTL} />
             ) : announcements.length === 0 ? (
               <Text style={[styles.body, isRTL && styles.txtRtl]}>
                 {t('estDetailAnnouncementsEmpty')}
@@ -586,23 +588,24 @@ export default function EstablishmentDetailScreen() {
                   <AnnouncementCard
                     key={`ann-${a.id}`}
                     item={a}
-                    /* Le suivi est porté par l'école entière → on reflète l'état global. */
+                    previewOnly={a.previewOnly ?? announcementsLocked}
                     isFollowed={isFollowing}
                     followStateLoading={isLoggedIn && !followProbeDone}
                     eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
                     busy={followBusy}
                     onToggleFollow={onToggleFollow}
                     onOpenLink={() => {
+                      if (announcementsLocked) {
+                        openTawjihPlusProduct();
+                        return;
+                      }
                       if (a.registrationUrl) {
                         void Linking.openURL(a.registrationUrl).catch(() => undefined);
                       }
                     }}
-                    onOpenComments={() =>
-                      setAnnouncementQnaSheet({
-                        id: a.id,
-                        title: (isRTL && a.titleAr ? a.titleAr : a.title) || '',
-                      })
-                    }
+                    onUpdateStatus={() => {
+                      if (announcementsLocked) openTawjihPlusProduct();
+                    }}
                     onPress={() => router.push(`/inscriptions/${a.id}` as never)}
                   />
                 ))}
@@ -684,27 +687,9 @@ export default function EstablishmentDetailScreen() {
             </Section>
           ) : null}
 
-          {id > 0 ? (
-            <CommunityQnaSection
-              contextType="establishment"
-              contextId={id}
-              marginHorizontal={spacing.xl}
-              highlightQuestionId={highlightQuestionId}
-              scrollParentRef={scrollRef}
-              composerLayout="instagram"
-              instagramAnchoredDock
-            />
-          ) : null}
         </ScrollView>
       )}
       </View>
-
-      <ContestAnnouncementQnaBottomSheet
-        visible={announcementQnaSheet !== null}
-        announcementId={announcementQnaSheet?.id ?? 0}
-        announcementTitle={announcementQnaSheet?.title ?? ''}
-        onClose={closeAnnouncementQnaSheet}
-      />
     </View>
   );
 }
@@ -834,78 +819,43 @@ function Flag({
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  root: {
     flex: 1,
-    backgroundColor: '#F1F5F9',
+    backgroundColor: brand.backgroundSoft,
   },
-  headerSafe: {
-    backgroundColor: homeShell.blue,
-    zIndex: 10,
+  topBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    backgroundColor: brand.primary,
+    gap: spacing.sm,
+  },
+  rowRtl: {
+    flexDirection: 'row-reverse',
+  },
+  iconBtn: {
+    width: 36,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+  },
+  topBarTitle: {
+    color: brand.white,
+    fontWeight: '800',
+    fontSize: fontSize.md,
+    flex: 1,
+    textAlign: 'center',
+  },
+  topBarSpacer: {
+    width: 36,
+    height: 36,
   },
   main: {
     flex: 1,
-  },
-  header: {
-    backgroundColor: homeShell.blue,
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-  },
-  headerRtl: {
-    flexDirection: 'row-reverse',
-  },
-  backBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
-  },
-  headerTitle: {
-    flex: 1,
-    color: homeShell.text,
-    fontSize: fontSize.md,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-    opacity: 0.92,
-  },
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: radius.full,
-    padding: 3,
-    marginStart: spacing.sm,
-  },
-  langSwitchRtl: {
-    flexDirection: 'row-reverse',
-    marginStart: 0,
-    marginEnd: spacing.sm,
-  },
-  langPill: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: radius.full,
-  },
-  langPillActive: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  langPillPressed: {
-    opacity: 0.88,
-  },
-  langPillTxt: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  langPillTxtActive: {
-    color: homeShell.text,
   },
   txtRtl: {
     textAlign: 'right',
@@ -1092,11 +1042,6 @@ const styles = StyleSheet.create({
   },
 
   /* Section "Annonces de l'école" */
-  announcementsLoading: {
-    paddingVertical: spacing.lg,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   announcementsList: {
     gap: spacing.md,
   },

@@ -17,6 +17,7 @@ import {
 import Animated, { useAnimatedKeyboard, useAnimatedStyle } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LoadingCardStack } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import { KeyboardAwareBottomSpacer } from '@/components/ui/KeyboardAwareBottomSpacer';
 import { useAuth } from '@/contexts/AuthContext';
@@ -155,7 +156,7 @@ export function CommunityQnaSection({
         if (fetchGenRef.current !== expectedGen) {
           return;
         }
-        setListErr(formatCommunityQnaApiError(e));
+        setListErr(formatCommunityQnaApiError(e, t));
         setRows([]);
       } finally {
         if (fetchGenRef.current === expectedGen) {
@@ -221,7 +222,7 @@ export function CommunityQnaSection({
       setCompose('');
       await load(fetchGenRef.current);
     } catch (e) {
-      Alert.alert('', formatCommunityQnaApiError(e));
+      Alert.alert('', formatCommunityQnaApiError(e, t));
     } finally {
       setSendingQ(false);
     }
@@ -244,7 +245,7 @@ export function CommunityQnaSection({
           ),
         );
       } catch (e) {
-        Alert.alert('', formatCommunityQnaApiError(e));
+        Alert.alert('', formatCommunityQnaApiError(e, t));
       }
     },
     [getValidAccessToken, isLoggedIn, router],
@@ -274,7 +275,7 @@ export function CommunityQnaSection({
           Keyboard.dismiss();
         }
       } catch (e) {
-        Alert.alert('', formatCommunityQnaApiError(e));
+        Alert.alert('', formatCommunityQnaApiError(e, t));
       } finally {
         setReplyBusyId(null);
       }
@@ -578,17 +579,15 @@ export function CommunityQnaSection({
       </View>
 
       {loading && rows.length === 0 ? (
-        <View style={styles.listLoading}>
-          <ActivityIndicator color={brand.primary} />
-          <Text style={[styles.listLoadingTxt, isRTL && styles.rtl]}>{t('qnaLoadingComments')}</Text>
-        </View>
+        <LoadingCardStack count={2} isRTL={isRTL} style={styles.listLoading} />
       ) : null}
 
       {refreshing && rows.length > 0 ? (
-        <View style={[styles.listLoading, styles.listLoadingRefreshing]}>
-          <ActivityIndicator color={brand.primary} />
-          <Text style={[styles.listLoadingTxt, isRTL && styles.rtl]}>{t('qnaLoadingComments')}</Text>
-        </View>
+        <LoadingCardStack
+          count={1}
+          isRTL={isRTL}
+          style={[styles.listLoading, styles.listLoadingRefreshing]}
+        />
       ) : null}
 
       {!loading && listErr ? <Text style={[styles.err, isRTL && styles.rtl]}>{listErr}</Text> : null}

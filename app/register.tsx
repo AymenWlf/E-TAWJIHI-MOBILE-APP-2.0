@@ -24,12 +24,15 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { CAIRO } from '@/theme/arabicTypography';
 import { brand, radius, spacing } from '@/theme/tokens';
 import { errorMessage } from '@/utils/errorMessage';
+import { isValidMoroccoMobile10, sanitizeMoroccoMobileInput } from '@/utils/moroccoMobilePhone';
+import { evaluateAccountPassword, isStrongAccountPassword } from '@/utils/accountPasswordPolicy';
 
 const BLUE = brand.primary;
 const MINT = brand.success;
@@ -37,7 +40,7 @@ const MINT = brand.success;
 const FIELD_SCROLL_INSET = 28;
 
 export default function RegisterScreen() {
-  const { isRTL, locale, setLocale, t } = useLocale();
+  const { isRTL, t } = useLocale();
   const { register } = useAuth();
   const { bottom: safeBottom } = useSafeAreaInsets();
 
@@ -116,10 +119,13 @@ export default function RegisterScreen() {
 
   const rtl = isRTL;
 
+  const passwordRules = useMemo(() => evaluateAccountPassword(password), [password]);
+  const passwordStrong = useMemo(() => isStrongAccountPassword(password), [password]);
+
   const v = useMemo(() => {
-    const phoneOk = phone.replace(/\s/g, '').length >= 9;
-    const passwordOk = password.length >= 4;
-    const confirmOk = confirm.length >= 4;
+    const phoneOk = isValidMoroccoMobile10(phone);
+    const passwordOk = passwordStrong;
+    const confirmOk = confirm.length >= 8;
     const match = passwordOk && confirmOk && password === confirm;
     return {
       phoneOk,
@@ -128,11 +134,11 @@ export default function RegisterScreen() {
       match,
       canSubmit: phoneOk && passwordOk && confirmOk && match && !submitting,
       phoneError: touched.phone && !phoneOk ? t('loginInvalidPhone') : '',
-      passwordError: touched.password && !passwordOk ? t('loginInvalidPassword') : '',
+      passwordError: touched.password && !passwordOk ? t('registerPasswordWeak') : '',
       confirmError: touched.confirm && !confirmOk ? t('registerInvalidConfirm') : '',
       matchError: touched.confirm && confirmOk && passwordOk && !match ? t('registerPasswordsMismatch') : '',
     };
-  }, [confirm, password, phone, submitting, t, touched.confirm, touched.password, touched.phone]);
+  }, [confirm, password, passwordStrong, phone, submitting, t, touched.confirm, touched.password, touched.phone]);
 
   async function onSubmit() {
     setTouched({ phone: true, password: true, confirm: true });
@@ -143,7 +149,7 @@ export default function RegisterScreen() {
       // Navigation handled by useSetupRedirectGate in _layout.tsx
       await register(phone.trim(), password);
     } catch (e: unknown) {
-      setServerError(errorMessage(e));
+      setServerError(errorMessage(e, t, 'auth'));
     } finally {
       setSubmitting(false);
     }
@@ -161,26 +167,7 @@ export default function RegisterScreen() {
         </View>
 
         <View style={styles.topRow}>
-          <View style={styles.langSwitchWrap} accessibilityLabel={t('languageSwitcher')}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setLocale('fr')}
-              style={[styles.langPill, locale === 'fr' && styles.langPillActive]}
-            >
-              <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>
-                {t('langFr')}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setLocale('ar')}
-              style={[styles.langPill, locale === 'ar' && styles.langPillActive]}
-            >
-              <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>
-                {t('langAr')}
-              </Text>
-            </Pressable>
-          </View>
+          <HeroLangSwitch />
         </View>
 
         <View style={styles.topLogoCenter}>
@@ -228,7 +215,7 @@ export default function RegisterScreen() {
               </View>
               <TextInput
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(text) => setPhone(sanitizeMoroccoMobileInput(text))}
                 onFocus={() => scrollToFieldBlock('phone')}
                 onBlur={() => setTouched((s) => ({ ...s, phone: true }))}
                 onSubmitEditing={() => passwordRef.current?.focus()}
@@ -238,6 +225,7 @@ export default function RegisterScreen() {
                 autoComplete="tel"
                 textContentType="telephoneNumber"
                 returnKeyType="next"
+                maxLength={10}
                 style={[styles.fieldInput, rtl && styles.rtl]}
               />
             </View>
@@ -281,6 +269,34 @@ export default function RegisterScreen() {
               </Pressable>
             </View>
             {!!v.passwordError && <Text style={[styles.fieldHint, rtl && styles.rtl]}>{v.passwordError}</Text>}
+            {password.length > 0 ? (
+              <View style={styles.passwordRulesBox}>
+                <Text style={[styles.passwordRulesTitle, rtl && styles.rtl]}>{t('registerPasswordRulesTitle')}</Text>
+                {(
+                  [
+                    ['minLength', t('registerPasswordRuleMinLength')],
+                    ['hasUpperCase', t('registerPasswordRuleUpper')],
+                    ['hasLowerCase', t('registerPasswordRuleLower')],
+                    ['hasNumber', t('registerPasswordRuleNumber')],
+                    ['hasSpecialChar', t('registerPasswordRuleSpecial')],
+                  ] as const
+                ).map(([key, label]) => {
+                  const ok = passwordRules[key];
+                  return (
+                    <View key={key} style={[styles.passwordRuleRow, rtl && styles.passwordRuleRowRtl]}>
+                      <FontAwesome
+                        name={ok ? 'check-circle' : 'circle-o'}
+                        size={13}
+                        color={ok ? brand.success : brand.textMuted}
+                      />
+                      <Text style={[styles.passwordRuleTxt, ok && styles.passwordRuleTxtOk, rtl && styles.rtl]}>
+                        {label}
+                      </Text>
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
           </View>
 
           <View
@@ -401,20 +417,6 @@ const styles = StyleSheet.create({
     lineHeight: 18,
   },
 
-  langSwitchWrap: {
-    flexDirection: 'row',
-    backgroundColor: brand.backgroundSoft,
-    borderRadius: 999,
-    padding: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: brand.border,
-    gap: 4,
-  },
-  langPill: { height: 28, paddingHorizontal: 10, borderRadius: 999, alignItems: 'center', justifyContent: 'center' },
-  langPillActive: { backgroundColor: 'rgba(51,62,143,0.12)' },
-  langPillTxt: { fontSize: 12, fontWeight: '900', color: brand.textMuted },
-  langPillTxtActive: { color: BLUE },
-
   bottomPanel: { flex: 1, justifyContent: 'flex-end' },
   bottomPanelKeyboard: { zIndex: 40, elevation: 24 },
   sheetPressable: { flex: 1 },
@@ -473,6 +475,20 @@ const styles = StyleSheet.create({
   fieldInput: { flex: 1, height: '100%', fontSize: 15, color: brand.text, paddingVertical: 0, fontFamily: CAIRO.bold },
   eyeBtn: { paddingHorizontal: 14, paddingVertical: 10 },
   fieldHint: { marginTop: 5, marginLeft: 2, fontSize: 12, color: brand.error, fontWeight: '700' },
+  passwordRulesBox: {
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: brand.backgroundSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: brand.border,
+    gap: 6,
+  },
+  passwordRulesTitle: { fontSize: 12, fontWeight: '800', color: brand.text, marginBottom: 2 },
+  passwordRuleRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  passwordRuleRowRtl: { flexDirection: 'row-reverse' },
+  passwordRuleTxt: { flex: 1, fontSize: 12, color: brand.textMuted, fontWeight: '600' },
+  passwordRuleTxtOk: { color: brand.success },
 
   cta: {
     height: 54,

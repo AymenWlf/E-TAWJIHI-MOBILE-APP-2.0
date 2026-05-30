@@ -1,5 +1,6 @@
 import type { PlatformServiceItem } from '@/services/platformServices';
 import type { EligibilityProfile } from '@/utils/eligibility';
+import { isFiliere1BacId, isPremiereBacNiveau } from '@/utils/academicFiliere';
 
 /** Filières du bac marocain « mission » (SM, SPC, SVT, STE, STM) — aligné backend / web. */
 export const MISSION_BAC_FILIERE_NAMES = [
@@ -66,20 +67,62 @@ function namedOnlyEntries(accepted: string[]): string[] {
 
 function parseAccepted(accepted: string[]) {
   const norms = accepted.map(norm).filter(Boolean);
+  const names = namedOnlyEntries(accepted);
+
   return {
     hasAll: norms.includes('all'),
     hasMission: norms.includes('mission'),
     hasReste: norms.includes('reste'),
-    names: namedOnlyEntries(accepted),
+    names,
+    names1Bac: names.filter((n) => isFiliere1BacId(n)),
+    names2Bac: names.filter((n) => !isFiliere1BacId(n)),
   };
+}
+
+function platformServiceVisibleForPremiereBac(
+  accepted: string[],
+  profile: EligibilityProfile | null,
+  opts?: { profileLoading?: boolean },
+): boolean {
+  if (opts?.profileLoading) return true;
+
+  const { hasAll, hasMission, hasReste, names1Bac, names2Bac } = parseAccepted(accepted);
+
+  if (hasAll) return true;
+
+  if (names1Bac.length > 0) {
+    const userFiliere = userFiliereForMatch(profile);
+    if (!userFiliere) return true;
+    if (!isFiliere1BacId(userFiliere)) return false;
+    return names1Bac.includes(userFiliere);
+  }
+
+  if (hasMission || hasReste || names2Bac.length > 0) return false;
+
+  return false;
+}
+
+/**
+ * Éligibilité complète (filière + offre niveau si le profil a un niveau).
+ */
+export function platformServiceEligibleForProfile(
+  service: Pick<PlatformServiceItem, 'filieresAccepted' | 'eligibleForNiveau'>,
+  profile: EligibilityProfile | null,
+  opts?: { profileLoading?: boolean },
+): boolean {
+  if (!platformServiceVisibleForProfile(service, profile, opts)) {
+    return false;
+  }
+  const niveau = profile?.niveau?.trim();
+  if (!niveau) {
+    return true;
+  }
+  return service.eligibleForNiveau !== false;
 }
 
 /**
  * Indique si un service plateforme doit être proposé à l’utilisateur selon
- * `filieresAccepted` (all / mission / reste / noms) et son profil (`bacType`, filière).
- *
- * Bac Mission : tous les packs `all` ou `mission` (sans filtre par spécialité).
- * Bac marocain : packs `all` / `reste` ou dont la filière figure dans la liste admin.
+ * `filieresAccepted` (all / mission / reste / noms / ids 1ère bac) et son profil.
  */
 export function platformServiceVisibleForProfile(
   service: Pick<PlatformServiceItem, 'filieresAccepted'>,
@@ -89,16 +132,24 @@ export function platformServiceVisibleForProfile(
   if (opts?.profileLoading) return true;
 
   const accepted = service.filieresAccepted.length > 0 ? service.filieresAccepted : ['all'];
-  const { hasAll, hasMission, hasReste, names } = parseAccepted(accepted);
+
+  if (isPremiereBacNiveau(profile?.niveau ?? '')) {
+    return platformServiceVisibleForPremiereBac(accepted, profile, opts);
+  }
+
+  const { hasAll, hasMission, hasReste, names1Bac, names2Bac } = parseAccepted(accepted);
+  const names = names2Bac;
 
   if (hasAll) return true;
 
+  if (names1Bac.length > 0 && names.length === 0 && !hasMission && !hasReste) {
+    return false;
+  }
+
   const kind = bacKindFromProfile(profile);
   const userFiliere = userFiliereForMatch(profile);
-  const namedAreAllMission =
-    names.length > 0 && names.every(isMissionBacFiliereName);
-  const namedAreAllNonMission =
-    names.length > 0 && names.every((n) => !isMissionBacFiliereName(n));
+  const namedAreAllMission = names.length > 0 && names.every(isMissionBacFiliereName);
+  const namedAreAllNonMission = names.length > 0 && names.every((n) => !isMissionBacFiliereName(n));
 
   if (kind === 'mission') {
     if (hasMission) return true;
@@ -138,12 +189,12 @@ export type ShopServiceFiliereBadgeKey =
 
 export function shopServiceFiliereBadgeKey(filieresAccepted: string[]): ShopServiceFiliereBadgeKey {
   const list = filieresAccepted.length > 0 ? filieresAccepted : ['all'];
-  const { hasAll, hasMission, hasReste, names } = parseAccepted(list);
+  const { hasAll, hasMission, hasReste, names2Bac } = parseAccepted(list);
   if (hasAll) return 'shopServicesEligibleYou';
-  const namedAreAllMission = names.length > 0 && names.every(isMissionBacFiliereName);
-  if (hasMission && !hasReste && names.length === 0) return 'shopServicesFiliereMission';
-  if (hasReste && !hasMission && names.length === 0) return 'shopServicesFiliereReste';
+  const namedAreAllMission = names2Bac.length > 0 && names2Bac.every(isMissionBacFiliereName);
+  if (hasMission && !hasReste && names2Bac.length === 0) return 'shopServicesFiliereMission';
+  if (hasReste && !hasMission && names2Bac.length === 0) return 'shopServicesFiliereReste';
   if (namedAreAllMission && !hasReste) return 'shopServicesFiliereMission';
-  if (names.length > 0 && !hasMission && hasReste) return 'shopServicesFiliereReste';
+  if (names2Bac.length > 0 && !hasMission && hasReste) return 'shopServicesFiliereReste';
   return 'shopServicesEligibleYou';
 }

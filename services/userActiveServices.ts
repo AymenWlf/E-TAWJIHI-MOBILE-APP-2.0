@@ -40,8 +40,17 @@ type ActiveServicesResponse = {
   };
 };
 
-export async function fetchUserActiveServices(accessToken: string): Promise<UserActiveCommercialService[]> {
-  const url = buildApiUrl('/api/user/active-services');
+export type FetchUserActiveServicesOptions = {
+  /** Accueil : un seul libellé — le pack le plus haut dans la chaîne upgrade. */
+  highestTierOnly?: boolean;
+};
+
+export async function fetchUserActiveServices(
+  accessToken: string,
+  options?: FetchUserActiveServicesOptions,
+): Promise<UserActiveCommercialService[]> {
+  const qs = options?.highestTierOnly ? '?highestTierOnly=1' : '';
+  const url = buildApiUrl(`/api/user/active-services${qs}`);
   const res = await httpGetJson<ActiveServicesResponse>(url, {
     headers: { Authorization: `Bearer ${accessToken}` },
   });

@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Linking, Platform, StyleSheet, useWindowDimensions } from 'react-native';
+import { Platform, StyleSheet, useWindowDimensions } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 
 import { Text } from '@/components/ui/Text';
@@ -8,6 +8,7 @@ import { CAIRO } from '@/theme/arabicTypography';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, spacing } from '@/theme/tokens';
 import { normalizeEstablishmentDescriptionHtml } from '@/utils/descriptionHtml';
+import { safeOpenUrl } from '@/utils/safeOpenUrl';
 
 type Props = {
   /** Peut contenir du HTML (admin / CMS) ou du texte brut. */
@@ -174,8 +175,7 @@ export function EstablishmentDescriptionHtml({
       renderersProps={{
         a: {
           onPress(_, href) {
-            if (!href) return;
-            void Linking.openURL(href);
+            void safeOpenUrl(href);
           },
         },
       }}

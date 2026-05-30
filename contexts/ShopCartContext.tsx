@@ -1,4 +1,4 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import type { ShopCartLine } from '@/types/shop';
 import { cartItemCount, clearCart, loadCart, saveCart, upsertCartLine } from '@/utils/shopCartStorage';
@@ -31,12 +31,15 @@ const MAX_LINE_QTY = 99;
 export function ShopCartProvider({ children }: { children: React.ReactNode }) {
   const [lines, setLines] = useState<ShopCartLine[]>([]);
   const [ready, setReady] = useState(false);
+  /** Dernière valeur persistée — évite les courses entre removeLine puis addLine (closures React). */
+  const linesRef = useRef<ShopCartLine[]>([]);
 
   useEffect(() => {
     let alive = true;
     void (async () => {
       const initial = await loadCart();
       if (!alive) return;
+      linesRef.current = initial;
       setLines(initial);
       setReady(true);
     })();
@@ -46,6 +49,7 @@ export function ShopCartProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const persist = useCallback(async (next: ShopCartLine[]) => {
+    linesRef.current = next;
     setLines(next);
     await saveCart(next);
   }, []);
@@ -54,18 +58,18 @@ export function ShopCartProvider({ children }: { children: React.ReactNode }) {
     async (line) => {
       const rawQty = Math.floor(line.quantity || 1);
       const qty = isPlatformServiceCartLine(line) ? 1 : Math.min(MAX_LINE_QTY, Math.max(1, rawQty));
-      const merged = upsertCartLine(lines, {
+      const merged = upsertCartLine(linesRef.current, {
         ...line,
         quantity: qty,
       });
       await persist(merged);
     },
-    [lines, persist],
+    [persist],
   );
 
   const updateQuantity = useCallback<ShopCartContextValue['updateQuantity']>(
     async (productId, quantity) => {
-      const next = lines.map((l) => {
+      const next = linesRef.current.map((l) => {
         if (l.productId !== productId) return l;
         if (isPlatformServiceCartLine(l)) {
           return { ...l, quantity: 1 };
@@ -75,30 +79,31 @@ export function ShopCartProvider({ children }: { children: React.ReactNode }) {
       });
       await persist(next);
     },
-    [lines, persist],
+    [persist],
   );
 
   const removeLine = useCallback<ShopCartContextValue['removeLine']>(
     async (productId) => {
-      const next = lines.filter((l) => l.productId !== productId);
+      const next = linesRef.current.filter((l) => l.productId !== productId);
       await persist(next);
     },
-    [lines, persist],
+    [persist],
   );
 
   const clear = useCallback<ShopCartContextValue['clear']>(async () => {
+    linesRef.current = [];
     setLines([]);
     await clearCart();
   }, []);
 
   const hydrateImages = useCallback<ShopCartContextValue['hydrateImages']>(async () => {
-    if (lines.length === 0) return;
-    let next = await mergePlatformServiceBrandingIntoCartLines(lines);
+    if (linesRef.current.length === 0) return;
+    let next = await mergePlatformServiceBrandingIntoCartLines(linesRef.current);
     next = await hydrateCartLinesImagesViaApi(next);
     next = await hydrateCartLinesPricesViaApi(next);
-    const changed = JSON.stringify(lines) !== JSON.stringify(next);
+    const changed = JSON.stringify(linesRef.current) !== JSON.stringify(next);
     if (changed) await persist(next);
-  }, [lines, persist]);
+  }, [persist]);
 
   const replaceLines = useCallback<ShopCartContextValue['replaceLines']>(
     async (next) => {

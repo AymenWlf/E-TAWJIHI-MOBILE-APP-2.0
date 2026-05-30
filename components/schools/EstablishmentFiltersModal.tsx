@@ -4,10 +4,10 @@
  * souhaite filtrer ses items via les **mêmes critères** (ex. l'onglet
  * « Annonces » de « Mes inscriptions »).
  *
- * Le composant est entièrement contrôlé : il reçoit `value` (la valeur
- * courante des filtres) et `onChange(next)` qui est appelée à chaque
- * modification. Il gère en interne les bottom-sheets de sélection (ville
- * et secteur) afin de cacher cette complexité au parent.
+ * Le composant reçoit `value` (filtres **appliqués** côté parent) et
+ * `onChange(next)` appelé uniquement quand l'utilisateur appuie sur
+ * « Appliquer ». Les sélections dans la modale restent en brouillon
+ * jusqu'à validation (fermeture sans appliquer = annulation).
  *
  * Le parent doit charger les `cities` et `secteurs` (ces données sont
  * partagées par toutes les pages qui utilisent les filtres). Cette
@@ -16,9 +16,8 @@
  */
 
 import { FontAwesome } from '@expo/vector-icons';
-import React, { useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  Modal,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -31,11 +30,14 @@ import {
   SearchablePickPanel,
   type SearchablePickItem,
 } from '@/components/schools/SearchablePickSheet';
+import { PlatformSheetOverlay } from '@/components/ui/PlatformSheetOverlay';
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import type { CityRow, SecteurRow } from '@/services/referenceData';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, radius, spacing } from '@/theme/tokens';
+import { BAC_TYPES, FILIERE_BAC_OPTIONS, SPECIALITES_MISSION, SPECIALITES_MISSION_LABELS } from '@/constants/academicSetup';
+import type { EligibilityProfile } from '@/utils/eligibility';
 import { DIPLOME_OPTIONS } from '@/utils/establishmentWebFilters';
 
 /** État complet des filtres appliqués sur un listing d'établissements. */
@@ -56,18 +58,6 @@ export type EstablishmentFiltersValue = {
   fraisMin: number;
   /** Borne haute de la fourchette de frais (DH/an). */
   fraisMax: number;
-  /** Filtre « E-Tawjihi inscription possible ». */
-  eTawjihiOnly: boolean;
-  /** Filtre « Mises en avant » (`isFeatured`). */
-  featuredOnly: boolean;
-  /** Filtre « Recommandées E-Tawjihi ». */
-  recommendedOnly: boolean;
-  /** Filtre « Sponsorisées ». */
-  sponsoredOnly: boolean;
-  /** Filtre « Accréditées par l'État ». */
-  accreditationEtat: boolean;
-  /** Filtre « Échange international ». */
-  echangeInternational: boolean;
   /**
    * Filtre d'éligibilité de l'utilisateur connecté (basé sur la filière
    * du Bac uniquement — l'année du bac n'est volontairement pas prise en
@@ -82,6 +72,13 @@ export type EstablishmentFiltersValue = {
    * ignoré côté parent (les éléments « unknown » sont toujours affichés).
    */
   eligibilityFilter: 'all' | 'eligible' | 'not_eligible';
+  /**
+   * Filière d’étude acceptée (filtre explicite, indépendant du profil utilisateur).
+   * `acceptedStudyBacType` vide ⇒ pas de filtre ; sinon `acceptedStudyValue` =
+   * filière bac marocain ou spécialité bac Mission.
+   */
+  acceptedStudyBacType: '' | 'normal' | 'mission';
+  acceptedStudyValue: string;
   /**
    * Filtre statut « ouvert / fermé » des annonces. Pertinent uniquement
    * pour les listings d'annonces — pour les écoles ce champ est ignoré
@@ -103,19 +100,52 @@ export const defaultEstablishmentFilters = (): EstablishmentFiltersValue => ({
   diplome: '',
   fraisMin: 0,
   fraisMax: 100_000,
-  eTawjihiOnly: false,
-  featuredOnly: false,
-  recommendedOnly: false,
-  sponsoredOnly: false,
-  accreditationEtat: false,
-  echangeInternational: false,
   // Choix produit : on présélectionne « éligible » pour mettre en avant
   // ce qui correspond directement au profil de l'utilisateur. Pour un
   // visiteur sans profil, le filtre est silencieusement ignoré côté
   // parent (cf. `EligibilityFilter` doc).
   eligibilityFilter: 'eligible',
+  acceptedStudyBacType: '',
+  acceptedStudyValue: '',
   statusFilter: 'all',
 });
+
+/** Défauts onglet Annonces : éligibles au profil (filière/spécialité appliquée après chargement profil). */
+export const defaultAnnouncementEstablishmentFilters = (): EstablishmentFiltersValue => ({
+  ...defaultEstablishmentFilters(),
+  statusFilter: 'all',
+});
+
+/** Aucun filtre restrictif — liste complète (ex. retour depuis le parcours « Gestion des inscriptions »). */
+export const neutralAnnouncementEstablishmentFilters = (): EstablishmentFiltersValue => ({
+  ...defaultEstablishmentFilters(),
+  statusFilter: 'all',
+  eligibilityFilter: 'all',
+});
+
+/** Défauts annonces + filière / spécialité du profil connecté si disponibles. */
+export function announcementEstablishmentFiltersFromProfile(
+  profile?: EligibilityProfile | null,
+): EstablishmentFiltersValue {
+  const base = defaultAnnouncementEstablishmentFilters();
+  if (!profile) return base;
+  const bac = (profile.bacType ?? '').trim().toLowerCase();
+  if (bac === 'normal') {
+    const filiere = (profile.filiere ?? '').trim();
+    if (filiere) {
+      return { ...base, acceptedStudyBacType: 'normal', acceptedStudyValue: filiere };
+    }
+  }
+  if (bac === 'mission') {
+    const spec = [profile.specialite1, profile.specialite2, profile.specialite3]
+      .map((s) => (s ?? '').trim())
+      .find((s) => s !== '');
+    if (spec) {
+      return { ...base, acceptedStudyBacType: 'mission', acceptedStudyValue: spec };
+    }
+  }
+  return base;
+}
 
 /** Nombre de filtres actuellement actifs (utile pour afficher un badge). */
 export function countActiveEstablishmentFilters(v: EstablishmentFiltersValue): number {
@@ -127,19 +157,16 @@ export function countActiveEstablishmentFilters(v: EstablishmentFiltersValue): n
     (v.secteurId.trim() ? 1 : 0) +
     (v.diplome.trim() ? 1 : 0) +
     (v.fraisMin > 0 || v.fraisMax < 100_000 ? 1 : 0) +
-    (v.eTawjihiOnly ? 1 : 0) +
-    (v.featuredOnly ? 1 : 0) +
-    (v.recommendedOnly ? 1 : 0) +
-    (v.sponsoredOnly ? 1 : 0) +
-    (v.accreditationEtat ? 1 : 0) +
-    (v.echangeInternational ? 1 : 0) +
-    // Le filtre éligibilité par défaut est `eligible` : on ne le compte
-    // pas comme « actif » pour ne pas afficher en permanence un badge à
-    // côté du bouton « Filtres avancés ». Idem pour `statusFilter`
-    // (défaut `all`).
-    (v.eligibilityFilter && v.eligibilityFilter !== 'eligible' ? 1 : 0) +
-    (v.statusFilter && v.statusFilter !== 'all' ? 1 : 0)
+    // `eligible` = défaut écoles ; `all` = défaut neutre annonces — aucun badge.
+    (v.eligibilityFilter === 'not_eligible' ? 1 : 0) +
+    (v.acceptedStudyBacType && v.acceptedStudyValue.trim() ? 1 : 0) +
+    (v.statusFilter === 'closed' ? 1 : 0)
   );
+}
+
+/** Compte aussi la présélection « éligibles » de l’onglet Annonces. */
+export function countAnnouncementTabFiltersActive(v: EstablishmentFiltersValue): number {
+  return countActiveEstablishmentFilters(v) + (v.eligibilityFilter === 'eligible' ? 1 : 0);
 }
 
 export type EstablishmentFiltersModalProps = {
@@ -155,6 +182,8 @@ export type EstablishmentFiltersModalProps = {
    * notion d'ouverture / fermeture.
    */
   showStatusFilter?: boolean;
+  /** Réinitialisation (ex. défauts annonces + profil). Sinon `defaultEstablishmentFilters`. */
+  getDefaultFilters?: () => EstablishmentFiltersValue;
 };
 
 export function EstablishmentFiltersModal({
@@ -165,25 +194,67 @@ export function EstablishmentFiltersModal({
   cities,
   secteurs,
   showStatusFilter = false,
+  getDefaultFilters,
 }: EstablishmentFiltersModalProps) {
   const { isRTL, t } = useLocale();
   const { height: winH } = useWindowDimensions();
+
+  /** Brouillon édité dans la modale — appliqué au parent seulement via « Appliquer ». */
+  const [draft, setDraft] = useState(value);
+  const wasVisibleRef = useRef(false);
 
   const [cityPickOpen, setCityPickOpen] = useState(false);
   const [sectorPickOpen, setSectorPickOpen] = useState(false);
   const [fraisMinStr, setFraisMinStr] = useState(String(value.fraisMin || 0));
   const [fraisMaxStr, setFraisMaxStr] = useState(String(value.fraisMax || 100_000));
 
-  /* Si les valeurs externes changent (ex. reset du parent), on resync les inputs texte. */
-  React.useEffect(() => {
-    setFraisMinStr(String(value.fraisMin || 0));
-    setFraisMaxStr(String(value.fraisMax || 100_000));
-  }, [value.fraisMin, value.fraisMax]);
+  useEffect(() => {
+    if (visible && !wasVisibleRef.current) {
+      setDraft(value);
+      setFraisMinStr(String(value.fraisMin || 0));
+      setFraisMaxStr(String(value.fraisMax || 100_000));
+    }
+    wasVisibleRef.current = visible;
+  }, [visible, value]);
 
-  const set = <K extends keyof EstablishmentFiltersValue>(
+  const set = useCallback(<K extends keyof EstablishmentFiltersValue>(
     key: K,
     v: EstablishmentFiltersValue[K],
-  ) => onChange({ ...value, [key]: v });
+  ) => {
+    setDraft((prev) => ({ ...prev, [key]: v }));
+  }, []);
+
+  const applyDraft = useCallback(() => {
+    onChange(draft);
+    onClose();
+  }, [draft, onChange, onClose]);
+
+  const acceptedStudyTypeOptions = useMemo(
+    () => [
+      { label: t('schoolsAll'), value: '' as const },
+      ...BAC_TYPES.map((b) => ({
+        label: isRTL && b.labelAr ? b.labelAr : b.label,
+        value: b.value,
+      })),
+    ],
+    [isRTL, t],
+  );
+
+  const acceptedStudyValueOptions = useMemo(() => {
+    if (draft.acceptedStudyBacType === 'normal') {
+      return FILIERE_BAC_OPTIONS.filter((o) => o.value).map((o) => ({
+        value: o.value,
+        label: isRTL && o.labelAr ? o.labelAr : o.label,
+      }));
+    }
+    if (draft.acceptedStudyBacType === 'mission') {
+      return SPECIALITES_MISSION.map((s) => ({
+        value: s,
+        label: SPECIALITES_MISSION_LABELS[s] ?? s,
+      }));
+    }
+    return [];
+  }, [draft.acceptedStudyBacType, isRTL]);
 
   const typeOptions = useMemo(
     () => [
@@ -240,19 +311,19 @@ export function EstablishmentFiltersModal({
   );
 
   const villeLabel = useMemo(() => {
-    const v = value.ville.trim();
+    const v = draft.ville.trim();
     if (!v) return t('schoolsAllCities');
     const hit = sortedCities.find((c) => (c.titre ?? '').trim() === v);
     return hit?.titre?.trim() ?? v;
-  }, [value.ville, sortedCities, t]);
+  }, [draft.ville, sortedCities, t]);
 
   const secteurLabel = useMemo(() => {
-    const id = value.secteurId.trim();
+    const id = draft.secteurId.trim();
     if (!id) return t('schoolsAllSectors');
     const s = sortedSecteurs.find((x) => String(x.id) === id);
     if (!s) return id;
     return ((isRTL ? s.titreAr || s.titre : s.titre) ?? '').trim() || id;
-  }, [value.secteurId, sortedSecteurs, isRTL, t]);
+  }, [draft.secteurId, sortedSecteurs, isRTL, t]);
 
   const pickSheetOpen = cityPickOpen || sectorPickOpen;
 
@@ -268,7 +339,10 @@ export function EstablishmentFiltersModal({
   };
 
   const reset = () => {
-    onChange(defaultEstablishmentFilters());
+    const next = getDefaultFilters?.() ?? defaultEstablishmentFilters();
+    setDraft(next);
+    setFraisMinStr(String(next.fraisMin || 0));
+    setFraisMaxStr(String(next.fraisMax || 100_000));
   };
 
   const syncFraisFromStr = (kind: 'min' | 'max', txt: string) => {
@@ -284,7 +358,7 @@ export function EstablishmentFiltersModal({
   };
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={closeAll}>
+    <PlatformSheetOverlay visible={visible} onRequestClose={closeAll} animationType="slide">
       <View style={styles.modalRoot}>
         <Pressable style={styles.modalOverlay} onPress={closeAll} />
         <View
@@ -320,17 +394,17 @@ export function EstablishmentFiltersModal({
                 <Pressable
                   key={opt.value || 'all'}
                   onPress={() => set('type', opt.value)}
-                  style={[styles.modalTypeChip, value.type === opt.value && styles.modalTypeChipOn]}>
+                  style={[styles.modalTypeChip, draft.type === opt.value && styles.modalTypeChipOn]}>
                   <Text
                     style={[
                       styles.modalTypeChipTxt,
-                      value.type === opt.value && styles.modalTypeChipTxtOn,
+                      draft.type === opt.value && styles.modalTypeChipTxtOn,
                     ]}>
                     {opt.label}
                   </Text>
                 </Pressable>
               ))}
-              {value.type.trim() ? (
+              {draft.type.trim() ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t('schoolsClearFilter')}
@@ -346,7 +420,7 @@ export function EstablishmentFiltersModal({
             <View style={[styles.modalInputRow, isRTL && styles.rowRtl]}>
               <FontAwesome name="search" size={15} color={homeShell.greenDark} />
               <TextInput
-                value={value.universite}
+                value={draft.universite}
                 onChangeText={(v) => set('universite', v)}
                 placeholder={t('schoolsUniversityPlaceholder')}
                 placeholderTextColor={homeShell.cardMuted}
@@ -363,11 +437,11 @@ export function EstablishmentFiltersModal({
               nestedScrollEnabled>
               <Pressable
                 onPress={() => set('regionTitle', '')}
-                style={[styles.miniChip, !value.regionTitle && styles.miniChipOn]}>
+                style={[styles.miniChip, !draft.regionTitle && styles.miniChipOn]}>
                 <Text
                   style={[
                     styles.miniChipTxt,
-                    !value.regionTitle && styles.miniChipTxtOn,
+                    !draft.regionTitle && styles.miniChipTxtOn,
                   ]}>
                   {t('schoolsAll')}
                 </Text>
@@ -376,17 +450,17 @@ export function EstablishmentFiltersModal({
                 <Pressable
                   key={r}
                   onPress={() => set('regionTitle', r)}
-                  style={[styles.miniChip, value.regionTitle === r && styles.miniChipOn]}>
+                  style={[styles.miniChip, draft.regionTitle === r && styles.miniChipOn]}>
                   <Text
                     style={[
                       styles.miniChipTxt,
-                      value.regionTitle === r && styles.miniChipTxtOn,
+                      draft.regionTitle === r && styles.miniChipTxtOn,
                     ]}>
                     {r}
                   </Text>
                 </Pressable>
               ))}
-              {value.regionTitle ? (
+              {draft.regionTitle ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t('schoolsClearFilter')}
@@ -414,7 +488,7 @@ export function EstablishmentFiltersModal({
               <Text
                 style={[
                   styles.selectFieldTxt,
-                  !value.ville.trim() && styles.selectFieldPlaceholder,
+                  !draft.ville.trim() && styles.selectFieldPlaceholder,
                   isRTL && styles.txtRtl,
                 ]}
                 numberOfLines={1}>
@@ -443,7 +517,7 @@ export function EstablishmentFiltersModal({
               <Text
                 style={[
                   styles.selectFieldTxt,
-                  !value.secteurId.trim() && styles.selectFieldPlaceholder,
+                  !draft.secteurId.trim() && styles.selectFieldPlaceholder,
                   isRTL && styles.txtRtl,
                 ]}
                 numberOfLines={1}>
@@ -465,11 +539,11 @@ export function EstablishmentFiltersModal({
               nestedScrollEnabled>
               <Pressable
                 onPress={() => set('diplome', '')}
-                style={[styles.miniChip, !value.diplome && styles.miniChipOn]}>
+                style={[styles.miniChip, !draft.diplome && styles.miniChipOn]}>
                 <Text
                   style={[
                     styles.miniChipTxt,
-                    !value.diplome && styles.miniChipTxtOn,
+                    !draft.diplome && styles.miniChipTxtOn,
                   ]}>
                   {t('schoolsAllDiplomas')}
                 </Text>
@@ -478,15 +552,15 @@ export function EstablishmentFiltersModal({
                 <Pressable
                   key={d}
                   onPress={() => set('diplome', d)}
-                  style={[styles.miniChip, value.diplome === d && styles.miniChipOn]}>
+                  style={[styles.miniChip, draft.diplome === d && styles.miniChipOn]}>
                   <Text
-                    style={[styles.miniChipTxt, value.diplome === d && styles.miniChipTxtOn]}
+                    style={[styles.miniChipTxt, draft.diplome === d && styles.miniChipTxtOn]}
                     numberOfLines={1}>
                     {d}
                   </Text>
                 </Pressable>
               ))}
-              {value.diplome.trim() ? (
+              {draft.diplome.trim() ? (
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel={t('schoolsClearFilter')}
@@ -549,12 +623,12 @@ export function EstablishmentFiltersModal({
                       onPress={() => set('statusFilter', opt.value)}
                       style={[
                         styles.modalTypeChip,
-                        value.statusFilter === opt.value && styles.modalTypeChipOn,
+                        draft.statusFilter === opt.value && styles.modalTypeChipOn,
                       ]}>
                       <Text
                         style={[
                           styles.modalTypeChipTxt,
-                          value.statusFilter === opt.value && styles.modalTypeChipTxtOn,
+                          draft.statusFilter === opt.value && styles.modalTypeChipTxtOn,
                         ]}>
                         {opt.label}
                       </Text>
@@ -564,13 +638,92 @@ export function EstablishmentFiltersModal({
               </>
             ) : null}
 
+            <Text style={[styles.modalLabel, isRTL && styles.txtRtl]}>
+              {t('schoolsFilterAcceptedStudyLabel')}
+            </Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={isRTL && styles.hScrollRtl}
+              contentContainerStyle={styles.hScrollTight}
+              nestedScrollEnabled>
+              {acceptedStudyTypeOptions.map((opt) => (
+                <Pressable
+                  key={opt.value || 'all-bac'}
+                  onPress={() => {
+                    if (!opt.value) {
+                      setDraft((prev) => ({
+                        ...prev,
+                        acceptedStudyBacType: '',
+                        acceptedStudyValue: '',
+                      }));
+                      return;
+                    }
+                    setDraft((prev) => ({
+                      ...prev,
+                      acceptedStudyBacType: opt.value,
+                      acceptedStudyValue:
+                        prev.acceptedStudyBacType === opt.value ? prev.acceptedStudyValue : '',
+                    }));
+                  }}
+                  style={[
+                    styles.modalTypeChip,
+                    (opt.value === ''
+                      ? !draft.acceptedStudyBacType
+                      : draft.acceptedStudyBacType === opt.value) && styles.modalTypeChipOn,
+                  ]}>
+                  <Text
+                    style={[
+                      styles.modalTypeChipTxt,
+                      (opt.value === ''
+                        ? !draft.acceptedStudyBacType
+                        : draft.acceptedStudyBacType === opt.value) && styles.modalTypeChipTxtOn,
+                    ]}>
+                    {opt.label}
+                  </Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            {draft.acceptedStudyBacType ? (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={[{ marginTop: 8 }, isRTL && styles.hScrollRtl]}
+                contentContainerStyle={styles.hScrollTight}
+                nestedScrollEnabled>
+                {acceptedStudyValueOptions.map((opt) => (
+                  <Pressable
+                    key={opt.value}
+                    onPress={() =>
+                      set(
+                        'acceptedStudyValue',
+                        draft.acceptedStudyValue === opt.value ? '' : opt.value,
+                      )
+                    }
+                    style={[
+                      styles.modalTypeChip,
+                      draft.acceptedStudyValue === opt.value && styles.modalTypeChipOn,
+                    ]}>
+                    <Text
+                      style={[
+                        styles.modalTypeChipTxt,
+                        draft.acceptedStudyValue === opt.value && styles.modalTypeChipTxtOn,
+                      ]}
+                      numberOfLines={2}>
+                      {opt.label}
+                    </Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
+            ) : null}
+
             {/*
               Éligibilité — basée sur la filière du bac (cf.
               `evaluateEligibilityByFiliere` côté parent). On ne tient pas
               compte de l'année du bac pour ce filtre rapide afin d'éviter
               une exclusion trop restrictive.
             */}
-            <Text style={[styles.modalLabel, isRTL && styles.txtRtl]}>
+            <Text style={[styles.modalLabel, isRTL && styles.txtRtl, { marginTop: spacing.md }]}>
               {t('inscFilterEligibilityLabel')}
             </Text>
             <ScrollView
@@ -591,53 +744,18 @@ export function EstablishmentFiltersModal({
                   onPress={() => set('eligibilityFilter', opt.value)}
                   style={[
                     styles.modalTypeChip,
-                    value.eligibilityFilter === opt.value && styles.modalTypeChipOn,
+                    draft.eligibilityFilter === opt.value && styles.modalTypeChipOn,
                   ]}>
                   <Text
                     style={[
                       styles.modalTypeChipTxt,
-                      value.eligibilityFilter === opt.value && styles.modalTypeChipTxtOn,
+                      draft.eligibilityFilter === opt.value && styles.modalTypeChipTxtOn,
                     ]}>
                     {opt.label}
                   </Text>
                 </Pressable>
               ))}
             </ScrollView>
-
-            <View style={styles.toggleRow}>
-              <Toggle
-                label={t('schoolsToggleRecommended')}
-                value={value.recommendedOnly}
-                onToggle={() => set('recommendedOnly', !value.recommendedOnly)}
-              />
-              <Toggle
-                label={t('schoolsToggleSponsored')}
-                value={value.sponsoredOnly}
-                onToggle={() => set('sponsoredOnly', !value.sponsoredOnly)}
-              />
-              <Toggle
-                label={t('schoolsToggleFeatured')}
-                value={value.featuredOnly}
-                onToggle={() => set('featuredOnly', !value.featuredOnly)}
-              />
-              <Toggle
-                label={t('schoolsToggleAccreditationEtat')}
-                value={value.accreditationEtat}
-                onToggle={() => set('accreditationEtat', !value.accreditationEtat)}
-              />
-              <Toggle
-                label={t('schoolsToggleExchangeInternational')}
-                value={value.echangeInternational}
-                onToggle={() => set('echangeInternational', !value.echangeInternational)}
-              />
-              <Toggle
-                label={t('schoolsToggleEtawjihiOnly')}
-                value={value.eTawjihiOnly}
-                onToggle={() => set('eTawjihiOnly', !value.eTawjihiOnly)}
-              />
-            </View>
-
-            <Text style={styles.modalFootnote}>{t('schoolsFootnote')}</Text>
           </ScrollView>
 
           <View style={styles.modalActions}>
@@ -647,7 +765,7 @@ export function EstablishmentFiltersModal({
               <Text style={styles.modalGhostTxt}>{t('schoolsReset')}</Text>
             </Pressable>
             <Pressable
-              onPress={onClose}
+              onPress={applyDraft}
               style={({ pressed }) => [styles.modalPrimaryBtn, pressed && { opacity: 0.92 }]}>
               <Text style={styles.modalPrimaryTxt}>{t('schoolsApply')}</Text>
             </Pressable>
@@ -665,7 +783,7 @@ export function EstablishmentFiltersModal({
                 emptyLabel={t('setupCityNoResults')}
                 allLabel={t('schoolsAllCities')}
                 items={cityPickItems}
-                selectedValue={value.ville.trim()}
+                selectedValue={draft.ville.trim()}
                 onPick={(v) => set('ville', v)}
                 onClose={() => setCityPickOpen(false)}
                 rtl={isRTL}
@@ -678,7 +796,7 @@ export function EstablishmentFiltersModal({
                 emptyLabel={t('schoolsSectorNoResults')}
                 allLabel={t('schoolsAllSectors')}
                 items={secteurPickItems}
-                selectedValue={value.secteurId.trim()}
+                selectedValue={draft.secteurId.trim()}
                 onPick={(v) => set('secteurId', v)}
                 onClose={() => setSectorPickOpen(false)}
                 rtl={isRTL}
@@ -687,29 +805,7 @@ export function EstablishmentFiltersModal({
           </View>
         ) : null}
       </View>
-    </Modal>
-  );
-}
-
-function Toggle({
-  label,
-  value,
-  onToggle,
-}: {
-  label: string;
-  value: boolean;
-  onToggle: () => void;
-}) {
-  const { isRTL } = useLocale();
-  return (
-    <Pressable
-      onPress={onToggle}
-      style={({ pressed }) => [styles.tgl, isRTL && styles.rowRtl, pressed && { opacity: 0.92 }]}>
-      <View style={[styles.tglBox, value && styles.tglBoxOn]}>
-        {value ? <FontAwesome name="check" size={12} color={homeShell.text} /> : null}
-      </View>
-      <Text style={[styles.tglTxt, isRTL && styles.txtRtl]}>{label}</Text>
-    </Pressable>
+    </PlatformSheetOverlay>
   );
 }
 
@@ -871,28 +967,6 @@ const styles = StyleSheet.create({
     color: homeShell.cardText,
     fontWeight: '700',
     fontSize: fontSize.md,
-  },
-  toggleRow: { marginTop: spacing.md, gap: spacing.md },
-  tgl: { flexDirection: 'row', alignItems: 'center', gap: 12 },
-  tglBox: {
-    width: 22,
-    height: 22,
-    borderRadius: 7,
-    borderWidth: 2,
-    borderColor: homeShell.borderOnWhite,
-    backgroundColor: '#F8FAFC',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  tglBoxOn: { backgroundColor: homeShell.green, borderColor: 'rgba(47,206,148,0.55)' },
-  tglTxt: { flex: 1, color: homeShell.cardText, fontSize: fontSize.md, fontWeight: '700' },
-  modalFootnote: {
-    marginTop: spacing.md,
-    color: '#94A3B8',
-    fontSize: 11,
-    fontWeight: '600',
-    fontStyle: 'italic',
-    marginBottom: spacing.sm,
   },
   modalActions: {
     paddingTop: spacing.md,

@@ -7,11 +7,14 @@ export type HomeCopyKey =
   | 'notifDrawerSubtitle'
   | 'notifDrawerEmpty'
   | 'notifDrawerOpenLink'
+  | 'notifDrawerSeeRecommendations'
+  | 'notifDrawerContinueParcours'
   | 'unreadSuffix'
   | 'help'
   | 'profile'
   | 'greeting'
   | 'userSubtitle'
+  | 'homePackLabel'
   | 'packStandardLabel'
   | 'bacMissionLabel'
   | 'newsTitle'
@@ -19,6 +22,10 @@ export type HomeCopyKey =
   | 'langFr'
   | 'langAr'
   | 'gameDailyTitle'
+  | 'orientation1BacHomeButton'
+  | 'orientation1BacHomeLocked'
+  | 'orientation1BacHomeLockedA11y'
+  | 'homePackAcademicLine'
   | 'gameDailyBody'
   | 'dailyChallengeTitle'
   | 'dailyChallengeClose'
@@ -81,6 +88,8 @@ export type HomeCopyKey =
   | 'dailyChallengeLeaderboardTopToday'
   | 'dailyChallengeLeaderboardLoadMore'
   | 'dailyChallengeYouLabel'
+  | 'dailyChallengePremiumBadge'
+  | 'dailyChallengePremiumBadgeA11y'
   | 'dailyChallengeScoreLabel'
   | 'dailyChallengeHubHeroLine'
   | 'dailyChallengeMissionsTitle'
@@ -91,6 +100,8 @@ export type HomeCopyKey =
   | 'dailyChallengeProgressXpMaxed'
   | 'dailyChallengeProgressBadgeQuest'
   | 'dailyChallengeProgressRecordShort'
+  | 'dailyChallengeProgressBestScoreShort'
+  | 'dailyChallengeProgressBestTimeShort'
   | 'dailyChallengeProgressIceShort'
   | 'dailyChallengeStreakRecord'
   | 'dailyChallengeIceStock'
@@ -113,18 +124,47 @@ export type HomeCopyKey =
   | 'practicalTitle'
   | 'practicalSubtitle'
   | 'practicalSectionA11y'
+  | 'homeSeeMore'
+  | 'homeMostVisitedSchoolsTitle'
+  | 'homeMostVisitedSchoolsSubtitle'
+  | 'homeMostVisitedSchoolsA11y'
+  | 'homeLatestAnnouncementsTitle'
+  | 'homeLatestAnnouncementsSubtitle'
+  | 'homeLatestAnnouncementsA11y'
+  | 'homeAnnouncementOpen'
+  | 'homeAnnouncementClosed'
+  | 'homeAnnouncementDatesLocked'
+  | 'homeRefresh'
+  | 'homeRefreshA11y'
+  | 'homeRefreshing'
+  | 'home_orientation_access_eyebrow'
+  | 'home_orientation_access_title'
+  | 'practical_orientation_section'
+  | 'practical_services_section'
+  | 'practical_diagnostic_ecoles'
+  | 'sidebarOrientation1Bac'
+  | 'practical_diagnostic_rapport'
+  | 'practical_diagnostic_recommandations'
+  | 'practical_diagnostic_ecoles_desc'
+  | 'practical_diagnostic_rapport_desc'
+  | 'practical_diagnostic_recommandations_desc'
+  | 'practical_recommandations_locked_account'
+  | 'practical_recommandations_locked_diagnostic'
+  | 'practical_orientation_locked_title'
+  | 'practical_orientation_loading'
+  | 'practical_diagnostic_locked_account'
+  | 'practical_rapport_locked_account'
+  | 'practical_rapport_locked_diagnostic'
   | 'practical_ecoles'
   | 'practical_inscriptions'
   | 'practical_candidatures'
-  | 'practical_testsOrientation'
-  | 'practical_resultatsOrientation'
+  | 'practical_evenements_desc'
   | 'practical_ecolesInscription'
   | 'practical_boutique'
   | 'practical_ecoles_desc'
   | 'practical_inscriptions_desc'
   | 'practical_candidatures_desc'
-  | 'practical_testsOrientation_desc'
-  | 'practical_resultatsOrientation_desc'
+  | 'practical_evenements_desc'
   | 'practical_ecolesInscription_desc'
   | 'practical_boutique_desc'
   | 'practicalCardEyebrow'
@@ -137,6 +177,8 @@ export type HomeCopyKey =
   | 'schoolsFiltersA11y'
   | 'schoolsFollowedOnlyA11y'
   | 'schoolsSearchPlaceholder'
+  | 'schoolsSearchPlaceholderLocked'
+  | 'schoolsSearchFiltersLockedHint'
   | 'schoolsTypeAll'
   | 'schoolsTypeLabel'
   | 'schoolsTypePublic'
@@ -145,6 +187,7 @@ export type HomeCopyKey =
   | 'schoolsTypeMilitary'
   | 'schoolsFiltersTitle'
   | 'schoolsFiltersHint'
+  | 'schoolsFilterAcceptedStudyLabel'
   | 'schoolsUniversityLabel'
   | 'schoolsUniversityPlaceholder'
   | 'schoolsRegionLabel'
@@ -171,6 +214,7 @@ export type HomeCopyKey =
   | 'schoolsReset'
   | 'schoolsApply'
   | 'schoolsRetry'
+  | 'schoolsRefreshing'
   | 'estCardQnaOpenA11y'
   | 'estCardBtnComment'
   | 'estCardBadgeSponsored'
@@ -183,10 +227,265 @@ export type HomeCopyKey =
   | 'storiesA11y'
   | 'newsCarouselA11y'
   | 'swipeCardsHint'
+  | 'bacCardEyebrow'
+  | 'bacCardTitle'
+  | 'bacCardDateLabel'
+  | 'bacStatusNotYet'
+  | 'bacStatusPublished'
+  | 'bacCountdownKicker'
+  | 'bacCountdownDays'
+  | 'bacCountdownHours'
+  | 'bacCountdownMinutes'
+  | 'bacJourJTitle'
+  | 'bacWaitingResult'
+  | 'bacOutletsTitle'
+  | 'bacOutletOutlook'
+  | 'bacOutletSms'
+  | 'bacOutletMenResults'
+  | 'bacSiteStatusLabel'
+  | 'bacSiteOnline'
+  | 'bacSiteOffline'
+  | 'bacLinkOutlook'
+  | 'bacLinkMen'
+  | 'bacLinkOutlookA11y'
+  | 'bacLinkMenA11y'
+  | 'bacTapForGuide'
+  | 'bacOutletGuideA11y'
+  | 'bacVerifyModalTitleOutlook'
+  | 'bacVerifyModalTitleMen'
+  | 'bacVerifyModalTitleSms'
+  | 'bacVerifyStepsTitle'
+  | 'bacMassarSectionTitle'
+  | 'bacMassarSectionHint'
+  | 'bacMassarPlaceholder'
+  | 'bacMassarConfirm'
+  | 'bacMassarEdit'
+  | 'bacMassarSaved'
+  | 'bacOutlookEmailLabel'
+  | 'bacOutlookPasswordLabel'
+  | 'bacOutlookPasswordHint'
+  | 'bacOutlookStep1'
+  | 'bacOutlookStep2'
+  | 'bacOutlookStep3'
+  | 'bacOutlookStep4'
+  | 'bacOutlookStep5'
+  | 'bacMenStep1'
+  | 'bacMenStep2'
+  | 'bacMenStep3'
+  | 'bacMenStep4'
+  | 'bacMenStep5'
+  | 'bacMenStep6'
+  | 'bacSmsStep1'
+  | 'bacSmsStep2'
+  | 'bacSmsStep3'
+  | 'bacOpenOutlook'
+  | 'bacOpenMenSite'
+  | 'bacModalClose'
+  | 'bacThresholdsEyebrow'
+  | 'bacThresholdsTitle'
+  | 'bacThresholdsSubtitle'
+  | 'bacThresholdsTip'
+  | 'bacThresholdsSectionNotes'
+  | 'bacThresholdsSectionHint'
+  | 'bacThresholdsRegional'
+  | 'bacThresholdsNational'
+  | 'bacThresholdsContinuous'
+  | 'bacThresholdsOverall'
+  | 'bacThresholdsPlaceholder'
+  | 'bacThresholdsSave'
+  | 'bacThresholdsSaved'
+  | 'bacThresholdsResultsTitle'
+  | 'bacThresholdsFormula7525'
+  | 'bacThresholdsFormula5050'
+  | 'bacThresholdsFormulaMajorBadge'
+  | 'bacThresholdsOverallLabel'
+  | 'bacThresholdsDisclaimer'
+  | 'bacThresholdsOutOf20'
+  | 'bacThresholdsCtaTitle'
+  | 'bacThresholdsCtaSub'
+  | 'bacThresholdsLockedSub'
   | 'orientationTapHint'
   | 'orientationProgressLabel'
   | 'orientationTasksA11y'
   | 'orientationModalSubtitle'
+  | 'orientationFranchisedEmpty'
+  | 'orientationContinueCta'
+  | 'orientationSeeAllSteps'
+  | 'orientationStepCountLabel'
+  | 'orientationStepAccountSetup'
+  | 'orientationStepAccountSetupShort'
+  | 'orientationStepBadgeDone'
+  | 'orientationStepBadgeCurrent'
+  | 'orientationStepBadgeTodo'
+  | 'orientationStepOrientationDiagnostic'
+  | 'orientationStepOrientationDiagnosticShort'
+  | 'orientationStepRecommendation'
+  | 'orientationStepRecommendationShort'
+  | 'orientationStepRecommendationHint'
+  | 'diagnosticRecoFollowBanner'
+  | 'diagnosticRecoFollowBannerDone'
+  | 'practical_diagnostic_recommandations_follow_hint'
+  | 'orientationStepFeedback'
+  | 'orientationStepFeedbackShort'
+  | 'appFeedbackTitle'
+  | 'appFeedbackIntro'
+  | 'appFeedbackEyebrow'
+  | 'appFeedbackProgress'
+  | 'appFeedbackScaleHint'
+  | 'appFeedbackOptionTresBien'
+  | 'appFeedbackOptionBien'
+  | 'appFeedbackOptionMoyen'
+  | 'appFeedbackCatDesign'
+  | 'appFeedbackCatDesignDesc'
+  | 'appFeedbackCatSimplicity'
+  | 'appFeedbackCatSimplicityDesc'
+  | 'appFeedbackCatTranslations'
+  | 'appFeedbackCatTranslationsDesc'
+  | 'appFeedbackCatRecommendations'
+  | 'appFeedbackCatRecommendationsDesc'
+  | 'appFeedbackCatSchools'
+  | 'appFeedbackCatSchoolsDesc'
+  | 'appFeedbackCatContent'
+  | 'appFeedbackCatContentDesc'
+  | 'appFeedbackCatTechnical'
+  | 'appFeedbackCatTechnicalDesc'
+  | 'appFeedbackCatShop'
+  | 'appFeedbackCatShopDesc'
+  | 'appFeedbackCatComments'
+  | 'appFeedbackCatCommentsDesc'
+  | 'appFeedbackQDesignOverall'
+  | 'appFeedbackQDesignOverallDesc'
+  | 'appFeedbackQDesignNav'
+  | 'appFeedbackQDesignNavDesc'
+  | 'appFeedbackQDesignRead'
+  | 'appFeedbackQDesignReadDesc'
+  | 'appFeedbackQEaseFirst'
+  | 'appFeedbackQEaseFirstDesc'
+  | 'appFeedbackQEaseFind'
+  | 'appFeedbackQEaseFindDesc'
+  | 'appFeedbackQEaseForms'
+  | 'appFeedbackQEaseFormsDesc'
+  | 'appFeedbackQTransFr'
+  | 'appFeedbackQTransFrDesc'
+  | 'appFeedbackQTransAr'
+  | 'appFeedbackQTransArDesc'
+  | 'appFeedbackQTransConsist'
+  | 'appFeedbackQTransConsistDesc'
+  | 'appFeedbackQRecoRel'
+  | 'appFeedbackQRecoRelDesc'
+  | 'appFeedbackQRecoClear'
+  | 'appFeedbackQRecoClearDesc'
+  | 'appFeedbackQRecoDiag'
+  | 'appFeedbackQRecoDiagDesc'
+  | 'appFeedbackQSchoolSearch'
+  | 'appFeedbackQSchoolSearchDesc'
+  | 'appFeedbackQSchoolAnn'
+  | 'appFeedbackQSchoolAnnDesc'
+  | 'appFeedbackQSchoolFollow'
+  | 'appFeedbackQSchoolFollowDesc'
+  | 'appFeedbackQContentHome'
+  | 'appFeedbackQContentHomeDesc'
+  | 'appFeedbackQContentNotif'
+  | 'appFeedbackQContentNotifDesc'
+  | 'appFeedbackQTechSpeed'
+  | 'appFeedbackQTechSpeedDesc'
+  | 'appFeedbackQTechStable'
+  | 'appFeedbackQTechStableDesc'
+  | 'appFeedbackQTechBugs'
+  | 'appFeedbackQTechBugsDesc'
+  | 'appFeedbackQShop'
+  | 'appFeedbackQShopDesc'
+  | 'appFeedbackTextImprove'
+  | 'appFeedbackTextImprovePh'
+  | 'appFeedbackTextBugs'
+  | 'appFeedbackTextBugsPh'
+  | 'appFeedbackTextFeatures'
+  | 'appFeedbackTextFeaturesPh'
+  | 'appFeedbackSubmit'
+  | 'appFeedbackThanks'
+  | 'appFeedbackThanksSub'
+  | 'appFeedbackThanksEyebrow'
+  | 'appFeedbackThanksCardTitle'
+  | 'appFeedbackThanksCardSub'
+  | 'appFeedbackError'
+  | 'appFeedbackLoginRequired'
+  | 'appFeedbackRequiredRatings'
+  | 'appFeedbackRequiredComment'
+  | 'appFeedbackOpenCta'
+  | 'appUpdateEyebrow'
+  | 'appUpdateTitleRequired'
+  | 'appUpdateTitleRecommended'
+  | 'appUpdateCta'
+  | 'appUpdateLater'
+  | 'appUpdateVersionHint'
+  | 'pushPermissionModalTitle'
+  | 'pushPermissionModalBody'
+  | 'pushPermissionModalHint'
+  | 'pushPermissionModalOpenSettings'
+  | 'pushPermissionModalLater'
+  | 'orientationStepApplyToSchools'
+  | 'orientationStepApplyToSchoolsShort'
+  | 'applySchoolsTourEyebrow'
+  | 'applySchoolsTourTitle'
+  | 'applySchoolsTourNext'
+  | 'applySchoolsTourBack'
+  | 'applySchoolsTourTapNotif'
+  | 'applySchoolsTourTapFollow'
+  | 'applySchoolsTourTapStatus'
+  | 'applySchoolsTourFocusTap'
+  | 'applySchoolsTourFocusLearn'
+  | 'applySchoolsTourTrackerStep'
+  | 'applySchoolsTourTrackerActionTitle'
+  | 'applySchoolsTourTrackerPending'
+  | 'applySchoolsTourTrackerDone'
+  | 'applySchoolsTourActionTapNotification'
+  | 'applySchoolsTourActionTapContinue'
+  | 'applySchoolsTourActionTapFollow'
+  | 'applySchoolsTourActionTapStatus'
+  | 'applySchoolsTourActionTapCandidaciesTab'
+  | 'applySchoolsTourActionTapRegistrationLink'
+  | 'applySchoolsTourTabsLegend'
+  | 'applySchoolsTourTabsAnnouncementsPlaceholder'
+  | 'applySchoolsTourTabsTapCandidaciesHint'
+  | 'applySchoolsTourGoInscriptions'
+  | 'applySchoolsTourTeaseTitle'
+  | 'applySchoolsTourTeaseSub'
+  | 'applySchoolsTourTeaseHint'
+  | 'applySchoolsTourPushHint'
+  | 'applySchoolsTourCardTypeHint'
+  | 'applySchoolsTourCardFollowHint'
+  | 'applySchoolsTourCardStatusHint'
+  | 'applySchoolsTourFollowHint'
+  | 'applySchoolsTourStatusHint'
+  | 'applySchoolsTourCandidacyHint'
+  | 'applySchoolsTourBravoTitle'
+  | 'applySchoolsTourBravoSub'
+  | 'applySchoolsTourStep_notification_tease_title'
+  | 'applySchoolsTourStep_notification_tease_body'
+  | 'applySchoolsTourStep_push_preview_title'
+  | 'applySchoolsTourStep_push_preview_body'
+  | 'applySchoolsTourStep_announcement_card_title'
+  | 'applySchoolsTourStep_announcement_card_body'
+  | 'applySchoolsTourRegistrationLinkHint'
+  | 'applySchoolsTourStep_registration_link_title'
+  | 'applySchoolsTourStep_registration_link_body'
+  | 'applySchoolsTourStep_follow_action_title'
+  | 'applySchoolsTourStep_follow_action_body'
+  | 'applySchoolsTourStep_status_action_title'
+  | 'applySchoolsTourStep_status_action_body'
+  | 'applySchoolsTourStep_inscriptions_tabs_title'
+  | 'applySchoolsTourStep_inscriptions_tabs_body'
+  | 'applySchoolsTourStep_candidacies_tab_title'
+  | 'applySchoolsTourStep_candidacies_tab_body'
+  | 'applySchoolsTourStep_candidacy_card_title'
+  | 'applySchoolsTourStep_candidacy_card_body'
+  | 'applySchoolsTourStep_bravo_title'
+  | 'applySchoolsTourStep_bravo_body'
+  | 'inscCandidaciesEmptyTourCta'
+  | 'orientationStepAppDiscovery'
+  | 'orientationStepAppDiscoveryShort'
+  | 'orientationStepInviteFriend'
+  | 'orientationStepInviteFriendShort'
   | 'modalClose'
   | 'closeOverlayA11y'
   | 'dailyPlay'
@@ -228,6 +527,13 @@ export type HomeCopyKey =
   | 'registerLoginLink'
   | 'registerInvalidConfirm'
   | 'registerPasswordsMismatch'
+  | 'registerPasswordRulesTitle'
+  | 'registerPasswordRuleMinLength'
+  | 'registerPasswordRuleUpper'
+  | 'registerPasswordRuleLower'
+  | 'registerPasswordRuleNumber'
+  | 'registerPasswordRuleSpecial'
+  | 'registerPasswordWeak'
   | 'forgotTitle'
   | 'forgotSubtitle'
   | 'forgotInstructionsTitle'
@@ -241,6 +547,70 @@ export type HomeCopyKey =
   | 'forgotSuccessBody'
   | 'forgotNewPasswordLabel'
   | 'forgotBackToLogin'
+  | 'forgotSubtitleWhatsapp'
+  | 'forgotSuccessWhatsappTitle'
+  | 'forgotSuccessWhatsappBody'
+  | 'forgotCtaWhatsapp'
+  | 'forgotCtaCheckPhone'
+  | 'forgotAccountNotFound'
+  | 'forgotAccountFoundTitle'
+  | 'forgotAccountFoundIntro'
+  | 'forgotWhatsappMessageLabel'
+  | 'forgotWhatsappContactLabel'
+  | 'forgotWhatsappMessage'
+  | 'forgotCopyWhatsappMessage'
+  | 'forgotCopied'
+  | 'forgotOpenWhatsappCta'
+  | 'deviceTransferTitle'
+  | 'deviceTransferSubtitle'
+  | 'deviceTransferIntro'
+  | 'deviceTransferIntroMulti'
+  | 'deviceTransferPickSubtitle'
+  | 'deviceTransferPickIntro'
+  | 'deviceTransferPickLabel'
+  | 'deviceTransferSecurityHint'
+  | 'deviceTransferCta'
+  | 'deviceTransferSupportLabel'
+  | 'deviceTransferSupportHint'
+  | 'deviceTransferOpenSupportWhatsapp'
+  | 'deviceTransferErrInvalid'
+  | 'forgotWhatsappStepsTitle'
+  | 'forgotWhatsappStepSend'
+  | 'forgotWhatsappStepSameNumber'
+  | 'forgotWhatsappStepFollow'
+  | 'verifyOtpTitle'
+  | 'verifyOtpSubtitle'
+  | 'verifyOtpCta'
+  | 'verifyOtpResend'
+  | 'verifyOtpErrInvalid'
+  | 'verifyOtpErrMissingPhone'
+  | 'verifyOtpCodeLabel'
+  | 'verifyOtpHint'
+  | 'forgotInfoWhatsapp'
+  | 'forgotWhatsappNotSent'
+  | 'forgotSuccessManychatTitle'
+  | 'forgotSuccessManychatIntro'
+  | 'forgotSuccessManychatStep1'
+  | 'forgotSuccessManychatStep2'
+  | 'forgotSuccessManychatStep3'
+  | 'forgotSuccessManychatStep4'
+  | 'forgotSuccessManychatSamePhone'
+  | 'forgotSuccessManychatAltApp'
+  | 'forgotSuccessCtaEnterCodeInApp'
+  | 'resetFlowStep1'
+  | 'resetFlowStep2'
+  | 'resetFlowStep3'
+  | 'resetPasswordTitle'
+  | 'resetPasswordSubtitle'
+  | 'resetPasswordNew'
+  | 'resetPasswordConfirm'
+  | 'resetPasswordCta'
+  | 'resetPasswordDoneTitle'
+  | 'resetPasswordDoneBody'
+  | 'resetPasswordErrToken'
+  | 'resetPasswordErrMatch'
+  | 'loginShowPassword'
+  | 'loginHidePassword'
   | 'setupTitle'
   | 'setupStepPrefix'
   | 'setupStep1Title'
@@ -259,6 +629,7 @@ export type HomeCopyKey =
   | 'setupStudyLevel'
   | 'setupBacType'
   | 'setupFiliere'
+  | 'setupFiliere1Bac'
   | 'setupBacAnnee'
   | 'setupBacAnneeHelp'
   | 'setupSpecialite1'
@@ -377,6 +748,8 @@ export type HomeCopyKey =
   | 'accountActiveServicesDownloadReceipt'
   | 'accountActiveServicesReceiptSoonTitle'
   | 'accountActiveServicesReceiptSoonBody'
+  | 'accountActiveServicesReceiptError'
+  | 'accountActiveServicesReceiptShareUnavailable'
   | 'referralTeaserTitle'
   | 'referralTeaserSubtitle'
   | 'referralTeaserCta'
@@ -439,6 +812,7 @@ export type HomeCopyKey =
   | 'referralTierPickProduct'
   | 'referralTierChoiceHint'
   | 'referralTierGeneratePromo'
+  | 'referralTierRewardFree'
   | 'referralTierPromoTitle'
   | 'referralTierPromoUsed'
   | 'referralTierPromoAvailable'
@@ -529,6 +903,22 @@ export type HomeCopyKey =
   | 'accountCityPlaceholder'
   | 'accountCitiesLoading'
   | 'commonErrorTitle'
+  | 'commonLoadError'
+  | 'commonRetry'
+  | 'apiErrNetwork'
+  | 'apiErrTimeout'
+  | 'apiErrUnauthorized'
+  | 'apiErrForbidden'
+  | 'apiErrNotFound'
+  | 'apiErrValidation'
+  | 'apiErrConflict'
+  | 'apiErrServer'
+  | 'apiErrRateLimit'
+  | 'apiErrGeneric'
+  | 'apiErrAuth'
+  | 'apiErrDiagnostic'
+  | 'apiErrDailyChallenge'
+  | 'qnaErrorGeneric'
   | 'accountSectionOrders'
   | 'accountOrdersEmpty'
   | 'accountOrdersEmptyProducts'
@@ -536,6 +926,7 @@ export type HomeCopyKey =
   | 'accountOrdersLoading'
   | 'accountOrdersError'
   | 'accountTabProfile'
+  | 'accountRefreshing'
   | 'accountTabOrders'
   | 'accountOrdersOpenBadgeA11y'
   | 'accountOrdersOpenCount'
@@ -589,6 +980,11 @@ export type HomeCopyKey =
   | 'shopCartTotalEstimated'
   | 'shopCartFooterTotal'
   | 'shopCartGoCheckout'
+  | 'shopCartReplaceServiceTitle'
+  | 'shopCartReplaceServiceMessage'
+  | 'shopCartReplaceServiceMessageMany'
+  | 'shopCartReplaceServiceAccept'
+  | 'shopCartReplaceServiceCancel'
   | 'shopCheckoutEyebrowBoutique'
   | 'shopCheckoutTitle'
   | 'shopCheckoutItemsSummary'
@@ -624,6 +1020,8 @@ export type HomeCopyKey =
   | 'shopCheckoutNotesDesc'
   | 'shopCheckoutPhNotes'
   | 'shopCheckoutRecapTitle'
+  | 'shopCheckoutUpgradeCatalog'
+  | 'shopCheckoutUpgradeCredit'
   | 'shopCheckoutLblSubtotal'
   | 'shopCheckoutPromoTitle'
   | 'shopCheckoutPromoHint'
@@ -717,6 +1115,7 @@ export type HomeCopyKey =
   | 'shopErrorLoad'
   | 'shopLoading'
   | 'shopEmptyTitle'
+  | 'shopRefreshing'
   | 'shopEmptyDesc'
   | 'shopEstablishmentsConcernedNotice'
   | 'shopBadgeProduct'
@@ -795,6 +1194,8 @@ export type HomeCopyKey =
   | 'tabInscriptions'
   | 'tabBoutique'
   | 'tabCompte'
+  | 'hubWhatsAppA11y'
+  | 'hubWhatsAppPrefill'
   | 'hubGlobalWallUnreadBadgeA11y'
   | 'globalWallTitle'
   | 'globalWallIntro'
@@ -898,10 +1299,15 @@ export type HomeCopyKey =
   | 'shareKindBoutique'
   | 'shareKindBoutiqueProduct'
   | 'sidebarTitle'
+  | 'sidebarSubtitle'
   | 'sidebarOpen'
   | 'sidebarClose'
   | 'sidebarCart'
   | 'sidebarEvents'
+  | 'sidebarSectionDiscover'
+  | 'sidebarSectionTools'
+  | 'sidebarSectionShop'
+  | 'sidebarSectionAccount'
   | 'eventsAgendaTitle'
   | 'eventsDetailPractical'
   | 'eventsDetailDescription'
@@ -933,6 +1339,7 @@ export type HomeCopyKey =
   | 'eventsConfirmPresence'
   | 'eventsFull'
   | 'eventsLoadError'
+  | 'eventsRefreshing'
   | 'eventsOnlineLink'
   | 'eventsMapsLink'
   | 'eventsOpenDetail'
@@ -1002,6 +1409,20 @@ export type HomeCopyKey =
   | 'inscRetry'
   | 'inscRequireLogin'
   | 'inscRequireLoginCta'
+  | 'inscTawjihPlusUpgradeCta'
+  | 'inscTawjihPlusLockTitle'
+  | 'inscTawjihPlusLockHint'
+  | 'diagnosticAnswersSavedHint'
+  | 'diagnosticRecoGateEyebrow'
+  | 'diagnosticRecoGateHeaderTitle'
+  | 'diagnosticRecoGateHeaderSub'
+  | 'diagnosticRecoGateCardBadge'
+  | 'diagnosticRecoGateCardTitle'
+  | 'diagnosticRecoGateCardDesc'
+  | 'diagnosticRecoGateFeature1'
+  | 'diagnosticRecoGateFeature2'
+  | 'diagnosticRecoGateFeature3'
+  | 'diagnosticRecoGateSavedBox'
   | 'inscNotifEmptyTitle'
   | 'inscNotifEmptyDesc'
   | 'inscNotifMarkAllRead'
@@ -1026,6 +1447,8 @@ export type HomeCopyKey =
   | 'inscAnnouncementsOpenLink'
   | 'inscAnnouncementsAlreadyTracked'
   | 'inscAnnouncementsMarkApplied'
+  | 'inscAnnouncementUnseen'
+  | 'inscAnnouncementUnread'
   | 'inscStatusUnknown'
   | 'inscStatusNone'
   | 'inscStatusActionTitle'
@@ -1035,6 +1458,8 @@ export type HomeCopyKey =
   | 'inscStatusActionUpdating'
   | 'inscStatusBlockTitle'
   | 'inscStatusUnavailable'
+  | 'inscStatusSectionInProgress'
+  | 'inscStatusSectionFinalized'
   | 'inscOpenLinkBtn'
   | 'inscOpenLinkA11y'
   | 'inscOpenLinkBtnResult'
@@ -1042,6 +1467,12 @@ export type HomeCopyKey =
   | 'inscOpenLinkBtnOffer'
   | 'inscOpenLinkBtnInfo'
   | 'inscOpenLinkBtnRegister'
+  | 'inscAnnTypeOpening'
+  | 'inscAnnTypeImportant'
+  | 'inscAnnTypeOffer'
+  | 'inscAnnTypeResult'
+  | 'inscAnnTypeScholarshipMa'
+  | 'inscAnnTypeScholarshipForeign'
   | 'inscRemoveCandidacy'
   | 'inscRemoveCandidacyConfirmTitle'
   | 'inscRemoveCandidacyConfirmMsg'
@@ -1182,18 +1613,25 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     notifDrawerSubtitle: 'Alertes inscriptions, annonces et questions-réponses.',
     notifDrawerEmpty: 'Aucune notification pour le moment.',
     notifDrawerOpenLink: 'Voir',
+    notifDrawerSeeRecommendations: 'Voir mes recommandations',
+    notifDrawerContinueParcours: 'Continuer le parcours',
     unreadSuffix: 'non lues',
     help: 'Aide',
     profile: 'Profil',
     greeting: 'Bonjour',
-    userSubtitle: 'Pack Standard · Sciences Math A',
+    userSubtitle: 'TAWJIH PLUS · Sciences Math A · 2ème Bac',
+    homePackLabel: 'Pack :',
     packStandardLabel: 'Pack Standard',
     bacMissionLabel: 'BAC MISSION',
     newsTitle: 'Actualités',
     languageSwitcher: 'Langue',
     langFr: 'FR',
-    langAr: 'AR',
+    langAr: 'عربي',
     gameDailyTitle: 'Jeu quotidien',
+    orientation1BacHomeButton: 'Test d’orientation 1ère bac',
+    orientation1BacHomeLocked: 'Ouverture le {date}',
+    orientation1BacHomeLockedA11y: 'Test d’orientation 1ère bac — disponible à partir du {date}',
+    homePackAcademicLine: '{filiere} · {niveau}',
     gameDailyBody: 'À brancher sur le mini-jeu (shell).',
     dailyChallengeTitle: 'Défi du jour',
     dailyChallengeClose: 'Fermer',
@@ -1261,6 +1699,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     dailyChallengeLeaderboardTopToday: 'Meilleurs temps',
     dailyChallengeLeaderboardLoadMore: 'Charger plus',
     dailyChallengeYouLabel: 'Toi',
+    dailyChallengePremiumBadge: 'Premium',
+    dailyChallengePremiumBadgeA11y: 'Client avec au moins un service acquis',
     dailyChallengeScoreLabel: 'Score',
     dailyChallengeHubHeroLine: 'Une session courte, chaque jour, pour avancer pas à pas.',
     dailyChallengeMissionsTitle: 'Missions du jour',
@@ -1271,6 +1711,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     dailyChallengeProgressXpMaxed: 'Tous les paliers débloqués — maintiens ta série !',
     dailyChallengeProgressBadgeQuest: 'Quête badges',
     dailyChallengeProgressRecordShort: 'Record série',
+    dailyChallengeProgressBestScoreShort: 'Record score',
+    dailyChallengeProgressBestTimeShort: 'Record chrono',
     dailyChallengeProgressIceShort: 'Gels (ICE)',
     dailyChallengeStreakRecord: 'Record : {{n}}',
     dailyChallengeIceStock: 'ICE × {{n}}',
@@ -1298,11 +1740,48 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     practicalTitle: 'Liens pratiques',
     practicalSubtitle: 'Accès rapides à vos services',
     practicalSectionA11y: 'Liens pratiques',
+    homeSeeMore: 'Voir plus',
+    homeMostVisitedSchoolsTitle: 'Écoles les plus visitées',
+    homeMostVisitedSchoolsSubtitle: 'Les établissements consultés par la communauté',
+    homeMostVisitedSchoolsA11y: 'Écoles les plus visitées',
+    homeLatestAnnouncementsTitle: 'Dernières annonces',
+    homeLatestAnnouncementsSubtitle: 'Concours et inscriptions récemment publiés',
+    homeLatestAnnouncementsA11y: 'Dernières annonces',
+    homeAnnouncementOpen: 'Ouvert',
+    homeAnnouncementClosed: 'Clôturé',
+    homeAnnouncementDatesLocked: 'Dates — TAWJIH PLUS',
+    homeRefresh: 'Actualiser',
+    homeRefreshA11y: 'Actualiser la page d’accueil',
+    homeRefreshing: 'Actualisation',
+    home_orientation_access_eyebrow: 'Orientation',
+    home_orientation_access_title: 'Diagnostic et recommandations',
+    practical_orientation_section: 'Parcours orientation',
+    practical_services_section: 'Services',
+    practical_diagnostic_ecoles: 'Diagnostic écoles',
+    sidebarOrientation1Bac: 'Test orientation 1ère bac',
+    practical_diagnostic_rapport: 'Rapport diagnostic',
+    practical_diagnostic_recommandations: 'Recommandations écoles',
+    practical_diagnostic_ecoles_desc:
+      'Questionnaire rapide pour personnaliser vos recommandations d’établissements.',
+    practical_diagnostic_rapport_desc:
+      'Parcourez vos réponses et la synthèse étape par étape.',
+    practical_diagnostic_recommandations_desc:
+      'Liste personnalisée et suivi d’au moins 3 établissements pour valider le parcours.',
+    practical_recommandations_locked_account:
+      'Complétez la configuration de votre compte pour voir vos recommandations.',
+    practical_recommandations_locked_diagnostic:
+      'Terminez d’abord le diagnostic écoles pour débloquer vos recommandations.',
+    practical_orientation_locked_title: 'Étape verrouillée',
+    practical_orientation_loading: 'Chargement du parcours…',
+    practical_diagnostic_locked_account:
+      'Complétez la configuration de votre compte pour lancer le diagnostic.',
+    practical_rapport_locked_account:
+      'Complétez la configuration de votre compte pour accéder au rapport.',
+    practical_rapport_locked_diagnostic:
+      'Terminez d’abord le diagnostic écoles pour débloquer le rapport.',
     practical_ecoles: 'Écoles supérieures',
     practical_inscriptions: 'Inscriptions et dates',
     practical_candidatures: 'Suivi de mes candidatures',
-    practical_testsOrientation: "Test d'orientations",
-    practical_resultatsOrientation: "Résultats d'orientations",
     practical_ecolesInscription: "Mes écoles d'inscriptions",
     practical_boutique: 'Boutique',
     practical_ecoles_desc:
@@ -1311,10 +1790,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       'Calendriers des concours, dossiers à fournir et dates limites pour ne rien manquer.',
     practical_candidatures_desc:
       'Suivez l’état de vos dossiers et les prochaines étapes de vos candidatures.',
-    practical_testsOrientation_desc:
-      'Questionnaires et outils pour affiner votre orientation et vos préférences.',
-    practical_resultatsOrientation_desc:
-      'Consultez vos résultats et les pistes proposées selon votre profil.',
+    practical_evenements_desc:
+      'Salons, ateliers et webinaires pour avancer dans votre orientation.',
     practical_ecolesInscription_desc:
       'La liste des établissements pour lesquels vous déposez ou suivrez une candidature.',
     practical_boutique_desc:
@@ -1329,6 +1806,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsFiltersA11y: 'Filtres détaillés',
     schoolsFollowedOnlyA11y: 'Uniquement les écoles que je suis',
     schoolsSearchPlaceholder: 'Rechercher (nom, ville, université...)',
+    schoolsSearchPlaceholderLocked: 'Recherche réservée aux clients TAWJIH PLUS',
+    schoolsSearchFiltersLockedHint:
+      'Recherche et filtres détaillés réservés aux clients TAWJIH PLUS.',
     schoolsTypeAll: 'Tous',
     schoolsTypeLabel: "Type d'établissement",
     schoolsTypePublic: 'Public',
@@ -1336,6 +1816,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsTypeSemiPublic: 'Semi‑Public',
     schoolsTypeMilitary: 'Militaire',
     schoolsFiltersTitle: 'Filtres détaillés',
+    schoolsFilterAcceptedStudyLabel: "Filière d'étude acceptée",
     schoolsFiltersHint:
       'Aligné sur la page web `/etablissements` : secteur, région, ville, diplôme, fourchette de frais, etc.',
     schoolsUniversityLabel: 'Recherche',
@@ -1364,6 +1845,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsReset: 'Réinitialiser',
     schoolsApply: 'Appliquer',
     schoolsRetry: 'Réessayer',
+    schoolsRefreshing: 'Actualisation…',
     estCardQnaOpenA11y: 'Ouvrir les questions et réponses',
     estCardBtnComment: 'Commentaire',
     estCardBadgeSponsored: 'Sponsorisé',
@@ -1376,10 +1858,291 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     storiesA11y: 'Stories',
     newsCarouselA11y: 'Actualités — défilement horizontal',
     swipeCardsHint: 'Glissez les cartes',
-    orientationTapHint: 'Toucher pour afficher les tâches restantes',
+    bacCardEyebrow: 'Baccalauréat 2026',
+    bacCardTitle: 'Résultat du baccalauréat',
+    bacCardDateLabel: 'Publication prévue',
+    bacStatusNotYet: 'Pas encore',
+    bacStatusPublished: 'Publié',
+    bacCountdownKicker: 'Compte à rebours',
+    bacCountdownDays: 'j',
+    bacCountdownHours: 'h',
+    bacCountdownMinutes: 'min',
+    bacJourJTitle: 'Jour J',
+    bacWaitingResult: 'En attente du résultat',
+    bacOutletsTitle: 'Sorties des résultats',
+    bacOutletOutlook: 'Outlook (courriel)',
+    bacOutletSms: 'SMS',
+    bacOutletMenResults: 'bac.men.gov.ma (notes)',
+    bacSiteStatusLabel: 'Site bac.men.gov.ma',
+    bacSiteOnline: 'En ligne',
+    bacSiteOffline: 'Hors ligne',
+    bacLinkOutlook: 'Vérifier Outlook',
+    bacLinkMen: 'bac.men.gov.ma',
+    bacLinkOutlookA11y: 'Ouvrir Outlook pour vérifier vos résultats',
+    bacLinkMenA11y: 'Ouvrir le site officiel bac.men.gov.ma',
+    bacTapForGuide: 'Instructions',
+    bacOutletGuideA11y: 'Voir les instructions de vérification',
+    bacVerifyModalTitleOutlook: 'Vérifier via Outlook',
+    bacVerifyModalTitleMen: 'Consulter sur bac.men.gov.ma',
+    bacVerifyModalTitleSms: 'Résultat par SMS',
+    bacVerifyStepsTitle: 'Étapes',
+    bacMassarSectionTitle: 'Code Massar',
+    bacMassarSectionHint:
+      'Confirmez ou corrigez votre code. Il sert à vous connecter sur le site officiel et à former votre adresse @taalim.ma.',
+    bacMassarPlaceholder: 'Ex. A123456789',
+    bacMassarConfirm: 'Confirmer',
+    bacMassarEdit: 'Modifier',
+    bacMassarSaved: 'Enregistré',
+    bacOutlookEmailLabel: 'Identifiant Outlook',
+    bacOutlookPasswordLabel: 'Mot de passe',
+    bacOutlookPasswordHint: 'Même mot de passe que Massar',
+    bacOutlookStep1: 'Ouvrez Outlook (courriel) ou l’application mail sur votre téléphone.',
+    bacOutlookStep2: 'Connectez-vous avec votre adresse {email} (code Massar + @taalim.ma).',
+    bacOutlookStep3: 'Saisissez le mot de passe Massar (identique à celui du portail Massar).',
+    bacOutlookStep4: 'Consultez votre boîte de réception : un message officiel annonce votre résultat.',
+    bacOutlookStep5: 'Si rien n’apparaît, attendez quelques minutes et actualisez la boîte de réception.',
+    bacMenStep1: 'Ouvrez bac.men.gov.ma depuis le bouton ci-dessous.',
+    bacMenStep2: 'Saisissez votre code Massar dans le formulaire.',
+    bacMenStep3: 'Cochez « Je ne suis pas un robot » (captcha).',
+    bacMenStep4: 'Validez le formulaire pour afficher votre note et votre mention.',
+    bacMenStep5: 'En cas de réussite : note et mention s’affichent. En cas d’échec sans rattrapage : message adapté.',
+    bacMenStep6: 'Si vous êtes admis au rattrapage, le site l’indique clairement.',
+    bacSmsStep1: 'Aucune action dans l’application : le SMS est envoyé par le système officiel.',
+    bacSmsStep2: 'Le message arrive sur le numéro de téléphone enregistré sur votre compte Massar.',
+    bacSmsStep3: 'Le SMS vous annonce directement votre résultat le jour de publication.',
+    bacOpenOutlook: 'Ouvrir Outlook',
+    bacOpenMenSite: 'Ouvrir bac.men.gov.ma',
+    bacModalClose: 'Fermer',
+    bacThresholdsEyebrow: 'Admission supérieure',
+    bacThresholdsTitle: 'Calcul des seuils',
+    bacThresholdsSubtitle:
+      'Saisis tes notes du bulletin pour estimer ton score d’admission aux écoles.',
+    bacThresholdsTip:
+      'Les formules ci-dessous servent à comparer ton profil aux seuils affichés sur les fiches établissements.',
+    bacThresholdsSectionNotes: 'Notes du bulletin',
+    bacThresholdsSectionHint: 'Reprends les notes de ton relevé officiel (sur 20).',
+    bacThresholdsRegional: 'Régional',
+    bacThresholdsNational: 'National',
+    bacThresholdsContinuous: 'Contrôles continus',
+    bacThresholdsOverall: 'Note générale',
+    bacThresholdsPlaceholder: '0,00',
+    bacThresholdsSave: 'Enregistrer et calculer',
+    bacThresholdsSaved: 'Notes enregistrées',
+    bacThresholdsResultsTitle: 'Tes scores estimés',
+    bacThresholdsFormula7525: '75 % national + 25 % régional',
+    bacThresholdsFormula5050: '50 % national + 50 % régional',
+    bacThresholdsFormulaMajorBadge: 'Formule majoritaire',
+    bacThresholdsOverallLabel: 'Note générale (bulletin)',
+    bacThresholdsDisclaimer:
+      'Chaque établissement peut appliquer sa propre formule. En pratique, environ 90 % des écoles supérieures utilisent 75 % national et 25 % régional — détail indiqué sur les fiches écoles.',
+    bacThresholdsOutOf20: '/20',
+    bacThresholdsCtaTitle: 'Calculer les seuils des écoles',
+    bacThresholdsCtaSub: 'Saisis tes notes du bulletin · formules 75/25 et 50/50',
+    bacThresholdsLockedSub: 'Disponible en 2ème bac',
+    orientationTapHint: 'Toucher pour voir les étapes',
     orientationProgressLabel: "Progression d'orientation",
-    orientationTasksA11y: "Voir les tâches restantes du parcours d'orientation",
-    orientationModalSubtitle: 'Tâches restantes du parcours',
+    orientationTasksA11y: "Parcours d'orientation — 6 étapes",
+    orientationModalSubtitle: 'Votre plan en 6 étapes',
+    orientationFranchisedEmpty: 'Aucune étape franchie pour le moment.',
+    orientationContinueCta: 'Continuer',
+    orientationSeeAllSteps: 'Voir le détail',
+    orientationStepCountLabel: '6 étapes',
+    orientationStepAccountSetup: 'Configuration du compte',
+    orientationStepAccountSetupShort: 'Compte',
+    orientationStepBadgeDone: 'Fait',
+    orientationStepBadgeCurrent: 'En cours',
+    orientationStepBadgeTodo: 'À faire',
+    orientationStepOrientationDiagnostic: "Diagnostic d'orientation",
+    orientationStepOrientationDiagnosticShort: 'Diagnostic',
+    orientationStepRecommendation: "Recommandation et suivi d'écoles",
+    orientationStepRecommendationShort: 'Reco. & suivi',
+    orientationStepRecommendationHint:
+      'Suivez 3 écoles recommandées pour valider cette étape.',
+    diagnosticRecoFollowBanner:
+      'Pour valider le parcours, suivez 3 écoles recommandées.',
+    diagnosticRecoFollowBannerDone:
+      'Étape validée — vous suivez vos écoles recommandées.',
+    practical_diagnostic_recommandations_follow_hint:
+      'Suivez au moins 3 écoles dans la liste de recommandations.',
+    orientationStepFeedback: 'Feedback',
+    orientationStepFeedbackShort: 'Feedback',
+    appFeedbackTitle: 'Votre avis sur l’application',
+    appFeedbackEyebrow: 'Amélioration continue',
+    appFeedbackIntro:
+      'Vos retours orientent nos priorités. Merci de prendre 2–3 minutes pour évaluer chaque thème.',
+    appFeedbackProgress: '{{done}} / {{total}} critères notés',
+    appFeedbackScaleHint: 'Choisissez : Très bien, Bien ou Moyen pour chaque question.',
+    appFeedbackOptionTresBien: 'Très bien',
+    appFeedbackOptionBien: 'Bien',
+    appFeedbackOptionMoyen: 'Moyen',
+    appFeedbackCatDesign: 'Design & interface',
+    appFeedbackCatDesignDesc: 'Apparence, navigation et lisibilité des écrans.',
+    appFeedbackCatSimplicity: 'Simplicité',
+    appFeedbackCatSimplicityDesc: 'Facilité à démarrer, trouver une info et remplir les formulaires.',
+    appFeedbackCatTranslations: 'Langues & traductions',
+    appFeedbackCatTranslationsDesc: 'Qualité du français, de l’arabe et cohérence entre les pages.',
+    appFeedbackCatRecommendations: 'Orientation & recommandations',
+    appFeedbackCatRecommendationsDesc: 'Diagnostic, scores et pertinence des écoles proposées.',
+    appFeedbackCatSchools: 'Écoles & inscriptions',
+    appFeedbackCatSchoolsDesc: 'Recherche d’établissements, annonces et suivi de candidature.',
+    appFeedbackCatContent: 'Accueil & parcours',
+    appFeedbackCatContentDesc: 'Page d’accueil, plan de réussite et notifications.',
+    appFeedbackCatTechnical: 'Performance & fiabilité',
+    appFeedbackCatTechnicalDesc: 'Vitesse, stabilité et bugs éventuels.',
+    appFeedbackCatShop: 'Boutique & services',
+    appFeedbackCatShopDesc: 'Découverte des offres et expérience d’achat.',
+    appFeedbackCatComments: 'Vos commentaires',
+    appFeedbackCatCommentsDesc: 'Détaillez ce qui pourrait être amélioré.',
+    appFeedbackQDesignOverall: 'Aspect général de l’application',
+    appFeedbackQDesignOverallDesc: 'Couleurs, identité visuelle, impression globale.',
+    appFeedbackQDesignNav: 'Navigation entre les sections',
+    appFeedbackQDesignNavDesc: 'Onglets, menus, retour arrière, clarté des parcours.',
+    appFeedbackQDesignRead: 'Lisibilité des contenus',
+    appFeedbackQDesignReadDesc: 'Taille des textes, contrastes, hiérarchie visuelle.',
+    appFeedbackQEaseFirst: 'Prise en main',
+    appFeedbackQEaseFirstDesc: 'Compte, profil, première visite sans aide extérieure.',
+    appFeedbackQEaseFind: 'Trouver une information',
+    appFeedbackQEaseFindDesc: 'Écoles, annonces, diagnostic, boutique, compte…',
+    appFeedbackQEaseForms: 'Formulaires & filtres',
+    appFeedbackQEaseFormsDesc: 'Diagnostic, filtres écoles, mise à jour du profil.',
+    appFeedbackQTransFr: 'Qualité du français',
+    appFeedbackQTransFrDesc: 'Formulations, fautes, ton adapté au lycée.',
+    appFeedbackQTransAr: 'Qualité de l’arabe',
+    appFeedbackQTransArDesc: 'Formulations, sens, affichage RTL.',
+    appFeedbackQTransConsist: 'Cohérence FR / AR',
+    appFeedbackQTransConsistDesc: 'Même niveau de qualité sur tous les écrans.',
+    appFeedbackQRecoRel: 'Pertinence des écoles recommandées',
+    appFeedbackQRecoRelDesc: 'Adéquation avec votre profil et vos choix.',
+    appFeedbackQRecoClear: 'Clarté des explications',
+    appFeedbackQRecoClearDesc: 'Scores, tiers, texte du rapport de diagnostic.',
+    appFeedbackQRecoDiag: 'Parcours du diagnostic',
+    appFeedbackQRecoDiagDesc: 'Étapes, durée, compréhension des questions.',
+    appFeedbackQSchoolSearch: 'Liste et fiches écoles',
+    appFeedbackQSchoolSearchDesc: 'Filtres, fiches établissement, informations utiles.',
+    appFeedbackQSchoolAnn: 'Annonces d’inscription',
+    appFeedbackQSchoolAnnDesc: 'Lisibilité, dates, liens, détail annonce.',
+    appFeedbackQSchoolFollow: 'Suivi & statuts',
+    appFeedbackQSchoolFollowDesc: 'Candidatures suivies, mise à jour du statut.',
+    appFeedbackQContentHome: 'Accueil & parcours d’orientation',
+    appFeedbackQContentHomeDesc: 'Cartes, plan de réussite, étapes franchies.',
+    appFeedbackQContentNotif: 'Notifications',
+    appFeedbackQContentNotifDesc: 'Pertinence, fréquence, clarté des messages.',
+    appFeedbackQTechSpeed: 'Rapidité & chargements',
+    appFeedbackQTechSpeedDesc: 'Listes, images, changement d’écran.',
+    appFeedbackQTechStable: 'Stabilité générale',
+    appFeedbackQTechStableDesc: 'Plantages, écrans bloqués, fermetures inattendues.',
+    appFeedbackQTechBugs: 'Bugs rencontrés',
+    appFeedbackQTechBugsDesc: 'Fréquence et gravité des dysfonctionnements.',
+    appFeedbackQShop: 'Boutique & commandes',
+    appFeedbackQShopDesc: 'Produits, services, panier et suivi commande.',
+    appFeedbackTextImprove: 'Comment améliorer l’application ?',
+    appFeedbackTextImprovePh:
+      'Ce qui vous a plu, ce qui manque, ce qui vous a bloqué… (facultatif)',
+    appFeedbackTextBugs: 'Bugs, lenteurs ou blocages précis',
+    appFeedbackTextBugsPh: 'Écran concerné, action effectuée, message d’erreur éventuel…',
+    appFeedbackTextFeatures: 'Fonctionnalités souhaitées',
+    appFeedbackTextFeaturesPh: 'Idées pour les prochaines versions (optionnel)',
+    appFeedbackSubmit: 'Envoyer mon avis',
+    appFeedbackThanks: 'Merci pour votre contribution',
+    appFeedbackThanksSub: 'Votre avis aide toute la communauté E-Tawjihi.',
+    appFeedbackThanksEyebrow: 'Envoyé',
+    appFeedbackThanksCardTitle: 'Votre avis est bien enregistré',
+    appFeedbackThanksCardSub:
+      'Nous le prenons en compte pour améliorer l’application. Vous pouvez fermer cette fenêtre.',
+    appFeedbackError: 'Envoi impossible. Réessayez dans un instant.',
+    appFeedbackLoginRequired: 'Connectez-vous pour envoyer votre avis.',
+    appFeedbackRequiredRatings: 'Merci de répondre à toutes les questions (Très bien, Bien ou Moyen).',
+    appFeedbackRequiredComment: 'Merci de décrire comment améliorer l’app (10 caractères min.).',
+    appFeedbackOpenCta: 'Donner mon avis sur l’app',
+    appUpdateEyebrow: 'Mise à jour',
+    appUpdateTitleRequired: 'Mise à jour obligatoire',
+    appUpdateTitleRecommended: 'Nouvelle version disponible',
+    appUpdateCta: 'Mettre à jour depuis le store',
+    appUpdateLater: 'Plus tard',
+    appUpdateVersionHint: 'Votre version : {current} — dernière : {latest}',
+    pushPermissionModalTitle: 'Activez les notifications',
+    pushPermissionModalBody:
+      'Recevez les alertes d’ouverture d’inscriptions, les annonces concours et les messages importants d’E-Tawjihi.',
+    pushPermissionModalHint:
+      'Les notifications sont désactivées sur cet appareil. Ouvrez les réglages pour les autoriser (Réglages → Notifications → E-Tawjihi sur iPhone, ou Paramètres → Applications → E-Tawjihi sur Android).',
+    pushPermissionModalOpenSettings: 'Ouvrir les réglages',
+    pushPermissionModalLater: 'Plus tard',
+    orientationStepApplyToSchools: 'Gestion des inscriptions',
+    orientationStepApplyToSchoolsShort: 'Inscriptions',
+    applySchoolsTourEyebrow: 'Guide',
+    applySchoolsTourTitle: 'Gestion des inscriptions',
+    applySchoolsTourNext: 'Continuer',
+    applySchoolsTourBack: 'Retour',
+    applySchoolsTourTapNotif: 'Voir la notification',
+    applySchoolsTourTapFollow: 'Suivre cette annonce',
+    applySchoolsTourTapStatus: 'Mettre à jour mon statut',
+    applySchoolsTourFocusTap: 'Appuyez ici',
+    applySchoolsTourFocusLearn: 'À découvrir',
+    applySchoolsTourTrackerStep: 'Étape {current} / {total}',
+    applySchoolsTourTrackerActionTitle: 'Action à faire',
+    applySchoolsTourTrackerPending: 'À faire',
+    applySchoolsTourTrackerDone: 'Terminée',
+    applySchoolsTourActionTapNotification: 'Appuyez sur l’alerte concours ci-dessous',
+    applySchoolsTourActionTapContinue: 'Appuyez sur Continuer en bas',
+    applySchoolsTourActionTapFollow: 'Appuyez sur le cœur « Suivre » sur la carte',
+    applySchoolsTourActionTapStatus: 'Appuyez sur « Mettre à jour » sur la carte',
+    applySchoolsTourActionTapCandidaciesTab: 'Appuyez sur l’onglet Candidatures',
+    applySchoolsTourActionTapRegistrationLink: 'Appuyez sur le lien d’inscription',
+    applySchoolsTourTabsLegend:
+      'Pastille verte : {{active}} candidatures actives · pastille rouge : {{attention}} action(s) requise(s).',
+    applySchoolsTourTabsAnnouncementsPlaceholder:
+      'Onglet Annonces : toutes les publications des écoles (concours, inscriptions…).',
+    applySchoolsTourTabsTapCandidaciesHint:
+      'Appuyez sur l’onglet Candidatures pour voir vos suivis et les actions à traiter.',
+    applySchoolsTourGoInscriptions: 'Aller aux inscriptions',
+    applySchoolsTourTeaseTitle: 'Alerte concours {school}',
+    applySchoolsTourTeaseSub: 'Appuyez pour recevoir une notification sur votre téléphone',
+    applySchoolsTourTeaseHint: 'Comme sur votre téléphone : vous êtes prévenu dès qu’une école publie une annonce.',
+    applySchoolsTourPushHint: 'La notification ouvre l’annonce dans l’app. Ici, c’est un exemple pour {school}.',
+    applySchoolsTourCardTypeHint: 'Le bandeau indique le type d’annonce (ici : ouverture d’inscription).',
+    applySchoolsTourCardFollowHint: 'Le cœur permet de suivre l’école et recevoir les prochaines annonces.',
+    applySchoolsTourCardStatusHint: '« Mettre à jour » sert à indiquer où vous en êtes (intéressé, candidaté, inscrit…).',
+    applySchoolsTourFollowHint: 'Appuyez sur le cœur : vous suivez {school} et activez les alertes.',
+    applySchoolsTourStatusHint: 'Choisissez votre statut de candidature — comme dans l’onglet Inscriptions.',
+    applySchoolsTourCandidacyHint: 'Dans Candidatures : la carte devient rose si une nouvelle annonce demande votre attention.',
+    applySchoolsTourBravoTitle: 'Bravo !',
+    applySchoolsTourBravoSub: 'Vous savez suivre une annonce, mettre à jour votre statut et retrouver vos écoles.',
+    applySchoolsTourStep_notification_tease_title: '1. Les alertes concours',
+    applySchoolsTourStep_notification_tease_body:
+      'Quand une école publie une annonce (concours, ouverture d’inscription…), vous pouvez recevoir une notification.',
+    applySchoolsTourStep_push_preview_title: '2. Exemple de notification',
+    applySchoolsTourStep_push_preview_body:
+      'Voici à quoi ressemble une alerte pour l’ouverture des inscriptions à {school}.',
+    applySchoolsTourStep_announcement_card_title: '3. L’annonce {school}',
+    applySchoolsTourStep_announcement_card_body:
+      'Même présentation que dans l’onglet Annonces : dates, lien d’inscription, éligibilité et actions.',
+    applySchoolsTourRegistrationLinkHint:
+      'En conditions réelles, ce bouton vous mène vers la page d’inscription officielle de l’école (site ou formulaire). Ici, on ne l’ouvre pas : c’est une démonstration.',
+    applySchoolsTourStep_registration_link_title: '4. Lien d’inscription',
+    applySchoolsTourStep_registration_link_body:
+      'Le bouton avec la flèche ouvre la page d’inscription de l’établissement. Utilisez-le quand vous êtes prêt à candidater sur le site de l’école.',
+    applySchoolsTourStep_follow_action_title: '5. Suivre l’école',
+    applySchoolsTourStep_follow_action_body:
+      'En suivant, vous centralisez le suivi de candidature pour cette école.',
+    applySchoolsTourStep_status_action_title: '6. Statut de candidature',
+    applySchoolsTourStep_status_action_body:
+      'Appuyez sur « Mettre à jour » et choisissez « Inscrit » ou « Non intéressé » pour cette école.',
+    applySchoolsTourStep_inscriptions_tabs_title: '7. Onglets Annonces / Candidatures',
+    applySchoolsTourStep_inscriptions_tabs_body:
+      'Deux onglets : les annonces à découvrir et vos candidatures suivies. Les pastilles indiquent combien de suivis sont actifs et combien demandent une action.',
+    applySchoolsTourStep_candidacies_tab_title: '8. Ouvrir Candidatures',
+    applySchoolsTourStep_candidacies_tab_body:
+      'Appuyez sur Candidatures pour afficher vos écoles suivies. Le filtre « Action requise » (pastille rouge) ne garde que les cartes à mettre à jour.',
+    applySchoolsTourStep_candidacy_card_title: '9. Mettre à jour une candidature',
+    applySchoolsTourStep_candidacy_card_body:
+      'Carte en « action requise » : appuyez sur « Mettre à jour » et indiquez « Admis au concours » ou « Non admis au concours ».',
+    applySchoolsTourStep_bravo_title: '10. C’est parti !',
+    applySchoolsTourStep_bravo_body: 'Explorez les vraies annonces et lancez vos candidatures.',
+    inscCandidaciesEmptyTourCta: 'Voir le guide',
+    orientationStepAppDiscovery: "Découverte de l'application",
+    orientationStepAppDiscoveryShort: 'Découverte',
+    orientationStepInviteFriend: 'Inviter un ami',
+    orientationStepInviteFriendShort: 'Parrainage',
     modalClose: 'Fermer',
     closeOverlayA11y: 'Fermer',
     dailyPlay: 'Jouer',
@@ -1396,7 +2159,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     loginTitle: 'Se connecter',
     loginSubtitle: 'Accédez à votre espace E‑Tawjihi.',
     loginPhoneLabel: 'Numéro de téléphone',
-    loginPhonePlaceholder: 'Numéro de téléphone',
+    loginPhonePlaceholder: '06XXXXXXXX',
     loginPasswordLabel: 'Mot de passe',
     loginPasswordPlaceholder: 'Mot de passe',
     loginForgotPassword: 'Mot de passe oublié ?',
@@ -1411,7 +2174,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     registerTitle: 'Créer un compte',
     registerSubtitle: 'Créez votre compte E‑Tawjihi en quelques secondes.',
     registerPhoneLabel: 'Numéro de téléphone',
-    registerPhonePlaceholder: 'Numéro de téléphone',
+    registerPhonePlaceholder: '06XXXXXXXX',
     registerPasswordLabel: 'Mot de passe',
     registerPasswordPlaceholder: 'Mot de passe',
     registerPasswordConfirmLabel: 'Confirmer le mot de passe',
@@ -1421,6 +2184,13 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     registerLoginLink: 'Se connecter',
     registerInvalidConfirm: 'Confirmation invalide',
     registerPasswordsMismatch: 'Les mots de passe ne correspondent pas.',
+    registerPasswordRulesTitle: 'Le mot de passe doit contenir :',
+    registerPasswordRuleMinLength: 'Au moins 8 caractères',
+    registerPasswordRuleUpper: 'Une majuscule (A-Z)',
+    registerPasswordRuleLower: 'Une minuscule (a-z)',
+    registerPasswordRuleNumber: 'Un chiffre (0-9)',
+    registerPasswordRuleSpecial: 'Un caractère spécial (!@#$…)',
+    registerPasswordWeak: 'Mot de passe trop faible',
     forgotTitle: 'Mot de passe oublié',
     forgotSubtitle: 'Récupérez l’accès à votre compte.',
     forgotInstructionsTitle: 'Instructions',
@@ -1434,6 +2204,91 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     forgotSuccessBody: 'Utilisez ce mot de passe pour vous reconnecter, puis changez-le depuis votre compte.',
     forgotNewPasswordLabel: 'Mot de passe généré',
     forgotBackToLogin: 'Retour à la connexion',
+    forgotSubtitleWhatsapp:
+      'Indiquez le numéro de téléphone enregistré sur votre compte (le même que sur WhatsApp).',
+    forgotSuccessWhatsappTitle: 'Vérifiez WhatsApp',
+    forgotSuccessWhatsappBody:
+      'Si un compte existe pour ce numéro, un code vous sera envoyé sous peu. Saisissez-le pour choisir un nouveau mot de passe.',
+    forgotCtaWhatsapp: 'Envoyer la demande par WhatsApp',
+    forgotCtaCheckPhone: 'Vérifier mon numéro',
+    forgotAccountNotFound:
+      'Aucun compte E-Tawjihi actif pour ce numéro. Vérifiez le 06 ou 07 enregistré sur votre compte.',
+    forgotAccountFoundTitle: 'Compte trouvé',
+    forgotAccountFoundIntro:
+      'Envoyez le message ci-dessous depuis le même numéro WhatsApp que votre compte, vers le numéro officiel E-Tawjihi.',
+    forgotWhatsappMessageLabel: 'Message à envoyer',
+    forgotWhatsappContactLabel: 'Numéro WhatsApp E-Tawjihi à contacter',
+    forgotWhatsappMessage:
+      'Mot de passe oublié E-Tawjihi\nMon numéro de compte : {{phone}}\nMerci de m’aider à récupérer mon accès.',
+    forgotCopyWhatsappMessage: 'Copier le message',
+    forgotCopied: 'Message copié',
+    forgotOpenWhatsappCta: 'Ouvrir WhatsApp',
+    deviceTransferTitle: 'Transférer le compte',
+    deviceTransferSubtitle: 'Appareils connectés',
+    deviceTransferIntro:
+      'Ce compte est déjà actif sur un autre appareil. Choisissez l’appareil à déconnecter pour activer celui-ci.',
+    deviceTransferIntroMulti:
+      'La limite de {{max}} appareils connectés en même temps est atteinte. Déconnectez un appareil ci-dessous pour continuer sur celui-ci.',
+    deviceTransferPickSubtitle: 'Choisir un appareil',
+    deviceTransferPickIntro:
+      'Sélectionnez l’appareil à déconnecter pour libérer une place sur ce compte.',
+    deviceTransferPickLabel: 'Appareils connectés',
+    deviceTransferSecurityHint:
+      'Si l’un de ces appareils ne vous appartient pas, contactez le support pour sécuriser votre compte.',
+    deviceTransferCta: 'Déconnecter et continuer',
+    deviceTransferSupportLabel: 'Appareil inconnu ?',
+    deviceTransferSupportHint:
+      'Contactez le support E-Tawjihi sur WhatsApp (0655690632). Le message inclura votre numéro de compte.',
+    deviceTransferOpenSupportWhatsapp: 'Sécuriser mon compte (WhatsApp)',
+    deviceTransferErrInvalid: 'Impossible de compléter le transfert. Réessayez ou contactez le support.',
+    forgotWhatsappStepsTitle: 'Étapes',
+    forgotWhatsappStepSend: '1. Copiez le message ou appuyez sur « Ouvrir WhatsApp » (le texte est déjà rempli).',
+    forgotWhatsappStepSameNumber:
+      '2. Envoyez-le depuis le téléphone du numéro {{phone}} — celui de votre compte.',
+    forgotWhatsappStepFollow:
+      '3. Suivez les instructions d’E-Tawjihi dans la conversation pour recevoir votre nouveau mot de passe.',
+    forgotSuccessManychatTitle: 'Message envoyé',
+    forgotSuccessManychatIntro:
+      'Si un compte existe pour ce numéro, E-Tawjihi vous enverra un WhatsApp depuis notre numéro officiel.',
+    forgotSuccessManychatSamePhone:
+      'Important : le message arrive sur le même numéro que celui saisi (06 ou 07 de votre compte).',
+    forgotSuccessManychatStep1:
+      '1. Ouvrez WhatsApp sur ce téléphone et attendez le message « Mot de passe oublié » d’E-Tawjihi.',
+    forgotSuccessManychatStep2:
+      '2. Notez le code de récupération à 6 chiffres indiqué dans le message.',
+    forgotSuccessManychatStep3:
+      '3. Appuyez sur le lien du message et saisissez ce code dans la conversation.',
+    forgotSuccessManychatStep4:
+      '4. Un nouveau mot de passe vous sera renvoyé par WhatsApp. Utilisez-le pour vous connecter.',
+    forgotSuccessManychatAltApp: 'Vous préférez choisir vous-même un mot de passe ?',
+    forgotSuccessCtaEnterCodeInApp: 'Saisir le code dans l’application',
+    verifyOtpTitle: 'Code de vérification',
+    verifyOtpSubtitle: 'Saisissez le code à 6 chiffres reçu sur WhatsApp au {phone}.',
+    verifyOtpCta: 'Vérifier le code',
+    verifyOtpResend: 'Renvoyer un code',
+    verifyOtpErrInvalid: 'Code invalide ou expiré.',
+    verifyOtpErrMissingPhone: 'Numéro manquant. Recommencez la procédure.',
+    verifyOtpCodeLabel: 'Code à 6 chiffres',
+    verifyOtpHint:
+      'Option : saisissez ici le code reçu sur WhatsApp pour choisir votre mot de passe. Sinon, suivez le lien du message pour recevoir un mot de passe généré.',
+    forgotInfoWhatsapp:
+      'Le numéro doit être celui de votre compte E-Tawjihi. Le WhatsApp part du numéro officiel E-Tawjihi.',
+    forgotWhatsappNotSent:
+      'Le message WhatsApp n’a pas pu être envoyé. Vérifiez que ce numéro est bien inscrit sur E-Tawjihi, ou réessayez plus tard.',
+    resetFlowStep1: 'Étape 1 / 3',
+    resetFlowStep2: 'Étape 2 / 3',
+    resetFlowStep3: 'Étape 3 / 3',
+    resetPasswordTitle: 'Nouveau mot de passe',
+    resetPasswordSubtitle: 'Choisissez un mot de passe fort (8 caractères minimum, majuscule, minuscule, chiffre, caractère spécial).',
+    resetPasswordNew: 'Nouveau mot de passe',
+    resetPasswordConfirm: 'Confirmer le mot de passe',
+    resetPasswordCta: 'Enregistrer',
+    resetPasswordDoneTitle: 'Mot de passe mis à jour',
+    resetPasswordDoneBody: 'Redirection vers la connexion…',
+    resetPasswordErrToken: 'Session expirée. Recommencez la procédure (nouveau code WhatsApp).',
+    resetPasswordErrMatch: 'Les mots de passe ne correspondent pas.',
+    loginShowPassword: 'Afficher',
+    loginHidePassword: 'Masquer',
     setupTitle: 'Configuration du compte',
     setupStepPrefix: 'Étape',
     setupStep1Title: 'Informations académiques',
@@ -1452,6 +2307,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     setupStudyLevel: "Niveau d'étude",
     setupBacType: 'Type de bac',
     setupFiliere: 'Filière',
+    setupFiliere1Bac: 'Filière en 1ère bac',
     setupBacAnnee: 'Année du bac',
     setupBacAnneeHelp:
       'Année scolaire d’obtention (ou en cours) — utilisée pour vérifier votre éligibilité aux annonces et écoles.',
@@ -1571,7 +2427,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountActiveServicesDownloadReceipt: 'Télécharger le reçu',
     accountActiveServicesReceiptSoonTitle: 'Reçu de paiement',
     accountActiveServicesReceiptSoonBody:
-      'Le téléchargement du reçu sera disponible prochainement. En attendant, contactez votre conseiller si vous avez besoin d’une attestation.',
+      'Aucun paiement enregistré pour générer un reçu. Contactez votre conseiller si vous avez besoin d’une attestation.',
+    accountActiveServicesReceiptError:
+      'Une erreur est survenue lors de la génération du reçu. Réessayez plus tard.',
+    accountActiveServicesReceiptShareUnavailable:
+      'Impossible d’ouvrir le menu de partage sur cet appareil.',
     referralTeaserTitle: 'Programme parrainage & cadeaux',
     referralTeaserSubtitle: 'Invitez vos proches et débloquez des cadeaux à chaque palier.',
     referralTeaserCta: 'Voir le programme parrainage & cadeaux',
@@ -1579,9 +2439,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     referralPageSubtitle:
       'Invitez vos proches : chaque achat TAWJIH PLUS compte pour débloquer vos récompenses.',
     referralReferredDiscountHint:
-      'Vos parrainés bénéficient de {{percent}} de réduction en boutique avec votre code.',
-    referralReferredDiscountBadge: '{{percent}} en boutique',
-    referralReferredDiscountShopLine: 'en boutique',
+      'Vos parrainés bénéficient de {{percent}} de réduction sur les services avec votre code (pas sur les produits).',
+    referralReferredDiscountBadge: '{{percent}} sur les services',
+    referralReferredDiscountShopLine: 'sur les services',
     referralLockedTitle: 'Programme parrainage & cadeaux verrouillé',
     referralLockedBody:
       'Un service {{service}} actif est requis pour partager votre code et débloquer vos récompenses.',
@@ -1600,13 +2460,14 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     referralTierPickProduct: 'Sélectionnez un produit avant de générer le code.',
     referralTierChoiceHint: '{{count}} récompenses au choix une fois le palier débloqué',
     referralTierGeneratePromo: 'Générer mon code promo 100 %',
+    referralTierRewardFree: 'Gratuit',
     referralTierPromoTitle: 'Votre code promo',
     referralTierPromoUsed: 'Code utilisé',
     referralTierPromoAvailable: 'Code disponible — 1 utilisation',
     referralTierPromoHint: 'Code à 100 % sur le produit sélectionné, valable une seule fois en boutique.',
     referralTierPromoError: 'Impossible de générer le code. Réessayez.',
     referralTierGoShop: 'Utiliser en boutique',
-    referralSingleRewardHint: 'Une seule récompense au choix : palier 1 ou palier 2.',
+    referralSingleRewardHint: 'Une récompense distincte par palier débloqué.',
     referralRewardTakenBadge: 'Récompense prise',
     referralRewardTakenOnOtherTier: 'Récompense déjà prise sur le palier {{tier}}',
     referralBalanceLabel: 'Mes points',
@@ -1736,6 +2597,22 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountCityPlaceholder: 'Choisir une ville…',
     accountCitiesLoading: 'Chargement des villes…',
     commonErrorTitle: 'Erreur',
+    commonLoadError: 'Problème sur le serveur. Réessayez.',
+    commonRetry: 'Réessayer',
+    apiErrNetwork: 'Connexion impossible. Vérifiez votre réseau et réessayez.',
+    apiErrTimeout: 'Le serveur met trop de temps à répondre. Réessayez dans un instant.',
+    apiErrUnauthorized: 'Session expirée. Reconnectez-vous.',
+    apiErrForbidden: 'Vous n’avez pas accès à cette action.',
+    apiErrNotFound: 'Contenu introuvable.',
+    apiErrValidation: 'Certaines informations sont invalides. Vérifiez et réessayez.',
+    apiErrConflict: 'Cette action n’est plus possible (déjà effectuée ou en conflit).',
+    apiErrServer: 'Le serveur rencontre un problème. Réessayez plus tard.',
+    apiErrRateLimit: 'Trop de tentatives. Patientez un moment.',
+    apiErrGeneric: 'Une erreur est survenue. Réessayez.',
+    apiErrAuth: 'Identifiants incorrects ou compte indisponible.',
+    apiErrDiagnostic: 'Impossible de traiter le diagnostic. Réessayez.',
+    apiErrDailyChallenge: 'Impossible de charger le défi du jour. Réessayez.',
+    qnaErrorGeneric: 'Impossible d’envoyer votre message. Réessayez.',
     accountSectionOrders: 'Mes commandes',
     accountOrdersEmpty: 'Aucune commande pour l\'instant.',
     accountOrdersEmptyProducts: 'Aucun produit commandé. Consultez l\'onglet Services.',
@@ -1800,6 +2677,13 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCartTotalEstimated: 'Total estimé',
     shopCartFooterTotal: 'Total',
     shopCartGoCheckout: 'Passer à la caisse',
+    shopCartReplaceServiceTitle: 'Service non cumulable',
+    shopCartReplaceServiceMessage:
+      'Si vous ajoutez {newService} au panier, {removed} sera retiré du panier car vous ne pouvez pas cumuler les deux services.',
+    shopCartReplaceServiceMessageMany:
+      'Si vous ajoutez {newService} au panier, {removed} seront retirés du panier car vous ne pouvez pas cumuler ces services.',
+    shopCartReplaceServiceAccept: 'J’accepte',
+    shopCartReplaceServiceCancel: 'Annuler',
     shopCheckoutEyebrowBoutique: 'Boutique',
     shopCheckoutTitle: 'Commande',
     shopCheckoutItemsSummary: '{n} article(s)',
@@ -1838,6 +2722,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCheckoutNotesDesc: 'Optionnel — précisions pour l’équipe E-Tawjihi.',
     shopCheckoutPhNotes: 'Précisions utiles…',
     shopCheckoutRecapTitle: 'Récapitulatif',
+    shopCheckoutUpgradeCatalog: 'Prix catalogue :',
+    shopCheckoutUpgradeCredit: 'Service déjà acheté ({service}) : −{amount}',
     shopCheckoutLblSubtotal: 'Sous-total',
     shopCheckoutPromoTitle: 'Code promo',
     shopCheckoutPromoHint:
@@ -1938,6 +2824,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopErrorLoad: 'Impossible de charger la boutique.',
     shopLoading: 'Chargement…',
     shopEmptyTitle: 'Aucun produit',
+    shopRefreshing: 'Actualisation…',
     shopEmptyDesc: 'Modifiez vos filtres ou revenez plus tard.',
     shopEstablishmentsConcernedNotice:
       'Vous pourrez personnaliser vos choix d’écoles parmi la liste proposée. Pour les écoles qui exigent le paiement de frais de préinscription, vous devez régler ces frais pour finaliser l’inscription. Pour les écoles soumises à des critères d’éligibilité, l’inscription n’est effectuée qu’en cas d’éligibilité.',
@@ -2028,6 +2915,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     tabInscriptions: 'Inscriptions',
     tabBoutique: 'Boutique',
     tabCompte: 'Compte',
+    hubWhatsAppA11y: 'Nous contacter sur WhatsApp pour des informations',
+    hubWhatsAppPrefill: 'Salam, j’aurais besoin d’informations sur E-TAWJIHI.',
     hubGlobalWallUnreadBadgeA11y: '{{count}} nouveau(x) message(s) sur le groupe BAC 2026',
     globalWallTitle: 'Groupe BAC 2026',
     globalWallIntro:
@@ -2139,11 +3028,16 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shareKindCommunity: 'Groupe BAC 2026',
     shareKindBoutique: 'Boutique',
     shareKindBoutiqueProduct: 'Fiche produit',
-    sidebarTitle: 'Navigation',
+    sidebarTitle: 'Menu',
+    sidebarSubtitle: 'Parcours, outils & communauté',
     sidebarOpen: 'Ouvrir le menu',
     sidebarClose: 'Fermer',
     sidebarCart: 'Panier',
     sidebarEvents: 'Événements',
+    sidebarSectionDiscover: 'Découvrir',
+    sidebarSectionTools: 'Outils & orientation',
+    sidebarSectionShop: 'Boutique',
+    sidebarSectionAccount: 'Mon espace',
     eventsAgendaTitle: 'Événements & webinaires',
     eventsDetailPractical: 'Informations',
     eventsDetailDescription: 'À propos',
@@ -2156,6 +3050,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     eventsTabPast: 'Passés',
     eventsEmpty: 'Aucun événement dans cette liste.',
     eventsEmptyLive: 'Aucun événement en direct pour le moment.',
+    eventsRefreshing: 'Actualisation…',
     eventsRegister: "S'inscrire",
     eventsRegFormTitle: "Coordonnées d'inscription",
     eventsRegFirstName: 'Prénom',
@@ -2247,6 +3142,25 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscRetry: 'Réessayer',
     inscRequireLogin: 'Connectez-vous pour suivre vos candidatures.',
     inscRequireLoginCta: 'Se connecter',
+    inscTawjihPlusUpgradeCta: 'Passer à TAWJIH PLUS',
+    inscTawjihPlusLockTitle: 'Contenu réservé aux clients TAWJIH PLUS',
+    inscTawjihPlusLockHint:
+      'Annonces détaillées, liens d’inscription, filtres avancés et suivi complet de statut.',
+    diagnosticAnswersSavedHint:
+      'Vos réponses au diagnostic sont enregistrées. Passez à TAWJIH PLUS pour générer vos recommandations personnalisées.',
+    diagnosticRecoGateEyebrow: 'Diagnostic écoles',
+    diagnosticRecoGateHeaderTitle: 'Recommandations IA d’écoles',
+    diagnosticRecoGateHeaderSub:
+      'Classement personnalisé et synthèse de profil selon vos réponses au diagnostic.',
+    diagnosticRecoGateCardBadge: 'TAWJIH PLUS',
+    diagnosticRecoGateCardTitle: 'Contenu réservé aux clients TAWJIH PLUS',
+    diagnosticRecoGateCardDesc:
+      'Cette page affiche vos établissements recommandés par intelligence artificielle, avec commentaires détaillés et synthèse de profil.',
+    diagnosticRecoGateFeature1: 'Classement des écoles (recommandé, possible, dernier choix…)',
+    diagnosticRecoGateFeature2: 'Synthèse IA et commentaire global adapté à votre profil',
+    diagnosticRecoGateFeature3: 'Suivi des établissements recommandés pour votre parcours',
+    diagnosticRecoGateSavedBox:
+      'Vos réponses au diagnostic sont déjà enregistrées. Dès votre passage à TAWJIH PLUS, la génération de cette page se lancera automatiquement.',
     inscNotifEmptyTitle: 'Aucune notification',
     inscNotifEmptyDesc: 'Vos alertes d\'inscription, résultats et orientation apparaîtront ici.',
     inscNotifMarkAllRead: 'Tout marquer lu',
@@ -2272,6 +3186,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscAnnouncementsOpenLink: 'Lien d\'inscription',
     inscAnnouncementsAlreadyTracked: 'Déjà suivi',
     inscAnnouncementsMarkApplied: 'J\'ai postulé',
+    inscAnnouncementUnseen: 'Non vue',
+    inscAnnouncementUnread: 'Non lue',
     inscStatusUnknown: 'Statut inconnu',
     inscStatusNone: 'Aucun statut',
     inscStatusActionClear: 'Retirer le statut',
@@ -2281,6 +3197,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscStatusActionUpdating: 'Mise à jour…',
     inscStatusBlockTitle: 'Statut de candidature',
     inscStatusUnavailable: 'Non disponible pour le moment',
+    inscStatusSectionInProgress: 'En cours',
+    inscStatusSectionFinalized: 'Résultat final',
     inscOpenLinkBtn: 'Ouvrir le lien',
     inscOpenLinkA11y: 'Ouvrir le lien d\'inscription officiel',
     inscOpenLinkBtnResult: 'Voir le résultat',
@@ -2288,6 +3206,12 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscOpenLinkBtnOffer: 'Profiter de l\'offre',
     inscOpenLinkBtnInfo: 'En savoir plus',
     inscOpenLinkBtnRegister: 'Lien d\'inscription',
+    inscAnnTypeOpening: 'Ouverture d\'inscription',
+    inscAnnTypeImportant: 'Message important',
+    inscAnnTypeOffer: 'Offre',
+    inscAnnTypeResult: 'Résultat d\'inscription',
+    inscAnnTypeScholarshipMa: 'Bourse maroc',
+    inscAnnTypeScholarshipForeign: 'Bourse étrangère',
     inscRemoveCandidacy: 'Retirer du suivi',
     inscRemoveCandidacyConfirmTitle: 'Retirer cette candidature ?',
     inscRemoveCandidacyConfirmMsg: 'Le suivi et la timeline de cette candidature seront supprimés.',
@@ -2432,11 +3356,14 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     notifDrawerSubtitle: 'تنبيهات التسجيل والإعلانات والأسئلة والأجوبة.',
     notifDrawerEmpty: 'لا توجد إشعارات حالياً.',
     notifDrawerOpenLink: 'عرض',
+    notifDrawerSeeRecommendations: 'عرض توصياتي',
+    notifDrawerContinueParcours: 'متابعة المسار',
     unreadSuffix: 'غير مقروءة',
     help: 'المساعدة',
     profile: 'الملف الشخصي',
     greeting: 'مرحبا',
-    userSubtitle: 'الباقة القياسية · علوم رياضية أ',
+    userSubtitle: 'TAWJIH PLUS · علوم رياضية أ · الثانية باك',
+    homePackLabel: 'الباقة :',
     packStandardLabel: 'الباقة القياسية',
     bacMissionLabel: 'بكالوريا البعثة',
     newsTitle: 'الأخبار',
@@ -2444,6 +3371,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     langFr: 'FR',
     langAr: 'عربي',
     gameDailyTitle: 'لعبة اليوم',
+    orientation1BacHomeButton: 'توجيه 1ère باك',
+    orientation1BacHomeLocked: 'يفتح في {date}',
+    orientation1BacHomeLockedA11y: 'اختبار التوجيه 1ère باك — متاح من {date}',
+    homePackAcademicLine: '{filiere} · {niveau}',
     gameDailyBody: 'سيتم ربطها باللعبة المصغرة (shell).',
     dailyChallengeTitle: 'تحدي اليوم',
     dailyChallengeClose: 'إغلاق',
@@ -2508,9 +3439,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     dailyChallengeBeatPlayersPrefix: 'تتقدّم على نحو',
     dailyChallengeBeatPlayersSuffix: '% من المشاركين اليوم.',
     dailyChallengeLeaderboardModalTitle: 'تصنيف اليوم',
-    dailyChallengeLeaderboardTopToday: 'أفضل الأوقات',
+    dailyChallengeLeaderboardTopToday: 'أفضل الأزمنة',
     dailyChallengeLeaderboardLoadMore: 'تحميل المزيد',
     dailyChallengeYouLabel: 'أنت',
+    dailyChallengePremiumBadge: 'Premium',
+    dailyChallengePremiumBadgeA11y: 'عميل اقتنى خدمة واحدة على الأقل',
     dailyChallengeScoreLabel: 'النقاط',
     dailyChallengeHubHeroLine: 'جلسة قصيرة كل يوم للتقدّم خطوة بخطوة.',
     dailyChallengeMissionsTitle: 'مهام اليوم',
@@ -2521,6 +3454,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     dailyChallengeProgressXpMaxed: 'كل المراحل مفتوحة — حافظ على سلسلتك!',
     dailyChallengeProgressBadgeQuest: 'مسار الشارات',
     dailyChallengeProgressRecordShort: 'أفضل سلسلة',
+    dailyChallengeProgressBestScoreShort: 'أفضل نتيجة',
+    dailyChallengeProgressBestTimeShort: 'أفضل زمان',
     dailyChallengeProgressIceShort: 'تجميدات ICE',
     dailyChallengeStreakRecord: 'الأرقام القياسية: {{n}}',
     dailyChallengeIceStock: 'ICE × {{n}}',
@@ -2548,11 +3483,48 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     practicalTitle: 'روابط مفيدة',
     practicalSubtitle: 'وصول سريع إلى خدماتك',
     practicalSectionA11y: 'روابط مفيدة',
+    homeSeeMore: 'عرض المزيد',
+    homeMostVisitedSchoolsTitle: 'المدارس الأكثر زيارة',
+    homeMostVisitedSchoolsSubtitle: 'المؤسسات التي يتصفحها المجتمع',
+    homeMostVisitedSchoolsA11y: 'المدارس الأكثر زيارة',
+    homeLatestAnnouncementsTitle: 'آخر الإعلانات',
+    homeLatestAnnouncementsSubtitle: 'مسابقات وتسجيلات منشورة حديثًا',
+    homeLatestAnnouncementsA11y: 'آخر الإعلانات',
+    homeAnnouncementOpen: 'مفتوح',
+    homeAnnouncementClosed: 'مغلق',
+    homeAnnouncementDatesLocked: 'التواريخ — TAWJIH PLUS',
+    homeRefresh: 'تحديث',
+    homeRefreshA11y: 'تحديث الصفحة الرئيسية',
+    homeRefreshing: 'جاري التحديث…',
+    home_orientation_access_eyebrow: 'التوجيه',
+    home_orientation_access_title: 'التشخيص والتوصيات',
+    practical_orientation_section: 'مسار التوجيه',
+    practical_services_section: 'الخدمات',
+    practical_diagnostic_ecoles: 'تشخيص المدارس',
+    sidebarOrientation1Bac: 'اختبار التوجيه 1ère باك',
+    practical_diagnostic_rapport: 'تقرير التشخيص',
+    practical_diagnostic_recommandations: 'توصيات المدارس',
+    practical_diagnostic_ecoles_desc:
+      'استبيان سريع لتخصيص توصيات المؤسسات.',
+    practical_diagnostic_rapport_desc:
+      'استعرض إجاباتك والملخص مرحلة بمرحلة.',
+    practical_diagnostic_recommandations_desc:
+      'قائمة مخصصة ومتابعة 3 مؤسسات على الأقل لإتمام المسار.',
+    practical_recommandations_locked_account:
+      'أكمل إعداد حسابك لعرض توصياتك.',
+    practical_recommandations_locked_diagnostic:
+      'أنهِ تشخيص المدارس أولاً لفتح التوصيات.',
+    practical_orientation_locked_title: 'الخطوة مقفلة',
+    practical_orientation_loading: 'جاري تحميل المسار…',
+    practical_diagnostic_locked_account:
+      'أكمل إعداد حسابك لبدء التشخيص.',
+    practical_rapport_locked_account:
+      'أكمل إعداد حسابك للوصول إلى التقرير.',
+    practical_rapport_locked_diagnostic:
+      'أنهِ تشخيص المدارس أولاً لفتح التقرير.',
     practical_ecoles: 'المدارس العليا',
     practical_inscriptions: 'التسجيلات والمواعيد',
     practical_candidatures: 'متابعة طلباتي',
-    practical_testsOrientation: 'اختبار التوجيه',
-    practical_resultatsOrientation: 'نتائج التوجيه',
     practical_ecolesInscription: 'مدارس تسجيلي',
     practical_boutique: 'المتجر',
     practical_ecoles_desc:
@@ -2561,10 +3533,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       'تقاويم المسابقات والملفات المطلوبة والآجال حتى لا يفوتك أي موعد.',
     practical_candidatures_desc:
       'تتبّع حالة ملفاتك والخطوات القادمة في طلباتك.',
-    practical_testsOrientation_desc:
-      'استبيانات وأدوات لتحسين توجهك وتفضيلاتك.',
-    practical_resultatsOrientation_desc:
-      'اطّلع على نتائجك والمسارات المقترحة حسب ملفك.',
+    practical_evenements_desc:
+      'معارض وورش عمل وندوات عبر الويب لتطوير توجهك.',
     practical_ecolesInscription_desc:
       'المؤسسات التي تقدّم لها طلبًا أو تتابع معها التسجيل.',
     practical_boutique_desc:
@@ -2579,6 +3549,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsFiltersA11y: 'فلاتر مفصلة',
     schoolsFollowedOnlyA11y: 'المدارس التي أتابعها فقط',
     schoolsSearchPlaceholder: 'بحث (الاسم، المدينة، الجامعة...)',
+    schoolsSearchPlaceholderLocked: 'البحث مخصّص لعملاء TAWJIH PLUS',
+    schoolsSearchFiltersLockedHint: 'البحث والفلاتر التفصيلية مخصّصة لعملاء TAWJIH PLUS.',
     schoolsTypeAll: 'الكل',
     schoolsTypeLabel: 'نوع المؤسسة',
     schoolsTypePublic: 'عمومي',
@@ -2586,6 +3558,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsTypeSemiPublic: 'شبه عمومي',
     schoolsTypeMilitary: 'عسكري',
     schoolsFiltersTitle: 'فلاتر مفصلة',
+    schoolsFilterAcceptedStudyLabel: 'شعبة الدراسة المقبولة',
     schoolsFiltersHint:
       'تصفية المدارس المعروضة حسب: القطاع، الجهة، المدينة، الدبلوم، نطاق الرسوم، وغيرها.',
     schoolsUniversityLabel: 'بحث',
@@ -2614,6 +3587,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsReset: 'إعادة الضبط',
     schoolsApply: 'تطبيق',
     schoolsRetry: 'إعادة المحاولة',
+    schoolsRefreshing: 'جاري التحديث…',
     estCardQnaOpenA11y: 'فتح الأسئلة والأجوبة',
     estCardBtnComment: 'تعليقات',
     estCardBadgeSponsored: 'برعاية',
@@ -2626,10 +3600,283 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     storiesA11y: 'القصص',
     newsCarouselA11y: 'الأخبار — تمرير أفقي',
     swipeCardsHint: 'اسحب البطاقات',
-    orientationTapHint: 'المس لعرض المهام المتبقية',
+    bacCardEyebrow: 'البكالوريا 2026',
+    bacCardTitle: 'نتيجة البكالوريا',
+    bacCardDateLabel: 'النشر المتوقع',
+    bacStatusNotYet: 'لم يُنشر بعد',
+    bacStatusPublished: 'منشور',
+    bacCountdownKicker: 'العد التنازلي',
+    bacCountdownDays: 'ي',
+    bacCountdownHours: 'س',
+    bacCountdownMinutes: 'د',
+    bacJourJTitle: 'يوم النتائج',
+    bacWaitingResult: 'في انتظار النتيجة',
+    bacOutletsTitle: 'قنوات النتائج',
+    bacOutletOutlook: 'Outlook (البريد)',
+    bacOutletSms: 'رسالة SMS',
+    bacOutletMenResults: 'bac.men.gov.ma (النقاط)',
+    bacSiteStatusLabel: 'موقع bac.men.gov.ma',
+    bacSiteOnline: 'متصل',
+    bacSiteOffline: 'غير متصل',
+    bacLinkOutlook: 'التحقق من Outlook',
+    bacLinkMen: 'bac.men.gov.ma',
+    bacLinkOutlookA11y: 'فتح Outlook للتحقق من النتائج',
+    bacLinkMenA11y: 'فتح الموقع الرسمي bac.men.gov.ma',
+    bacTapForGuide: 'التعليمات',
+    bacOutletGuideA11y: 'عرض تعليمات التحقق',
+    bacVerifyModalTitleOutlook: 'التحقق عبر Outlook',
+    bacVerifyModalTitleMen: 'الاطلاع على bac.men.gov.ma',
+    bacVerifyModalTitleSms: 'النتيجة عبر SMS',
+    bacVerifyStepsTitle: 'الخطوات',
+    bacMassarSectionTitle: 'رمز مسار',
+    bacMassarSectionHint:
+      'أكّد أو صحّح رمز مسار. يُستخدم للدخول إلى الموقع الرسمي ولتكوين بريد @taalim.ma.',
+    bacMassarPlaceholder: 'مثال A123456789',
+    bacMassarConfirm: 'تأكيد',
+    bacMassarEdit: 'تعديل',
+    bacMassarSaved: 'تم الحفظ',
+    bacOutlookEmailLabel: 'معرّف Outlook',
+    bacOutlookPasswordLabel: 'كلمة المرور',
+    bacOutlookPasswordHint: 'نفس كلمة مرور مسار',
+    bacOutlookStep1: 'افتح Outlook أو تطبيق البريد على هاتفك.',
+    bacOutlookStep2: 'سجّل الدخول بـ {email} (رمز مسار + @taalim.ma).',
+    bacOutlookStep3: 'أدخل كلمة مرور مسار (نفس بوابة مسار).',
+    bacOutlookStep4: 'راجع البريد الوارد: رسالة رسمية تعلن نتيجتك.',
+    bacOutlookStep5: 'إن لم يظهر شيء، انتظر دقائق ثم حدّث البريد.',
+    bacMenStep1: 'افتح bac.men.gov.ma من الزر أدناه.',
+    bacMenStep2: 'أدخل رمز مسار في الاستمارة.',
+    bacMenStep3: 'فعّل « لستُ روبوتاً » (كابتشا).',
+    bacMenStep4: 'أرسل الاستمارة لعرض النقطة والميزة.',
+    bacMenStep5: 'عند النجاح: النقطة والميزة. عند الرسوب دون استدراك: رسالة مناسبة.',
+    bacMenStep6: 'إن كنت مستحقاً للاستدراك، يوضح الموقع ذلك.',
+    bacSmsStep1: 'لا إجراء في التطبيق: الرسالة من النظام الرسمي.',
+    bacSmsStep2: 'تصل الرسالة إلى الهاتف المسجّل في حساب مسار.',
+    bacSmsStep3: 'الرسالة تعلن نتيجتك يوم النشر مباشرة.',
+    bacOpenOutlook: 'فتح Outlook',
+    bacOpenMenSite: 'فتح bac.men.gov.ma',
+    bacModalClose: 'إغلاق',
+    bacThresholdsEyebrow: 'الالتحاق بالتعليم العالي',
+    bacThresholdsTitle: 'حساب العتبات',
+    bacThresholdsSubtitle: 'أدخل نقاطك من كشف النقاط لتقدير معدل القبول في المدارس.',
+    bacThresholdsTip: 'الصيغ أدناه لمقارنة ملفك مع العتبات على بطاقات المؤسسات.',
+    bacThresholdsSectionNotes: 'نقاط كشف النقاط',
+    bacThresholdsSectionHint: 'من كشف النقاط الرسمي (على 20).',
+    bacThresholdsRegional: 'الجهوي',
+    bacThresholdsNational: 'الوطني',
+    bacThresholdsContinuous: 'المراقبة المستمرة',
+    bacThresholdsOverall: 'المعدل العام',
+    bacThresholdsPlaceholder: '0,00',
+    bacThresholdsSave: 'حفظ وحساب',
+    bacThresholdsSaved: 'تم حفظ النقاط',
+    bacThresholdsResultsTitle: 'معدلاتك التقديرية',
+    bacThresholdsFormula7525: '75 % وطني + 25 % جهوي',
+    bacThresholdsFormula5050: '50 % وطني + 50 % جهوي',
+    bacThresholdsFormulaMajorBadge: 'الصيغة الأكثر شيوعاً',
+    bacThresholdsOverallLabel: 'المعدل العام (كشف النقاط)',
+    bacThresholdsDisclaimer:
+      'قد تطبق كل مؤسسة صيغتها. عملياً، نحو 90 % من المدارس العليا تستخدم 75 % وطني و 25 % جهوي — التفاصيل على بطاقات المدارس.',
+    bacThresholdsOutOf20: '/20',
+    bacThresholdsCtaTitle: 'حساب عتبات المدارس',
+    bacThresholdsCtaSub: 'أدخل نقاطك · صيغ 75/25 و 50/50',
+    bacThresholdsLockedSub: 'متاح في 2ème باك',
+    orientationTapHint: 'المس لعرض الخطوات',
     orientationProgressLabel: 'تقدّم التوجيه',
-    orientationTasksA11y: 'عرض المهام المتبقية في المسار',
-    orientationModalSubtitle: 'المهام المتبقية في المسار',
+    orientationTasksA11y: 'مسار التوجيه — 6 خطوات',
+    orientationModalSubtitle: 'خطتك في 6 مراحل',
+    orientationFranchisedEmpty: 'لا توجد خطوة مكتملة بعد.',
+    orientationContinueCta: 'متابعة',
+    orientationSeeAllSteps: 'عرض التفاصيل',
+    orientationStepCountLabel: '6 خطوات',
+    orientationStepAccountSetup: 'إعداد الحساب',
+    orientationStepAccountSetupShort: 'الحساب',
+    orientationStepBadgeDone: 'مكتمل',
+    orientationStepBadgeCurrent: 'جاري',
+    orientationStepBadgeTodo: 'للقيام',
+    orientationStepOrientationDiagnostic: 'تشخيص التوجيه',
+    orientationStepOrientationDiagnosticShort: 'تشخيص',
+    orientationStepRecommendation: 'توصية ومتابعة المدارس',
+    orientationStepRecommendationShort: 'توصيات ومتابعة',
+    orientationStepRecommendationHint:
+      'تابع 3 مؤسسات موصى بها لإتمام هذه الخطوة.',
+    diagnosticRecoFollowBanner:
+      'لإتمام المسار: تابع 3 مؤسسات موصى بها على الأقل.',
+    diagnosticRecoFollowBannerDone: 'تمت الخطوة — تتابع مؤسساتك الموصى بها.',
+    practical_diagnostic_recommandations_follow_hint:
+      'تابع 3 مؤسسات على الأقل من قائمة التوصيات.',
+    orientationStepFeedback: 'ملاحظات',
+    orientationStepFeedbackShort: 'ملاحظات',
+    appFeedbackTitle: 'رأيك في التطبيق',
+    appFeedbackEyebrow: 'تحسين مستمر',
+    appFeedbackIntro:
+      'ملاحظاتك توجّه أولوياتنا. خصّص 2–3 دقائق لتقييم كل محور.',
+    appFeedbackProgress: '{{done}} / {{total}} معايير مقيّمة',
+    appFeedbackScaleHint: 'اختر لكل سؤال: ممتاز، جيد أو متوسط.',
+    appFeedbackOptionTresBien: 'ممتاز',
+    appFeedbackOptionBien: 'جيد',
+    appFeedbackOptionMoyen: 'متوسط',
+    appFeedbackCatDesign: 'التصميم والواجهة',
+    appFeedbackCatDesignDesc: 'المظهر، التنقل ووضوح الشاشات.',
+    appFeedbackCatSimplicity: 'سهولة الاستخدام',
+    appFeedbackCatSimplicityDesc: 'البدء، إيجاد المعلومة وملء الاستمارات.',
+    appFeedbackCatTranslations: 'اللغات والترجمة',
+    appFeedbackCatTranslationsDesc: 'جودة الفرنسية والعربية واتساق الصفحات.',
+    appFeedbackCatRecommendations: 'التوجيه والتوصيات',
+    appFeedbackCatRecommendationsDesc: 'التشخيص، النقاط وملاءمة المؤسسات المقترحة.',
+    appFeedbackCatSchools: 'المؤسسات والتسجيلات',
+    appFeedbackCatSchoolsDesc: 'البحث، الإعلانات ومتابعة الترشيح.',
+    appFeedbackCatContent: 'الرئيسية والمسار',
+    appFeedbackCatContentDesc: 'الصفحة الرئيسية، خطة النجاح والإشعارات.',
+    appFeedbackCatTechnical: 'الأداء والموثوقية',
+    appFeedbackCatTechnicalDesc: 'السرعة، الاستقرار والأعطال.',
+    appFeedbackCatShop: 'المتجر والخدمات',
+    appFeedbackCatShopDesc: 'اكتشاف العروض وتجربة الشراء.',
+    appFeedbackCatComments: 'تعليقاتكم',
+    appFeedbackCatCommentsDesc: 'فصّلوا ما يمكن تحسينه.',
+    appFeedbackQDesignOverall: 'المظهر العام للتطبيق',
+    appFeedbackQDesignOverallDesc: 'الألوان، الهوية البصرية، الانطباع العام.',
+    appFeedbackQDesignNav: 'التنقل بين الأقسام',
+    appFeedbackQDesignNavDesc: 'التبويبات، القوائم، الرجوع، وضوح المسارات.',
+    appFeedbackQDesignRead: 'وضوح المحتوى',
+    appFeedbackQDesignReadDesc: 'حجم النص، التباين، التسلسل البصري.',
+    appFeedbackQEaseFirst: 'البدء والتعارف',
+    appFeedbackQEaseFirstDesc: 'الحساب، الملف، الزيارة الأولى دون مساعدة.',
+    appFeedbackQEaseFind: 'إيجاد المعلومة',
+    appFeedbackQEaseFindDesc: 'مدارس، إعلانات، تشخيص، متجر، حساب…',
+    appFeedbackQEaseForms: 'الاستمارات والفلاتر',
+    appFeedbackQEaseFormsDesc: 'التشخيص، فلاتر المدارس، تحديث الملف.',
+    appFeedbackQTransFr: 'جودة الفرنسية',
+    appFeedbackQTransFrDesc: 'الصياغة، الأخطاء، أسلوب مناسب للتلميذ.',
+    appFeedbackQTransAr: 'جودة العربية',
+    appFeedbackQTransArDesc: 'الصياغة، المعنى، عرض RTL.',
+    appFeedbackQTransConsist: 'اتساق FR / AR',
+    appFeedbackQTransConsistDesc: 'نفس مستوى الجودة في كل الشاشات.',
+    appFeedbackQRecoRel: 'ملاءمة التوصيات',
+    appFeedbackQRecoRelDesc: 'تناسب المؤسسات مع ملفك واختياراتك.',
+    appFeedbackQRecoClear: 'وضوح الشروحات',
+    appFeedbackQRecoClearDesc: 'النقاط، المستويات، تقرير التشخيص.',
+    appFeedbackQRecoDiag: 'مسار التشخيص',
+    appFeedbackQRecoDiagDesc: 'الخطوات، المدة، فهم الأسئلة.',
+    appFeedbackQSchoolSearch: 'قوائم وبطاقات المدارس',
+    appFeedbackQSchoolSearchDesc: 'الفلاتر، البطاقات، المعلومات المفيدة.',
+    appFeedbackQSchoolAnn: 'إعلانات التسجيل',
+    appFeedbackQSchoolAnnDesc: 'الوضوح، التواريخ، الروابط، التفاصيل.',
+    appFeedbackQSchoolFollow: 'المتابعة والحالات',
+    appFeedbackQSchoolFollowDesc: 'الترشيحات المتتبعة وتحديث الحالة.',
+    appFeedbackQContentHome: 'الرئيسية ومسار التوجيه',
+    appFeedbackQContentHomeDesc: 'البطاقات، خطة النجاح، الخطوات المنجزة.',
+    appFeedbackQContentNotif: 'الإشعارات',
+    appFeedbackQContentNotifDesc: 'الملاءمة، التكرار، وضوح الرسائل.',
+    appFeedbackQTechSpeed: 'السرعة والتحميل',
+    appFeedbackQTechSpeedDesc: 'القوائم، الصور، تغيير الشاشة.',
+    appFeedbackQTechStable: 'الاستقرار العام',
+    appFeedbackQTechStableDesc: 'تعطل، تجمّد، إغلاق مفاجئ.',
+    appFeedbackQTechBugs: 'الأخطاء التي واجهتها',
+    appFeedbackQTechBugsDesc: 'تكرار وخطورة المشاكل.',
+    appFeedbackQShop: 'المتجر والطلبات',
+    appFeedbackQShopDesc: 'المنتجات، الخدمات، السلة ومتابعة الطلب.',
+    appFeedbackTextImprove: 'كيف نحسّن التطبيق؟',
+    appFeedbackTextImprovePh:
+      'ما أعجبك، ما ينقص، ما عطّلك… (اختياري)',
+    appFeedbackTextBugs: 'أخطاء أو بطء محدد',
+    appFeedbackTextBugsPh: 'الشاشة، الإجراء، رسالة الخطأ إن وجدت…',
+    appFeedbackTextFeatures: 'ميزات مرغوبة',
+    appFeedbackTextFeaturesPh: 'أفكار للإصدارات القادمة (اختياري)',
+    appFeedbackSubmit: 'إرسال رأيي',
+    appFeedbackThanks: 'شكراً على مساهمتك',
+    appFeedbackThanksSub: 'رأيك يساعد مجتمع إي-توجيهي بأكمله.',
+    appFeedbackThanksEyebrow: 'تم الإرسال',
+    appFeedbackThanksCardTitle: 'تم تسجيل رأيك بنجاح',
+    appFeedbackThanksCardSub: 'سنأخذه بعين الاعتبار لتحسين التطبيق. يمكنك إغلاق هذه النافذة.',
+    appFeedbackError: 'تعذّر الإرسال. أعد المحاولة لاحقاً.',
+    appFeedbackLoginRequired: 'سجّل الدخول لإرسال رأيك.',
+    appFeedbackRequiredRatings: 'يُرجى الإجابة على جميع الأسئلة (ممتاز، جيد أو متوسط).',
+    appFeedbackRequiredComment: 'يُرجى وصف كيفية تحسين التطبيق (10 أحرف على الأقل).',
+    appFeedbackOpenCta: 'إبداء رأيي في التطبيق',
+    appUpdateEyebrow: 'تحديث',
+    appUpdateTitleRequired: 'تحديث إلزامي',
+    appUpdateTitleRecommended: 'إصدار جديد متوفر',
+    appUpdateCta: 'التحديث من المتجر',
+    appUpdateLater: 'لاحقاً',
+    appUpdateVersionHint: 'إصدارك: {current} — آخر إصدار: {latest}',
+    pushPermissionModalTitle: 'فعّل الإشعارات',
+    pushPermissionModalBody:
+      'استقبل تنبيهات فتح التسجيلات وإعلانات المسابقات ورسائل إي توجيهي المهمة.',
+    pushPermissionModalHint:
+      'الإشعارات معطّلة على هذا الجهاز. افتح الإعدادات للسماح بها (الإعدادات → الإشعارات → E-Tawjihi على iPhone، أو الإعدادات → التطبيقات → E-Tawjihi على Android).',
+    pushPermissionModalOpenSettings: 'فتح الإعدادات',
+    pushPermissionModalLater: 'لاحقاً',
+    orientationStepApplyToSchools: 'إدارة التسجيلات',
+    orientationStepApplyToSchoolsShort: 'التسجيلات',
+    applySchoolsTourEyebrow: 'دليل',
+    applySchoolsTourTitle: 'إدارة التسجيلات',
+    applySchoolsTourNext: 'متابعة',
+    applySchoolsTourBack: 'رجوع',
+    applySchoolsTourTapNotif: 'عرض التنبيه',
+    applySchoolsTourTapFollow: 'متابعة هذا الإعلان',
+    applySchoolsTourTapStatus: 'تحديث حالتي',
+    applySchoolsTourFocusTap: 'اضغط هنا',
+    applySchoolsTourFocusLearn: 'اكتشف',
+    applySchoolsTourTrackerStep: 'الخطوة {current} / {total}',
+    applySchoolsTourTrackerActionTitle: 'الإجراء المطلوب',
+    applySchoolsTourTrackerPending: 'لم يُنجَز بعد',
+    applySchoolsTourTrackerDone: 'مكتمل',
+    applySchoolsTourActionTapNotification: 'اضغط على تنبيه المسابقة أدناه',
+    applySchoolsTourActionTapContinue: 'اضغط « متابعة » في الأسفل',
+    applySchoolsTourActionTapFollow: 'اضغط قلب « متابعة » على البطاقة',
+    applySchoolsTourActionTapStatus: 'اضغط « تحديث » على البطاقة',
+    applySchoolsTourActionTapCandidaciesTab: 'اضغط تبويب الترشيحات',
+    applySchoolsTourActionTapRegistrationLink: 'اضغط رابط التسجيل',
+    applySchoolsTourTabsLegend:
+      'الشارة الخضراء: {{active}} ترشيحات نشطة · الحمراء: {{attention}} إجراء(ات) مطلوب(ة).',
+    applySchoolsTourTabsAnnouncementsPlaceholder:
+      'تبويب الإعلانات: كل منشورات المدارس (مسابقات، تسجيلات…).',
+    applySchoolsTourTabsTapCandidaciesHint:
+      'اضغط تبويب الترشيحات لعرض متابعاتك والإجراءات المطلوبة.',
+    applySchoolsTourGoInscriptions: 'الذهاب إلى التسجيلات',
+    applySchoolsTourTeaseTitle: '{school} — تنبيه مسابقة',
+    applySchoolsTourTeaseSub: 'اضغط لاستقبال تنبيه على هاتفك',
+    applySchoolsTourTeaseHint: 'كما على هاتفك: يُعلِمك التنبيه عند نشر مدرسة لإعلان جديد.',
+    applySchoolsTourPushHint: 'يفتح التنبيه الإعلان في التطبيق. هنا مثال لـ {school}.',
+    applySchoolsTourCardTypeHint: 'الشريط يوضح نوع الإعلان (هنا: فتح التسجيلات).',
+    applySchoolsTourCardFollowHint: 'القلب لمتابعة المدرسة واستقبال الإعلانات القادمة.',
+    applySchoolsTourCardStatusHint: '« تحديث » لتحديد مرحلتك (مهتم، مرشّح، مسجّل…).',
+    applySchoolsTourFollowHint: 'اضغط القلب: تتابع {school} وتفعّل التنبيهات.',
+    applySchoolsTourStatusHint: 'اختر حالة ترشيحك — كما في تبويب التسجيلات.',
+    applySchoolsTourCandidacyHint: 'في الترشيحات: البطاقة تتحول للون الوردي عند إعلان جديد يتطلب انتباهك.',
+    applySchoolsTourBravoTitle: 'أحسنت!',
+    applySchoolsTourBravoSub: 'تعرف متابعة إعلان، تحديث حالتك وإيجاد مدارسك.',
+    applySchoolsTourStep_notification_tease_title: '1. تنبيهات المسابقات',
+    applySchoolsTourStep_notification_tease_body: 'عند نشر مدرسة لإعلان (مسابقة، فتح تسجيلات…) يمكنك تلقي تنبيهاً.',
+    applySchoolsTourStep_push_preview_title: '2. مثال تنبيه',
+    applySchoolsTourStep_push_preview_body: 'هذا شكل التنبيه لفتح التسجيلات لدى {school}.',
+    applySchoolsTourStep_announcement_card_title: '3. إعلان {school}',
+    applySchoolsTourStep_announcement_card_body: 'نفس العرض في تبويب الإعلانات: التواريخ، الرابط، الأهلية والإجراءات.',
+    applySchoolsTourRegistrationLinkHint:
+      'في الاستخدام الفعلي، يفتح هذا الزر صفحة التسجيل الرسمية للمدرسة (موقع أو استمارة). هنا لا نفتحه: هذا عرض توضيحي فقط.',
+    applySchoolsTourStep_registration_link_title: '4. رابط التسجيل',
+    applySchoolsTourStep_registration_link_body:
+      'زر السهم يفتح صفحة التسجيل لدى المؤسسة. استخدمه عندما تكون مستعداً للتسجيل على موقع المدرسة.',
+    applySchoolsTourStep_follow_action_title: '5. متابعة المدرسة',
+    applySchoolsTourStep_follow_action_body: 'بالمتابعة تجمع تتبع ترشيحك لهذه المدرسة.',
+    applySchoolsTourStep_status_action_title: '6. حالة الترشيح',
+    applySchoolsTourStep_status_action_body:
+      'اضغط « تحديث » واختر « مسجَّل » أو « غير مهتم » لهذه المدرسة.',
+    applySchoolsTourStep_inscriptions_tabs_title: '7. تبويبا الإعلانات / الترشيحات',
+    applySchoolsTourStep_inscriptions_tabs_body:
+      'تبويبان: اكتشاف الإعلانات ومتابعة ترشيحاتك. الشارات توضّح عدد المتابعات النشطة وعدد الإجراءات المطلوبة.',
+    applySchoolsTourStep_candidacies_tab_title: '8. فتح الترشيحات',
+    applySchoolsTourStep_candidacies_tab_body:
+      'اضغط الترشيحات لعرض مدارسك المتابَعة. مرشّح « إجراء مطلوب » (الشارة الحمراء) يعرض البطاقات التي تحتاج تحديثاً.',
+    applySchoolsTourStep_candidacy_card_title: '9. تحديث ترشيح',
+    applySchoolsTourStep_candidacy_card_body:
+      'بطاقة « إجراء مطلوب »: اضغط « تحديث » وحدّد « مقبول في المباراة » أو « غير مقبول في المباراة ».',
+    applySchoolsTourStep_bravo_title: '10. انطلق!',
+    applySchoolsTourStep_bravo_body: 'استكشف الإعلانات الحقيقية وابدأ ترشيحاتك.',
+    inscCandidaciesEmptyTourCta: 'عرض الدليل',
+    orientationStepAppDiscovery: 'اكتشاف التطبيق',
+    orientationStepAppDiscoveryShort: 'اكتشاف',
+    orientationStepInviteFriend: 'دعوة صديق',
+    orientationStepInviteFriendShort: 'إحالة',
     modalClose: 'إغلاق',
     closeOverlayA11y: 'إغلاق',
     dailyPlay: 'العب',
@@ -2646,13 +3893,13 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     loginTitle: 'تسجيل الدخول',
     loginSubtitle: 'ادخل إلى فضاء E‑Tawjihi الخاص بك.',
     loginPhoneLabel: 'رقم الهاتف',
-    loginPhonePlaceholder: 'رقم الهاتف',
+    loginPhonePlaceholder: '06XXXXXXXX',
     loginPasswordLabel: 'كلمة المرور',
     loginPasswordPlaceholder: 'كلمة المرور',
     loginForgotPassword: 'نسيت كلمة المرور؟',
     loginCta: 'تسجيل الدخول',
     loginBack: 'رجوع',
-    loginInvalidPhone: 'رقم غير صحيح',
+    loginInvalidPhone: '10 أرقام تبدأ بـ 06 أو 07',
     loginInvalidPassword: 'كلمة مرور غير صحيحة',
     loginBadCredentials: 'بيانات الدخول غير صحيحة.',
     loginBrandSubtitle: 'لوحتك بعد البكالوريا: التوجيه، التسجيلات، والمرافقة.',
@@ -2661,7 +3908,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     registerTitle: 'إنشاء حساب',
     registerSubtitle: 'أنشئ حسابك في E‑Tawjihi في ثوانٍ.',
     registerPhoneLabel: 'رقم الهاتف',
-    registerPhonePlaceholder: 'رقم الهاتف',
+    registerPhonePlaceholder: '06XXXXXXXX',
     registerPasswordLabel: 'كلمة المرور',
     registerPasswordPlaceholder: 'كلمة المرور',
     registerPasswordConfirmLabel: 'تأكيد كلمة المرور',
@@ -2671,6 +3918,13 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     registerLoginLink: 'تسجيل الدخول',
     registerInvalidConfirm: 'تأكيد غير صحيح',
     registerPasswordsMismatch: 'كلمتا المرور غير متطابقتين.',
+    registerPasswordRulesTitle: 'يجب أن تحتوي كلمة المرور على:',
+    registerPasswordRuleMinLength: '8 أحرف على الأقل',
+    registerPasswordRuleUpper: 'حرف كبير (A-Z)',
+    registerPasswordRuleLower: 'حرف صغير (a-z)',
+    registerPasswordRuleNumber: 'رقم (0-9)',
+    registerPasswordRuleSpecial: 'رمز خاص (!@#$…)',
+    registerPasswordWeak: 'كلمة المرور ضعيفة',
     forgotTitle: 'نسيت كلمة المرور',
     forgotSubtitle: 'استرجع الوصول إلى حسابك.',
     forgotInstructionsTitle: 'تعليمات',
@@ -2684,6 +3938,87 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     forgotSuccessBody: 'استخدم هذه الكلمة لتسجيل الدخول ثم قم بتغييرها من حسابك.',
     forgotNewPasswordLabel: 'كلمة المرور المُنشأة',
     forgotBackToLogin: 'العودة لتسجيل الدخول',
+    forgotSubtitleWhatsapp:
+      'أدخل رقم الهاتف المسجّل في حسابك (نفس الرقم على واتساب).',
+    forgotSuccessWhatsappTitle: 'تحقق من واتساب',
+    forgotSuccessWhatsappBody:
+      'إذا وُجد حساب لهذا الرقم، سيصلك رمز قريباً. أدخله لاختيار كلمة مرور جديدة.',
+    forgotCtaWhatsapp: 'إرسال الطلب عبر واتساب',
+    forgotCtaCheckPhone: 'التحقق من رقمي',
+    forgotAccountNotFound:
+      'لا يوجد حساب نشط في إي توجيهي لهذا الرقم. تحقق من 06 أو 07 المسجّل في حسابك.',
+    forgotAccountFoundTitle: 'تم العثور على الحساب',
+    forgotAccountFoundIntro:
+      'أرسل الرسالة أدناه من نفس رقم واتساب حسابك إلى الرقم الرسمي لإي توجيهي.',
+    forgotWhatsappMessageLabel: 'الرسالة المراد إرسالها',
+    forgotWhatsappContactLabel: 'رقم واتساب إي توجيهي للتواصل',
+    forgotWhatsappMessage:
+      'Mot de passe oublié E-Tawjihi\nMon numéro de compte : {{phone}}\nMerci de m’aider à récupérer mon accès.',
+    forgotCopyWhatsappMessage: 'نسخ الرسالة',
+    forgotCopied: 'تم نسخ الرسالة',
+    forgotOpenWhatsappCta: 'فتح واتساب',
+    deviceTransferTitle: 'نقل الحساب',
+    deviceTransferSubtitle: 'الأجهزة المتصلة',
+    deviceTransferIntro:
+      'هذا الحساب نشط على جهاز آخر. اختر الجهاز الذي تريد قطع اتصاله لتفعيل هذا الهاتف.',
+    deviceTransferIntroMulti:
+      'تم بلوغ حد {{max}} أجهزة متصلة في آن واحد. اقطع اتصال جهازاً أدناه للمتابعة على هذا الجهاز.',
+    deviceTransferPickSubtitle: 'اختيار جهاز',
+    deviceTransferPickIntro: 'اختر الجهاز الذي تريد قطع اتصاله لتحرير مكان على هذا الحساب.',
+    deviceTransferPickLabel: 'الأجهزة المتصلة',
+    deviceTransferSecurityHint:
+      'إذا كان أحد هذه الأجهزة ليس لك، تواصل مع الدعم لتأمين حسابك.',
+    deviceTransferCta: 'قطع الاتصال والمتابعة',
+    deviceTransferSupportLabel: 'جهاز غير معروف؟',
+    deviceTransferSupportHint:
+      'تواصل مع دعم إي توجيهي على واتساب (0655690632). ستتضمن الرسالة رقم حسابك.',
+    deviceTransferOpenSupportWhatsapp: 'تأمين حسابي (واتساب)',
+    deviceTransferErrInvalid: 'تعذّر إكمال النقل. أعد المحاولة أو تواصل مع الدعم.',
+    forgotWhatsappStepsTitle: 'الخطوات',
+    forgotWhatsappStepSend: '1. انسخ الرسالة أو اضغط «فتح واتساب» (النص جاهز مسبقاً).',
+    forgotWhatsappStepSameNumber: '2. أرسلها من هاتف الرقم {{phone}} — رقم حسابك.',
+    forgotWhatsappStepFollow:
+      '3. اتبع تعليمات إي توجيهي في المحادثة لاستلام كلمة المرور الجديدة.',
+    forgotSuccessManychatTitle: 'تم إرسال الطلب',
+    forgotSuccessManychatIntro:
+      'إذا وُجد حساب لهذا الرقم، ستتلقى رسالة واتساب من إي توجيهي عبر رقمنا الرسمي.',
+    forgotSuccessManychatSamePhone:
+      'مهم: الرسالة تصل على نفس الرقم الذي أدخلته (06 أو 07 الخاص بحسابك).',
+    forgotSuccessManychatStep1:
+      '1. افتح واتساب على هذا الهاتف وانتظر رسالة «نسيت كلمة المرور» من إي توجيهي.',
+    forgotSuccessManychatStep2: '2. دوّن رمز الاسترداد المكوّن من 6 أرقام في الرسالة.',
+    forgotSuccessManychatStep3: '3. اضغط على الرابط في الرسالة وأدخل الرمز في المحادثة.',
+    forgotSuccessManychatStep4:
+      '4. ستصلك كلمة مرور جديدة عبر واتساب. استخدمها لتسجيل الدخول.',
+    forgotSuccessManychatAltApp: 'تفضّل اختيار كلمة المرور بنفسك؟',
+    forgotSuccessCtaEnterCodeInApp: 'إدخال الرمز في التطبيق',
+    verifyOtpTitle: 'رمز التحقق',
+    verifyOtpSubtitle: 'أدخل الرمز المكوّن من 6 أرقام المرسل عبر واتساب إلى {phone}.',
+    verifyOtpCta: 'التحقق من الرمز',
+    verifyOtpResend: 'إعادة إرسال الرمز',
+    verifyOtpErrInvalid: 'رمز غير صالح أو منتهٍ.',
+    verifyOtpErrMissingPhone: 'رقم الهاتف مفقود. أعد المحاولة.',
+    verifyOtpCodeLabel: 'رمز من 6 أرقام',
+    verifyOtpHint:
+      'خيار: أدخل هنا الرمز المستلم على واتساب لاختيار كلمة المرور. أو اتبع الرابط في الرسالة لاستلام كلمة مرور مُنشأة تلقائياً.',
+    forgotInfoWhatsapp:
+      'يجب أن يكون الرقم مسجّلاً في إي توجيهي. تُرسل الرسالة من رقم إي توجيهي الرسمي على واتساب.',
+    forgotWhatsappNotSent:
+      'تعذّر إرسال رسالة واتساب. تأكد أن هذا الرقم مسجّل في إي توجيهي، أو أعد المحاولة لاحقاً.',
+    resetFlowStep1: 'الخطوة 1 / 3',
+    resetFlowStep2: 'الخطوة 2 / 3',
+    resetFlowStep3: 'الخطوة 3 / 3',
+    resetPasswordTitle: 'كلمة مرور جديدة',
+    resetPasswordSubtitle: 'اختر كلمة مرور قوية (8 أحرف على الأقل، حرف كبير، صغير، رقم، رمز).',
+    resetPasswordNew: 'كلمة المرور الجديدة',
+    resetPasswordConfirm: 'تأكيد كلمة المرور',
+    resetPasswordCta: 'حفظ',
+    resetPasswordDoneTitle: 'تم تحديث كلمة المرور',
+    resetPasswordDoneBody: 'جارٍ التوجيه لتسجيل الدخول…',
+    resetPasswordErrToken: 'انتهت الجلسة. أعد المحاولة (رمز واتساب جديد).',
+    resetPasswordErrMatch: 'كلمتا المرور غير متطابقتين.',
+    loginShowPassword: 'إظهار',
+    loginHidePassword: 'إخفاء',
     setupTitle: 'إعداد الحساب',
     setupStepPrefix: 'المرحلة',
     setupStep1Title: 'المعلومات الدراسية',
@@ -2702,6 +4037,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     setupStudyLevel: 'المستوى الدراسي',
     setupBacType: 'نوع البكالوريا',
     setupFiliere: 'الشعبة',
+    setupFiliere1Bac: 'شعبة 1ère باك',
     setupBacAnnee: 'السنة الدراسية للباكالوريا',
     setupBacAnneeHelp:
       'السنة الدراسية للحصول على البكالوريا (أو الجارية) — تُستعمَل للتحقق من أهليتك للإعلانات والمدارس.',
@@ -2821,15 +4157,18 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountActiveServicesDownloadReceipt: 'تحميل الإيصال',
     accountActiveServicesReceiptSoonTitle: 'إيصال الدفع',
     accountActiveServicesReceiptSoonBody:
-      'سيتوفر تحميل الإيصال قريباً. إلى ذلك الحين، تواصل مع مستشارك إذا احتجت إلى إثبات الدفع.',
+      'لا يوجد دفع مسجّل لإنشاء إيصال. تواصل مع مستشارك إذا احتجت إلى إثبات.',
+    accountActiveServicesReceiptError: 'حدث خطأ أثناء إنشاء الإيصال. يُرجى المحاولة لاحقاً.',
+    accountActiveServicesReceiptShareUnavailable: 'تعذّر فتح قائمة المشاركة على هذا الجهاز.',
     referralTeaserTitle: 'برنامج الإحالة والمكافآت',
     referralTeaserSubtitle: 'ادعُ أصدقاءك وافتح مكافآت وهدايا عند كل مستوى.',
     referralTeaserCta: 'عرض برنامج الإحالة والمكافآت',
     referralPageTitle: 'برنامج الإحالة والمكافآت',
     referralPageSubtitle: 'ادعُ أصدقاءك: كل شراء TAWJIH PLUS يقربك من مكافآتك.',
-    referralReferredDiscountHint: 'يحصل أصدقاؤك المدعوون على خصم {{percent}} في المتجر عند استخدام رمزك.',
-    referralReferredDiscountBadge: 'خصم {{percent}} في المتجر',
-    referralReferredDiscountShopLine: 'في المتجر',
+    referralReferredDiscountHint:
+      'يحصل أصدقاؤك المدعوون على خصم {{percent}} على الخدمات عند استخدام رمزك (وليس على المنتجات).',
+    referralReferredDiscountBadge: 'خصم {{percent}} على الخدمات',
+    referralReferredDiscountShopLine: 'على الخدمات',
     referralLockedTitle: 'برنامج الإحالة والمكافآت مقفل',
     referralLockedBody: 'يلزم خدمة {{service}} نشطة لمشاركة رمزك وفتح المكافآت.',
     referralLockedCta: 'عرض الخدمات',
@@ -2847,13 +4186,14 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     referralTierPickProduct: 'اختر منتجاً قبل إنشاء الرمز.',
     referralTierChoiceHint: '{{count}} مكافآت للاختيار عند تفعيل المستوى',
     referralTierGeneratePromo: 'إنشاء رمز ترويجي 100٪',
+    referralTierRewardFree: 'مجاني',
     referralTierPromoTitle: 'رمزك الترويجي',
     referralTierPromoUsed: 'تم استخدام الرمز',
     referralTierPromoAvailable: 'الرمز متاح — استخدام واحد',
     referralTierPromoHint: 'خصم 100٪ على المنتج المختار، استخدام واحد في المتجر.',
     referralTierPromoError: 'تعذّر إنشاء الرمز. أعد المحاولة.',
     referralTierGoShop: 'الذهاب إلى المتجر',
-    referralSingleRewardHint: 'مكافأة واحدة فقط: المستوى 1 أو 2.',
+    referralSingleRewardHint: 'مكافأة مستقلة لكل مستوى يتم فتحه.',
     referralRewardTakenBadge: 'تم اختيار المكافأة',
     referralRewardTakenOnOtherTier: 'المكافأة مأخوذة من المستوى {{tier}}',
     referralStep3BodyNew: 'عند شراء مدعوك TAWJIH PLUS يُحتسب في مستوياتك.',
@@ -2977,6 +4317,22 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountCityPlaceholder: 'اختر مدينة…',
     accountCitiesLoading: 'جارٍ تحميل المدن…',
     commonErrorTitle: 'خطأ',
+    commonLoadError: 'مشكلة في الخادم. أعد المحاولة.',
+    commonRetry: 'إعادة المحاولة',
+    apiErrNetwork: 'تعذّر الاتصال. تحقق من الشبكة وأعد المحاولة.',
+    apiErrTimeout: 'الخادم يستغرق وقتاً طويلاً. أعد المحاولة بعد قليل.',
+    apiErrUnauthorized: 'انتهت الجلسة. سجّل الدخول مجدداً.',
+    apiErrForbidden: 'ليس لديك صلاحية لهذا الإجراء.',
+    apiErrNotFound: 'المحتوى غير موجود.',
+    apiErrValidation: 'بعض المعلومات غير صالحة. تحقق وأعد المحاولة.',
+    apiErrConflict: 'هذا الإجراء لم يعد ممكناً (تم بالفعل أو تعارض).',
+    apiErrServer: 'الخادم يواجه مشكلة. أعد المحاولة لاحقاً.',
+    apiErrRateLimit: 'محاولات كثيرة. انتظر قليلاً.',
+    apiErrGeneric: 'حدث خطأ. أعد المحاولة.',
+    apiErrAuth: 'بيانات الدخول غير صحيحة أو الحساب غير متاح.',
+    apiErrDiagnostic: 'تعذّر معالجة التشخيص. أعد المحاولة.',
+    apiErrDailyChallenge: 'تعذّر تحميل تحدي اليوم. أعد المحاولة.',
+    qnaErrorGeneric: 'تعذّر إرسال رسالتك. أعد المحاولة.',
     accountSectionOrders: 'طلباتي',
     accountOrdersEmpty: 'لا توجد طلبات حتى الآن.',
     accountOrdersEmptyProducts: 'لا توجد منتجات. راجع تبويب الخدمات.',
@@ -2984,6 +4340,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountOrdersLoading: 'جارٍ تحميل الطلبات…',
     accountOrdersError: 'تعذّر تحميل الطلبات.',
     accountTabProfile: 'معلوماتي',
+    accountRefreshing: 'جاري التحديث…',
     accountTabOrders: 'طلباتي',
     accountOrdersOpenBadgeA11y: '{{count}} طلبات قيد المعالجة',
     accountOrdersOpenCount: '{{count}} قيد المعالجة',
@@ -3039,6 +4396,13 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCartTotalEstimated: 'الإجمالي التقديري',
     shopCartFooterTotal: 'الإجمالي',
     shopCartGoCheckout: 'إتمام الطلب',
+    shopCartReplaceServiceTitle: 'خدمات غير قابلة للجمع',
+    shopCartReplaceServiceMessage:
+      'إذا أضفت {newService} إلى السلة، سيتم إزالة {removed} من السلة لأنك لا يمكنك الجمع بين هاتين الخدمتين.',
+    shopCartReplaceServiceMessageMany:
+      'إذا أضفت {newService} إلى السلة، سيتم إزالة {removed} من السلة لأنك لا يمكنك الجمع بين هذه الخدمات.',
+    shopCartReplaceServiceAccept: 'أوافق',
+    shopCartReplaceServiceCancel: 'إلغاء',
     shopCheckoutEyebrowBoutique: 'المتجر',
     shopCheckoutTitle: 'الطلب',
     shopCheckoutItemsSummary: '{n} عنصر(ات)',
@@ -3076,6 +4440,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCheckoutNotesDesc: 'اختياري — تفاصيل لفريق إي‑توجيهي.',
     shopCheckoutPhNotes: 'ملاحظات مفيدة…',
     shopCheckoutRecapTitle: 'الملخص',
+    shopCheckoutUpgradeCatalog: 'السعر الكامل :',
+    shopCheckoutUpgradeCredit: 'الخدمة المشتراة ({service}) : −{amount}',
     shopCheckoutLblSubtotal: 'المجموع الفرعي',
     shopCheckoutPromoTitle: 'رمز ترويجي',
     shopCheckoutPromoHint:
@@ -3174,6 +4540,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopErrorLoad: 'تعذّر تحميل المتجر.',
     shopLoading: 'جارٍ التحميل…',
     shopEmptyTitle: 'لا يوجد منتج',
+    shopRefreshing: 'جاري التحديث…',
     shopEmptyDesc: 'غيّر الفلاتر أو عد لاحقًا.',
     shopEstablishmentsConcernedNotice:
       'يمكنكم لاحقًا تخصيص اختيارات المدارس من القائمة المعروضة. بالنسبة للمدارس التي تشترط دفع رسوم التسجيل المسبق، يجب إتمام الدفع لإتمام التسجيل. وبالنسبة للمدارس التي تضع معايير أهلية، يُكمَل التسجيل فقط في حال استيفاء شروط الأهلية.',
@@ -3260,6 +4627,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     tabInscriptions: 'التسجيلات',
     tabBoutique: 'المتجر',
     tabCompte: 'حسابي',
+    hubWhatsAppA11y: 'التواصل عبر واتساب للحصول على معلومات',
+    hubWhatsAppPrefill: 'السلام، أحتاج معلومات حول إ-توجيهي.',
     hubGlobalWallUnreadBadgeA11y: '{{count}} رسالة جديدة في مجموعة الباك',
     globalWallTitle: 'مجموعة باك 2026',
     globalWallIntro:
@@ -3370,11 +4739,16 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shareKindCommunity: 'مجموعة باك 2026',
     shareKindBoutique: 'المتجر',
     shareKindBoutiqueProduct: 'بطاقة منتج',
-    sidebarTitle: 'التنقل',
+    sidebarTitle: 'القائمة',
+    sidebarSubtitle: 'المسار والأدوات والمجتمع',
     sidebarOpen: 'فتح القائمة',
     sidebarClose: 'إغلاق',
     sidebarCart: 'السلة',
     sidebarEvents: 'الفعاليات',
+    sidebarSectionDiscover: 'اكتشف',
+    sidebarSectionTools: 'أدوات وإرشاد',
+    sidebarSectionShop: 'المتجر',
+    sidebarSectionAccount: 'مساحتي',
     eventsAgendaTitle: 'الفعاليات والندوات',
     eventsDetailPractical: 'معلومات',
     eventsDetailDescription: 'عن الفعالية',
@@ -3408,6 +4782,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     eventsConfirmPresence: 'تأكيد الحضور',
     eventsFull: 'مكتمل',
     eventsLoadError: 'تعذّر تحميل الفعاليات.',
+    eventsRefreshing: 'جاري التحديث…',
     eventsOnlineLink: 'رابط الاتصال',
     eventsMapsLink: 'خرائط Google',
     eventsOpenDetail: 'التفاصيل',
@@ -3478,6 +4853,25 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscRetry: 'إعادة المحاولة',
     inscRequireLogin: 'سجّل الدخول لمتابعة ترشيحاتك.',
     inscRequireLoginCta: 'تسجيل الدخول',
+    inscTawjihPlusUpgradeCta: 'الانتقال إلى TAWJIH PLUS',
+    inscTawjihPlusLockTitle: 'محتوى مخصّص لعملاء TAWJIH PLUS',
+    inscTawjihPlusLockHint:
+      'إعلانات مفصّلة، روابط التسجيل، فلاتر متقدمة ومتابعة كاملة للحالة.',
+    diagnosticAnswersSavedHint:
+      'تم حفظ إجابات التشخيص. انتقل إلى TAWJIH PLUS لتوليد توصياتك المخصّصة.',
+    diagnosticRecoGateEyebrow: 'تشخيص المدارس',
+    diagnosticRecoGateHeaderTitle: 'توصيات المدارس بالذكاء الاصطناعي',
+    diagnosticRecoGateHeaderSub:
+      'ترتيب مخصّص وملخص للملف الشخصي وفق إجاباتك في التشخيص.',
+    diagnosticRecoGateCardBadge: 'TAWJIH PLUS',
+    diagnosticRecoGateCardTitle: 'محتوى مخصّص لعملاء TAWJIH PLUS',
+    diagnosticRecoGateCardDesc:
+      'تعرض هذه الصفحة المؤسسات الموصى بها بالذكاء الاصطناعي، مع تعليقات تفصيلية وملخص لملفك الشخصي.',
+    diagnosticRecoGateFeature1: 'ترتيب المدارس (موصى به، ممكن، خيار أخير…)',
+    diagnosticRecoGateFeature2: 'ملخص بالذكاء الاصطناعي وتعليق عام مخصّص لملفك',
+    diagnosticRecoGateFeature3: 'متابعة المؤسسات الموصى بها ضمن مسارك',
+    diagnosticRecoGateSavedBox:
+      'تم حفظ إجابات التشخيص. بمجرد الاشتراك في TAWJIH PLUS، ستُولَّد هذه الصفحة تلقائياً.',
     inscNotifEmptyTitle: 'لا توجد إشعارات',
     inscNotifEmptyDesc: 'ستظهر هنا تنبيهات التسجيل والنتائج والتوجيه.',
     inscNotifMarkAllRead: 'وسم الكل كمقروء',
@@ -3503,6 +4897,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscAnnouncementsOpenLink: 'رابط التسجيل',
     inscAnnouncementsAlreadyTracked: 'مُتابَع بالفعل',
     inscAnnouncementsMarkApplied: 'لقد تقدّمت',
+    inscAnnouncementUnseen: 'لم تُعرض',
+    inscAnnouncementUnread: 'غير مقروءة',
     inscStatusUnknown: 'حالة غير معروفة',
     inscStatusNone: 'بدون حالة',
     inscStatusActionClear: 'إزالة الحالة',
@@ -3512,6 +4908,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscStatusActionUpdating: 'جارٍ التحديث…',
     inscStatusBlockTitle: 'حالة الترشّح',
     inscStatusUnavailable: 'غير متاحة حاليًا',
+    inscStatusSectionInProgress: 'قيد المتابعة',
+    inscStatusSectionFinalized: 'النتيجة النهائية',
     inscOpenLinkBtn: 'فتح الرابط',
     inscOpenLinkA11y: 'فتح رابط التسجيل الرسمي',
     inscOpenLinkBtnResult: 'عرض النتيجة',
@@ -3519,6 +4917,12 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscOpenLinkBtnOffer: 'الاستفادة من العرض',
     inscOpenLinkBtnInfo: 'معرفة المزيد',
     inscOpenLinkBtnRegister: 'رابط التسجيل',
+    inscAnnTypeOpening: 'فتح التسجيل',
+    inscAnnTypeImportant: 'رسالة مهمة',
+    inscAnnTypeOffer: 'عرض',
+    inscAnnTypeResult: 'نتيجة التسجيل',
+    inscAnnTypeScholarshipMa: 'منحة المغرب',
+    inscAnnTypeScholarshipForeign: 'منحة أجنبية',
     inscRemoveCandidacy: 'إزالة من المتابعة',
     inscRemoveCandidacyConfirmTitle: 'إزالة هذا الترشّح؟',
     inscRemoveCandidacyConfirmMsg: 'ستُحذف المتابعة والسجل الزمني لهذا الترشّح.',

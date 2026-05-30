@@ -1,6 +1,9 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
 
+/** Nombre de joueurs par page dans le classement du jour. */
+export const DAILY_CHALLENGE_LEADERBOARD_PAGE_SIZE = 20;
+
 export type DailyChallengeQuestion = {
   id: number;
   prompt: string;
@@ -54,6 +57,7 @@ export type DailyChallengeTodayData = {
   streak?: {
     current: number;
     longestStreak?: number;
+    bestSnakeTimeMs?: number;
     lastCompletedDate?: string;
     freezesRemaining: number;
     /** Éphémère : ICE auto consommé au chargement du hub. */
@@ -87,6 +91,7 @@ export type DailyChallengeSubmitResponse = {
     totalPlayers: number;
     streak: number;
     longestStreak?: number;
+    bestSnakeTimeMs?: number;
     freezesRemaining?: number;
     streakNotices?: Array<{ type: string; date?: string; freezesRemaining?: number; streak?: number }>;
     badgesEarned: Array<{ code: string; labelFr: string; labelAr: string | null; pointsEarned?: number }>;
@@ -100,6 +105,8 @@ export type DailyChallengeLeaderboardRow = {
   profileImageUrl?: string | null;
   score: number;
   durationMs: number;
+  /** Au moins un service acquis (user_commercial_service). */
+  isPremium?: boolean;
   /** Présent sur les tranches « charger plus » : évite le doublon avec la ligne épinglée. */
   isMe?: boolean;
 };
@@ -117,6 +124,7 @@ export type DailyChallengeLeaderboardData = {
     profileImageUrl?: string | null;
     score: number;
     durationMs: number;
+    isPremium?: boolean;
   } | null;
   myRank: number | null;
   hasMore: boolean;

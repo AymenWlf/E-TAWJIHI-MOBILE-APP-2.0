@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useHeaderHeight } from '@react-navigation/elements';
-import { Link, Stack } from 'expo-router';
+import { Link, Redirect, Stack } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -25,6 +25,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as DocumentPicker from 'expo-document-picker';
 import * as ImagePicker from 'expo-image-picker';
 
+import { ModalSearchWithApply } from '@/components/search/ModalSearchWithApply';
+import { useAppliedTextSearch } from '@/hooks/useAppliedTextSearch';
 import {
   CHAT_WALLPAPER_BG,
   ChatConversationBackground,
@@ -34,11 +36,17 @@ import { GlobalWallMessageAttachment } from '@/components/global/GlobalWallMessa
 import { GlobalWallMessageReactions } from '@/components/global/GlobalWallMessageReactions';
 import { GlobalWallSenderReceipts } from '@/components/global/GlobalWallSenderReceipts';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
+import {
+  LoadingCardStack,
+  LoadingContentCardSkeleton,
+  LoadingScreenPlaceholder,
+} from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import {
   GLOBAL_WALL_ATTACH_MAIN_ENTRIES,
   type GlobalWallAttachSubmenu,
 } from '@/constants/globalWallAttachPages';
+import { GLOBAL_WALL_MOBILE_ENABLED } from '@/constants/mobileFeatureFlags';
 import { useAuth } from '@/contexts/AuthContext';
 import { useGlobalWallUnread } from '@/contexts/GlobalWallUnreadContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -67,11 +75,13 @@ import { fetchShopProducts } from '@/services/shop';
 import { fetchPlatformEvents, type PlatformEventBrief } from '@/services/platformEvents';
 import type { ShopProductListItem } from '@/types/shop';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { pickAnnouncementTypeLabel } from '@/utils/announcementTypeLabel';
 import { webPathBoutiqueProduct, webPathContestAnnouncement, webPathEstablishment, webPathEvent } from '@/utils/sharePublicUrls';
 import { resolvePlatformEventCoverUri } from '@/utils/platformEventCover';
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
 import { countNewGlobalWallMessages } from '@/utils/countNewGlobalWallMessages';
 import { pickDocumentIcon } from '@/utils/documents';
+import { getUserFacingApiFailureMessage } from '@/utils/apiError';
 import { WhatsAppStyleOfficialBody } from '@/utils/whatsappStyleBody';
 
 function dayKey(iso: string | null): string {
@@ -124,7 +134,7 @@ function globalWallBodySnippet(body: string, maxLen = 52): string {
   return `${single.slice(0, maxLen)}…`;
 }
 
-export default function CommunauteScreen() {
+function CommunauteScreenContent() {
   const { t, isRTL, locale } = useLocale();
   const insets = useSafeAreaInsets();
   const headerHeight = useHeaderHeight();
@@ -145,22 +155,18 @@ export default function CommunauteScreen() {
   const [attachMenuOpen, setAttachMenuOpen] = useState(false);
   const [pickPageOpen, setPickPageOpen] = useState(false);
   const [attachModalStep, setAttachModalStep] = useState<'main' | GlobalWallAttachSubmenu>('main');
-  const [schoolSearchInput, setSchoolSearchInput] = useState('');
-  const [debouncedSchoolSearch, setDebouncedSchoolSearch] = useState('');
+  const schoolSearch = useAppliedTextSearch();
   const [establishments, setEstablishments] = useState<EstablishmentNormalized[]>([]);
   const [establishmentsLoading, setEstablishmentsLoading] = useState(false);
   const [announcements, setAnnouncements] = useState<ContestAnnouncementCard[]>([]);
   const [announcementsLoading, setAnnouncementsLoading] = useState(false);
   const [boutiqueProducts, setBoutiqueProducts] = useState<ShopProductListItem[]>([]);
   const [boutiqueLoading, setBoutiqueLoading] = useState(false);
-  const [boutiqueSearchInput, setBoutiqueSearchInput] = useState('');
-  const [debouncedBoutiqueSearch, setDebouncedBoutiqueSearch] = useState('');
+  const boutiqueSearch = useAppliedTextSearch();
   const [platformEventsAll, setPlatformEventsAll] = useState<PlatformEventBrief[]>([]);
   const [eventsLoading, setEventsLoading] = useState(false);
-  const [eventSearchInput, setEventSearchInput] = useState('');
-  const [debouncedEventSearch, setDebouncedEventSearch] = useState('');
-  const [announcementSearchInput, setAnnouncementSearchInput] = useState('');
-  const [debouncedAnnouncementSearch, setDebouncedAnnouncementSearch] = useState('');
+  const eventSearch = useAppliedTextSearch();
+  const announcementSearch = useAppliedTextSearch();
   const [composerBusy, setComposerBusy] = useState(false);
   /** `null` = nouvelle publication sur le fil ; sinon réponse sous le post choisi (« Répondre ici »). */
   const [replyTargetPostId, setReplyTargetPostId] = useState<number | null>(null);
@@ -189,17 +195,17 @@ export default function CommunauteScreen() {
   }, [orderedPosts, replyTargetPostId]);
 
   const filteredPlatformEvents = useMemo(() => {
-    const q = debouncedEventSearch.trim().toLowerCase();
+    const q = eventSearch.applied.trim().toLowerCase();
     if (!q) return platformEventsAll;
     return platformEventsAll.filter((ev) => {
       const a = (ev.title ?? '').toLowerCase();
       const b = (ev.titleAr ?? '').toLowerCase();
       return a.includes(q) || b.includes(q);
     });
-  }, [platformEventsAll, debouncedEventSearch]);
+  }, [platformEventsAll, eventSearch.applied]);
 
   const filteredAnnouncements = useMemo(() => {
-    const q = debouncedAnnouncementSearch.trim().toLowerCase();
+    const q = announcementSearch.applied.trim().toLowerCase();
     if (!q) return announcements;
     return announcements.filter((c) => {
       const tit = (c.title ?? '').toLowerCase();
@@ -208,7 +214,7 @@ export default function CommunauteScreen() {
       const typ = (c.announcementType ?? '').toLowerCase();
       return tit.includes(q) || titAr.includes(q) || est.includes(q) || typ.includes(q);
     });
-  }, [announcements, debouncedAnnouncementSearch]);
+  }, [announcements, announcementSearch.applied]);
 
   useEffect(() => {
     if (replyTargetPostId == null) return;
@@ -331,7 +337,7 @@ export default function CommunauteScreen() {
         if (res.success && res.data?.reactions) {
           patchPostReactions(postId, res.data.reactions);
         } else {
-          Alert.alert('', res.message ?? t('globalWallError'));
+          Alert.alert('', getUserFacingApiFailureMessage(t, { context: 'globalWall' }));
         }
       } catch {
         Alert.alert('', t('globalWallError'));
@@ -356,7 +362,7 @@ export default function CommunauteScreen() {
         if (res.success && res.data?.reactions) {
           patchReplyReactions(postId, replyId, res.data.reactions);
         } else {
-          Alert.alert('', res.message ?? t('globalWallError'));
+          Alert.alert('', getUserFacingApiFailureMessage(t, { context: 'globalWall' }));
         }
       } catch {
         Alert.alert('', t('globalWallError'));
@@ -368,39 +374,16 @@ export default function CommunauteScreen() {
   );
 
   useEffect(() => {
-    const id = setTimeout(() => setDebouncedSchoolSearch(schoolSearchInput.trim()), 380);
-    return () => clearTimeout(id);
-  }, [schoolSearchInput]);
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedBoutiqueSearch(boutiqueSearchInput.trim()), 380);
-    return () => clearTimeout(id);
-  }, [boutiqueSearchInput]);
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedEventSearch(eventSearchInput.trim()), 380);
-    return () => clearTimeout(id);
-  }, [eventSearchInput]);
-
-  useEffect(() => {
-    const id = setTimeout(() => setDebouncedAnnouncementSearch(announcementSearchInput.trim()), 380);
-    return () => clearTimeout(id);
-  }, [announcementSearchInput]);
-
-  useEffect(() => {
     if (!pickPageOpen) {
       setAttachModalStep('main');
-      setSchoolSearchInput('');
-      setDebouncedSchoolSearch('');
-      setBoutiqueSearchInput('');
-      setDebouncedBoutiqueSearch('');
-      setEventSearchInput('');
-      setDebouncedEventSearch('');
-      setAnnouncementSearchInput('');
-      setDebouncedAnnouncementSearch('');
+      schoolSearch.clear();
+      boutiqueSearch.clear();
+      eventSearch.clear();
+      announcementSearch.clear();
       setBoutiqueProducts([]);
       setPlatformEventsAll([]);
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [pickPageOpen]);
 
   useEffect(() => {
@@ -415,7 +398,7 @@ export default function CommunauteScreen() {
     void listEstablishments({
       page: 1,
       limit: 60,
-      search: debouncedSchoolSearch || undefined,
+      search: schoolSearch.applied || undefined,
     })
       .then((res) => {
         if (!cancelled) setEstablishments(res.data);
@@ -436,8 +419,8 @@ export default function CommunauteScreen() {
     let cancelled = false;
     setAnnouncementsLoading(true);
     void fetchContestAnnouncements()
-      .then((rows) => {
-        if (!cancelled) setAnnouncements(rows);
+      .then((result) => {
+        if (!cancelled) setAnnouncements(result.items);
       })
       .catch(() => {
         if (!cancelled) setAnnouncements([]);
@@ -471,7 +454,7 @@ export default function CommunauteScreen() {
     return () => {
       cancelled = true;
     };
-  }, [pickPageOpen, attachModalStep, debouncedBoutiqueSearch]);
+  }, [pickPageOpen, attachModalStep, boutiqueSearch.applied]);
 
   useEffect(() => {
     if (!pickPageOpen || attachModalStep !== 'events') return;
@@ -517,7 +500,7 @@ export default function CommunauteScreen() {
             void markGlobalWallSeen({ postIds, replyIds }, token).catch(() => {});
           }
         } else {
-          Alert.alert('', res.message ?? t('globalWallError'));
+          Alert.alert('', getUserFacingApiFailureMessage(t, { context: 'globalWall' }));
         }
       } catch {
         Alert.alert('', t('globalWallError'));
@@ -692,7 +675,7 @@ export default function CommunauteScreen() {
               })
             : null;
         if (photo && !photo.success) {
-          Alert.alert('', photo.message ?? t('globalWallError'));
+          Alert.alert('', getUserFacingApiFailureMessage(t, { context: 'globalWall' }));
           return;
         }
         const document =
@@ -706,7 +689,7 @@ export default function CommunauteScreen() {
               })
             : null;
         if (document && !document.success) {
-          Alert.alert('', document.message ?? t('globalWallError'));
+          Alert.alert('', getUserFacingApiFailureMessage(t, { context: 'globalWall' }));
           return;
         }
         const res = await postGlobalWallReply(
@@ -740,7 +723,7 @@ export default function CommunauteScreen() {
             scrollToLatestEnd();
           }
         } else {
-          Alert.alert('', res.message ?? t('globalWallError'));
+          Alert.alert('', getUserFacingApiFailureMessage(t, { context: 'globalWall' }));
         }
       } catch {
         Alert.alert('', t('globalWallError'));
@@ -763,7 +746,7 @@ export default function CommunauteScreen() {
             })
           : null;
       if (photo && !photo.success) {
-        Alert.alert('', photo.message ?? t('globalWallError'));
+        Alert.alert('', getUserFacingApiFailureMessage(t, { context: 'globalWall' }));
         return;
       }
       const document =
@@ -777,7 +760,7 @@ export default function CommunauteScreen() {
             })
           : null;
       if (document && !document.success) {
-        Alert.alert('', document.message ?? t('globalWallError'));
+        Alert.alert('', getUserFacingApiFailureMessage(t, { context: 'globalWall' }));
         return;
       }
       const res = await postGlobalWallUserPost(
@@ -799,7 +782,7 @@ export default function CommunauteScreen() {
         setTotal((n) => n + 1);
         scrollToLatestEnd();
       } else {
-        Alert.alert('', res.message ?? t('globalWallError'));
+        Alert.alert('', getUserFacingApiFailureMessage(t, { context: 'globalWall' }));
       }
     } catch {
       Alert.alert('', t('globalWallError'));
@@ -813,7 +796,7 @@ export default function CommunauteScreen() {
       <>
         <Stack.Screen options={communauteStackOptions} />
         <SafeAreaView style={[styles.center, { backgroundColor: CHAT_WALLPAPER_BG }]} edges={['bottom']}>
-          <ActivityIndicator size="large" color={brand.primary} />
+          <LoadingScreenPlaceholder count={4} isRTL={isRTL} />
         </SafeAreaView>
       </>
     );
@@ -887,7 +870,9 @@ export default function CommunauteScreen() {
             if (posts.length > 0 && posts.length < total) void onLoadOlder();
           }}
           ListHeaderComponent={
-            loadingMore ? <ActivityIndicator style={styles.historyLoader} color={brand.primary} /> : null
+            loadingMore ? (
+              <LoadingContentCardSkeleton isRTL={isRTL} style={styles.historyLoader} />
+            ) : null
           }
           ListEmptyComponent={
             !loading && posts.length === 0 ? (
@@ -1560,17 +1545,17 @@ export default function CommunauteScreen() {
                       color={brand.textMuted}
                     />
                   </Pressable>
-                  <TextInput
-                    style={[styles.attachSearchInput, isRTL && styles.rtlInput]}
+                  <ModalSearchWithApply
+                    value={schoolSearch.draft}
+                    onChangeText={schoolSearch.setDraft}
+                    onApply={schoolSearch.apply}
                     placeholder={t('globalWallSearchSchoolsPlaceholder')}
-                    placeholderTextColor={brand.textMuted}
-                    value={schoolSearchInput}
-                    onChangeText={setSchoolSearchInput}
-                    autoCapitalize="none"
-                    autoCorrect={false}
+                    applyLabel={t('schoolsApply')}
+                    showApply={schoolSearch.hasPending || schoolSearch.draft.trim().length > 0}
+                    isRTL={isRTL}
                   />
                   {establishmentsLoading ? (
-                    <ActivityIndicator style={{ marginVertical: spacing.md }} color={brand.primary} />
+                    <LoadingCardStack count={2} isRTL={isRTL} style={{ marginVertical: spacing.md }} />
                   ) : establishments.length === 0 ? (
                     <Text style={[styles.attachEmpty, isRTL && styles.rtl]}>{t('globalWallEmpty')}</Text>
                   ) : (
@@ -1635,17 +1620,17 @@ export default function CommunauteScreen() {
                       color={brand.textMuted}
                     />
                   </Pressable>
-                  <TextInput
-                    style={[styles.attachSearchInput, isRTL && styles.rtlInput]}
+                  <ModalSearchWithApply
+                    value={boutiqueSearch.draft}
+                    onChangeText={boutiqueSearch.setDraft}
+                    onApply={boutiqueSearch.apply}
                     placeholder={t('globalWallSearchBoutiquePlaceholder')}
-                    placeholderTextColor={brand.textMuted}
-                    value={boutiqueSearchInput}
-                    onChangeText={setBoutiqueSearchInput}
-                    autoCapitalize="none"
-                    autoCorrect={false}
+                    applyLabel={t('schoolsApply')}
+                    showApply={boutiqueSearch.hasPending || boutiqueSearch.draft.trim().length > 0}
+                    isRTL={isRTL}
                   />
                   {boutiqueLoading ? (
-                    <ActivityIndicator style={{ marginVertical: spacing.md }} color={brand.primary} />
+                    <LoadingCardStack count={2} isRTL={isRTL} style={{ marginVertical: spacing.md }} />
                   ) : boutiqueProducts.length === 0 ? (
                     <Text style={[styles.attachEmpty, isRTL && styles.rtl]}>{t('globalWallEmpty')}</Text>
                   ) : (
@@ -1712,17 +1697,17 @@ export default function CommunauteScreen() {
                       color={brand.textMuted}
                     />
                   </Pressable>
-                  <TextInput
-                    style={[styles.attachSearchInput, isRTL && styles.rtlInput]}
+                  <ModalSearchWithApply
+                    value={eventSearch.draft}
+                    onChangeText={eventSearch.setDraft}
+                    onApply={eventSearch.apply}
                     placeholder={t('globalWallSearchEventsPlaceholder')}
-                    placeholderTextColor={brand.textMuted}
-                    value={eventSearchInput}
-                    onChangeText={setEventSearchInput}
-                    autoCapitalize="none"
-                    autoCorrect={false}
+                    applyLabel={t('schoolsApply')}
+                    showApply={eventSearch.hasPending || eventSearch.draft.trim().length > 0}
+                    isRTL={isRTL}
                   />
                   {eventsLoading ? (
-                    <ActivityIndicator style={{ marginVertical: spacing.md }} color={brand.primary} />
+                    <LoadingCardStack count={2} isRTL={isRTL} style={{ marginVertical: spacing.md }} />
                   ) : filteredPlatformEvents.length === 0 ? (
                     <Text style={[styles.attachEmpty, isRTL && styles.rtl]}>{t('globalWallEmpty')}</Text>
                   ) : (
@@ -1805,7 +1790,7 @@ export default function CommunauteScreen() {
                     />
                   </Pressable>
                   {announcementsLoading ? (
-                    <ActivityIndicator style={{ marginVertical: spacing.md }} color={brand.primary} />
+                    <LoadingCardStack count={2} isRTL={isRTL} style={{ marginVertical: spacing.md }} />
                   ) : announcements.length === 0 ? (
                     <Text style={[styles.attachEmpty, isRTL && styles.rtl]}>{t('globalWallEmpty')}</Text>
                   ) : (
@@ -1835,7 +1820,7 @@ export default function CommunauteScreen() {
                             </Text>
                           ) : null}
                           <Text style={[styles.attachAnnType, isRTL && styles.rtl]} numberOfLines={1}>
-                            {c.announcementType}
+                            {pickAnnouncementTypeLabel(c.announcementType, t)}
                           </Text>
                         </View>
                         <FontAwesome
@@ -1902,6 +1887,13 @@ export default function CommunauteScreen() {
       </Modal>
     </>
   );
+}
+
+export default function CommunauteScreen() {
+  if (!GLOBAL_WALL_MOBILE_ENABLED) {
+    return <Redirect href="/(tabs)" />;
+  }
+  return <CommunauteScreenContent />;
 }
 
 const styles = StyleSheet.create({

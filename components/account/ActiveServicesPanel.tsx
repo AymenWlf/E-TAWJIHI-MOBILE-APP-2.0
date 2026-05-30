@@ -1,9 +1,13 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useCallback, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
+import { ActiveServicesLoadingSkeleton } from '@/components/account/ActiveServiceCardSkeleton';
 import { Text } from '@/components/ui/Text';
 import type { HomeCopyKey } from '@/constants/i18n';
 import type { UserActiveCommercialService } from '@/services/userActiveServices';
+import type { CommercialReceiptClientInfo } from '@/utils/commercialServiceReceiptDocument';
+import { downloadCommercialServiceReceiptPdf } from '@/utils/downloadCommercialServiceReceipt';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
@@ -22,6 +26,7 @@ type Props = {
   locale: string;
   t: (k: HomeCopyKey) => string;
   onRetry: () => void;
+  receiptClient: CommercialReceiptClientInfo | null;
 };
 
 function parseMoney(raw: string | null | undefined): number {
@@ -77,33 +82,35 @@ function MoneyCell({
   );
 }
 
-function showReceiptComingSoon(t: (k: HomeCopyKey) => string) {
-  Alert.alert(t('accountActiveServicesReceiptSoonTitle'), t('accountActiveServicesReceiptSoonBody'), [
-    { text: 'OK' },
-  ]);
-}
-
 function ReceiptDownloadButton({
   rtl,
   t,
-  compact,
+  busy,
+  onPress,
 }: {
   rtl: boolean;
   t: (k: HomeCopyKey) => string;
-  compact?: boolean;
+  busy: boolean;
+  onPress: () => void;
 }) {
   return (
     <Pressable
-      onPress={() => showReceiptComingSoon(t)}
+      onPress={onPress}
+      disabled={busy}
       accessibilityRole="button"
-      accessibilityState={{ disabled: true }}
+      accessibilityLabel={t('accountActiveServicesDownloadReceipt')}
       style={({ pressed }) => [
-        compact ? styles.receiptBtnCompact : styles.receiptBtn,
+        styles.receiptBtn,
         rtl && styles.receiptBtnRtl,
-        pressed && styles.receiptBtnPressed,
+        pressed && !busy && styles.receiptBtnPressed,
+        busy && { opacity: 0.6 },
       ]}>
-      <FontAwesome name="download" size={compact ? 12 : 13} color={homeShell.blue} />
-      <Text style={[compact ? styles.receiptBtnTxtCompact : styles.receiptBtnTxt, rtl && styles.txtRtl]}>
+      {busy ? (
+        <ActivityIndicator size="small" color={homeShell.blue} />
+      ) : (
+        <FontAwesome name="download" size={13} color={homeShell.blue} />
+      )}
+      <Text style={[styles.receiptBtnTxt, rtl && styles.txtRtl]}>
         {t('accountActiveServicesDownloadReceipt')}
       </Text>
     </Pressable>
@@ -116,12 +123,18 @@ function ServiceCard({
   loc,
   t,
   isLast,
+  receiptClient,
+  receiptBusy,
+  onDownloadReceipt,
 }: {
   svc: UserActiveCommercialService;
   rtl: boolean;
   loc: string;
   t: (k: HomeCopyKey) => string;
   isLast: boolean;
+  receiptClient: CommercialReceiptClientInfo | null;
+  receiptBusy: boolean;
+  onDownloadReceipt: (svc: UserActiveCommercialService) => void;
 }) {
   const days = daysLabel(svc, t);
   const endStr = svc.dateFin ? formatShortDateInParis(svc.dateFin, loc) : null;
@@ -210,8 +223,13 @@ function ServiceCard({
             </Text>
           ) : null}
 
-          {showPayment ? (
-            <ReceiptDownloadButton rtl={rtl} t={t} />
+          {showPayment && receiptClient ? (
+            <ReceiptDownloadButton
+              rtl={rtl}
+              t={t}
+              busy={receiptBusy}
+              onPress={() => onDownloadReceipt(svc)}
+            />
           ) : null}
         </View>
       ) : null}
@@ -253,7 +271,6 @@ function ServiceCard({
         {txs.length === 0 ? (
           <View style={styles.txEmptyWrap}>
             <Text style={[styles.txEmpty, rtl && styles.txtRtl]}>{t('accountActiveServicesNoTransactions')}</Text>
-            {showPayment ? <ReceiptDownloadButton rtl={rtl} t={t} compact /> : null}
           </View>
         ) : (
           txs.map((tx, txIdx) => {
@@ -279,7 +296,6 @@ function ServiceCard({
                     {' · '}
                     {t('accountActiveServicesTxStatus')}: {statut}
                   </Text>
-                  <ReceiptDownloadButton rtl={rtl} t={t} compact />
                 </View>
               </View>
             );
@@ -290,8 +306,51 @@ function ServiceCard({
   );
 }
 
-export function ActiveServicesPanel({ services, loading, loaded, error, rtl, locale, t, onRetry }: Props) {
+export function ActiveServicesPanel({
+  services,
+  loading,
+  loaded,
+  error,
+  rtl,
+  locale,
+  t,
+  onRetry,
+  receiptClient,
+}: Props) {
   const loc = locale === 'ar' ? 'ar' : 'fr';
+  const [receiptBusyId, setReceiptBusyId] = useState<number | null>(null);
+
+  const onDownloadReceipt = useCallback(
+    async (svc: UserActiveCommercialService) => {
+      if (!receiptClient) return;
+      setReceiptBusyId(svc.id);
+      try {
+        const client: CommercialReceiptClientInfo = {
+          ...receiptClient,
+          numeroContrat: svc.numeroContrat ?? receiptClient.numeroContrat,
+        };
+        await downloadCommercialServiceReceiptPdf(client, [svc]);
+      } catch (e) {
+        const msg = e instanceof Error ? e.message : '';
+        if (msg === 'NO_PAYMENTS') {
+          Alert.alert(t('accountActiveServicesReceiptSoonTitle'), t('accountActiveServicesReceiptSoonBody'), [
+            { text: 'OK' },
+          ]);
+        } else if (msg === 'SHARE_UNAVAILABLE') {
+          Alert.alert(t('accountActiveServicesReceiptSoonTitle'), t('accountActiveServicesReceiptShareUnavailable'), [
+            { text: 'OK' },
+          ]);
+        } else {
+          Alert.alert(t('accountActiveServicesReceiptSoonTitle'), t('accountActiveServicesReceiptError'), [
+            { text: 'OK' },
+          ]);
+        }
+      } finally {
+        setReceiptBusyId(null);
+      }
+    },
+    [receiptClient, t],
+  );
 
   return (
     <View style={styles.card}>
@@ -308,10 +367,7 @@ export function ActiveServicesPanel({ services, loading, loaded, error, rtl, loc
       </View>
 
       {loading && !loaded ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={homeShell.blue} size="small" />
-          <Text style={[styles.hint, rtl && styles.txtRtl]}>{t('accountActiveServicesLoading')}</Text>
-        </View>
+        <ActiveServicesLoadingSkeleton isRTL={rtl} count={1} />
       ) : error ? (
         <View style={styles.center}>
           <Text style={[styles.hint, styles.error, rtl && styles.txtRtl]}>{error}</Text>
@@ -323,14 +379,17 @@ export function ActiveServicesPanel({ services, loading, loaded, error, rtl, loc
         <Text style={[styles.hint, rtl && styles.txtRtl]}>{t('accountActiveServicesEmpty')}</Text>
       ) : (
         services.map((svc, idx) => (
-          <ServiceCard
-            key={svc.id}
-            svc={svc}
-            rtl={rtl}
-            loc={loc}
-            t={t}
-            isLast={idx === services.length - 1}
-          />
+            <ServiceCard
+              key={svc.id}
+              svc={svc}
+              rtl={rtl}
+              loc={loc}
+              t={t}
+              isLast={idx === services.length - 1}
+              receiptClient={receiptClient}
+              receiptBusy={receiptBusyId === svc.id}
+              onDownloadReceipt={onDownloadReceipt}
+            />
         ))
       )}
     </View>
@@ -342,9 +401,13 @@ const styles = StyleSheet.create({
     backgroundColor: homeShell.card,
     borderRadius: radius.lg,
     padding: spacing.md,
-    marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: homeShell.borderOnWhite,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.07,
+    shadowRadius: 12,
+    elevation: 4,
   },
   sectionHead: {
     flexDirection: 'row',

@@ -6,6 +6,8 @@ export type ReferralInviteStatus = 'registered' | 'profile_done' | 'qualified' |
 export type UserReferralInvite = {
   id: string;
   displayName: string;
+  firstName?: string | null;
+  lastName?: string | null;
   status: ReferralInviteStatus;
   registeredAt: string | null;
   countsForTier: boolean;
@@ -16,6 +18,7 @@ export type ReferralTierProduct = {
   slug: string;
   title: string;
   imageUrl: string | null;
+  images?: string[] | null;
   price?: string | null;
   description?: string | null;
   displayOrder?: number;
@@ -124,7 +127,7 @@ export async function claimReferralTierPromo(
 }
 
 export function tierCanClaimReward(tier: ReferralTierInfo): boolean {
-  return tier.canClaim !== false && !tier.rewardTakenOnOtherTier;
+  return tier.canClaim !== false;
 }
 
 /** Parrainage complété = achat éligible comptabilisé pour les paliers. */

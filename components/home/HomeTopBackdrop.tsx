@@ -1,6 +1,7 @@
 import { StyleSheet, View } from 'react-native';
 
 import { homeShell } from '@/theme/homeShell';
+import { computeHomeTopBackdropMetrics } from '@/utils/homeTopBackdropLayout';
 
 type Props = {
   width: number;
@@ -8,20 +9,12 @@ type Props = {
   topInset?: number;
 };
 
-/** Facteur du halo vert (ombre douce) autour du disque bleu. */
-const GREEN_HALO_SCALE = 1.09;
-
 /**
  * Grand disque bleu marque derrière le hero + halo vert type ombre.
+ * Sur iPad / tablette : disque plus petit et plus haut pour ne pas empiéter sur les sections blanches.
  */
 export function HomeTopBackdrop({ width, topInset = 0 }: Props) {
-  const main = width * 1.52;
-  const left = (width - main) / 2;
-  const top = topInset - main * 0.44;
-
-  const glowSize = main * GREEN_HALO_SCALE;
-  const glowLeft = left + (main - glowSize) / 2;
-  const glowTop = top + (main - glowSize) / 2;
+  const m = computeHomeTopBackdropMetrics(width, topInset);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -29,11 +22,11 @@ export function HomeTopBackdrop({ width, topInset = 0 }: Props) {
         style={[
           styles.disk,
           {
-            width: glowSize,
-            height: glowSize,
-            borderRadius: glowSize / 2,
-            top: glowTop,
-            left: glowLeft,
+            width: m.glowSize,
+            height: m.glowSize,
+            borderRadius: m.glowSize / 2,
+            top: m.glowTop,
+            left: m.glowLeft,
             backgroundColor: homeShell.greenAlpha28,
           },
         ]}
@@ -42,11 +35,11 @@ export function HomeTopBackdrop({ width, topInset = 0 }: Props) {
         style={[
           styles.disk,
           {
-            width: main,
-            height: main,
-            borderRadius: main / 2,
-            top,
-            left,
+            width: m.main,
+            height: m.main,
+            borderRadius: m.main / 2,
+            top: m.top,
+            left: m.left,
             backgroundColor: homeShell.bg,
             shadowColor: homeShell.green,
             shadowOffset: { width: 0, height: 10 },
@@ -60,11 +53,11 @@ export function HomeTopBackdrop({ width, topInset = 0 }: Props) {
         style={[
           styles.disk,
           {
-            width: main * 1.05,
-            height: main * 1.05,
-            borderRadius: (main * 1.05) / 2,
-            top: top - 2,
-            left: left - main * 0.025,
+            width: m.ringSize,
+            height: m.ringSize,
+            borderRadius: m.ringSize / 2,
+            top: m.ringTop,
+            left: m.ringLeft,
             borderWidth: 1,
             borderColor: 'rgba(255,255,255,0.06)',
             backgroundColor: 'transparent',

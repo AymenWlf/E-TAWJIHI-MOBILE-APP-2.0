@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
@@ -22,7 +22,7 @@ export function ChatMiniCardLoading() {
         </View>
       </View>
       <View style={styles.loadingFooter}>
-        <ActivityIndicator color={brand.primary} size="small" />
+        <View style={styles.loadingFooterPill} />
       </View>
     </View>
   );
@@ -229,6 +229,12 @@ const styles = StyleSheet.create({
   loadingFooter: {
     marginTop: spacing.sm,
     alignItems: 'flex-start',
+  },
+  loadingFooterPill: {
+    width: 72,
+    height: 18,
+    borderRadius: 6,
+    backgroundColor: 'rgba(51, 62, 143, 0.1)',
   },
   row: {
     flexDirection: 'row',

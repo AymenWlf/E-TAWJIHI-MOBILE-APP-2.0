@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFocusEffect } from '@react-navigation/native';
 import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -22,19 +22,31 @@ import {
   type SearchablePickItem,
 } from '@/components/schools/SearchablePickSheet';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
+import { LoadErrorState, loadErrorRetryLabel } from '@/components/ui/LoadErrorState';
+import {
+  AccountOrdersLoadingSkeleton,
+  AccountProfileLoadingSkeleton,
+} from '@/components/account/AccountScreenSkeleton';
 import { BirthDateField } from '@/components/ui/BirthDateField';
 import { SelectField } from '@/components/ui/SelectField';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import {
   BAC_TYPES,
-  FILIERE_BAC_OPTIONS,
   type LabeledOption,
   NIVEAU_ETUDE_OPTIONS,
   SPECIALITES_MISSION,
 } from '@/constants/academicSetup';
+import {
+  filiereOptionsForNiveau,
+  isPremiereBacNiveau,
+  resolveFiliereDisplayLabel,
+  sanitizeFiliereForNiveau,
+} from '@/utils/academicFiliere';
 import { anneesBacOptionsForLocale } from '@/utils/bacSchoolYearLabels';
 import { getApiBaseUrl } from '@/constants/api';
 import type { HomeCopyKey } from '@/constants/i18n';
+import { useAppFeedback } from '@/contexts/AppFeedbackContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { invalidateEligibilityProfileCache } from '@/hooks/useEligibilityProfile';
@@ -47,15 +59,15 @@ import {
 } from '@/services/userActiveServices';
 import { ActiveServicesPanel } from '@/components/account/ActiveServicesPanel';
 import { LoyaltyTeaserCard } from '@/components/account/LoyaltyTeaserCard';
+import { ProfileOrdersPreviewPanel } from '@/components/account/ProfileOrdersPreviewPanel';
 import { useUserReferral } from '@/hooks/useUserReferral';
-import {
-  getReferralRequiredServiceName,
-  getReferralRequiredServiceSlug,
-  isReferralProgramUnlocked,
-} from '@/services/userReferral';
+import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
+import { getReferralRequiredServiceName, isReferralProgramUnlocked } from '@/services/userReferral';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { homeShell } from '@/theme/homeShell';
 import { formatOrderCreatedAtShort } from '@/utils/dateParis';
+import { getUserFacingApiError, getUserFacingLoadError } from '@/utils/apiError';
 import { errorMessage } from '@/utils/errorMessage';
 import { isValidEmail } from '@/utils/isValidEmail';
 import { OrderServicePaymentSnippet } from '@/components/shop/OrderServicePaymentSnippet';
@@ -64,8 +76,9 @@ import { countOpenShopOrders, isShopOrderClosed, shopOrderStatusUi } from '@/uti
 
 export default function CompteTabScreen() {
   const router = useRouter();
+  const { openAppFeedback } = useAppFeedback();
   const { user, isLoading: authLoading, getValidAccessToken, reloadMe, logout } = useAuth();
-  const { t, isRTL, locale, setLocale } = useLocale();
+  const { t, isRTL, locale } = useLocale();
   const insets = useSafeAreaInsets();
   const [mainTab, setMainTab] = useState<'profile' | 'orders'>('profile');
   const [ordersSegment, setOrdersSegment] = useState<'all' | 'products' | 'services'>('all');
@@ -76,6 +89,7 @@ export default function CompteTabScreen() {
   const [cities, setCities] = useState<CityRow[]>([]);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [profileLoaded, setProfileLoaded] = useState(false);
+  const [profileLoadError, setProfileLoadError] = useState<string | null>(null);
   const [orders, setOrders] = useState<UserOrderSummary[]>([]);
   const [ordersLoadError, setOrdersLoadError] = useState<string | null>(null);
   const [ordersLoading, setOrdersLoading] = useState(false);
@@ -124,6 +138,7 @@ export default function CompteTabScreen() {
    * `null` ⇒ aucun sheet ouvert.
    */
   type AcademicField =
+    | 'userType'
     | 'niveau'
     | 'bacType'
     | 'filiere'
@@ -202,9 +217,23 @@ export default function CompteTabScreen() {
     [],
   );
 
+  /** Type de compte : étudiant ou tuteur (parent). */
+  const userTypeOptions = useMemo<LabeledOption[]>(
+    () => [
+      { value: 'student', label: t('setupStudent'), labelAr: 'تلميذ/طالب' },
+      { value: 'tutor', label: t('setupTutor'), labelAr: 'ولي الأمر' },
+    ],
+    [t],
+  );
+
   /** Pour chaque champ académique éditable, retourne (label, items, value courante). */
   const academicConfig = useMemo(
     () => ({
+      userType: {
+        title: t('setupYouAre'),
+        items: toPickItems(userTypeOptions),
+        value: form.userType,
+      },
       niveau: {
         title: t('setupStudyLevel'),
         items: toPickItems(NIVEAU_ETUDE_OPTIONS),
@@ -216,8 +245,8 @@ export default function CompteTabScreen() {
         value: form.bacType,
       },
       filiere: {
-        title: t('setupFiliere'),
-        items: toPickItems(FILIERE_BAC_OPTIONS),
+        title: isPremiereBacNiveau(form.niveau) ? t('setupFiliere1Bac') : t('setupFiliere'),
+        items: toPickItems(filiereOptionsForNiveau(form.niveau)),
         value: form.filiere,
       },
       bacAnnee: {
@@ -251,7 +280,7 @@ export default function CompteTabScreen() {
         value: form.tuteur,
       },
     }),
-    [t, toPickItems, anneesBacPickItems, form, specialiteOptions, typeLyceeOptions, tuteurOptions],
+    [t, toPickItems, anneesBacPickItems, form, specialiteOptions, typeLyceeOptions, tuteurOptions, userTypeOptions],
   );
 
   /**
@@ -274,19 +303,34 @@ export default function CompteTabScreen() {
     return user?.phone ?? user?.email ?? '';
   }, [form.nom, form.prenom, isRTL, user?.email, user?.phone]);
 
-  const { data: referralProgram, reload: reloadReferral } = useUserReferral(isLoggedIn);
+  const profileInitials = useMemo(() => {
+    const parts = [form.prenom.trim(), form.nom.trim()].filter(Boolean);
+    if (parts.length >= 2) {
+      return `${parts[0][0] ?? ''}${parts[1][0] ?? ''}`.toUpperCase();
+    }
+    if (parts[0]) return parts[0].slice(0, 2).toUpperCase();
+    const fallback = (user?.phone ?? user?.email ?? '?').trim();
+    return fallback.slice(0, 2).toUpperCase();
+  }, [form.nom, form.prenom, user?.email, user?.phone]);
+
+  const { data: referralProgram, loading: referralLoading, reload: reloadReferral } = useUserReferral(isLoggedIn);
+  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading } = useTawjihPlusAccess();
   const referralUnlocked = isReferralProgramUnlocked(referralProgram);
   const referralRequiredServiceName = getReferralRequiredServiceName(referralProgram);
 
-  const openReferralServicesCta = useCallback(() => {
-    const slug = getReferralRequiredServiceSlug(referralProgram);
-    if (slug) {
-      router.push(`/boutique/service/${slug}`);
+  const openFideliteScreen = useCallback(() => {
+    if (!tawjihPlusLoading && !hasTawjihPlusAccess) {
+      Alert.alert(t('inscTawjihPlusLockTitle'), t('inscTawjihPlusLockHint'), [
+        { text: t('closeOverlayA11y'), style: 'cancel' },
+        {
+          text: t('inscTawjihPlusUpgradeCta'),
+          onPress: () => router.push(TAWJIH_PLUS_PRODUCT_PATH as never),
+        },
+      ]);
       return;
     }
-    router.push('/boutique');
-  }, [referralProgram, router]);
-
+    router.push('/compte/fidelite');
+  }, [hasTawjihPlusAccess, router, t, tawjihPlusLoading]);
   /**
    * Le « Diplôme en cours » n'a de sens que pour les étudiants du supérieur
    * (BAC+1 à BAC+6 et Doctorat) — exactement comme dans le wizard d'inscription.
@@ -319,6 +363,7 @@ export default function CompteTabScreen() {
       return;
     }
     setLoading(true);
+    setProfileLoadError(null);
     try {
       const p = await getUserProfile(token);
       setProfile(p);
@@ -351,11 +396,14 @@ export default function CompteTabScreen() {
         professionTuteur: p?.professionTuteur ?? '',
         adresseTuteur: p?.adresseTuteur ?? '',
       });
+    } catch (e) {
+      setProfile(null);
+      setProfileLoadError(getUserFacingLoadError(e, t, { context: 'account' }));
     } finally {
       setLoading(false);
       setProfileLoaded(true);
     }
-  }, [getValidAccessToken, isLoggedIn, user?.email]);
+  }, [getValidAccessToken, isLoggedIn, user?.email, t]);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -382,7 +430,7 @@ export default function CompteTabScreen() {
       setActiveServices(rows);
     } catch (e) {
       setActiveServices([]);
-      setActiveServicesLoadError(e instanceof Error ? e.message : t('accountActiveServicesError'));
+      setActiveServicesLoadError(getUserFacingLoadError(e, t, { context: 'account' }));
     } finally {
       setActiveServicesLoading(false);
       setActiveServicesLoaded(true);
@@ -400,7 +448,7 @@ export default function CompteTabScreen() {
       setOrders(rows);
     } catch (e) {
       setOrders([]);
-      setOrdersLoadError(e instanceof Error ? e.message : t('accountOrdersError'));
+      setOrdersLoadError(getUserFacingLoadError(e, t, { context: 'account' }));
     } finally {
       setOrdersLoading(false);
       setOrdersLoaded(true);
@@ -465,11 +513,13 @@ export default function CompteTabScreen() {
         isLoggedIn ? reloadMe() : Promise.resolve(),
         loadProfile(),
         loadOrders(),
+        loadActiveServices(),
+        isLoggedIn ? reloadReferral() : Promise.resolve(),
       ]);
     } finally {
       setRefreshing(false);
     }
-  }, [loadCities, loadProfile, loadOrders, loadActiveServices, isLoggedIn, reloadMe]);
+  }, [loadCities, loadProfile, loadOrders, loadActiveServices, isLoggedIn, reloadMe, reloadReferral]);
 
   const save = useCallback(async () => {
     if (!isLoggedIn) return;
@@ -480,6 +530,10 @@ export default function CompteTabScreen() {
       const emailTrim = form.email.trim();
       if (!isValidEmail(emailTrim)) {
         Alert.alert(t('commonErrorTitle'), t('errInvalidEmail'));
+        return;
+      }
+      if (!form.userType.trim()) {
+        Alert.alert(t('commonErrorTitle'), t('setupErrPickUserType'));
         return;
       }
       const payload = {
@@ -523,7 +577,7 @@ export default function CompteTabScreen() {
       await loadProfile();
       Alert.alert(t('accountUpdatedTitle'), t('accountUpdatedBody'));
     } catch (e: unknown) {
-      Alert.alert(t('commonErrorTitle'), errorMessage(e));
+      Alert.alert(t('commonErrorTitle'), errorMessage(e, t, 'account'));
     } finally {
       setLoading(false);
     }
@@ -540,7 +594,7 @@ export default function CompteTabScreen() {
           try {
             await logout();
           } catch (e: unknown) {
-            Alert.alert(t('commonErrorTitle'), errorMessage(e));
+            Alert.alert(t('commonErrorTitle'), errorMessage(e, t, 'account'));
           } finally {
             setLoggingOut(false);
           }
@@ -562,33 +616,7 @@ export default function CompteTabScreen() {
                 {t('accountSubtitle')}
               </Text>
             </View>
-            <View
-              style={[styles.langSwitch, isRTL && styles.langSwitchRtl]}
-              accessibilityRole="tablist"
-              accessibilityLabel={t('languageSwitcher')}>
-              <Pressable
-                onPress={() => setLocale('fr')}
-                style={({ pressed }) => [
-                  styles.langPill,
-                  locale === 'fr' && styles.langPillActive,
-                  pressed && styles.langPillPressed,
-                ]}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: locale === 'fr' }}>
-                <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>{t('langFr')}</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setLocale('ar')}
-                style={({ pressed }) => [
-                  styles.langPill,
-                  locale === 'ar' && styles.langPillActive,
-                  pressed && styles.langPillPressed,
-                ]}
-                accessibilityRole="tab"
-                accessibilityState={{ selected: locale === 'ar' }}>
-                <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>{t('langAr')}</Text>
-              </Pressable>
-            </View>
+            <HeroLangSwitch style={{ alignSelf: 'flex-start' }} />
           </View>
           {isLoggedIn && profileLoaded ? (
             <AccountTabsRow
@@ -625,10 +653,7 @@ export default function CompteTabScreen() {
         {...(Platform.OS === 'android' ? { overScrollMode: 'always' as const } : {})}
         refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
         {authLoading ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={homeShell.blue} size="large" />
-            <Text style={[styles.loadingHint, isRTL && styles.txtRtl]}>{t('setupLoading')}</Text>
-          </View>
+          <AccountProfileLoadingSkeleton isRTL={isRTL} />
         ) : !isLoggedIn ? (
           <>
             <View style={styles.card}>
@@ -651,16 +676,20 @@ export default function CompteTabScreen() {
               </Link>
             </View>
           </>
-        ) : !profileLoaded && !refreshing ? (
-          <View style={styles.center}>
-            <ActivityIndicator color={homeShell.blue} size="large" />
-            <Text style={[styles.loadingHint, isRTL && styles.txtRtl]}>{t('setupLoading')}</Text>
-          </View>
+        ) : !profileLoaded ? (
+          <AccountProfileLoadingSkeleton isRTL={isRTL} />
+        ) : profileLoadError ? (
+          <LoadErrorState
+            message={profileLoadError}
+            onRetry={() => void onRefresh()}
+            retryLabel={loadErrorRetryLabel(t)}
+            isRTL={isRTL}
+          />
         ) : (
           <>
-            <View style={[styles.identityCard, isRTL && styles.identityCardRtl]}>
+            <View style={[styles.identityCard, styles.profileStackItem, isRTL && styles.identityCardRtl]}>
               <View style={styles.avatarRing}>
-                <FontAwesome name="user" size={28} color={homeShell.blue} />
+                <Text style={styles.avatarInitials}>{profileInitials}</Text>
               </View>
               <View style={[styles.identityTextCol, isRTL && styles.identityTextColRtl]}>
                 <Text
@@ -681,7 +710,7 @@ export default function CompteTabScreen() {
             </View>
 
             {mainTab === 'profile' ? (
-              <>
+              <View style={[styles.profileStack, styles.profileStackAfterIdentity]}>
             <LoyaltyTeaserCard
               rtl={isRTL}
               locale={locale}
@@ -689,11 +718,12 @@ export default function CompteTabScreen() {
               referralLink={referralProgram?.referralLink}
               referredDiscountPercent={referralProgram?.referredDiscountPercent}
               tierProgress={referralProgram?.tierProgress}
+              loading={referralLoading && !referralProgram}
               locked={Boolean(referralProgram) && !referralUnlocked}
               requiredServiceName={referralRequiredServiceName}
               t={t}
-              onPress={() => router.push('/compte/fidelite')}
-              onLockedCtaPress={openReferralServicesCta}
+              onPress={openFideliteScreen}
+              showShareActions={false}
             />
 
             <ActiveServicesPanel
@@ -705,16 +735,97 @@ export default function CompteTabScreen() {
               locale={locale}
               t={t}
               onRetry={() => void loadActiveServices()}
+              receiptClient={
+                profile || user
+                  ? {
+                      prenom: (profile?.prenom ?? '').trim(),
+                      nom: (profile?.nom ?? '').trim(),
+                      telephone: (profile?.telephone ?? user?.phone ?? '').trim(),
+                      email: (profile?.email ?? user?.email ?? '').trim() || undefined,
+                      bacType: profile?.bacType ?? null,
+                      filiere: profile?.filiere ?? null,
+                      bacAnnee: profile?.bacAnnee ?? null,
+                      specialite1: profile?.specialite1 ?? null,
+                      specialite2: profile?.specialite2 ?? null,
+                      specialite3: profile?.specialite3 ?? null,
+                    }
+                  : null
+              }
             />
 
-            <View style={styles.card}>
+            <ProfileOrdersPreviewPanel
+              orders={orders}
+              loading={ordersLoading}
+              loaded={ordersLoaded}
+              error={ordersLoadError}
+              openOrdersCount={openOrdersCount}
+              rtl={isRTL}
+              locale={locale}
+              t={t}
+              onViewAll={() => {
+                setMainTab('orders');
+                setOrdersSegment('all');
+              }}
+              onRetry={() => void loadOrders()}
+              onOrderPress={(publicId) => router.push(`/compte/commande/${publicId}`)}
+            />
+
+            <Pressable
+              onPress={() => openAppFeedback()}
+              style={({ pressed }) => [styles.feedbackCard, styles.profileStackItem, pressed && { opacity: 0.92 }]}
+              accessibilityRole="button">
+              <View style={[styles.feedbackCardHead, isRTL && styles.feedbackCardHeadRtl]}>
+                <View style={styles.feedbackCardIcon}>
+                  <FontAwesome name="comment-o" size={18} color={brand.primary} />
+                </View>
+                <View style={{ flex: 1, minWidth: 0 }}>
+                  <Text style={[styles.feedbackCardTitle, isRTL && styles.txtRtl]}>
+                    {t('appFeedbackTitle')}
+                  </Text>
+                  <Text style={[styles.feedbackCardSub, isRTL && styles.txtRtl]} numberOfLines={2}>
+                    {t('appFeedbackIntro')}
+                  </Text>
+                </View>
+                <FontAwesome
+                  name={isRTL ? 'chevron-left' : 'chevron-right'}
+                  size={14}
+                  color={homeShell.cardMuted}
+                />
+              </View>
+            </Pressable>
+
+            <View style={[styles.card, styles.profileStackItem]}>
               <View style={styles.sectionHead}>
-                <FontAwesome name="id-card-o" size={16} color={homeShell.greenDark} />
+                <FontAwesome name="id-card-o" size={16} color={homeShell.blue} />
                 <Text
                   style={[styles.sectionTitle, isRTL ? styles.sectionTitleRtl : styles.sectionTitleLtr]}>
                   {t('accountSectionProfile')}
                 </Text>
               </View>
+
+              <Field label={t('setupYouAre')} rtl={isRTL} required>
+                <Pressable
+                  onPress={() => setAcademicField('userType')}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('setupYouAre')}
+                  style={({ pressed }) => [
+                    styles.input,
+                    styles.cityPickerBtn,
+                    isRTL && styles.cityPickerBtnRtl,
+                    pressed && { opacity: 0.85 },
+                  ]}>
+                  <Text
+                    numberOfLines={1}
+                    style={[
+                      styles.cityPickerTxt,
+                      !form.userType.trim() && styles.cityPickerTxtPlaceholder,
+                      isRTL && styles.txtRtl,
+                    ]}>
+                    {labelFor(form.userType, academicConfig.userType.items) || t('setupYouAre')}
+                  </Text>
+                  <FontAwesome name="chevron-down" size={12} color={homeShell.cardMuted} />
+                </Pressable>
+              </Field>
 
               <Field label={t('setupLastName')} rtl={isRTL}>
                 <TextInput
@@ -810,12 +921,13 @@ export default function CompteTabScreen() {
                   />
                 </Pressable>
               </Field>
+
             </View>
 
             {/* ──────────────── Section Académique ──────────────── */}
-            <View style={styles.card}>
+            <View style={[styles.card, styles.profileStackItem]}>
               <View style={styles.sectionHead}>
-                <FontAwesome name="graduation-cap" size={16} color={homeShell.greenDark} />
+                <FontAwesome name="graduation-cap" size={16} color={homeShell.blue} />
                 <Text
                   style={[styles.sectionTitle, isRTL ? styles.sectionTitleRtl : styles.sectionTitleLtr]}>
                   {t('accountSectionAcademic')}
@@ -839,7 +951,10 @@ export default function CompteTabScreen() {
               {form.bacType === 'normal' ? (
                 <SelectField
                   label={t('setupFiliere')}
-                  value={labelFor(form.filiere, academicConfig.filiere.items)}
+                  value={
+                    resolveFiliereDisplayLabel(form.filiere, locale === 'ar' ? 'ar' : 'fr') ||
+                    labelFor(form.filiere, academicConfig.filiere.items)
+                  }
                   rtl={isRTL}
                   onPress={() => setAcademicField('filiere')}
                 />
@@ -938,9 +1053,9 @@ export default function CompteTabScreen() {
             </View>
 
             {/* ──────────────── Section Tuteur ──────────────── */}
-            <View style={styles.card}>
+            <View style={[styles.card, styles.profileStackItem]}>
               <View style={styles.sectionHead}>
-                <FontAwesome name="users" size={16} color={homeShell.greenDark} />
+                <FontAwesome name="users" size={16} color={homeShell.blue} />
                 <Text
                   style={[styles.sectionTitle, isRTL ? styles.sectionTitleRtl : styles.sectionTitleLtr]}>
                   {t('accountSectionTutor')}
@@ -1012,9 +1127,9 @@ export default function CompteTabScreen() {
               </Field>
             </View>
 
-            <View style={styles.card}>
+            <View style={[styles.card, styles.profileStackItem]}>
               <View style={styles.sectionHead}>
-                <FontAwesome name="lock" size={16} color={homeShell.greenDark} />
+                <FontAwesome name="lock" size={16} color={homeShell.blue} />
                 <Text
                   style={[styles.sectionTitle, isRTL ? styles.sectionTitleRtl : styles.sectionTitleLtr]}>
                   {t('accountSectionAccount')}
@@ -1075,9 +1190,9 @@ export default function CompteTabScreen() {
                 </>
               )}
             </Pressable>
-              </>
+              </View>
             ) : (
-              <View style={styles.card}>
+              <View style={[styles.card, styles.ordersTabCard]}>
                 <AccountTabsRow
                   tabs={[
                     { id: 'all' as const, label: t('accountOrdersSegmentAll'), icon: 'list' },
@@ -1097,10 +1212,7 @@ export default function CompteTabScreen() {
                 ) : null}
 
                 {ordersLoading && !ordersLoaded ? (
-                  <View style={styles.ordersCenter}>
-                    <ActivityIndicator color={homeShell.blue} size="small" />
-                    <Text style={[styles.ordersHint, isRTL && styles.txtRtl]}>{t('accountOrdersLoading')}</Text>
-                  </View>
+                  <AccountOrdersLoadingSkeleton count={2} isRTL={isRTL} style={styles.ordersCenter} />
                 ) : ordersLoadError ? (
                   <View style={styles.ordersCenter}>
                     <FontAwesome name="exclamation-circle" size={28} color="#DC2626" />
@@ -1165,10 +1277,7 @@ export default function CompteTabScreen() {
           items={academicConfig[academicField].items}
           selectedValue={academicConfig[academicField].value}
           onPick={(v) => {
-            // Le sheet retourne '' quand on appuie sur "Tout" → désélection.
-            const cleanField = academicField; // capture pour la closure
-            setForm((s) => ({ ...s, [cleanField]: v }));
-            // Si on change le type de bac, on nettoie les champs incompatibles
+            const cleanField = academicField;
             if (cleanField === 'bacType') {
               setForm((s) => ({
                 ...s,
@@ -1179,14 +1288,19 @@ export default function CompteTabScreen() {
                 ...(v === 'mission' ? { filiere: '', massarCode: '' } : {}),
                 ...(!v || v === '' ? { massarCode: '', studentCode: '' } : {}),
               }));
+              return;
             }
-            // Si le niveau change et n'est plus un niveau post-bac, on
-            // efface « diplôme en cours » pour éviter de conserver une
-            // valeur orpheline en base.
             if (cleanField === 'niveau') {
               const isHigher = ['BAC+1', 'BAC+2', 'BAC+3', 'BAC+4', 'BAC+5', 'BAC+6', 'Doctorant'].includes(v);
-              if (!isHigher) setForm((s) => ({ ...s, diplomeEnCours: '' }));
+              setForm((s) => ({
+                ...s,
+                niveau: v,
+                filiere: sanitizeFiliereForNiveau(v, s.filiere),
+                ...(!isHigher ? { diplomeEnCours: '' } : {}),
+              }));
+              return;
             }
+            setForm((s) => ({ ...s, [cleanField]: v }));
           }}
           onClose={() => setAcademicField(null)}
           rtl={isRTL}
@@ -1385,11 +1499,13 @@ function Field({
   label,
   hint,
   rtl,
+  required,
   children,
 }: {
   label: string;
   hint?: string;
   rtl: boolean;
+  required?: boolean;
   children: React.ReactNode;
 }) {
   return (
@@ -1398,6 +1514,7 @@ function Field({
       <View style={styles.fieldLabelRow}>
         <Text style={[styles.fieldLabel, rtl ? styles.fieldLabelRtl : styles.fieldLabelLtr]}>
           {label}
+          {required ? <Text style={styles.fieldRequiredMark}> *</Text> : null}
         </Text>
       </View>
       <View style={[styles.inputShell, rtl && styles.inputShellRtl]}>{children}</View>
@@ -1507,51 +1624,49 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     writingDirection: 'rtl',
   },
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: radius.full,
-    padding: 3,
-    alignSelf: 'flex-start',
-  },
-  langSwitchRtl: {
-    flexDirection: 'row-reverse',
-  },
-  langPill: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: radius.full,
-  },
-  langPillActive: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  langPillPressed: {
-    opacity: 0.88,
-  },
-  langPillTxt: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  langPillTxtActive: {
-    color: homeShell.text,
-  },
   scroll: {
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
   scrollContent: {
-    paddingHorizontal: spacing.xl,
-    paddingTop: spacing.lg,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
     flexGrow: 1,
+  },
+  profileStack: {
+    gap: spacing.lg,
+  },
+  profileStackAfterIdentity: {
+    marginTop: spacing.lg,
+  },
+  profileStackItem: {
+    marginBottom: 0,
   },
   /** Renforce l’alignement du contenu scrollé en RTL (Android + iOS). */
   scrollContentRtl: {
     direction: 'rtl',
     alignItems: 'stretch',
+  },
+  refreshBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(51, 62, 143, 0.06)',
+    borderWidth: 1,
+    borderColor: 'rgba(51, 62, 143, 0.12)',
+  },
+  refreshBannerRtl: {
+    flexDirection: 'row-reverse',
+  },
+  refreshBannerTxt: {
+    color: homeShell.blueDeep,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
   },
   txtRtl: {
     textAlign: 'right',
@@ -1576,10 +1691,48 @@ const styles = StyleSheet.create({
     borderColor: homeShell.borderOnWhite,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.07,
-    shadowRadius: 12,
+    shadowOpacity: 0.08,
+    shadowRadius: 14,
     elevation: 4,
-    marginBottom: spacing.lg,
+  },
+  feedbackCard: {
+    backgroundColor: homeShell.card,
+    borderRadius: radius.xl,
+    padding: spacing.lg,
+    borderWidth: 1,
+    borderColor: homeShell.borderOnWhite,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 10,
+    elevation: 3,
+  },
+  feedbackCardHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.md,
+  },
+  feedbackCardHeadRtl: {
+    flexDirection: 'row-reverse',
+  },
+  feedbackCardIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(51, 62, 143, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  feedbackCardTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    color: brand.primary,
+    marginBottom: 4,
+  },
+  feedbackCardSub: {
+    fontSize: fontSize.xs,
+    color: homeShell.cardMuted,
+    lineHeight: 17,
   },
   cardHead: {
     flexDirection: 'row',
@@ -1626,9 +1779,8 @@ const styles = StyleSheet.create({
     backgroundColor: homeShell.card,
     borderRadius: radius.xl,
     padding: spacing.lg,
-    marginBottom: spacing.lg,
     borderWidth: 1,
-    borderColor: 'rgba(47,206,148,0.22)',
+    borderColor: homeShell.borderOnWhite,
     shadowColor: '#0F172A',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.06,
@@ -1637,6 +1789,9 @@ const styles = StyleSheet.create({
   },
   identityCardRtl: {
     flexDirection: 'row-reverse',
+  },
+  ordersTabCard: {
+    marginTop: spacing.lg,
   },
   avatarRing: {
     width: 56,
@@ -1647,6 +1802,12 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
     borderColor: homeShell.greenAlpha28,
+  },
+  avatarInitials: {
+    fontSize: fontSize.lg,
+    fontWeight: '900',
+    color: homeShell.blue,
+    letterSpacing: -0.5,
   },
   identityName: {
     width: '100%',
@@ -1715,10 +1876,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
     fontSize: fontSize.xs,
     fontWeight: '800',
-    color: homeShell.blue,
+    color: '#475569',
     marginBottom: spacing.sm,
     textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.35,
   },
   fieldLabelLtr: {
     textAlign: 'left',
@@ -1729,6 +1890,10 @@ const styles = StyleSheet.create({
     writingDirection: 'rtl',
     textTransform: 'none',
     letterSpacing: 0,
+  },
+  fieldRequiredMark: {
+    color: '#DC2626',
+    fontWeight: '800',
   },
   inputShell: {
     flexDirection: 'row',

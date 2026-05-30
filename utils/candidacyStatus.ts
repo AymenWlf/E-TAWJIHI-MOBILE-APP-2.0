@@ -114,10 +114,21 @@ export function pickRegistrationUrlLabel(
   customLabel: string | null | undefined,
   announcementType: string | null | undefined,
   t: (k: HomeCopyKey) => string,
+  locale: 'fr' | 'ar' = 'fr',
+  customLabelAr?: string | null | undefined,
 ): string {
-  const c = (customLabel ?? '').trim();
-  if (c !== '') return c;
-  return t(pickRegistrationUrlLabelKey(announcementType));
+  const cFr = (customLabel ?? '').trim();
+  const cAr = (customLabelAr ?? '').trim();
+  const fallback = t(pickRegistrationUrlLabelKey(announcementType));
+
+  if (locale === 'ar') {
+    if (cAr !== '') return cAr;
+    // Libellé admin saisi en FR uniquement → i18n arabe selon le type d’annonce.
+    return fallback;
+  }
+
+  if (cFr !== '') return cFr;
+  return fallback;
 }
 
 /** Renvoie la description HTML à rendre selon la locale (FR par défaut, AR si dispo). */
@@ -197,6 +208,29 @@ export function formatTimeAgo(iso: string | null | undefined, locale: 'fr' | 'ar
   if (day < 30) return `Il y a ${day} j`;
   const months = Math.round(day / 30);
   return `Il y a ${months} mois`;
+}
+
+/** Parcours candidature clos (refus ou issue finale). */
+export function isCandidacyStatusFinalized(
+  status: CandidacyStatusType | null | undefined,
+): boolean {
+  return status?.isFinalizedMarker === true;
+}
+
+/** Sépare les statuts autorisés : en cours vs finalisés (pour le picker). */
+export function partitionCandidacyStatuses(
+  statuses: CandidacyStatusType[],
+): { inProgress: CandidacyStatusType[]; finalized: CandidacyStatusType[] } {
+  const inProgress: CandidacyStatusType[] = [];
+  const finalized: CandidacyStatusType[] = [];
+  for (const s of statuses) {
+    if (isCandidacyStatusFinalized(s)) {
+      finalized.push(s);
+    } else {
+      inProgress.push(s);
+    }
+  }
+  return { inProgress, finalized };
 }
 
 /** Renvoie le libellé d'un statut selon la locale (sécurisé contre `null`). */

@@ -1,4 +1,8 @@
 import { buildApiUrl } from '@/constants/api';
+import {
+  normalizePlatformServiceBrandColor,
+  parsePlatformServiceBrandIconKey,
+} from '@/utils/platformServiceBrandIcon';
 import type { AppLocale } from '@/constants/i18n';
 import { httpGetJson, httpPostJson } from '@/services/http';
 
@@ -26,6 +30,7 @@ export type PlatformServiceItem = {
   featuresAr: string[];
   price: string | null;
   promotionalPrice: string | null;
+  promotionDeadlineAt: string | null;
   currency: string;
   /**
    * Critères depuis l’API : `all`, `mission`, `reste`, et/ou noms de filières / intitulés.
@@ -43,6 +48,12 @@ export type PlatformServiceItem = {
   /** Couleur #RGB ou #RRGGBB pour la vignette du service. */
   brandColor: string;
   establishments: PlatformServiceEstablishment[];
+  miniDescriptionFr?: string | null;
+  miniDescriptionAr?: string | null;
+  niveauKeyApplied?: string | null;
+  /** false si le profil a un niveau sans offre active en base. */
+  eligibleForNiveau?: boolean;
+  availableNiveauKeys?: string[];
 };
 
 type ApiListResponse = {
@@ -66,6 +77,25 @@ export function platformServiceLocalizedDescription(
 }
 
 /** Puces « avantages » selon la langue de l’app (secours : autre langue). */
+/** Texte court carte boutique (mini description par niveau, sinon description). */
+export function platformServiceLocalizedMiniDescription(
+  s: Pick<
+    PlatformServiceItem,
+    'miniDescriptionFr' | 'miniDescriptionAr' | 'description' | 'descriptionFr' | 'descriptionAr'
+  >,
+  locale: AppLocale,
+): string | null {
+  const fr =
+    (s.miniDescriptionFr ?? '').trim() ||
+    platformServiceLocalizedDescription(s, 'fr') ||
+    '';
+  const ar = (s.miniDescriptionAr ?? '').trim();
+  if (locale === 'ar') {
+    return ar || fr || null;
+  }
+  return fr || ar || null;
+}
+
 export function platformServiceLocalizedFeatures(
   s: Pick<PlatformServiceItem, 'features' | 'featuresAr'>,
   locale: AppLocale,
@@ -127,6 +157,10 @@ function normalizeItem(raw: Record<string, unknown>): PlatformServiceItem {
       raw.promotionalPrice == null || raw.promotionalPrice === ''
         ? null
         : String(raw.promotionalPrice),
+    promotionDeadlineAt:
+      raw.promotionDeadlineAt == null || String(raw.promotionDeadlineAt).trim() === ''
+        ? null
+        : String(raw.promotionDeadlineAt).trim().slice(0, 10),
     currency: String(raw.currency ?? 'DHS'),
     filieresAccepted,
     popular: Boolean(raw.popular),
@@ -134,29 +168,40 @@ function normalizeItem(raw: Record<string, unknown>): PlatformServiceItem {
     isFreeShipping: Boolean(raw.isFreeShipping ?? raw.is_free_shipping),
     cta: String(raw.cta ?? 'Commander'),
     sortOrder: Number(raw.sortOrder ?? 0) || 0,
-    brandIcon:
-      raw.brandIcon == null || String(raw.brandIcon).trim() === ''
-        ? 'briefcase'
-        : String(raw.brandIcon).trim().slice(0, 48),
-    brandColor: (() => {
-      const c = raw.brandColor == null ? '' : String(raw.brandColor).trim();
-      if (c && /^#([0-9A-Fa-f]{3}|[0-9A-Fa-f]{6})$/.test(c)) return c;
-      return '#333E8F';
-    })(),
+    brandIcon: parsePlatformServiceBrandIconKey(
+      (raw.brandIcon ?? raw.brand_icon) as string | null | undefined,
+    ),
+    brandColor: normalizePlatformServiceBrandColor(
+      (raw.brandColor ?? raw.brand_color) as string | null | undefined,
+      false,
+    ),
     establishments,
+    eligibleForNiveau:
+      raw.eligibleForNiveau === undefined ? undefined : Boolean(raw.eligibleForNiveau),
+    availableNiveauKeys: Array.isArray(raw.availableNiveauKeys)
+      ? raw.availableNiveauKeys.map(String)
+      : undefined,
+    niveauKeyApplied:
+      raw.niveauKeyApplied == null || raw.niveauKeyApplied === ''
+        ? null
+        : String(raw.niveauKeyApplied),
   };
 }
 
-export async function fetchPlatformServices(): Promise<PlatformServiceItem[]> {
-  const url = buildApiUrl('/api/platform-services');
+export async function fetchPlatformServices(niveau?: string | null): Promise<PlatformServiceItem[]> {
+  const qs = niveau?.trim() ? `?niveau=${encodeURIComponent(niveau.trim())}` : '';
+  const url = buildApiUrl(`/api/platform-services${qs}`);
   const res = await httpGetJson<ApiListResponse>(url);
   if (!res.success || !Array.isArray(res.data)) return [];
   const items = res.data.map((row) => normalizeItem(row as Record<string, unknown>));
   return items.sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
-export async function fetchPlatformServiceBySlug(slug: string): Promise<PlatformServiceItem | null> {
-  const list = await fetchPlatformServices();
+export async function fetchPlatformServiceBySlug(
+  slug: string,
+  niveau?: string | null,
+): Promise<PlatformServiceItem | null> {
+  const list = await fetchPlatformServices(niveau);
   const s = String(slug ?? '').trim();
   return list.find((x) => x.slug === s) ?? null;
 }
@@ -168,6 +213,7 @@ export type PlatformServiceCatalogEntitlementStatus =
   | 'included'
   | 'blocked'
   | 'requires_prerequisite'
+  | 'not_eligible'
   | 'not_found';
 
 export type PlatformServiceCatalogEntitlement = {
@@ -177,14 +223,21 @@ export type PlatformServiceCatalogEntitlement = {
   code: string | null;
   upgradeFromSlugs: string[];
   includedViaSlug: string | null;
+  /** Services à retirer du panier si l’utilisateur ajoute celui-ci (conflit non cumulable). */
+  replacesCartSlugs?: string[];
+  /** Prix unitaire après crédit upgrade (prix liste source déduit). */
+  upgradeUnitPrice: string | null;
+  /** Montant déduit (prix liste du service possédé, pas le prix promo). */
+  upgradeCredit: string | null;
 };
 
 export async function fetchPlatformServiceCatalogEntitlements(
-  params: { phone?: string; cartSlugs?: string[] },
+  params: { phone?: string; cartSlugs?: string[]; niveau?: string | null },
   accessToken?: string | null,
 ): Promise<Record<string, PlatformServiceCatalogEntitlement>> {
   const search = new URLSearchParams();
   if (params.phone?.trim()) search.set('phone', params.phone.trim());
+  if (params.niveau?.trim()) search.set('niveau', params.niveau.trim());
   const cart = (params.cartSlugs ?? []).map((s) => s.trim()).filter(Boolean);
   if (cart.length > 0) search.set('cart', cart.join(','));
   const qs = search.toString();
@@ -196,7 +249,18 @@ export async function fetchPlatformServiceCatalogEntitlements(
     data?: { bySlug?: Record<string, PlatformServiceCatalogEntitlement> };
   }>(url, { headers });
   if (!res.success || !res.data?.bySlug) return {};
-  return res.data.bySlug;
+  const out: Record<string, PlatformServiceCatalogEntitlement> = {};
+  for (const [slug, row] of Object.entries(res.data.bySlug)) {
+    const raw = row as Record<string, unknown>;
+    const replacesRaw = raw.replacesCartSlugs ?? raw.replaces_cart_slugs;
+    out[slug] = {
+      ...(row as PlatformServiceCatalogEntitlement),
+      replacesCartSlugs: Array.isArray(replacesRaw)
+        ? replacesRaw.map((s) => String(s).trim()).filter(Boolean)
+        : [],
+    };
+  }
+  return out;
 }
 
 export async function checkPlatformServicePurchaseEligibility(

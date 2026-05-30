@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -6,7 +6,10 @@ import {
   type PlatformServiceCatalogEntitlement,
 } from '@/services/platformServices';
 
-export function usePlatformServiceCatalogEntitlements(cartServiceSlugs: string[]): {
+export function usePlatformServiceCatalogEntitlements(
+  cartServiceSlugs: string[],
+  niveau?: string | null,
+): {
   bySlug: Record<string, PlatformServiceCatalogEntitlement>;
   loading: boolean;
   refetch: () => Promise<void>;
@@ -14,6 +17,7 @@ export function usePlatformServiceCatalogEntitlements(cartServiceSlugs: string[]
   const { user, getValidAccessToken } = useAuth();
   const [bySlug, setBySlug] = useState<Record<string, PlatformServiceCatalogEntitlement>>({});
   const [loading, setLoading] = useState(true);
+  const hasLoadedRef = useRef(false);
 
   const cartKey = useMemo(
     () => [...cartServiceSlugs].map((s) => s.trim()).filter(Boolean).sort().join(','),
@@ -27,16 +31,18 @@ export function usePlatformServiceCatalogEntitlements(cartServiceSlugs: string[]
     try {
       const token = await getValidAccessToken();
       const map = await fetchPlatformServiceCatalogEntitlements(
-        { phone, cartSlugs: cartKey ? cartKey.split(',') : [] },
+        { phone, cartSlugs: cartKey ? cartKey.split(',') : [], niveau },
         token,
       );
       setBySlug(map);
+      hasLoadedRef.current = true;
     } catch {
       setBySlug({});
+      hasLoadedRef.current = true;
     } finally {
       setLoading(false);
     }
-  }, [cartKey, getValidAccessToken, phone]);
+  }, [cartKey, getValidAccessToken, phone, niveau]);
 
   useEffect(() => {
     void refetch();

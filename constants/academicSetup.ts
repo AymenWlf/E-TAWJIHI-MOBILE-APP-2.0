@@ -15,8 +15,8 @@ export const NIVEAU_ETUDE_OPTIONS: LabeledOption[] = [
 ];
 
 export const BAC_TYPES = [
-  { value: 'normal', label: 'Bac marocain' },
-  { value: 'mission', label: 'Bac Mission' },
+  { value: 'normal', label: 'Bac marocain', labelAr: 'باك مغربي' },
+  { value: 'mission', label: 'Bac Mission', labelAr: 'باك فرنسي (ميسيون)' },
 ] as const;
 
 /** Valeurs = libellés standard FR envoyés au backend ; label / labelAr = affichage selon la langue. */
@@ -87,6 +87,29 @@ export const SPECIALITES_MISSION = [
   'Arts',
   'Technologique',
 ] as const;
+
+/** Alias aligné web — utilisé par le rapport diagnostic (`schoolDiagnosticPayloadAdminDisplay`). */
+export const NIVEAU_ETUDE_FORM_MAROC_OPTIONS: { value: string; label: string }[] = NIVEAU_ETUDE_OPTIONS.map(
+  (o) => ({ value: o.value, label: o.label }),
+);
+
+/** Alias aligné web — valeurs identiques au diagnostic rapide. */
+export const FILIERE_BAC_FORM_MAROC_OPTIONS: { value: string; label: string }[] = FILIERE_BAC_OPTIONS.map(
+  (o) => ({ value: o.value, label: o.label }),
+);
+
+export const SPECIALITES_MISSION_LABELS: Record<string, string> = {
+  Mathématiques: 'Mathématiques',
+  'Physique-Chimie': 'Physique-Chimie',
+  SVT: 'SVT (Sciences de la Vie et de la Terre)',
+  NSI: 'Numérique et Sciences Informatiques (NSI)',
+  SES: 'SES (Sciences Économiques et Sociales)',
+  HGGSP: 'HGGSP (Histoire-Géo, Géopolitique, Sciences Politiques)',
+  HLP: 'HLP (Humanités, Littérature, Philosophie)',
+  LLCE: 'LLCE (Langues, Littératures et Cultures Étrangères)',
+  Arts: 'Arts (Théâtre, Musique, Arts Plastiques...)',
+  Technologique: 'Technologique (STMG, STI2D, STL, ...)',
+};
 
 export const TYPE_ECOLE_PREFERE: LabeledOption[] = [
   { value: 'public', label: 'Public', labelAr: 'عمومي' },

@@ -9,11 +9,12 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SearchInputWithApply } from '@/components/search/SearchInputWithApply';
+import { SchoolsSearchFiltersSkeleton } from '@/components/schools/SchoolsSearchFiltersSkeleton';
 import { SidebarMenuIconButton } from '@/components/SidebarMenuIconButton';
 import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
 import { EstablishmentCard } from '@/components/schools/EstablishmentCard';
@@ -23,13 +24,20 @@ import {
   EstablishmentFiltersModal,
   type EstablishmentFiltersValue,
 } from '@/components/schools/EstablishmentFiltersModal';
-import { EstablishmentQnaBottomSheet } from '@/components/schools/EstablishmentQnaBottomSheet';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
+import {
+  EstablishmentCardSkeleton,
+  EstablishmentCardSkeletonStack,
+} from '@/components/schools/EstablishmentCardSkeleton';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { getApiBaseUrl } from '@/constants/api';
+import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
+import { useAppliedTextSearch } from '@/hooks/useAppliedTextSearch';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import { listAllEstablishments, listEstablishments, type EstablishmentNormalized } from '@/services/establishments';
 import {
@@ -41,7 +49,7 @@ import {
   recordEstablishmentClick,
   recordEstablishmentListingImpressionsBatch,
 } from '@/services/establishmentTracking';
-import { evaluateEligibilityByFiliere } from '@/utils/eligibility';
+import { evaluateEligibilityByFiliere, matchesAcceptedStudyPathFilter } from '@/utils/eligibility';
 import { fireAndForget } from '@/utils/fireAndForget';
 import {
   fetchListingPlacementsByEstablishment,
@@ -50,7 +58,7 @@ import {
 } from '@/services/referencingAds';
 import { listAllSecteursActive, listCities, type CityRow, type SecteurRow } from '@/services/referenceData';
 import { homeShell } from '@/theme/homeShell';
-import { fontSize, radius, spacing } from '@/theme/tokens';
+import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
   applyEstablishmentWebClientFilters,
   getListingWebOrderContentSig,
@@ -61,7 +69,7 @@ const PAGE_SIZE = 18;
 
 export default function EcolesScreen() {
   const router = useRouter();
-  const { isRTL, locale, setLocale, t } = useLocale();
+  const { isRTL, t } = useLocale();
   const { presentShare } = useSharePreview();
   const insets = useSafeAreaInsets();
 
@@ -77,12 +85,19 @@ export default function EcolesScreen() {
   const [filteredPool, setFilteredPool] = useState<EstablishmentNormalized[] | null>(null);
   const [visibleEnd, setVisibleEnd] = useState(PAGE_SIZE);
 
-  const [q, setQ] = useState('');
-  const [debouncedQ, setDebouncedQ] = useState('');
+  const {
+    draft: q,
+    setDraft: setQ,
+    applied: appliedQ,
+    apply: applySearch,
+    clear: clearSearch,
+    hasPending: searchPending,
+  } = useAppliedTextSearch();
 
   /** Même modale que l’onglet Inscriptions › Annonces (`EstablishmentFiltersModal`). */
   const [filtersValue, setFiltersValue] = useState<EstablishmentFiltersValue>(() => defaultEstablishmentFilters());
   const [filtersOpen, setFiltersOpen] = useState(false);
+
   /** Afficher uniquement les établissements déjà suivis (cœur). */
   const [followedOnly, setFollowedOnly] = useState(false);
 
@@ -93,17 +108,32 @@ export default function EcolesScreen() {
   const listingWebOrderContentSigRef = useRef<string>('');
 
   /* Suivi d'écoles : Set des IDs suivis + IDs en cours de toggle */
-  const { user, getValidAccessToken } = useAuth();
+  const { user, getValidAccessToken, isLoading: authLoading } = useAuth();
   const isLoggedIn = !!user;
-  const { profile: eligibilityProfile, loading: eligibilityProfileLoading } = useEligibilityProfile();
+  const {
+    profile: eligibilityProfile,
+    loading: eligibilityProfileLoading,
+    refetch: refetchEligibilityProfile,
+  } = useEligibilityProfile();
+  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading } = useTawjihPlusAccess();
+  /** Skeleton recherche/filtres tant que la session ou les droits TAWJIH PLUS ne sont pas connus. */
+  const searchFiltersAccessLoading = authLoading || tawjihPlusLoading;
+  const searchFiltersLocked = !searchFiltersAccessLoading && !hasTawjihPlusAccess;
+
+  const openTawjihPlusProduct = useCallback(() => {
+    router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
+  }, [router]);
+
+  const showTawjihPlusUpgradeAlert = useCallback(() => {
+    Alert.alert(t('inscTawjihPlusLockTitle'), t('schoolsSearchFiltersLockedHint'), [
+      { text: t('accountLogoutCancel'), style: 'cancel' },
+      { text: t('inscTawjihPlusUpgradeCta'), onPress: openTawjihPlusProduct },
+    ]);
+  }, [openTawjihPlusProduct, t]);
   const [followedIds, setFollowedIds] = useState<Set<number>>(() => new Set());
   const [followBusyIds, setFollowBusyIds] = useState<Set<number>>(() => new Set());
   /** Premier chargement des suivis : évite d’afficher « non suivi » avant la réponse API. */
   const [followsReady, setFollowsReady] = useState(!isLoggedIn);
-
-  /** Panneau Q&R (questions / commentaires) ouvert depuis la carte école. */
-  const [qnaSheet, setQnaSheet] = useState<{ id: number; name: string } | null>(null);
-  const closeQnaSheet = useCallback(() => setQnaSheet(null), []);
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -233,11 +263,6 @@ export default function EcolesScreen() {
   );
 
   useEffect(() => {
-    const t = setTimeout(() => setDebouncedQ(q.trim()), 350);
-    return () => clearTimeout(t);
-  }, [q]);
-
-  useEffect(() => {
     void listCities(1000)
       .then(setCities)
       .catch(() => setCities([]));
@@ -255,17 +280,20 @@ export default function EcolesScreen() {
     return (
       !!fv.secteurId.trim() ||
       !!fv.diplome.trim() ||
-      fv.eTawjihiOnly ||
       fv.fraisMin > 0 ||
       fv.fraisMax < 100_000 ||
       !!fv.regionTitle.trim()
     );
   }, [filtersValue]);
 
+  const regionTitle = filtersValue.regionTitle.trim();
+  /** Attendre les villes uniquement pour le filtre région (scan client). */
+  const needsCitiesForRegion = needsClientScan && regionTitle.length > 0;
+
   const queryKey = useMemo(
     () =>
       [
-        debouncedQ,
+        appliedQ,
         filtersValue.type,
         filtersValue.ville.trim(),
         filtersValue.universite.trim(),
@@ -274,32 +302,20 @@ export default function EcolesScreen() {
         filtersValue.diplome,
         filtersValue.fraisMin,
         filtersValue.fraisMax,
-        filtersValue.eTawjihiOnly ? 1 : 0,
-        filtersValue.featuredOnly ? 1 : 0,
-        filtersValue.recommendedOnly ? 1 : 0,
-        filtersValue.sponsoredOnly ? 1 : 0,
-        filtersValue.accreditationEtat ? 1 : 0,
-        filtersValue.echangeInternational ? 1 : 0,
         filtersValue.eligibilityFilter,
         needsClientScan ? 1 : 0,
-        cities.length,
       ].join('__'),
-    [debouncedQ, filtersValue, needsClientScan, cities.length],
+    [appliedQ, filtersValue, needsClientScan],
   );
 
   const apiQueryBase = useCallback(
     () => ({
-      search: debouncedQ || undefined,
+      search: appliedQ || undefined,
       type: filtersValue.type || undefined,
       ville: filtersValue.ville.trim() || undefined,
       universite: filtersValue.universite.trim() || undefined,
-      isRecommended: filtersValue.recommendedOnly || undefined,
-      isSponsored: filtersValue.sponsoredOnly || undefined,
-      isFeatured: filtersValue.featuredOnly || undefined,
-      echangeInternational: filtersValue.echangeInternational || undefined,
-      accreditationEtat: filtersValue.accreditationEtat || undefined,
     }),
-    [debouncedQ, filtersValue],
+    [appliedQ, filtersValue],
   );
 
   useEffect(() => {
@@ -312,8 +328,7 @@ export default function EcolesScreen() {
     listingWebOrderContentSigRef.current = '';
 
     if (needsClientScan) {
-      const rt = filtersValue.regionTitle.trim();
-      if (rt && cities.length === 0) {
+      if (needsCitiesForRegion && cities.length === 0) {
         setLoading(true);
         return () => {
           cancelled = true;
@@ -324,10 +339,10 @@ export default function EcolesScreen() {
         .then((all) => {
           if (cancelled) return;
           const regionSet =
-            rt && cities.length > 0
+            needsCitiesForRegion && cities.length > 0
               ? new Set(
                   cities
-                    .filter((c) => c.region?.titre === rt)
+                    .filter((c) => c.region?.titre === regionTitle)
                     .map((c) => c.titre.trim())
                     .filter(Boolean),
                 )
@@ -339,7 +354,6 @@ export default function EcolesScreen() {
             diplomeExact: filtersValue.diplome.trim() || null,
             fraisMin: filtersValue.fraisMin,
             fraisMax: filtersValue.fraisMax,
-            eTawjihiInscription: filtersValue.eTawjihiOnly,
           });
           setFilteredPool(f);
           setItems(f.slice(0, PAGE_SIZE));
@@ -377,19 +391,34 @@ export default function EcolesScreen() {
     return () => {
       cancelled = true;
     };
-  }, [queryKey, apiQueryBase]);
+  }, [queryKey, apiQueryBase, needsCitiesForRegion ? cities.length : -1]);
 
-  async function onRefresh() {
+  const refreshEstablishments = useCallback(async () => {
+    if (refreshing) return;
     setRefreshing(true);
     setErr(null);
+    setPage(1);
+    setVisibleEnd(PAGE_SIZE);
+    setClientMode(needsClientScan);
+    listingWebOrderContentSigRef.current = '';
+
     try {
-      await reloadFollows();
       const rt = filtersValue.regionTitle.trim();
       let citiesLocal = cities;
-      if (needsClientScan && rt && citiesLocal.length === 0) {
-        citiesLocal = await listCities(1000).catch(() => [] as CityRow[]);
-        setCities(citiesLocal);
-      }
+
+      await Promise.all([
+        reloadFollows(),
+        isLoggedIn ? refetchEligibilityProfile() : Promise.resolve(),
+        fetchListingPlacementsByEstablishment()
+          .then(setPlacementByEid)
+          .catch(() => setPlacementByEid({})),
+        (async () => {
+          if (needsClientScan && rt && citiesLocal.length === 0) {
+            citiesLocal = await listCities(1000).catch(() => [] as CityRow[]);
+            setCities(citiesLocal);
+          }
+        })(),
+      ]);
 
       if (needsClientScan) {
         const all = await listAllEstablishments(apiQueryBase());
@@ -402,27 +431,23 @@ export default function EcolesScreen() {
                   .filter(Boolean),
               )
             : null;
-        let f = applyEstablishmentWebClientFilters(all, {
+        const f = applyEstablishmentWebClientFilters(all, {
           secteurId: filtersValue.secteurId ? parseInt(filtersValue.secteurId, 10) : null,
           villesInRegion: regionSet && regionSet.size > 0 ? regionSet : null,
           villeExact: filtersValue.ville.trim() || null,
           diplomeExact: filtersValue.diplome.trim() || null,
           fraisMin: filtersValue.fraisMin,
           fraisMax: filtersValue.fraisMax,
-          eTawjihiInscription: filtersValue.eTawjihiOnly,
         });
-        listingWebOrderContentSigRef.current = '';
         setFilteredPool(f);
         setItems(f.slice(0, PAGE_SIZE));
         setVisibleEnd(PAGE_SIZE);
         setPages(Math.max(1, Math.ceil(f.length / PAGE_SIZE)));
-        setPage(1);
       } else {
         setFilteredPool(null);
         const res = await listEstablishments({ ...apiQueryBase(), page: 1, limit: PAGE_SIZE });
         setItems(res.data);
         setPages(res.pagination.pages);
-        setPage(1);
       }
     } catch (e: unknown) {
       const msg =
@@ -431,7 +456,16 @@ export default function EcolesScreen() {
     } finally {
       setRefreshing(false);
     }
-  }
+  }, [
+    refreshing,
+    reloadFollows,
+    isLoggedIn,
+    refetchEligibilityProfile,
+    needsClientScan,
+    filtersValue,
+    cities,
+    apiQueryBase,
+  ]);
 
   async function loadMore() {
     if (loadingMore || loading || refreshing) return;
@@ -488,6 +522,19 @@ export default function EcolesScreen() {
   const visibleItems = useMemo(() => {
     const elig = filtersValue.eligibilityFilter;
     let list = mergedEstablishments;
+    const studyBac = filtersValue.acceptedStudyBacType;
+    const studyVal = filtersValue.acceptedStudyValue.trim();
+    if ((studyBac === 'normal' || studyBac === 'mission') && studyVal) {
+      list = list.filter((it) =>
+        matchesAcceptedStudyPathFilter(
+          {
+            filieresAcceptees: it.filieresAcceptees ?? null,
+            specialitesBacMissionAcceptees: it.specialitesBacMissionAcceptees ?? null,
+          },
+          { bacType: studyBac, value: studyVal },
+        ),
+      );
+    }
     if (elig !== 'all' && eligibilityProfile) {
       list = list.filter((it) => {
         const verdict = evaluateEligibilityByFiliere(
@@ -505,7 +552,16 @@ export default function EcolesScreen() {
       list = list.filter((it) => followedIds.has(it.id));
     }
     return list;
-  }, [mergedEstablishments, filtersValue.eligibilityFilter, eligibilityProfile, followedOnly, isLoggedIn, followedIds]);
+  }, [
+    mergedEstablishments,
+    filtersValue.eligibilityFilter,
+    filtersValue.acceptedStudyBacType,
+    filtersValue.acceptedStudyValue,
+    eligibilityProfile,
+    followedOnly,
+    isLoggedIn,
+    followedIds,
+  ]);
 
   const onPressFollowedOnlyToggle = useCallback(() => {
     if (!isLoggedIn) {
@@ -537,89 +593,80 @@ export default function EcolesScreen() {
               {t('schoolsHeroTitle')}
             </Text>
           </View>
-          <View
-            style={[styles.langSwitch, isRTL && styles.langSwitchRtl]}
-            accessibilityRole="tablist"
-            accessibilityLabel={t('languageSwitcher')}>
-            <Pressable
-              onPress={() => setLocale('fr')}
-              style={({ pressed }) => [
-                styles.langPill,
-                locale === 'fr' && styles.langPillActive,
-                pressed && styles.langPillPressed,
-              ]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: locale === 'fr' }}>
-              <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>FR</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setLocale('ar')}
-              style={({ pressed }) => [
-                styles.langPill,
-                locale === 'ar' && styles.langPillActive,
-                pressed && styles.langPillPressed,
-              ]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: locale === 'ar' }}>
-              <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>عربي</Text>
-            </Pressable>
-          </View>
+          <HeroLangSwitch />
         </View>
 
         <View style={styles.searchCard}>
-          <View style={[styles.searchRow, isRTL && styles.searchRowRtl]}>
-            <FontAwesome name="search" size={16} color={homeShell.cardMuted} />
-            <TextInput
-              value={q}
-              onChangeText={setQ}
-              placeholder={t('schoolsSearchPlaceholder')}
-              placeholderTextColor={homeShell.cardMuted}
-              style={[styles.searchInput, isRTL && styles.searchInputRtl]}
-              autoCapitalize="none"
-              autoCorrect={false}
-            />
-            {q ? (
-              <Pressable onPress={() => setQ('')} hitSlop={10} accessibilityLabel="Effacer la recherche">
-                <FontAwesome name="times-circle" size={18} color={homeShell.cardMuted} />
-              </Pressable>
-            ) : null}
-          </View>
-
-          <View style={[styles.filterBarRow, isRTL && styles.filterBarRowRtl]}>
-            <Pressable
-              onPress={() => setFiltersOpen(true)}
-              style={({ pressed }) => [
-                styles.filtersBtnBar,
-                isRTL && styles.filtersBtnBarRtl,
-                pressed && { opacity: 0.92 },
-              ]}
-              accessibilityRole="button"
-              accessibilityLabel={t('schoolsFiltersA11y')}>
-              <FontAwesome name="sliders" size={16} color={homeShell.blue} />
-              <Text style={styles.filtersBtnBarTxt}>{t('schoolsFilters')}</Text>
-              {activeFiltersCount > 0 ? (
-                <View style={styles.filtersBadge}>
-                  <Text style={styles.filtersBadgeTxt}>{activeFiltersCount}</Text>
-                </View>
-              ) : null}
-            </Pressable>
-            <Pressable
-              onPress={onPressFollowedOnlyToggle}
-              style={({ pressed }) => [
-                styles.followedOnlyBtn,
-                followedOnly && styles.followedOnlyBtnOn,
-                pressed && { opacity: 0.88 },
-              ]}
-              accessibilityRole="button"
-              accessibilityState={{ selected: followedOnly }}
-              accessibilityLabel={t('schoolsFollowedOnlyA11y')}>
-              <FontAwesome
-                name={followedOnly ? 'heart' : 'heart-o'}
-                size={18}
-                color={followedOnly ? homeShell.blue : homeShell.cardMuted}
+          {searchFiltersAccessLoading ? (
+            <SchoolsSearchFiltersSkeleton isRTL={isRTL} />
+          ) : (
+            <>
+              <SearchInputWithApply
+                value={q}
+                onChangeText={setQ}
+                onApply={applySearch}
+                onClear={clearSearch}
+                placeholder={t('schoolsSearchPlaceholder')}
+                applyLabel={t('schoolsApply')}
+                showApply={!searchFiltersLocked && (searchPending || q.trim().length > 0)}
+                isRTL={isRTL}
+                locked={searchFiltersLocked}
+                lockedPlaceholder={t('schoolsSearchPlaceholderLocked')}
+                onLockedPress={showTawjihPlusUpgradeAlert}
               />
-            </Pressable>
-          </View>
+
+              <View style={[styles.filterBarRow, isRTL && styles.filterBarRowRtl]}>
+                <Pressable
+                  onPress={
+                    searchFiltersLocked ? showTawjihPlusUpgradeAlert : () => setFiltersOpen(true)
+                  }
+                  style={({ pressed }) => [
+                    styles.filtersBtnBar,
+                    isRTL && styles.filtersBtnBarRtl,
+                    searchFiltersLocked && styles.filtersBtnBarLocked,
+                    pressed && { opacity: 0.92 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityLabel={
+                    searchFiltersLocked ? t('schoolsSearchFiltersLockedHint') : t('schoolsFiltersA11y')
+                  }>
+                  <FontAwesome
+                    name={searchFiltersLocked ? 'lock' : 'sliders'}
+                    size={16}
+                    color={searchFiltersLocked ? '#94A3B8' : homeShell.blue}
+                  />
+                  <Text
+                    style={[
+                      styles.filtersBtnBarTxt,
+                      searchFiltersLocked && styles.filtersBtnBarTxtLocked,
+                    ]}>
+                    {t('schoolsFilters')}
+                  </Text>
+                  {!searchFiltersLocked && activeFiltersCount > 0 ? (
+                    <View style={styles.filtersBadge}>
+                      <Text style={styles.filtersBadgeTxt}>{activeFiltersCount}</Text>
+                    </View>
+                  ) : null}
+                </Pressable>
+                <Pressable
+                  onPress={onPressFollowedOnlyToggle}
+                  style={({ pressed }) => [
+                    styles.followedOnlyBtn,
+                    followedOnly && styles.followedOnlyBtnOn,
+                    pressed && { opacity: 0.88 },
+                  ]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: followedOnly }}
+                  accessibilityLabel={t('schoolsFollowedOnlyA11y')}>
+                  <FontAwesome
+                    name={followedOnly ? 'heart' : 'heart-o'}
+                    size={18}
+                    color={followedOnly ? homeShell.blue : homeShell.cardMuted}
+                  />
+                </Pressable>
+              </View>
+            </>
+          )}
         </View>
 
         </View>
@@ -630,29 +677,36 @@ export default function EcolesScreen() {
           style={styles.scrollFill}
           contentContainerStyle={styles.center}
           keyboardShouldPersistTaps="handled"
-          refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-          <ActivityIndicator color={homeShell.blue} />
+          refreshControl={
+            <AppRefreshControl refreshing={refreshing} onRefresh={() => void refreshEstablishments()} />
+          }>
+          <EstablishmentCardSkeletonStack count={4} isRTL={isRTL} />
         </ScrollView>
       ) : err ? (
         <ScrollView
           style={styles.scrollFill}
           contentContainerStyle={styles.center}
           keyboardShouldPersistTaps="handled"
-          refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+          refreshControl={
+            <AppRefreshControl refreshing={refreshing} onRefresh={() => void refreshEstablishments()} />
+          }>
           <Text style={styles.errTxt}>{err}</Text>
           <Text style={styles.errSub}>API: {getApiBaseUrl()}</Text>
-          <Pressable onPress={onRefresh} style={styles.retryBtn}>
+          <Pressable onPress={() => void refreshEstablishments()} style={styles.retryBtn}>
             <Text style={styles.retryTxt}>{t('schoolsRetry')}</Text>
           </Pressable>
         </ScrollView>
       ) : (
+        <View style={styles.scrollFill}>
         <FlatList
           data={visibleItems}
           keyExtractor={(it) => String(it.id)}
           style={styles.scrollFill}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
-          refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+          refreshControl={
+            <AppRefreshControl refreshing={refreshing} onRefresh={() => void refreshEstablishments()} />
+          }
           onEndReachedThreshold={0.35}
           onEndReached={loadMore}
           ListHeaderComponent={
@@ -661,7 +715,7 @@ export default function EcolesScreen() {
           ListFooterComponent={
             loadingMore ? (
               <View style={styles.footer}>
-                <ActivityIndicator color={homeShell.blue} />
+                <EstablishmentCardSkeleton isRTL={isRTL} />
               </View>
             ) : null
           }
@@ -681,25 +735,23 @@ export default function EcolesScreen() {
                 followBusy={followBusyIds.has(item.id)}
                 eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
                 onToggleFollow={() => handleToggleFollow(item.id)}
-                onOpenComments={() => {
-                  const name = isRTL && item.nomArabe ? item.nomArabe : item.nom;
-                  setQnaSheet({ id: item.id, name });
-                }}
               />
             </View>
           )}
         />
+        {refreshing ? (
+          <View style={styles.refreshOverlay} pointerEvents="none">
+            <View style={[styles.refreshOverlayInner, isRTL && styles.refreshBannerRtl]}>
+              <ActivityIndicator size="large" color={homeShell.blue} />
+              <Text style={styles.refreshOverlayTxt}>{t('schoolsRefreshing')}</Text>
+            </View>
+          </View>
+        ) : null}
+        </View>
       )}
 
-      <EstablishmentQnaBottomSheet
-        visible={qnaSheet !== null}
-        establishmentId={qnaSheet?.id ?? 0}
-        establishmentName={qnaSheet?.name ?? ''}
-        onClose={closeQnaSheet}
-      />
-
       <EstablishmentFiltersModal
-        visible={filtersOpen}
+        visible={filtersOpen && !searchFiltersLocked}
         onClose={() => setFiltersOpen(false)}
         value={filtersValue}
         onChange={setFiltersValue}
@@ -758,43 +810,12 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     writingDirection: 'rtl',
   },
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: radius.full,
-    padding: 3,
-  },
-  langSwitchRtl: {
-    flexDirection: 'row-reverse',
-  },
-  langPill: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: radius.full,
-  },
-  langPillActive: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  langPillPressed: {
-    opacity: 0.88,
-  },
-  langPillTxt: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  langPillTxtActive: {
-    color: homeShell.text,
-  },
   searchCard: {
     marginTop: spacing.lg,
     backgroundColor: homeShell.card,
     borderRadius: radius.xl,
     padding: spacing.sm + 2,
-    gap: spacing.md,
+    gap: spacing.sm,
     borderWidth: 1,
     borderColor: 'rgba(47,206,148,0.18)',
     shadowColor: '#0F172A',
@@ -868,6 +889,14 @@ const styles = StyleSheet.create({
   filtersBtnBarRtl: {
     flexDirection: 'row-reverse',
   },
+  filtersBtnBarLocked: {
+    backgroundColor: '#F8FAFC',
+    borderColor: homeShell.borderOnWhite,
+    opacity: 0.92,
+  },
+  filtersBtnBarTxtLocked: {
+    color: '#94A3B8',
+  },
   filtersBtnBarTxt: {
     color: homeShell.blueDeep,
     fontSize: fontSize.sm,
@@ -914,4 +943,31 @@ const styles = StyleSheet.create({
   },
   retryTxt: { color: homeShell.text, fontWeight: '800', fontSize: fontSize.sm },
   footer: { paddingVertical: 18 },
+  refreshBannerRtl: {
+    flexDirection: 'row-reverse',
+  },
+  refreshOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: spacing.xl,
+    backgroundColor: 'rgba(248, 250, 252, 0.72)',
+    zIndex: 8,
+  },
+  refreshOverlayInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: brand.white,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
+  },
+  refreshOverlayTxt: {
+    color: homeShell.blueDeep,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+  },
 });

@@ -19,16 +19,27 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { SidebarMenuIconButton } from '@/components/SidebarMenuIconButton';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
+import { LoadErrorState, loadErrorRetryLabel } from '@/components/ui/LoadErrorState';
+import {
+  ShopProductGridFooterSkeleton,
+  ShopProductGridSkeleton,
+} from '@/components/shop/ShopProductCardSkeleton';
+import { ShopServicesPreviewSkeleton } from '@/components/shop/ShopServicesPreviewSkeleton';
+import { ShopServiceCompactCardSkeletonStack } from '@/components/shop/ShopServiceCompactCardSkeleton';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { ETAWJIHI_LOGO_TRANSPARENT } from '@/constants/brandAssets';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import { usePlatformServiceCatalogEntitlements } from '@/hooks/usePlatformServiceCatalogEntitlements';
 import {
+  fetchPlatformServiceCatalogEntitlements,
   fetchPlatformServices,
   platformServiceLocalizedDescription,
+  platformServiceLocalizedMiniDescription,
   platformServiceLocalizedFeatures,
   type PlatformServiceCatalogEntitlement,
   type PlatformServiceItem,
@@ -47,18 +58,39 @@ import {
 } from '@/utils/shopFormatPrice';
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
 import { platformServiceCartProductId } from '@/utils/platformServiceCart';
+import {
+  addPlatformServiceToCartWithEviction,
+  platformServiceCanAddToCart,
+} from '@/utils/platformServiceCartEviction';
 import { getShopPathAfterBuyNow } from '@/utils/shopCartStorage';
-import { platformServiceVisibleForProfile } from '@/utils/platformServiceFilieresFilter';
+import {
+  platformServiceEligibleForProfile,
+  platformServiceVisibleForProfile,
+} from '@/utils/platformServiceFilieresFilter';
+import {
+  normalizePlatformServiceBrandColor,
+  platformServiceCarouselCardWidth,
+  serviceCarouselContentInset,
+  withAlpha,
+} from '@/utils/platformServiceBrandIcon';
+import { getUserFacingLoadError } from '@/utils/apiError';
 import { PlatformServiceEntitlementStatus } from '@/components/shop/PlatformServiceEntitlementStatus';
+import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVisualThumb';
+import {
+  PlatformServiceUniformHeightProvider,
+  usePlatformServiceUniformCardHeight,
+} from '@/components/shop/PlatformServiceUniformHeightList';
 import {
   platformServiceCatalogCardInactive,
   platformServiceCatalogDisplayPrices,
   platformServiceCatalogPriceMode,
+  platformServiceCatalogPurchasable,
   platformServiceEntitlementCtaLabel,
   sortPlatformServicesForCatalog,
 } from '@/utils/platformServiceEntitlementUi';
 import type { EligibilityProfile } from '@/utils/eligibility';
 import {
+  platformServiceActivePromotionalPrice,
   platformServiceCurrency,
   platformServiceEffectiveUnitPriceString,
 } from '@/utils/platformServicePrice';
@@ -87,10 +119,15 @@ const CATALOG_TABS: {
 export default function BoutiqueTabScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const { t, isRTL, locale, setLocale } = useLocale();
+  const { t, isRTL, locale } = useLocale();
   const { presentShare } = useSharePreview();
-  const { count: cartCount, addLine, removeLine, lines: cartLines } = useShopCart();
-  const { profile: eligibilityProfile, loading: eligibilityProfileLoading } = useEligibilityProfile();
+  const { user, getValidAccessToken } = useAuth();
+  const { count: cartCount, addLine, removeLine, replaceLines, lines: cartLines } = useShopCart();
+  const {
+    profile: eligibilityProfile,
+    loading: eligibilityProfileLoading,
+    refetch: refetchEligibilityProfile,
+  } = useEligibilityProfile();
 
   const [items, setItems] = useState<ShopProductListItem[]>([]);
   const [pages, setPages] = useState(1);
@@ -118,8 +155,12 @@ export default function BoutiqueTabScreen() {
         .filter((s): s is string => Boolean(s)),
     [cartLines],
   );
-  const { bySlug: serviceEntitlementsBySlug, loading: entitlementsLoading } =
-    usePlatformServiceCatalogEntitlements(cartPlatformServiceSlugs);
+  const {
+    bySlug: serviceEntitlementsBySlug,
+    loading: entitlementsLoading,
+    refetch: refetchServiceEntitlements,
+  } = usePlatformServiceCatalogEntitlements(cartPlatformServiceSlugs, eligibilityProfile?.niveau);
+  const refreshInFlightRef = useRef(false);
 
   const serviceNameBySlug = useMemo(() => {
     const map = new Map<string, string>();
@@ -135,6 +176,28 @@ export default function BoutiqueTabScreen() {
         }),
       ),
     [serviceItems, eligibilityProfile, eligibilityProfileLoading],
+  );
+
+  const sortedServicesForUser = useMemo(
+    () => sortPlatformServicesForCatalog(servicesForUser, serviceEntitlementsBySlug, entitlementsLoading),
+    [servicesForUser, serviceEntitlementsBySlug, entitlementsLoading],
+  );
+
+  const { width: winW } = useWindowDimensions();
+  const serviceCarouselCardW = useMemo(
+    () => platformServiceCarouselCardWidth(winW, H_PAD),
+    [winW],
+  );
+  const serviceCarouselPad = useMemo(
+    () =>
+      serviceCarouselContentInset(
+        sortedServicesForUser.length,
+        serviceCarouselCardW,
+        spacing.sm,
+        winW,
+        H_PAD,
+      ),
+    [sortedServicesForUser.length, serviceCarouselCardW, winW],
   );
 
   const filteredServices = useMemo(() => {
@@ -154,30 +217,95 @@ export default function BoutiqueTabScreen() {
     return sortPlatformServicesForCatalog(matched, serviceEntitlementsBySlug, entitlementsLoading);
   }, [servicesForUser, debouncedSearch, locale, serviceEntitlementsBySlug, entitlementsLoading]);
 
+  const serviceCardsMeasureKey = useMemo(() => {
+    const slugs = filteredServices.map((s) => s.slug).join(',');
+    const ent = filteredServices
+      .map((s) => {
+        const e = serviceEntitlementsBySlug[s.slug];
+        return `${s.slug}:${e?.purchasable ?? ''}:${e?.status ?? ''}`;
+      })
+      .join('|');
+    return `${slugs}::${entitlementsLoading}::${ent}::${eligibilityProfileLoading}`;
+  }, [
+    filteredServices,
+    serviceEntitlementsBySlug,
+    entitlementsLoading,
+    eligibilityProfileLoading,
+  ]);
+
+  const previewCardsMeasureKey = useMemo(() => {
+    const slugs = sortedServicesForUser.map((s) => s.slug).join(',');
+    const ent = sortedServicesForUser
+      .map((s) => {
+        const e = serviceEntitlementsBySlug[s.slug];
+        return `${s.slug}:${e?.purchasable ?? ''}:${e?.status ?? ''}`;
+      })
+      .join('|');
+    return `${slugs}::${entitlementsLoading}::${ent}::${eligibilityProfileLoading}`;
+  }, [
+    sortedServicesForUser,
+    serviceEntitlementsBySlug,
+    entitlementsLoading,
+    eligibilityProfileLoading,
+  ]);
+
   const putPlatformServiceInCart = useCallback(
     async (s: PlatformServiceItem) => {
-      const ent = serviceEntitlementsBySlug[s.slug];
-      if (ent && !ent.purchasable) return;
-      const unit = platformServiceEffectiveUnitPriceString(s);
+      let ent = serviceEntitlementsBySlug[s.slug];
+      if (!platformServiceCanAddToCart(ent)) {
+        try {
+          const token = await getValidAccessToken();
+          const fresh = await fetchPlatformServiceCatalogEntitlements(
+            { phone: user?.phone?.trim() || undefined, cartSlugs: cartPlatformServiceSlugs, niveau: eligibilityProfile?.niveau },
+            token,
+          );
+          ent = fresh[s.slug] ?? ent;
+        } catch {
+          /* garde l’entitlement en cache */
+        }
+      }
+      if (ent && !platformServiceCanAddToCart(ent)) return;
+      const unit = platformServiceEffectiveUnitPriceString(s, ent);
       const currency = platformServiceCurrency(s.currency);
-      await addLine({
+      const line = {
         productId: platformServiceCartProductId(s.slug),
         slug: s.slug,
         title: s.name,
         price: unit,
         currency,
         quantity: 1,
-        type: 'service',
-        lineKind: 'platform_service',
+        type: 'service' as const,
+        lineKind: 'platform_service' as const,
         platformServiceSlug: s.slug,
-        images: [],
+        images: [] as string[],
         isFreeShipping: Boolean(s.isFreeShipping),
         platformServiceBrandIcon: s.brandIcon,
         platformServiceBrandColor: s.brandColor,
+      };
+      const canProceed = await addPlatformServiceToCartWithEviction({
+        entitlement: ent,
+        replaceLines,
+        lineToAdd: line,
+        newServiceName: s.name,
+        resolveServiceName: (slug) => serviceItems.find((x) => x.slug === slug)?.name ?? slug,
+        locale,
+        t,
       });
+      if (!canProceed) return;
       void recordShopBoutiqueEvent('add_to_cart', undefined, s.slug);
     },
-    [addLine, serviceEntitlementsBySlug],
+    [
+      replaceLines,
+      removeLine,
+      serviceEntitlementsBySlug,
+      serviceItems,
+      locale,
+      t,
+      cartPlatformServiceSlugs,
+      eligibilityProfile?.niveau,
+      getValidAccessToken,
+      user?.phone,
+    ],
   );
 
   const addPlatformServiceToCart = useCallback(
@@ -217,15 +345,15 @@ export default function BoutiqueTabScreen() {
     setServicesError(null);
     setServicesLoading(true);
     try {
-      const list = await fetchPlatformServices();
+      const list = await fetchPlatformServices(eligibilityProfile?.niveau ?? null);
       setServiceItems(list);
-    } catch {
-      setServicesError(t('shopServicesError'));
+    } catch (e) {
       setServiceItems([]);
+      setServicesError(getUserFacingLoadError(e, t, { context: 'shop' }));
     } finally {
       setServicesLoading(false);
     }
-  }, [t]);
+  }, [t, eligibilityProfile?.niveau]);
 
   const loadPage = useCallback(
     async (pageToLoad: number, append: boolean) => {
@@ -242,16 +370,35 @@ export default function BoutiqueTabScreen() {
         setPages(res.pagination.pages);
         setItems((prev) => (append ? [...prev, ...res.items] : res.items));
         setPage(pageToLoad);
-      } catch {
-        setError(t('shopErrorLoad'));
+      } catch (e) {
+        if (!append) setItems([]);
+        setError(getUserFacingLoadError(e, t, { context: 'shop' }));
       } finally {
         setLoading(false);
         setLoadingMore(false);
-        setRefreshing(false);
       }
     },
     [shopTypeParam, debouncedSearch, t],
   );
+
+  /** Recharge la 1ʳᵉ page produits sans skeleton plein écran (pull-to-refresh). */
+  const reloadProductsFirstPage = useCallback(async () => {
+    setError(null);
+    try {
+      const res = await fetchShopProducts({
+        page: 1,
+        limit: PAGE_SIZE,
+        type: shopTypeParam,
+        search: debouncedSearch || undefined,
+      });
+      setPages(res.pagination.pages);
+      setItems(res.items);
+      setPage(1);
+    } catch (e) {
+      setItems([]);
+      setError(getUserFacingLoadError(e, t, { context: 'shop' }));
+    }
+  }, [shopTypeParam, debouncedSearch, t]);
 
   useEffect(() => {
     if (!showShopGrid) return;
@@ -264,17 +411,31 @@ export default function BoutiqueTabScreen() {
     }
   }, [catalogTab, loadServices]);
 
-  const onRefresh = useCallback(() => {
+  const refreshBoutique = useCallback(async () => {
+    if (refreshInFlightRef.current) return;
+    refreshInFlightRef.current = true;
     setRefreshing(true);
-    if (isServicesTab) {
-      void loadServices().finally(() => setRefreshing(false));
-      return;
+    try {
+      const jobs: Promise<void>[] = [
+        reloadProductsFirstPage(),
+        refetchServiceEntitlements(),
+        refetchEligibilityProfile(),
+      ];
+      if (catalogTab === 'all' || catalogTab === 'services') {
+        jobs.push(loadServices());
+      }
+      await Promise.all(jobs);
+    } finally {
+      refreshInFlightRef.current = false;
+      setRefreshing(false);
     }
-    if (catalogTab === 'all') {
-      void loadServices();
-    }
-    void loadPage(1, false);
-  }, [isServicesTab, catalogTab, loadPage, loadServices]);
+  }, [
+    catalogTab,
+    loadServices,
+    reloadProductsFirstPage,
+    refetchServiceEntitlements,
+    refetchEligibilityProfile,
+  ]);
 
   const onEndReached = useCallback(() => {
     if (!showShopGrid) return;
@@ -341,40 +502,7 @@ export default function BoutiqueTabScreen() {
             <Text style={[styles.heroTitle, isRTL && styles.txtRtl]}>{t('shopTitle')}</Text>
           </View>
 
-          <View
-            style={[styles.langSwitch, isRTL && styles.langSwitchRtl]}
-            accessibilityRole="tablist"
-            accessibilityLabel={t('languageSwitcher')}
-          >
-            <Pressable
-              onPress={() => setLocale('fr')}
-              style={({ pressed }) => [
-                styles.langPill,
-                locale === 'fr' && styles.langPillActive,
-                pressed && styles.langPillPressed,
-              ]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: locale === 'fr' }}
-            >
-              <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>
-                {t('langFr')}
-              </Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setLocale('ar')}
-              style={({ pressed }) => [
-                styles.langPill,
-                locale === 'ar' && styles.langPillActive,
-                pressed && styles.langPillPressed,
-              ]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: locale === 'ar' }}
-            >
-              <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>
-                {t('langAr')}
-              </Text>
-            </Pressable>
-          </View>
+          <HeroLangSwitch />
 
           <Pressable
             style={({ pressed }) => [styles.cartBtn, pressed && { opacity: 0.88 }]}
@@ -426,8 +554,6 @@ export default function BoutiqueTabScreen() {
     [
       isRTL,
       t,
-      locale,
-      setLocale,
       cartCount,
       router,
       search,
@@ -495,63 +621,87 @@ export default function BoutiqueTabScreen() {
     const preview =
       catalogTab === 'all' &&
       (servicesLoading || serviceItems.length > 0 || (servicesError && !servicesLoading)) ? (
-        <View style={styles.servicesPreviewSection}>
+        servicesLoading ? (
+          <ShopServicesPreviewSkeleton isRTL={isRTL} />
+        ) : (
+        <View style={[styles.servicesPreviewSection, isRTL && styles.servicesPreviewSectionRtl]}>
           <View style={[styles.servicesPreviewTitleBlock, isRTL && styles.servicesPreviewTitleBlockRtl]}>
             <View style={styles.servicesPreviewIconWrap}>
               <FontAwesome name="handshake-o" size={16} color={brand.primary} />
             </View>
-            <View style={styles.servicesPreviewTitleTexts}>
+            <View style={[styles.servicesPreviewTitleTexts, isRTL && styles.servicesPreviewTitleTextsRtl]}>
               <Text style={[styles.servicesPreviewKicker, isRTL && styles.txtRtl]}>{t('shopEyebrow')}</Text>
               <Text style={[styles.servicesPreviewTitle, isRTL && styles.txtRtl]}>
                 {t('shopServicesSectionTitle')}
               </Text>
             </View>
           </View>
-          {servicesLoading ? (
-            <ActivityIndicator color={brand.primary} style={{ marginVertical: 14 }} />
-          ) : servicesError ? (
-            <Text style={[styles.servicesPreviewErr, isRTL && styles.txtRtl]}>{servicesError}</Text>
+          {servicesError ? (
+            <LoadErrorState
+              message={servicesError}
+              onRetry={() => void loadServices()}
+              retryLabel={loadErrorRetryLabel(t)}
+              isRTL={isRTL}
+              compact
+            />
           ) : servicesForUser.length === 0 ? (
             <Text style={[styles.servicesPreviewErr, isRTL && styles.txtRtl]}>{t('shopServicesEmpty')}</Text>
           ) : (
-            <ScrollView
-              horizontal
-              nestedScrollEnabled
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={[
-                styles.servicesPreviewScroll,
-                isRTL && styles.servicesPreviewScrollRtl,
-              ]}
+            <PlatformServiceUniformHeightProvider
+              itemIds={sortedServicesForUser.map((s) => s.slug)}
+              measureKey={previewCardsMeasureKey}
+              waitForAllItems
             >
-              {servicesForUser.map((s) => (
-                <ServiceCompactCard
-                  key={s.slug}
-                  service={s}
-                  locale={locale}
-                  t={t}
-                  isRTL={isRTL}
-                  eligibilityProfile={eligibilityProfile}
-                  eligibilityProfileLoading={eligibilityProfileLoading}
-                  entitlement={serviceEntitlementsBySlug[s.slug]}
-                  entitlementsLoading={entitlementsLoading}
-                  serviceNameBySlug={serviceNameBySlug}
-                  inCart={inCartIds.has(platformServiceCartProductId(s.slug))}
-                  onOpenDetail={() => router.push(`/boutique/service/${encodeURIComponent(s.slug)}` as any)}
-                  onAddCart={() => void addPlatformServiceToCart(s)}
-                  onBuyNow={() => void buyPlatformServiceNow(s)}
-                />
-              ))}
-            </ScrollView>
+              <View style={styles.servicesPreviewCarouselOuter}>
+                <ScrollView
+                  horizontal
+                  nestedScrollEnabled
+                  removeClippedSubviews={false}
+                  showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.servicesPreviewScroll,
+                  isRTL && styles.servicesPreviewScrollRtl,
+                  { paddingHorizontal: serviceCarouselPad },
+                ]}
+                >
+                  {sortedServicesForUser.map((s) => (
+                    <ServiceCompactCard
+                      key={s.slug}
+                      layout="carousel"
+                      carouselWidth={serviceCarouselCardW}
+                      service={s}
+                      locale={locale}
+                      t={t}
+                      isRTL={isRTL}
+                      eligibilityProfile={eligibilityProfile}
+                      eligibilityProfileLoading={eligibilityProfileLoading}
+                      entitlement={serviceEntitlementsBySlug[s.slug]}
+                      entitlementsLoading={entitlementsLoading}
+                      serviceNameBySlug={serviceNameBySlug}
+                      inCart={inCartIds.has(platformServiceCartProductId(s.slug))}
+                      onOpenDetail={() => router.push(`/boutique/service/${encodeURIComponent(s.slug)}` as any)}
+                      onAddCart={() => void addPlatformServiceToCart(s)}
+                      onBuyNow={() => void buyPlatformServiceNow(s)}
+                    />
+                  ))}
+                </ScrollView>
+              </View>
+            </PlatformServiceUniformHeightProvider>
           )}
         </View>
+        )
       ) : null;
 
     const errBlock =
       showShopGrid && error ? (
-        <View style={[styles.errorBox, isRTL && styles.errorBoxRtl]}>
-          <FontAwesome name="exclamation-triangle" size={13} color="#991B1B" />
-          <Text style={[styles.errorTxt, isRTL && styles.txtRtl]}>{error}</Text>
-        </View>
+        <LoadErrorState
+          message={error}
+          onRetry={() => void loadPage(1, false)}
+          retryLabel={loadErrorRetryLabel(t)}
+          isRTL={isRTL}
+          compact
+          style={styles.errorBox}
+        />
       ) : null;
 
     if (!preview && !errBlock) return null;
@@ -568,6 +718,10 @@ export default function BoutiqueTabScreen() {
     servicesLoading,
     serviceItems,
     servicesForUser,
+    sortedServicesForUser,
+    serviceCarouselPad,
+    serviceCarouselCardW,
+    previewCardsMeasureKey,
     eligibilityProfile,
     eligibilityProfileLoading,
     router,
@@ -666,6 +820,11 @@ export default function BoutiqueTabScreen() {
       {renderCatalogTabs()}
       <View style={styles.listRegion}>
         {isServicesTab ? (
+          <PlatformServiceUniformHeightProvider
+            itemIds={filteredServices.map((s) => s.slug)}
+            measureKey={serviceCardsMeasureKey}
+            waitForAllItems={false}
+          >
           <FlatList
             key="boutique-list-services-stack"
             data={filteredServices}
@@ -675,22 +834,25 @@ export default function BoutiqueTabScreen() {
             contentContainerStyle={[
               styles.list,
               styles.listServicesStack,
+              isRTL && styles.listServicesStackRtl,
               { paddingBottom: listContentBottomPad },
             ]}
             style={[styles.flatList, isRTL ? styles.rtl : styles.ltr]}
-            refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            refreshControl={
+              <AppRefreshControl refreshing={refreshing} onRefresh={() => void refreshBoutique()} />
+            }
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               servicesLoading ? (
-                <View style={styles.emptyWrap}>
-                  <ActivityIndicator size="large" color={brand.primary} />
-                  <Text style={styles.emptyTxt}>{t('shopLoading')}</Text>
-                </View>
+                <ShopServiceCompactCardSkeletonStack count={3} isRTL={isRTL} />
               ) : servicesError ? (
-                <View style={styles.emptyWrap}>
-                  <FontAwesome name="exclamation-triangle" size={28} color="#991B1B" />
-                  <Text style={[styles.emptyTitle, { marginTop: 10 }]}>{servicesError}</Text>
-                </View>
+                <LoadErrorState
+                  message={servicesError}
+                  onRetry={() => void refreshBoutique()}
+                  retryLabel={loadErrorRetryLabel(t)}
+                  isRTL={isRTL}
+                  style={styles.emptyWrap}
+                />
               ) : (
                 <View style={styles.emptyWrap}>
                   <View style={styles.emptyIcon}>
@@ -701,32 +863,41 @@ export default function BoutiqueTabScreen() {
                       accessibilityIgnoresInvertColors
                     />
                   </View>
-                  <Text style={styles.emptyTitle}>{t('shopServicesEmpty')}</Text>
+                  <Text style={[styles.emptyTitle, isRTL && styles.txtRtl]}>{t('shopServicesEmpty')}</Text>
                 </View>
               )
             }
             ListFooterComponent={<View style={{ height: spacing.lg }} />}
           />
+          </PlatformServiceUniformHeightProvider>
         ) : (
+          <View style={styles.listRegionInner}>
           <FlatList
             key="boutique-list-shop-grid"
-            data={items}
+            data={error ? [] : items}
             keyExtractor={keyExtractor}
             renderItem={renderItem}
             numColumns={2}
             ListHeaderComponent={listingHeaderElement}
             contentContainerStyle={[styles.list, { paddingBottom: listContentBottomPad }]}
             style={[styles.flatList, isRTL ? styles.rtl : styles.ltr]}
-            refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            refreshControl={
+              <AppRefreshControl refreshing={refreshing} onRefresh={() => void refreshBoutique()} />
+            }
             onEndReached={onEndReached}
             onEndReachedThreshold={0.4}
             showsVerticalScrollIndicator={false}
             ListEmptyComponent={
               loading ? (
-                <View style={styles.emptyWrap}>
-                  <ActivityIndicator size="large" color={brand.primary} />
-                  <Text style={styles.emptyTxt}>{t('shopLoading')}</Text>
-                </View>
+                <ShopProductGridSkeleton count={4} isRTL={isRTL} style={styles.emptyWrap} />
+              ) : error ? (
+                <LoadErrorState
+                  message={error}
+                  onRetry={() => void refreshBoutique()}
+                  retryLabel={loadErrorRetryLabel(t)}
+                  isRTL={isRTL}
+                  style={styles.emptyWrap}
+                />
               ) : (
                 <View style={styles.emptyWrap}>
                   <View style={styles.emptyIcon}>
@@ -739,14 +910,21 @@ export default function BoutiqueTabScreen() {
             }
             ListFooterComponent={
               loadingMore ? (
-                <View style={styles.footerLoad}>
-                  <ActivityIndicator color={brand.primary} />
-                </View>
+                <ShopProductGridFooterSkeleton isRTL={isRTL} />
               ) : (
                 <View style={{ height: spacing.lg }} />
               )
             }
           />
+          {refreshing ? (
+            <View style={styles.refreshOverlay} pointerEvents="none">
+              <View style={[styles.refreshOverlayInner, isRTL && styles.refreshOverlayInnerRtl]}>
+                <ActivityIndicator size="large" color={brand.primary} />
+                <Text style={styles.refreshOverlayTxt}>{t('shopRefreshing')}</Text>
+              </View>
+            </View>
+          ) : null}
+          </View>
         )}
       </View>
     </View>
@@ -769,7 +947,8 @@ function ServiceCompactCard({
   onOpenDetail,
   onAddCart,
   onBuyNow,
-  layout = 'carousel',
+  layout = 'stack',
+  carouselWidth,
 }: {
   service: PlatformServiceItem;
   locale: AppLocale;
@@ -784,31 +963,38 @@ function ServiceCompactCard({
   onOpenDetail: () => void;
   onAddCart: () => void;
   onBuyNow: () => void;
-  /** `carousel` : marges pour scroll horizontal « Tous ». `stack` : liste onglet Services. */
   layout?: 'carousel' | 'stack';
+  carouselWidth?: number;
 }) {
   const { width: winW } = useWindowDimensions();
   const isStack = layout === 'stack';
-  /** Carrousel « Tous » : largeur stable mais recalculée au resize / rotation. */
-  const carouselCardW = Math.min(308, Math.max(200, winW - H_PAD * 2));
+  const carouselCardW = carouselWidth ?? platformServiceCarouselCardWidth(winW, H_PAD);
 
   const cur = platformServiceCurrency(s.currency);
   const sale = s.promotionalPrice;
   const list = s.price;
-  const hasPromo = Boolean(sale && list && shopHasPromotionalPrice(sale, list));
+  const hasPromo = Boolean(
+    platformServiceActivePromotionalPrice(list, sale, s.promotionDeadlineAt),
+  );
   const inactive = platformServiceCatalogCardInactive(entitlement, entitlementsLoading);
+  const brandHex = normalizePlatformServiceBrandColor(s.brandColor, inactive);
   const priceMode = platformServiceCatalogPriceMode(entitlement, entitlementsLoading, hasPromo);
-  const { primary: pricePrimary, compare: priceCompare } = platformServiceCatalogDisplayPrices(
+  const { primary: pricePrimary, compare: priceCompare, isUpgradePrice } = platformServiceCatalogDisplayPrices(
     list,
     sale,
     priceMode,
+    entitlement,
+    s.promotionDeadlineAt,
   );
+  const showPromoStyle = hasPromo || isUpgradePrice;
   const feats = platformServiceLocalizedFeatures(s, locale).slice(0, 3);
-  const localizedDesc = platformServiceLocalizedDescription(s, locale);
+  const localizedDesc =
+    platformServiceLocalizedMiniDescription(s, locale) ??
+    platformServiceLocalizedDescription(s, locale);
 
   const isEligible = useMemo(
     () =>
-      platformServiceVisibleForProfile(s, eligibilityProfile, {
+      platformServiceEligibleForProfile(s, eligibilityProfile, {
         profileLoading: eligibilityProfileLoading,
       }),
     [s, eligibilityProfile, eligibilityProfileLoading],
@@ -816,23 +1002,22 @@ function ServiceCompactCard({
 
   const showEligibilityBadge = !eligibilityProfileLoading;
 
-  const purchasable = !entitlementsLoading && entitlement?.purchasable !== false;
+  const purchasable = platformServiceCatalogPurchasable(entitlement, entitlementsLoading);
+  const { minHeight: uniformMinHeight, onLayout: onUniformLayout } = usePlatformServiceUniformCardHeight(s.slug);
   useEffect(() => {
     void recordShopBoutiqueEvent('impression_listing', undefined, s.slug);
   }, [s.slug]);
 
   return (
     <View
+      onLayout={onUniformLayout}
       style={[
         styles.svcCompactOuter,
         inactive && styles.svcCompactOuterInactive,
         isStack
           ? styles.svcCompactOuterStack
-          : [
-              styles.svcCompactOuterCarousel,
-              { width: carouselCardW },
-              isRTL ? { marginLeft: spacing.sm } : { marginRight: spacing.sm },
-            ],
+          : [styles.svcCompactOuterCarousel, { width: carouselCardW, marginEnd: spacing.sm }],
+        uniformMinHeight != null && { minHeight: uniformMinHeight },
       ]}
     >
       <Pressable
@@ -840,21 +1025,28 @@ function ServiceCompactCard({
           void recordShopBoutiqueEvent('click_product', undefined, s.slug);
           onOpenDetail();
         }}
-        style={({ pressed }) => (pressed ? { opacity: 0.92 } : undefined)}
+        style={({ pressed }) => [
+          styles.svcCompactPressable,
+          pressed ? { opacity: 0.92 } : undefined,
+        ]}
         accessibilityRole="button"
-        accessibilityLabel={`${s.name} — ${t('shopServiceDetail')}`}
+        accessibilityLabel={s.name}
       >
-        <View style={styles.svcCompactAccent} />
+        <View
+          style={[
+            styles.svcCompactAccent,
+            { backgroundColor: withAlpha(brandHex, inactive ? 0.2 : 0.45) },
+          ]}
+        />
         <View style={[styles.svcCompactBody, isStack && styles.svcCompactBodyStack]}>
           <View style={[styles.svcCompactHeroRow, isRTL && styles.svcCompactHeroRowRtl]}>
-            <View style={[styles.svcCompactIconCircle, inactive && styles.svcCompactIconCircleInactive]}>
-              <Image
-                source={ETAWJIHI_LOGO_TRANSPARENT}
-                style={{ width: 22, height: 22, tintColor: inactive ? '#94A3B8' : brand.primary }}
-                resizeMode="contain"
-                accessibilityIgnoresInvertColors
-              />
-            </View>
+            <PlatformServiceVisualThumb
+              brandIcon={s.brandIcon}
+              brandColor={s.brandColor}
+              size={40}
+              iconSize={22}
+              inactive={inactive}
+            />
             <View style={styles.svcCompactTitleCol}>
               <View style={[styles.svcCompactTitleRow, isRTL && styles.svcCompactTitleRowRtl]}>
                 <Text
@@ -942,11 +1134,15 @@ function ServiceCompactCard({
           ) : null}
 
           {priceMode !== 'hidden' ? (
-            <View style={styles.svcCompactPriceBlock}>
+            <View style={[styles.svcCompactPriceBlock, isStack && styles.svcCompactPriceBlockStack]}>
               <View style={styles.svcCompactPriceLabels}>
-                {priceMode === 'promo-primary-only' && hasPromo ? (
+                {priceMode === 'promo-primary-only' && hasPromo && !isUpgradePrice ? (
                   <View style={styles.svcCompactPromoBadge}>
                     <Text style={styles.svcCompactPromoBadgeTxt}>{t('shopServicePromoChip')}</Text>
+                  </View>
+                ) : isUpgradePrice ? (
+                  <View style={styles.svcCompactPromoBadge}>
+                    <Text style={styles.svcCompactPromoBadgeTxt}>{t('shopEntitlementUpgradeAvailable')}</Text>
                   </View>
                 ) : null}
                 <View style={[styles.svcCompactPriceRow, isRTL && styles.svcCompactPriceRowRtl]}>
@@ -954,7 +1150,7 @@ function ServiceCompactCard({
                     style={[
                       styles.svcCompactPrice,
                       inactive && styles.svcCompactPriceInactive,
-                      (hasPromo && priceMode === 'standard') || priceMode === 'promo-primary-only'
+                      (showPromoStyle && priceMode === 'standard') || priceMode === 'promo-primary-only'
                         ? styles.priceSale
                         : undefined,
                     ]}
@@ -970,12 +1166,6 @@ function ServiceCompactCard({
               </View>
             </View>
           ) : null}
-
-          <View style={styles.svcCompactDetailBtn}>
-            <FontAwesome name="file-text-o" size={12} color={brand.primary} />
-            <Text style={styles.svcCompactDetailBtnTxt}>{t('shopServiceDetail')}</Text>
-            <FontAwesome name={isRTL ? 'chevron-left' : 'chevron-right'} size={11} color={brand.primary} />
-          </View>
         </View>
       </Pressable>
 
@@ -1206,6 +1396,36 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: brand.white,
   },
+  listRegionInner: {
+    flex: 1,
+  },
+  refreshOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: spacing.xl,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    zIndex: 8,
+  },
+  refreshOverlayInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: brand.white,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
+  },
+  refreshOverlayInnerRtl: {
+    flexDirection: 'row-reverse',
+  },
+  refreshOverlayTxt: {
+    color: brand.primary,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+  },
   flatList: {
     flex: 1,
     backgroundColor: brand.white,
@@ -1225,8 +1445,11 @@ const styles = StyleSheet.create({
   listServicesStack: {
     paddingHorizontal: H_PAD,
     paddingTop: spacing.md,
+    gap: spacing.md,
   },
-
+  listServicesStackRtl: {
+    alignItems: 'stretch',
+  },
   /* ── Hero ── */
   hero: {
     backgroundColor: brand.primary,
@@ -1248,38 +1471,6 @@ const styles = StyleSheet.create({
     gap: 4,
   },
 
-  /* Lang switch (placé entre titre et panier dans heroTop) */
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexShrink: 0,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: radius.full,
-    padding: 3,
-  },
-  langSwitchRtl: {
-    flexDirection: 'row-reverse',
-  },
-  langPill: {
-    paddingVertical: 6,
-    paddingHorizontal: 10,
-    borderRadius: radius.full,
-  },
-  langPillActive: {
-    backgroundColor: 'rgba(255,255,255,0.22)',
-  },
-  langPillPressed: {
-    opacity: 0.88,
-  },
-  langPillTxt: {
-    color: 'rgba(255,255,255,0.75)',
-    fontSize: 12,
-    fontWeight: '800',
-    letterSpacing: 0.3,
-  },
-  langPillTxtActive: {
-    color: brand.white,
-  },
   heroEyebrow: {
     fontSize: 10,
     fontWeight: '800',
@@ -1459,6 +1650,10 @@ const styles = StyleSheet.create({
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: brand.border,
   },
+  servicesPreviewSectionRtl: {
+    direction: 'rtl',
+    alignSelf: 'stretch',
+  },
   servicesPreviewTitleBlock: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -1484,6 +1679,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: 2,
   },
+  servicesPreviewTitleTextsRtl: {
+    alignItems: 'flex-end',
+  },
   servicesPreviewKicker: {
     fontSize: 10,
     fontWeight: '700',
@@ -1504,12 +1702,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     marginBottom: spacing.sm,
   },
+  /** Pleine largeur écran : évite de couper ombre/bordure de la 1ʳᵉ carte. */
+  servicesPreviewCarouselOuter: {
+    marginHorizontal: -H_PAD,
+  },
   servicesPreviewScroll: {
     flexDirection: 'row',
-    gap: spacing.sm,
-    paddingVertical: spacing.xs,
-    paddingBottom: spacing.xs,
-    paddingHorizontal: 0,
+    alignItems: 'stretch',
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
   servicesPreviewScrollRtl: {
     flexDirection: 'row-reverse',
@@ -1529,13 +1730,17 @@ const styles = StyleSheet.create({
   },
   svcCompactOuterCarousel: {
     maxWidth: '100%',
+    flexShrink: 0,
   },
-  /** Onglet Services : pleine largeur utile, plafonnée pour lisibilité sur tablette. */
+  /** Liste verticale : pleine largeur utile, plafonnée pour lisibilité sur tablette. */
   svcCompactOuterStack: {
     width: '100%',
     maxWidth: 720,
     alignSelf: 'center',
-    marginBottom: spacing.md,
+    flexDirection: 'column',
+  },
+  svcCompactPressable: {
+    flex: 1,
   },
   svcCompactOuterInactive: {
     backgroundColor: '#F1F5F9',
@@ -1554,8 +1759,13 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
   },
   svcCompactBodyStack: {
+    flex: 1,
+    flexDirection: 'column',
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm + 4,
+  },
+  svcCompactPriceBlockStack: {
+    marginTop: 'auto',
   },
   svcCompactHeroRow: {
     flexDirection: 'row',
@@ -1764,23 +1974,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: brand.emerald,
     lineHeight: 18,
-  },
-  svcCompactDetailBtn: {
-    marginTop: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    borderRadius: radius.sm,
-    backgroundColor: 'transparent',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: brand.border,
-  },
-  svcCompactDetailBtnTxt: {
-    fontSize: 12,
-    fontWeight: '600',
-    color: brand.primary,
   },
   svcCompactActions: {
     flexDirection: 'row',

@@ -31,6 +31,8 @@ export type ContestAnnouncementCard = {
   registrationUrl: string;
   /** Libellé personnalisé du bouton CTA (vide ⇒ libellé par défaut selon le type). */
   registrationUrlLabel: string | null;
+  /** Libellé arabe du bouton CTA (optionnel, ex. tutoriel / données enrichies). */
+  registrationUrlLabelAr?: string | null;
   ogImage: string | null;
   /** Liens utiles personnalisés (label + URL). */
   liensUtiles: CustomLink[];
@@ -50,6 +52,8 @@ export type ContestAnnouncementCard = {
   establishment: EstablishmentBrief | null;
   /** Messages publics Q&R (questions + réponses) pour l’icône commentaire sur la carte. */
   communityQnaMessageCount?: number;
+  /** Payload limité côté API (TAWJIH PLUS / TASSJIL requis pour le détail). */
+  previewOnly?: boolean;
 };
 
 type RawCard = {
@@ -71,6 +75,7 @@ type RawCard = {
   anneesBacAcceptees?: string[];
   availableStatuses?: RawAvailableStatus[];
   communityQnaMessageCount?: number;
+  previewOnly?: boolean;
   etablissement?: {
     id?: number;
     nom?: string;
@@ -84,7 +89,16 @@ type RawCard = {
   } | null;
 };
 
-type ListResponse = { success: boolean; data: RawCard[] };
+type ListResponse = {
+  success: boolean;
+  data: RawCard[];
+  meta?: { inscriptionsFullAccess?: boolean };
+};
+
+export type ContestAnnouncementsListResult = {
+  items: ContestAnnouncementCard[];
+  inscriptionsFullAccess: boolean;
+};
 
 /**
  * Forme brute d'un `CandidacyStatusType` côté API. On accepte les types
@@ -104,6 +118,7 @@ type RawAvailableStatus = {
   sortOrder?: number;
   isActive?: boolean;
   isEnrollmentMarker?: boolean;
+  isFinalizedMarker?: boolean;
 };
 
 function normalizeAvailableStatuses(
@@ -127,6 +142,7 @@ function normalizeAvailableStatuses(
       sortOrder: typeof s.sortOrder === 'number' ? s.sortOrder : 0,
       isActive: s.isActive !== false,
       isEnrollmentMarker: s.isEnrollmentMarker === true,
+      isFinalizedMarker: s.isFinalizedMarker === true,
     }));
 }
 
@@ -194,35 +210,73 @@ function normalize(c: RawCard): ContestAnnouncementCard {
       typeof c.communityQnaMessageCount === 'number' && Number.isFinite(c.communityQnaMessageCount)
         ? Math.max(0, Math.floor(c.communityQnaMessageCount))
         : undefined,
+    previewOnly: c.previewOnly === true,
   };
 }
 
-export async function fetchContestAnnouncements(): Promise<ContestAnnouncementCard[]> {
+function authHeaders(accessToken?: string | null): Record<string, string> | undefined {
+  const token = (accessToken ?? '').trim();
+  if (!token) return undefined;
+  return { Authorization: `Bearer ${token}` };
+}
+
+export async function fetchContestAnnouncements(
+  options?: { throwOnError?: boolean; accessToken?: string | null },
+): Promise<ContestAnnouncementsListResult> {
   try {
     const url = buildApiUrl('/api/contest-announcements');
-    const res = await httpGetJson<ListResponse>(url);
-    if (!res.success || !Array.isArray(res.data)) return [];
-    return res.data.map(normalize);
-  } catch {
-    return [];
+    const headers = authHeaders(options?.accessToken);
+    const res = await httpGetJson<ListResponse>(url, headers ? { headers } : undefined);
+    if (!res.success || !Array.isArray(res.data)) {
+      return { items: [], inscriptionsFullAccess: false };
+    }
+    return {
+      items: res.data.map(normalize),
+      inscriptionsFullAccess: res.meta?.inscriptionsFullAccess === true,
+    };
+  } catch (e) {
+    if (options?.throwOnError) throw e;
+    return { items: [], inscriptionsFullAccess: false };
   }
 }
 
-let contestAnnouncementsListCache: { at: number; data: ContestAnnouncementCard[] } | null = null;
-const CONTEST_ANNOUNCEMENTS_LIST_CACHE_MS = 45_000;
+let contestAnnouncementsListCache: {
+  at: number;
+  cacheKey: string;
+  data: ContestAnnouncementCard[];
+  inscriptionsFullAccess: boolean;
+} | null = null;
+const CONTEST_ANNOUNCEMENTS_LIST_CACHE_MS = 90_000;
+
+/** Invalide le cache liste (pull-to-refresh / bouton actualiser accueil). */
+export function clearContestAnnouncementsListCache(): void {
+  contestAnnouncementsListCache = null;
+}
 
 /** Liste publiée avec court cache — évite un GET à chaque bulle du chat E‑MOWAJIH. */
-export async function fetchContestAnnouncementsCached(): Promise<ContestAnnouncementCard[]> {
+export async function fetchContestAnnouncementsCached(
+  accessToken?: string | null,
+): Promise<ContestAnnouncementsListResult> {
   const now = Date.now();
+  const cacheKey = (accessToken ?? '').trim() || 'anon';
   if (
     contestAnnouncementsListCache &&
+    contestAnnouncementsListCache.cacheKey === cacheKey &&
     now - contestAnnouncementsListCache.at < CONTEST_ANNOUNCEMENTS_LIST_CACHE_MS
   ) {
-    return contestAnnouncementsListCache.data;
+    return {
+      items: contestAnnouncementsListCache.data,
+      inscriptionsFullAccess: contestAnnouncementsListCache.inscriptionsFullAccess,
+    };
   }
-  const data = await fetchContestAnnouncements();
-  contestAnnouncementsListCache = { at: now, data };
-  return data;
+  const result = await fetchContestAnnouncements({ accessToken });
+  contestAnnouncementsListCache = {
+    at: now,
+    cacheKey,
+    data: result.items,
+    inscriptionsFullAccess: result.inscriptionsFullAccess,
+  };
+  return result;
 }
 
 /** Aligne une fiche détail sur la forme « carte liste » pour les mini-cards chat. */
@@ -259,6 +313,7 @@ export function contestDetailToListCard(d: ContestAnnouncementDetail): ContestAn
         }
       : null,
     communityQnaMessageCount: undefined,
+    previewOnly: d.previewOnly === true,
   };
 }
 
@@ -268,15 +323,24 @@ export function contestDetailToListCard(d: ContestAnnouncementDetail): ContestAn
  */
 export async function fetchContestAnnouncementsByEstablishment(
   establishmentId: number,
-): Promise<ContestAnnouncementCard[]> {
-  if (!Number.isFinite(establishmentId) || establishmentId <= 0) return [];
+  options?: { accessToken?: string | null },
+): Promise<ContestAnnouncementsListResult> {
+  if (!Number.isFinite(establishmentId) || establishmentId <= 0) {
+    return { items: [], inscriptionsFullAccess: false };
+  }
   try {
     const url = buildApiUrl(`/api/contest-announcements/by-establishment/${establishmentId}`);
-    const res = await httpGetJson<ListResponse>(url);
-    if (!res.success || !Array.isArray(res.data)) return [];
-    return res.data.map(normalize);
+    const headers = authHeaders(options?.accessToken);
+    const res = await httpGetJson<ListResponse>(url, headers ? { headers } : undefined);
+    if (!res.success || !Array.isArray(res.data)) {
+      return { items: [], inscriptionsFullAccess: false };
+    }
+    return {
+      items: res.data.map(normalize),
+      inscriptionsFullAccess: res.meta?.inscriptionsFullAccess === true,
+    };
   } catch {
-    return [];
+    return { items: [], inscriptionsFullAccess: false };
   }
 }
 
@@ -331,6 +395,7 @@ export type ContestAnnouncementDetail = {
     siteWeb: string | null;
     campuses: { nom: string; ville: string }[];
   };
+  previewOnly?: boolean;
 };
 
 type RawDetail = {
@@ -380,6 +445,7 @@ type RawDetail = {
     siteWeb?: string | null;
     campuses?: { nom?: string; ville?: string }[];
   } | null;
+  previewOnly?: boolean;
 };
 
 function normalizeLinks(raw?: { titre?: string; url?: string }[]): CustomLink[] {
@@ -422,6 +488,44 @@ function normalizeSiblingsBrief(raw: unknown): ContestSiblingBrief[] {
   return out;
 }
 
+function rawDetailEstablishment(d: RawDetail): NonNullable<RawDetail['etablissement']> | null {
+  if (d.etablissement) return d.etablissement;
+  const alt = (d as RawDetail & { establishment?: RawDetail['etablissement'] }).establishment;
+  return alt ?? null;
+}
+
+function normalizeDetailEstablishment(
+  e: NonNullable<RawDetail['etablissement']> | null,
+): ContestAnnouncementDetail['establishment'] {
+  return {
+    id: e?.id ?? 0,
+    nom: e?.nom ?? '',
+    nomArabe: e?.nomArabe ?? null,
+    sigle: e?.sigle ?? null,
+    slug: e?.slug ?? null,
+    logo: e?.logo ?? null,
+    ville: e?.ville ?? null,
+    villes: Array.isArray(e?.villes) ? e!.villes! : [],
+    type: e?.type ?? null,
+    telephone: e?.telephone ?? null,
+    email: e?.email ?? null,
+    siteWeb: e?.siteWeb ?? null,
+    campuses: Array.isArray(e?.campuses)
+      ? e!
+          .campuses!.filter((c) => c && (c.nom || c.ville))
+          .map((c) => ({ nom: (c.nom ?? '').trim(), ville: (c.ville ?? '').trim() }))
+      : [],
+  };
+}
+
+/** Garantit `establishment` après normalisation ou état partiel (cache / payload incomplet). */
+export function ensureContestDetailEstablishment(
+  d: ContestAnnouncementDetail,
+): ContestAnnouncementDetail {
+  if (d.establishment && typeof d.establishment === 'object') return d;
+  return { ...d, establishment: normalizeDetailEstablishment(null) };
+}
+
 function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
   const days =
     d.daysUntilClose ?? computeDaysUntilClose(d.dateFermeture);
@@ -429,6 +533,7 @@ function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
   today.setHours(0, 0, 0, 0);
   const start = new Date(d.dateOuverture);
   const end = new Date(d.dateFermeture);
+  const etab = rawDetailEstablishment(d);
   return {
     id: d.id,
     title: d.titre ?? '',
@@ -469,37 +574,48 @@ function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
       : [],
     anneesBacAcceptees: Array.isArray(d.anneesBacAcceptees) ? d.anneesBacAcceptees : [],
     availableStatuses: normalizeAvailableStatuses(d.availableStatuses),
-    establishment: {
-      id: d.etablissement?.id ?? 0,
-      nom: d.etablissement?.nom ?? '',
-      nomArabe: d.etablissement?.nomArabe ?? null,
-      sigle: d.etablissement?.sigle ?? null,
-      slug: d.etablissement?.slug ?? null,
-      logo: d.etablissement?.logo ?? null,
-      ville: d.etablissement?.ville ?? null,
-      villes: Array.isArray(d.etablissement?.villes) ? d.etablissement!.villes! : [],
-      type: d.etablissement?.type ?? null,
-      telephone: d.etablissement?.telephone ?? null,
-      email: d.etablissement?.email ?? null,
-      siteWeb: d.etablissement?.siteWeb ?? null,
-      campuses: Array.isArray(d.etablissement?.campuses)
-        ? d.etablissement!.campuses!
-            .filter((c) => c && (c.nom || c.ville))
-            .map((c) => ({ nom: (c.nom ?? '').trim(), ville: (c.ville ?? '').trim() }))
-        : [],
-    },
+    establishment: normalizeDetailEstablishment(etab),
+    previewOnly: d.previewOnly === true,
   };
 }
 
+export type ContestAnnouncementDetailResult = {
+  detail: ContestAnnouncementDetail;
+  inscriptionsFullAccess: boolean;
+};
+
 export async function fetchContestAnnouncementDetail(
   id: number,
-): Promise<ContestAnnouncementDetail | null> {
+  options?: { throwOnError?: boolean; accessToken?: string | null },
+): Promise<ContestAnnouncementDetailResult | null> {
   try {
     const url = buildApiUrl(`/api/contest-announcements/${id}`);
-    const res = await httpGetJson<{ success: boolean; data: RawDetail }>(url);
+    const headers = authHeaders(options?.accessToken);
+    const res = await httpGetJson<{
+      success: boolean;
+      data: RawDetail;
+      meta?: { inscriptionsFullAccess?: boolean };
+    }>(url, headers ? { headers } : undefined);
     if (!res.success || !res.data) return null;
-    return normalizeDetail(res.data);
-  } catch {
+    const raw = res.data;
+    const payload: RawDetail =
+      raw &&
+      typeof raw === 'object' &&
+      'detail' in raw &&
+      raw.detail &&
+      typeof raw.detail === 'object'
+        ? (raw.detail as RawDetail)
+        : raw;
+    const meta =
+      raw && typeof raw === 'object' && 'inscriptionsFullAccess' in raw
+        ? (raw as { inscriptionsFullAccess?: boolean }).inscriptionsFullAccess
+        : res.meta?.inscriptionsFullAccess;
+    return {
+      detail: ensureContestDetailEstablishment(normalizeDetail(payload)),
+      inscriptionsFullAccess: meta === true || res.meta?.inscriptionsFullAccess === true,
+    };
+  } catch (e) {
+    if (options?.throwOnError) throw e;
     return null;
   }
 }
@@ -578,5 +694,51 @@ export async function recordContestClick(
     });
   } catch {
     /* noop */
+  }
+}
+
+export type ContestAnnouncementSeenState = {
+  seenIds: Set<number>;
+  unreadIds: Set<number>;
+  /** Annonces publiées jamais ouvertes (point « non vue » sur les cards). */
+  unseenIds: Set<number>;
+};
+
+/** État vu/lu serveur pour l'utilisateur connecté. */
+export async function fetchContestAnnouncementSeenState(
+  accessToken: string,
+): Promise<ContestAnnouncementSeenState> {
+  try {
+    const url = buildApiUrl('/api/contest-announcements/seen-state');
+    const res = await httpGetJson<{
+      success: boolean;
+      data?: { seenIds?: number[]; unreadIds?: number[]; unseenIds?: number[] };
+    }>(url, { headers: { Authorization: `Bearer ${accessToken}` } });
+    const seen = (res.data?.seenIds ?? []).filter((v) => Number.isFinite(v) && v > 0);
+    const unread = (res.data?.unreadIds ?? []).filter((v) => Number.isFinite(v) && v > 0);
+    const unseen = (res.data?.unseenIds ?? []).filter((v) => Number.isFinite(v) && v > 0);
+    return { seenIds: new Set(seen), unreadIds: new Set(unread), unseenIds: new Set(unseen) };
+  } catch {
+    return { seenIds: new Set(), unreadIds: new Set(), unseenIds: new Set() };
+  }
+}
+
+/** Marque l'annonce vue côté serveur et les notifications liées comme lues. */
+export async function markContestAnnouncementSeenApi(
+  accessToken: string,
+  contestId: number,
+): Promise<{ notificationsMarkedRead: number }> {
+  if (!Number.isFinite(contestId) || contestId <= 0) {
+    return { notificationsMarkedRead: 0 };
+  }
+  try {
+    const url = buildApiUrl(`/api/contest-announcements/${contestId}/mark-seen`);
+    const res = await httpPostJson<
+      { success: boolean; data?: { notificationsMarkedRead?: number } },
+      { source: 'mobile' }
+    >(url, { source: 'mobile' }, { headers: { Authorization: `Bearer ${accessToken}` } });
+    return { notificationsMarkedRead: res.data?.notificationsMarkedRead ?? 0 };
+  } catch {
+    return { notificationsMarkedRead: 0 };
   }
 }

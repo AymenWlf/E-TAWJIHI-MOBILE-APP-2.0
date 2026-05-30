@@ -1,7 +1,8 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { LoadingTimelineStackSkeleton } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import {
@@ -20,6 +21,7 @@ import {
   pickAnnouncementTitle,
   pickStatusLabel,
 } from '@/utils/candidacyStatus';
+import { pickAnnouncementTypeLabel } from '@/utils/announcementTypeLabel';
 
 type Props = {
   visible: boolean;
@@ -90,9 +92,7 @@ export function TimelineSheet({ visible, loading, payload, onClose }: Props) {
           </View>
 
           {loading ? (
-            <View style={styles.loadingWrap}>
-              <ActivityIndicator color={brand.primary} />
-            </View>
+            <LoadingTimelineStackSkeleton count={4} isRTL={isRTL} style={styles.loadingWrap} />
           ) : !payload ? (
             <View style={styles.loadingWrap}>
               <Text style={styles.empty}>{t('inscErrorLoad')}</Text>
@@ -150,7 +150,8 @@ export function TimelineSheet({ visible, loading, payload, onClose }: Props) {
                             {pickAnnouncementTitle(a, locale) || a.title}
                           </Text>
                           <Text style={[styles.relMeta, isRTL && styles.rtl]}>
-                            {a.announcementType} · {formatShortDate(a.dateStart, locale)} → {formatShortDate(a.dateEnd, locale)}
+                            {pickAnnouncementTypeLabel(a.announcementType, t)} ·{' '}
+                            {formatShortDate(a.dateStart, locale)} → {formatShortDate(a.dateEnd, locale)}
                           </Text>
                         </View>
                       </View>

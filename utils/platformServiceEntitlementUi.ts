@@ -1,5 +1,7 @@
 import type { AppLocale } from '@/constants/i18n';
 import type { PlatformServiceCatalogEntitlement } from '@/services/platformServices';
+import { platformServiceCanAddToCart } from '@/utils/platformServiceCartEviction';
+import { platformServiceActivePromotionalPrice } from '@/utils/platformServicePrice';
 import { shopHasPromotionalPrice } from '@/utils/shopFormatPrice';
 
 export type PlatformServiceCatalogPriceMode = 'standard' | 'promo-primary-only' | 'hidden';
@@ -24,6 +26,8 @@ export function platformServiceEntitlementShortLabel(
       return t('shopEntitlementBlocked');
     case 'requires_prerequisite':
       return t('shopEntitlementRequiresPrerequisite');
+    case 'not_eligible':
+      return t('eligibilityYouNotEligible');
     case 'upgrade_available':
       return t('shopEntitlementUpgradeAvailable');
     default:
@@ -53,6 +57,8 @@ export function platformServiceEntitlementBadgeTone(
       return 'info';
     case 'requires_prerequisite':
       return 'warning';
+    case 'not_eligible':
+      return 'danger';
     case 'blocked':
       return 'danger';
     default:
@@ -60,11 +66,22 @@ export function platformServiceEntitlementBadgeTone(
   }
 }
 
+/** Boutons panier / achat actifs (y compris si remplacement d’un service en conflit). */
+export function platformServiceCatalogPurchasable(
+  ent: PlatformServiceCatalogEntitlement | undefined,
+  entitlementsLoading = false,
+): boolean {
+  if (entitlementsLoading) return false;
+  if (!ent) return true;
+  return platformServiceCanAddToCart(ent);
+}
+
 export function platformServiceShouldShowCatalogPrice(
   ent: PlatformServiceCatalogEntitlement | undefined,
 ): boolean {
   if (!ent) return true;
-  return ent.purchasable && ent.status !== 'included' && ent.status !== 'already_owned';
+  const canBuy = ent.purchasable || (ent.replacesCartSlugs?.length ?? 0) > 0;
+  return canBuy && ent.status !== 'included' && ent.status !== 'already_owned';
 }
 
 export function platformServiceCatalogCardInactive(
@@ -72,6 +89,7 @@ export function platformServiceCatalogCardInactive(
   entitlementsLoading = false,
 ): boolean {
   if (entitlementsLoading || !ent) return false;
+  if ((ent.replacesCartSlugs?.length ?? 0) > 0) return false;
   return !ent.purchasable;
 }
 
@@ -81,7 +99,8 @@ export function platformServiceCatalogPriceMode(
   hasPromo = false,
 ): PlatformServiceCatalogPriceMode {
   if (entitlementsLoading) return 'standard';
-  if (!ent || ent.purchasable) {
+  const canAdd = !ent || ent.purchasable || (ent.replacesCartSlugs?.length ?? 0) > 0;
+  if (canAdd) {
     return platformServiceShouldShowCatalogPrice(ent) ? 'standard' : 'hidden';
   }
   if (hasPromo) return 'promo-primary-only';
@@ -92,18 +111,30 @@ export function platformServiceCatalogDisplayPrices(
   listPrice: string | null | undefined,
   promoPrice: string | null | undefined,
   mode: PlatformServiceCatalogPriceMode,
-): { primary: string; compare: string | null } {
+  ent?: PlatformServiceCatalogEntitlement,
+  promotionDeadlineAt?: string | null,
+): { primary: string; compare: string | null; isUpgradePrice: boolean } {
   const list = (listPrice ?? '').trim();
-  const sale = (promoPrice ?? '').trim();
+  const sale =
+    platformServiceActivePromotionalPrice(listPrice, promoPrice, promotionDeadlineAt) ??
+    (promoPrice ?? '').trim();
   const hasPromo = Boolean(sale && list && shopHasPromotionalPrice(sale, list));
+  const upgradeUnit = (ent?.upgradeUnitPrice ?? '').trim();
+  const hasUpgrade =
+    ent?.status === 'upgrade_available' &&
+    Boolean(upgradeUnit && list && shopHasPromotionalPrice(upgradeUnit, list));
+
+  if (hasUpgrade) {
+    return { primary: upgradeUnit, compare: list, isUpgradePrice: true };
+  }
 
   if (mode === 'promo-primary-only' && hasPromo) {
-    return { primary: sale, compare: null };
+    return { primary: sale, compare: null, isUpgradePrice: false };
   }
   if (hasPromo) {
-    return { primary: sale, compare: list };
+    return { primary: sale, compare: list, isUpgradePrice: false };
   }
-  return { primary: list || sale || '0', compare: null };
+  return { primary: list || sale || '0', compare: null, isUpgradePrice: false };
 }
 
 export function sortPlatformServicesForCatalog<T extends { slug: string; sortOrder?: number | null }>(
@@ -127,7 +158,7 @@ export function platformServiceEntitlementCtaLabel(
   if (ent?.status === 'upgrade_available') {
     return t('shopEntitlementUpgradeAvailable');
   }
-  if (!ent || ent.purchasable) return t(fallbackKey);
+  if (!ent || ent.purchasable || (ent.replacesCartSlugs?.length ?? 0) > 0) return t(fallbackKey);
   switch (ent.status) {
     case 'included':
       return t('shopEntitlementIncluded');
@@ -135,6 +166,8 @@ export function platformServiceEntitlementCtaLabel(
       return t('shopEntitlementAlreadyOwned');
     case 'requires_prerequisite':
       return t('shopEntitlementRequiresPrerequisite');
+    case 'not_eligible':
+      return t('eligibilityYouNotEligible');
     default:
       return t('shopEntitlementNotPurchasable');
   }
@@ -143,9 +176,35 @@ export function platformServiceEntitlementCtaLabel(
 export function resolveUpgradeSourceName(
   ent: PlatformServiceCatalogEntitlement | undefined,
   serviceNameBySlug: Map<string, string>,
-  locale: AppLocale,
+  _locale?: AppLocale,
 ): string | null {
   if (!ent?.upgradeFromSlugs?.length) return null;
   const slug = ent.upgradeFromSlugs[0];
   return serviceNameBySlug.get(slug) ?? slug;
+}
+
+/** Détail tarif upgrade pour récap checkout (prix catalogue, crédit service possédé, net). */
+export function platformServiceUpgradeCheckoutBreakdown(
+  listPrice: string | null | undefined,
+  promoPrice: string | null | undefined,
+  ent: PlatformServiceCatalogEntitlement | undefined,
+): {
+  catalogUnitPrice: string;
+  upgradeCredit: string;
+  upgradeUnitPrice: string;
+} | null {
+  if (ent?.status !== 'upgrade_available') return null;
+  const upgradeCredit = (ent.upgradeCredit ?? '').trim();
+  const upgradeUnitPrice = (ent.upgradeUnitPrice ?? '').trim();
+  if (!upgradeCredit || !upgradeUnitPrice) return null;
+  const { compare } = platformServiceCatalogDisplayPrices(
+    listPrice,
+    promoPrice,
+    'standard',
+    ent,
+    undefined,
+  );
+  const catalogUnitPrice = (compare ?? listPrice ?? '').trim();
+  if (!catalogUnitPrice) return null;
+  return { catalogUnitPrice, upgradeCredit, upgradeUnitPrice };
 }

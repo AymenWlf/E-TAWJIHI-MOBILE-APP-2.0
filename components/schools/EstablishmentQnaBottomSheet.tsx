@@ -1,8 +1,9 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Modal, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { CommunityQnaSection } from '@/components/community/CommunityQnaSection';
+import { PlatformSheetOverlay } from '@/components/ui/PlatformSheetOverlay';
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
@@ -27,7 +28,7 @@ export function EstablishmentQnaBottomSheet({
   const scrollMax = Math.min(winH * 0.78, 580);
 
   return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <PlatformSheetOverlay visible={visible} onRequestClose={onClose} animationType="slide">
       <View style={styles.root} pointerEvents="box-none">
         <Pressable
           style={styles.overlay}
@@ -69,7 +70,7 @@ export function EstablishmentQnaBottomSheet({
           </View>
         </View>
       </View>
-    </Modal>
+    </PlatformSheetOverlay>
   );
 }
 

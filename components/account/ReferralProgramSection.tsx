@@ -1,6 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
+import { ReferralInviteListSkeleton } from '@/components/account/ReferralProgramSkeleton';
 import { Text } from '@/components/ui/Text';
 import type { HomeCopyKey } from '@/constants/i18n';
 import { homeShell } from '@/theme/homeShell';
@@ -10,6 +11,7 @@ import {
   type UserReferralInvite,
   type UserReferralProgram,
 } from '@/services/userReferral';
+import { referredUserDisplayName } from '@/utils/referralDisplayName';
 
 type Props = {
   program: UserReferralProgram | null;
@@ -54,12 +56,15 @@ export function ReferralProgramSection({
       </View>
 
       {loading ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={brand.primary} />
-        </View>
+        <ReferralInviteListSkeleton
+          isRTL={rtl}
+          showHeader={false}
+          count={previewLimit && previewLimit > 0 ? Math.min(previewLimit, 2) : 2}
+          style={styles.inviteSkeleton}
+        />
       ) : error ? (
         <View style={styles.center}>
-          <Text style={[styles.err, rtl && styles.txtRtl]}>{t('loyaltyCatalogError')}</Text>
+          <Text style={[styles.err, rtl && styles.txtRtl]}>{t('commonLoadError')}</Text>
           <Pressable onPress={onReload} style={styles.retryBtn}>
             <Text style={styles.retryTxt}>{t('loyaltyCatalogRetry')}</Text>
           </Pressable>
@@ -73,7 +78,9 @@ export function ReferralProgramSection({
               <FontAwesome name="user" size={14} color={homeShell.blue} />
             </View>
             <View style={styles.inviteMain}>
-              <Text style={[styles.inviteName, rtl && styles.txtRtl]}>{inv.displayName}</Text>
+              <Text style={[styles.inviteName, rtl && styles.txtRtl]}>
+                {referredUserDisplayName(inv)}
+              </Text>
               <View
                 style={[
                   styles.pill,
@@ -135,6 +142,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.md,
     gap: spacing.sm,
+  },
+  inviteSkeleton: {
+    width: '100%',
+    paddingTop: spacing.xs,
   },
   err: {
     fontSize: fontSize.sm,

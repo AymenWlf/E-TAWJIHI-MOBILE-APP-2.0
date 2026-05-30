@@ -16,13 +16,17 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { EstablishmentRowLogoThumb } from '@/components/shop/EstablishmentRowLogoThumb';
 import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVisualThumb';
+import { ShopDetailScreenSkeleton } from '@/components/shop/ShopDetailScreenSkeleton';
 import { Text } from '@/components/ui/Text';
 import { ETAWJIHI_LOGO_COLOR, ETAWJIHI_LOGO_TRANSPARENT } from '@/constants/brandAssets';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
+import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import { usePlatformServiceCatalogEntitlements } from '@/hooks/usePlatformServiceCatalogEntitlements';
 import {
+  fetchPlatformServiceCatalogEntitlements,
   fetchPlatformServiceBySlug,
   fetchPlatformServices,
   platformServiceLocalizedDescription,
@@ -40,6 +44,12 @@ import {
 } from '@/utils/shopFormatPrice';
 import { platformServiceCartProductId } from '@/utils/platformServiceCart';
 import {
+  addPlatformServiceToCartWithEviction,
+  platformServiceCanAddToCart,
+} from '@/utils/platformServiceCartEviction';
+import { platformServiceCatalogPurchasable } from '@/utils/platformServiceEntitlementUi';
+import {
+  platformServiceActivePromotionalPrice,
   platformServiceCurrency,
   platformServiceEffectiveUnitPriceString,
 } from '@/utils/platformServicePrice';
@@ -48,9 +58,9 @@ import {
   establishmentSectionTitleKey,
   splitEstablishmentsByDisplayCategory,
 } from '@/utils/establishmentDisplayCategories';
-import { shopServiceFiliereBadgeKey } from '@/utils/platformServiceFilieresFilter';
 import { PlatformServiceEntitlementStatus } from '@/components/shop/PlatformServiceEntitlementStatus';
 import {
+  platformServiceCatalogDisplayPrices,
   platformServiceEntitlementCtaLabel,
   platformServiceShouldShowCatalogPrice,
 } from '@/utils/platformServiceEntitlementUi';
@@ -61,9 +71,10 @@ export default function PlatformServiceDetailScreen() {
   const { width } = useWindowDimensions();
   const { locale, isRTL, t } = useLocale();
   const { presentShare } = useSharePreview();
+  const { user, getValidAccessToken } = useAuth();
   const { slug: slugParam } = useLocalSearchParams<{ slug: string }>();
   const slug = typeof slugParam === 'string' ? slugParam : Array.isArray(slugParam) ? slugParam[0] : '';
-  const { addLine, removeLine, lines: cartLines, count: cartCount } = useShopCart();
+  const { removeLine, replaceLines, lines: cartLines, count: cartCount } = useShopCart();
 
   const cartPlatformServiceSlugs = useMemo(
     () =>
@@ -72,8 +83,9 @@ export default function PlatformServiceDetailScreen() {
         .filter((s): s is string => Boolean(s)),
     [cartLines],
   );
+  const { profile: eligibilityProfile } = useEligibilityProfile();
   const { bySlug: serviceEntitlementsBySlug, loading: entitlementsLoading } =
-    usePlatformServiceCatalogEntitlements(cartPlatformServiceSlugs);
+    usePlatformServiceCatalogEntitlements(cartPlatformServiceSlugs, eligibilityProfile?.niveau);
   const [serviceNames, setServiceNames] = useState<Map<string, string>>(new Map());
 
   const [service, setService] = useState<PlatformServiceItem | null>(null);
@@ -95,22 +107,14 @@ export default function PlatformServiceDetailScreen() {
     }
     setLoading(true);
     setNotFound(false);
-    void fetchPlatformServiceBySlug(slug)
+    void fetchPlatformServiceBySlug(slug, eligibilityProfile?.niveau ?? null)
       .then((s) => {
         if (s) setService(s);
         else setNotFound(true);
       })
       .catch(() => setNotFound(true))
       .finally(() => setLoading(false));
-  }, [slug]);
-
-  const cur = service ? platformServiceCurrency(service.currency) : 'MAD';
-  const unitStr = service ? platformServiceEffectiveUnitPriceString(service) : '0';
-  const list = service?.price ?? null;
-  const sale = service?.promotionalPrice ?? null;
-  const hasPromo = service && sale && list ? shopHasPromotionalPrice(sale, list) : false;
-  const promoPct =
-    service && sale && list ? shopPromoDiscountPercent(sale, list) : null;
+  }, [slug, eligibilityProfile?.niveau]);
 
   const localizedDescription = useMemo(
     () => (service ? platformServiceLocalizedDescription(service, locale) : null),
@@ -134,20 +138,57 @@ export default function PlatformServiceDetailScreen() {
   }, [service?.slug]);
 
   useEffect(() => {
-    void fetchPlatformServices().then((list) => {
+    void fetchPlatformServices(eligibilityProfile?.niveau ?? null).then((list) => {
       const map = new Map<string, string>();
       for (const s of list) map.set(s.slug, s.name);
       setServiceNames(map);
     });
-  }, []);
+  }, [eligibilityProfile?.niveau]);
 
   const entitlement = slug ? serviceEntitlementsBySlug[slug] : undefined;
-  const purchasable = !entitlementsLoading && entitlement?.purchasable !== false;
+  const purchasable = platformServiceCatalogPurchasable(entitlement, entitlementsLoading);
   const showPrice = platformServiceShouldShowCatalogPrice(entitlement);
+
+  const cur = service ? platformServiceCurrency(service.currency) : 'MAD';
+  const unitStr = service ? platformServiceEffectiveUnitPriceString(service, entitlement) : '0';
+  const list = service?.price ?? null;
+  const sale = service?.promotionalPrice ?? null;
+  const priceDisplay = platformServiceCatalogDisplayPrices(
+    list,
+    sale,
+    'standard',
+    entitlement,
+    service?.promotionDeadlineAt,
+  );
+  const hasPromo = Boolean(
+    service && platformServiceActivePromotionalPrice(list, sale, service.promotionDeadlineAt),
+  );
+  const showPromoStyle = priceDisplay.isUpgradePrice || hasPromo;
+  const promoPct =
+    service && priceDisplay.compare && showPromoStyle
+      ? shopPromoDiscountPercent(priceDisplay.primary, priceDisplay.compare)
+      : null;
 
   const handleAdd = useCallback(async () => {
     if (!service) return;
-    if (!purchasable) return;
+    let ent = entitlement;
+    if (!platformServiceCanAddToCart(ent)) {
+      try {
+        const token = await getValidAccessToken();
+        const fresh = await fetchPlatformServiceCatalogEntitlements(
+          {
+            phone: user?.phone?.trim() || undefined,
+            cartSlugs: cartPlatformServiceSlugs,
+            niveau: eligibilityProfile?.niveau,
+          },
+          token,
+        );
+        ent = fresh[service.slug] ?? ent;
+      } catch {
+        /* garde l’entitlement en cache */
+      }
+    }
+    if (!platformServiceCanAddToCart(ent)) return;
     setAddingToCart(true);
     try {
       const productId = platformServiceCartProductId(service.slug);
@@ -155,52 +196,102 @@ export default function PlatformServiceDetailScreen() {
         await removeLine(productId);
         return;
       }
-      const unit = platformServiceEffectiveUnitPriceString(service);
+      const unit = platformServiceEffectiveUnitPriceString(service, ent);
       const currency = platformServiceCurrency(service.currency);
-      await addLine({
+      const line = {
         productId,
         slug: service.slug,
         title: service.name,
         price: unit,
         currency,
         quantity: 1,
-        type: 'service',
-        lineKind: 'platform_service',
+        type: 'service' as const,
+        lineKind: 'platform_service' as const,
         platformServiceSlug: service.slug,
-        images: [],
+        images: [] as string[],
         isFreeShipping: Boolean(service.isFreeShipping),
         platformServiceBrandIcon: service.brandIcon,
         platformServiceBrandColor: service.brandColor,
+      };
+      const canProceed = await addPlatformServiceToCartWithEviction({
+        entitlement: ent,
+        replaceLines,
+        lineToAdd: line,
+        newServiceName: service.name,
+        resolveServiceName: (slug) => serviceNames.get(slug) ?? slug,
+        locale,
+        t,
       });
+      if (!canProceed) return;
       void recordShopBoutiqueEvent('add_to_cart', undefined, service.slug);
     } finally {
       setAddingToCart(false);
     }
-  }, [service, inCart, addLine, removeLine, purchasable]);
+  }, [
+    service,
+    inCart,
+    replaceLines,
+    removeLine,
+    entitlement,
+    serviceNames,
+    locale,
+    t,
+    cartPlatformServiceSlugs,
+    eligibilityProfile?.niveau,
+    getValidAccessToken,
+    user?.phone,
+  ]);
 
   const handleBuyNow = useCallback(async () => {
     if (!service) return;
-    if (!purchasable) return;
+    let ent = entitlement;
+    if (!platformServiceCanAddToCart(ent)) {
+      try {
+        const token = await getValidAccessToken();
+        const fresh = await fetchPlatformServiceCatalogEntitlements(
+          {
+            phone: user?.phone?.trim() || undefined,
+            cartSlugs: cartPlatformServiceSlugs,
+            niveau: eligibilityProfile?.niveau,
+          },
+          token,
+        );
+        ent = fresh[service.slug] ?? ent;
+      } catch {
+        /* garde l’entitlement en cache */
+      }
+    }
+    if (!platformServiceCanAddToCart(ent)) return;
     setAddingToCart(true);
     try {
       if (!inCart) {
-        const unit = platformServiceEffectiveUnitPriceString(service);
+        const unit = platformServiceEffectiveUnitPriceString(service, ent);
         const currency = platformServiceCurrency(service.currency);
-        await addLine({
+        const line = {
           productId: platformServiceCartProductId(service.slug),
           slug: service.slug,
           title: service.name,
           price: unit,
           currency,
           quantity: 1,
-          type: 'service',
-          lineKind: 'platform_service',
+          type: 'service' as const,
+          lineKind: 'platform_service' as const,
           platformServiceSlug: service.slug,
-          images: [],
+          images: [] as string[],
           isFreeShipping: Boolean(service.isFreeShipping),
           platformServiceBrandIcon: service.brandIcon,
           platformServiceBrandColor: service.brandColor,
+        };
+        const canProceed = await addPlatformServiceToCartWithEviction({
+          entitlement: ent,
+          replaceLines,
+          lineToAdd: line,
+          newServiceName: service.name,
+          resolveServiceName: (slug) => serviceNames.get(slug) ?? slug,
+          locale,
+          t,
         });
+        if (!canProceed) return;
         void recordShopBoutiqueEvent('add_to_cart', undefined, service.slug);
       }
       const path = await getShopPathAfterBuyNow();
@@ -208,14 +299,28 @@ export default function PlatformServiceDetailScreen() {
     } finally {
       setAddingToCart(false);
     }
-  }, [service, inCart, addLine, router, purchasable]);
+  }, [
+    service,
+    inCart,
+    replaceLines,
+    router,
+    entitlement,
+    serviceNames,
+    locale,
+    t,
+    cartPlatformServiceSlugs,
+    eligibilityProfile?.niveau,
+    getValidAccessToken,
+    user?.phone,
+  ]);
 
   if (loading) {
     return (
       <View style={styles.root}>
         <StatusBar style="light" backgroundColor={brand.primary} />
-        <SafeAreaView edges={['top']} style={styles.statusBarTint}>
-          <View style={[styles.navBar, styles.navBarOnPrimary]}>
+        <View pointerEvents="none" style={[styles.statusBarFill, { height: insets.top }]} />
+        <SafeAreaView edges={['top']} style={styles.galleryOverlay} pointerEvents="box-none">
+          <View style={[styles.galleryOverlayRow, isRTL && styles.galleryOverlayRowRtl]}>
             <Pressable onPress={() => router.back()} hitSlop={8} style={styles.navBtnOnPrimary}>
               <FontAwesome
                 name={isRTL ? 'chevron-right' : 'chevron-left'}
@@ -223,12 +328,10 @@ export default function PlatformServiceDetailScreen() {
                 color={brand.white}
               />
             </Pressable>
+            <View style={{ flex: 1 }} />
           </View>
         </SafeAreaView>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={brand.primary} />
-          <Text style={styles.loadingTxt}>Chargement…</Text>
-        </View>
+        <ShopDetailScreenSkeleton variant="service" gallerySize={width} isRTL={isRTL} />
       </View>
     );
   }
@@ -371,12 +474,6 @@ export default function PlatformServiceDetailScreen() {
                 <Text style={styles.freeShipBadgeTxt}>Livraison offerte</Text>
               </View>
             ) : null}
-            <View style={styles.filBadge}>
-              <FontAwesome name="graduation-cap" size={10} color={brand.textMuted} />
-              <Text style={[styles.filBadgeTxt, isRTL && styles.txtRtl]}>
-                {t(shopServiceFiliereBadgeKey(service.filieresAccepted))}
-              </Text>
-            </View>
           </View>
 
           <Text style={styles.title}>{service.name}</Text>
@@ -398,12 +495,12 @@ export default function PlatformServiceDetailScreen() {
           {showPrice ? (
             <View style={styles.priceCard}>
               <View style={styles.priceRow}>
-                <Text style={[styles.price, hasPromo && styles.priceSale]}>
-                  {formatShopPrice(unitStr, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                <Text style={[styles.price, showPromoStyle && styles.priceSale]}>
+                  {formatShopPrice(priceDisplay.primary, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                 </Text>
-                {hasPromo && list ? (
+                {showPromoStyle && priceDisplay.compare ? (
                   <Text style={styles.priceCompare}>
-                    {formatShopPrice(list, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
+                    {formatShopPrice(priceDisplay.compare, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
                   </Text>
                 ) : null}
                 {promoPct != null ? (
@@ -736,16 +833,6 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(16, 185, 129, 0.35)',
   },
   freeShipBadgeTxt: { fontSize: 10, fontWeight: '800', color: brand.emerald },
-  filBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    backgroundColor: brand.backgroundSoft,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.full,
-  },
-  filBadgeTxt: { fontSize: 10, fontWeight: '700', color: brand.textMuted },
   txtRtl: {
     textAlign: 'right',
     writingDirection: 'rtl',

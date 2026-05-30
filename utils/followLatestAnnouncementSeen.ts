@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 import type { EstablishmentFollow } from '@/types/inscriptions';
+import { isCandidacyStatusFinalized } from '@/utils/candidacyStatus';
 import { getAnnouncementTypeStyle } from '@/utils/announcementTypeStyle';
 
 const STORAGE_KEY = 'etawjihi.follow.latestAnnouncementSeen.v1';
@@ -115,6 +116,9 @@ export function followRequiresAttention(
   seenMap: FollowLatestSeenMap | null,
 ): boolean {
   if (!follow.latestAnnouncement?.id) return false;
+  if (isCandidacyStatusFinalized(follow.status)) {
+    return followHasUnseenLatestAnnouncement(follow, seenMap);
+  }
   return (
     followHasUnseenLatestAnnouncement(follow, seenMap) ||
     followStatusMisalignedWithLatestAnnouncement(follow) ||

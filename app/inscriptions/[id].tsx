@@ -6,7 +6,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  InteractionManager,
   Linking,
   Platform,
   Pressable,
@@ -18,7 +17,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
-import { CommunityQnaSection } from '@/components/community/CommunityQnaSection';
+import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
 import { ContestYoutubeTutorial } from '@/components/inscriptions/ContestYoutubeTutorial';
 import {
@@ -27,8 +26,14 @@ import {
 } from '@/components/inscriptions/EligibilityViews';
 import { StatusBadge } from '@/components/inscriptions/StatusBadge';
 import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
+import { TawjihPlusSectionLock } from '@/components/inscriptions/TawjihPlusPaywall';
+import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { EstablishmentDescriptionHtml } from '@/components/schools/EstablishmentDescriptionHtml';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
+import { LoadingCardStack } from '@/components/ui/CardLoadingSkeleton';
+import { AnnouncementDetailLoadingSkeleton } from '@/components/inscriptions/AnnouncementDetailLoadingSkeleton';
+import { LoadErrorState, loadErrorRetryLabel } from '@/components/ui/LoadErrorState';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import {
   fallbackEstablishmentAvatarName,
@@ -36,11 +41,16 @@ import {
 } from '@/constants/establishmentMedia';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import {
+  resolveDiagnosticRecommendationForAnnouncement,
+  useSchoolDiagnosticRecommendations,
+} from '@/contexts/SchoolDiagnosticRecommendationsContext';
 import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { sharePayloadContestAnnouncementDetail } from '@/utils/sharePagePayloads';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import {
+  ensureContestDetailEstablishment,
   fetchContestAnnouncementDetail,
   recordContestClick,
   recordContestImpression,
@@ -52,13 +62,14 @@ import {
   updateFollowStatus,
   upsertEstablishmentFollow,
 } from '@/services/establishmentFollows';
-import { markUnreadNotificationsForContestAnnouncement } from '@/services/notifications';
 import { recordEstablishmentClick } from '@/services/establishmentTracking';
 import type {
   CandidacyStatusType,
   EstablishmentFollow,
 } from '@/types/inscriptions';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { classifyApiError, getUserFacingLoadError } from '@/utils/apiError';
+import { pickAnnouncementTypeLabel } from '@/utils/announcementTypeLabel';
 import {
   formatDaysUntilClose,
   formatShortDate,
@@ -75,7 +86,7 @@ import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
 
 export default function InscriptionDetailScreen() {
   const router = useRouter();
-  const { t, locale, isRTL, setLocale } = useLocale();
+  const { t, locale, isRTL } = useLocale();
   const { presentShare } = useSharePreview();
   const insets = useSafeAreaInsets();
   const params = useLocalSearchParams<{
@@ -100,11 +111,21 @@ export default function InscriptionDetailScreen() {
   const { profile: eligibilityProfile, loading: eligibilityProfileLoading } = useEligibilityProfile();
   const { user, getValidAccessToken } = useAuth();
   const isLoggedIn = Boolean(user);
-  const { refreshUnread } = useNotificationsDrawer();
+  const {
+    isInscriptionsLocked,
+    isInscriptionsAccessPending,
+    openTawjihPlusProduct,
+    applyServerInscriptionsAccess,
+    resolveInscriptionsAccessWithoutServer,
+  } = useTawjihPlusAccessContext();
+  const { markAnnouncementSeen } = useNotificationsDrawer();
 
   const [data, setData] = useState<ContestAnnouncementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const showInscriptionsPaywall = !isInscriptionsAccessPending && isInscriptionsLocked;
+  const contentLocked = !isInscriptionsAccessPending && (data?.previewOnly ?? isInscriptionsLocked);
+  const pageLoading = loading || isInscriptionsAccessPending;
 
   /**
    * Suivi école courant (objet complet) pour pouvoir afficher le statut
@@ -135,34 +156,49 @@ export default function InscriptionDetailScreen() {
     }
     setLoading(true);
     setError(null);
-    const detail = await fetchContestAnnouncementDetail(id);
-    if (!detail) {
-      setError(t('inscDetailNotFound'));
-    } else {
-      setData(detail);
-      fireAndForget(recordContestImpression(detail.id, 'detail'));
+    try {
+      const token = isLoggedIn ? await getValidAccessToken() : null;
+      const result = await fetchContestAnnouncementDetail(id, {
+        throwOnError: true,
+        accessToken: token,
+      });
+      if (!result?.detail) {
+        setError(t('inscDetailNotFound'));
+        setData(null);
+      } else {
+        applyServerInscriptionsAccess(result.inscriptionsFullAccess);
+        setData(ensureContestDetailEstablishment(result.detail));
+        fireAndForget(recordContestImpression(result.detail.id, 'detail'));
+      }
+    } catch (e) {
+      setData(null);
+      resolveInscriptionsAccessWithoutServer();
+      if (classifyApiError(e) === 'notFound') {
+        setError(t('inscDetailNotFound'));
+      } else {
+        setError(getUserFacingLoadError(e, t, { context: 'inscriptions' }));
+      }
+    } finally {
+      setLoading(false);
     }
-    setLoading(false);
-  }, [id, t]);
+  }, [
+    applyServerInscriptionsAccess,
+    getValidAccessToken,
+    id,
+    isLoggedIn,
+    resolveInscriptionsAccessWithoutServer,
+    t,
+  ]);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  /** Aligner la cloche / pastilles avec la lecture sur cette page : marquer les notifs liées à l’annonce. */
+  /** Aligner badge + pastilles : marquer annonce comme vue (local + serveur). */
   useEffect(() => {
     if (!data || !isLoggedIn || data.id !== id) return;
-    let cancelled = false;
-    void (async () => {
-      const token = await getValidAccessToken();
-      if (!token || cancelled) return;
-      const marked = await markUnreadNotificationsForContestAnnouncement(token, id);
-      if (!cancelled && marked > 0) void refreshUnread();
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [data, id, isLoggedIn, getValidAccessToken, refreshUnread]);
+    void markAnnouncementSeen(id);
+  }, [data, id, isLoggedIn, markAnnouncementSeen]);
 
   // Charge l'état suivi côté serveur dès qu'on connaît l'établissement.
   // En cas d'utilisateur déconnecté, on laisse `currentFollow = null` :
@@ -192,25 +228,6 @@ export default function InscriptionDetailScreen() {
       cancelled = true;
     };
   }, [data?.establishment?.id, getValidAccessToken, isLoggedIn]);
-
-  useEffect(() => {
-    qnaScrollDoneRef.current = false;
-  }, [id, qnaScrollRequested]);
-
-  useEffect(() => {
-    if (!qnaScrollRequested || qnaScrollDoneRef.current || loading || !data) return;
-    let timeoutId: ReturnType<typeof setTimeout> | undefined;
-    const interactionTask = InteractionManager.runAfterInteractions(() => {
-      timeoutId = setTimeout(() => {
-        qnaScrollDoneRef.current = true;
-        scrollRef.current?.scrollToEnd({ animated: true });
-      }, 420);
-    });
-    return () => {
-      interactionTask.cancel?.();
-      if (timeoutId) clearTimeout(timeoutId);
-    };
-  }, [qnaScrollRequested, loading, data, id]);
 
   const onToggleFollowEst = useCallback(async () => {
     const eid = data?.establishment?.id ?? 0;
@@ -320,9 +337,13 @@ export default function InscriptionDetailScreen() {
       router.push('/login' as never);
       return;
     }
+    if (contentLocked) {
+      openTawjihPlusProduct();
+      return;
+    }
     if (!data?.availableStatuses?.length) return;
     setStatusSheetOpen(true);
-  }, [data?.availableStatuses?.length, isLoggedIn, router]);
+  }, [contentLocked, data?.availableStatuses?.length, isLoggedIn, openTawjihPlusProduct, router]);
 
   /**
    * Navigation vers la fiche école associée à l'annonce. Trace un clic
@@ -337,24 +358,30 @@ export default function InscriptionDetailScreen() {
   }, [data?.establishment, router]);
 
   const onPressOpenLink = useCallback(() => {
+    if (contentLocked) {
+      openTawjihPlusProduct();
+      return;
+    }
     if (!data?.registrationUrl) return;
     fireAndForget(recordContestClick(data.id, 'detail'));
     void Linking.openURL(data.registrationUrl).catch(() =>
       Alert.alert('Erreur', "Impossible d'ouvrir le lien."),
     );
-  }, [data]);
+  }, [contentLocked, data, openTawjihPlusProduct]);
 
   /* ───────── Render ───────── */
 
-  if (loading) {
+  if (pageLoading) {
     return (
-      <SafeAreaView style={styles.root}>
+      <View style={styles.root}>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={[styles.center, { paddingTop: insets.top + spacing.xl }]}>
-          <ActivityIndicator size="large" color={brand.primary} />
-          <Text style={styles.loadingTxt}>{t('inscDetailLoading')}</Text>
-        </View>
-      </SafeAreaView>
+        <StatusBar style="light" />
+        <AnnouncementDetailLoadingSkeleton
+          isRTL={isRTL}
+          topInset={insets.top + 6}
+          bottomInset={insets.bottom}
+        />
+      </View>
     );
   }
 
@@ -363,21 +390,18 @@ export default function InscriptionDetailScreen() {
       <SafeAreaView style={styles.root}>
         <Stack.Screen options={{ headerShown: false }} />
         <View style={[styles.center, { paddingTop: insets.top + spacing.xl }]}>
-          <FontAwesome name="exclamation-triangle" size={32} color={brand.textMuted} />
-          <Text style={styles.errorTxt}>{error ?? t('inscDetailNotFound')}</Text>
-          <Pressable
-            onPress={() => void load()}
-            style={({ pressed }) => [styles.retryBtn, pressed && { opacity: 0.85 }]}
-          >
-            <FontAwesome name="refresh" size={12} color={brand.primary} />
-            <Text style={styles.retryBtnTxt}>{t('inscDetailRetry')}</Text>
-          </Pressable>
+          <LoadErrorState
+            message={error ?? t('inscDetailNotFound')}
+            onRetry={() => void load()}
+            retryLabel={loadErrorRetryLabel(t)}
+            isRTL={isRTL}
+          />
         </View>
       </SafeAreaView>
     );
   }
 
-  const est = data.establishment;
+  const est = data.establishment ?? null;
   const estName = pickEstablishmentName(est, locale);
   const title = pickAnnouncementTitle(data, locale) || data.title;
   const descriptionHtml =
@@ -386,12 +410,13 @@ export default function InscriptionDetailScreen() {
       locale,
     ) || data.description;
 
-  const villes = (est.villes ?? []).filter(Boolean);
-  const villeMain = est.ville?.trim() || '';
+  const villes = (est?.villes ?? []).filter(Boolean);
+  const villeMain = est?.ville?.trim() || '';
   const villesShort = villes.length > 0 ? villes.join(' · ') : villeMain;
 
   const logoUri =
-    getEstablishmentLogoUrl(est.logo) ?? fallbackEstablishmentAvatarName(est.nom, est.sigle);
+    getEstablishmentLogoUrl(est?.logo) ??
+    fallbackEstablishmentAvatarName(est?.nom, est?.sigle);
 
   const deadline = formatDaysUntilClose(data.daysUntilClose, locale);
   const noEligibility =
@@ -406,7 +431,6 @@ export default function InscriptionDetailScreen() {
     },
     eligibilityProfile,
   );
-
   const fee =
     data.preRegistrationFee != null && Number(data.preRegistrationFee) > 0
       ? `${Number(data.preRegistrationFee).toLocaleString('fr-FR', {
@@ -428,6 +452,18 @@ export default function InscriptionDetailScreen() {
     return t('inscDetailSiblingUpcoming');
   };
 
+  const registrationLinkLabel = pickRegistrationUrlLabel(
+    data.registrationUrlLabel,
+    data.announcementType || data.type,
+    t,
+    locale,
+  );
+
+  const showRegistrationFooter =
+    contentLocked || Boolean(data.registrationUrl?.trim());
+  const scrollPaddingBottom =
+    insets.bottom + spacing.lg + (showRegistrationFooter ? 92 : spacing.xl);
+
   return (
     <View style={styles.root}>
       <Stack.Screen options={{ headerShown: false }} />
@@ -447,7 +483,7 @@ export default function InscriptionDetailScreen() {
           />
         </Pressable>
         <Text style={[styles.topBarTitle, isRTL && styles.rtl]} numberOfLines={1}>
-          {data.announcementType || data.type}
+          {pickAnnouncementTypeLabel(data.announcementType || data.type, t)}
         </Text>
         <ShareIconButton
           color={brand.white}
@@ -470,40 +506,7 @@ export default function InscriptionDetailScreen() {
             );
           }}
         />
-        <View
-          style={[styles.langSwitch, isRTL && styles.rowRtl]}
-          accessibilityRole="tablist"
-          accessibilityLabel={t('languageSwitcher')}
-        >
-          <Pressable
-            onPress={() => setLocale('fr')}
-            style={({ pressed }) => [
-              styles.langPill,
-              locale === 'fr' && styles.langPillActive,
-              pressed && { opacity: 0.85 },
-            ]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: locale === 'fr' }}
-          >
-            <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>
-              {t('langFr')}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setLocale('ar')}
-            style={({ pressed }) => [
-              styles.langPill,
-              locale === 'ar' && styles.langPillActive,
-              pressed && { opacity: 0.85 },
-            ]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: locale === 'ar' }}
-          >
-            <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>
-              {t('langAr')}
-            </Text>
-          </Pressable>
-        </View>
+        <HeroLangSwitch />
       </View>
 
       <ScrollView
@@ -538,14 +541,14 @@ export default function InscriptionDetailScreen() {
               {estName}
             </Text>
             <View style={[styles.estMetaRow, isRTL && styles.rowRtl]}>
-              {est.sigle ? (
+              {est?.sigle ? (
                 <View style={styles.siglePill}>
-                  <Text style={styles.siglePillTxt}>{est.sigle}</Text>
+                  <Text style={styles.siglePillTxt}>{est?.sigle}</Text>
                 </View>
               ) : null}
-              {est.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
+              {est?.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
             </View>
-            {villesShort ? (
+            {!contentLocked && villesShort ? (
               <View style={[styles.villeRow, isRTL && styles.rowRtl]}>
                 <FontAwesome name="map-marker" size={11} color={brand.textMuted} />
                 <Text style={[styles.villeTxt, isRTL && styles.rtl]} numberOfLines={2}>
@@ -664,6 +667,27 @@ export default function InscriptionDetailScreen() {
               ) : (
                 <EligibilityBadge result={eligibility} size="sm" />
               )}
+              {(est?.id ?? 0) > 0 ? (
+                <DiagnosticEstablishmentCompatibilityBadge
+                  establishmentId={est?.id ?? 0}
+                  announcementId={data.id}
+                  establishmentType={est?.type}
+                  size="sm"
+                  isRTL={isRTL}
+                  locale={locale === 'ar' ? 'ar' : 'fr'}
+                />
+              ) : null}
+            </View>
+          ) : (est?.id ?? 0) > 0 ? (
+            <View style={[styles.heroEligibilityRow, isRTL && styles.rowRtl]}>
+              <DiagnosticEstablishmentCompatibilityBadge
+                establishmentId={est?.id ?? 0}
+                announcementId={data.id}
+                establishmentType={est?.type}
+                size="sm"
+                isRTL={isRTL}
+                locale={locale === 'ar' ? 'ar' : 'fr'}
+              />
             </View>
           ) : null}
         </View>
@@ -694,6 +718,7 @@ export default function InscriptionDetailScreen() {
                 disabled={statusBusy || followStateLoading}
                 style={({ pressed }) => [
                   styles.candidacyStatusBtn,
+                  contentLocked && styles.candidacyStatusBtnLocked,
                   pressed && { opacity: 0.85 },
                   (statusBusy || followStateLoading) && { opacity: 0.6 },
                 ]}
@@ -701,9 +726,18 @@ export default function InscriptionDetailScreen() {
                 {statusBusy ? (
                   <ActivityIndicator size="small" color={brand.white} />
                 ) : (
-                  <FontAwesome name="pencil" size={12} color={brand.white} />
+                  <FontAwesome
+                    name={contentLocked ? 'lock' : 'pencil'}
+                    size={12}
+                    color={brand.white}
+                  />
                 )}
-                <Text style={styles.candidacyStatusBtnTxt} numberOfLines={1}>
+                <Text
+                  style={
+                    contentLocked ? styles.candidacyStatusBtnTxtLocked : styles.candidacyStatusBtnTxt
+                  }
+                  numberOfLines={1}
+                >
                   {currentFollow?.status
                     ? t('inscStatusActionUpdate')
                     : t('inscStatusActionTitle')}
@@ -714,7 +748,7 @@ export default function InscriptionDetailScreen() {
         ) : null}
 
         {/* ── Dates clés ── */}
-        <Section title={t('inscDetailKeyDates')} icon="calendar" rtl={isRTL}>
+        <DetailSection title={t('inscDetailKeyDates')} icon="calendar" rtl={isRTL} locked={contentLocked}>
           <View style={[styles.datesRow, isRTL && styles.rowRtl]}>
             <View style={[styles.datePill, isRTL && styles.rowRtl]}>
               <FontAwesome name="play-circle" size={11} color={brand.success} />
@@ -729,17 +763,17 @@ export default function InscriptionDetailScreen() {
               </Text>
             </View>
           </View>
-        </Section>
+        </DetailSection>
 
         <AppBannerSlot zone="mid_square" analyticsPage="/mobile/inscriptions/annonce/detail" style={{ marginHorizontal: spacing.md }} />
 
         {/* ── Frais ── */}
-        {(fee || data.preRegistrationFee === '0') ? (
-          <Section title={t('inscDetailFees')} icon="money" rtl={isRTL}>
+        {fee || data.preRegistrationFee === '0' || contentLocked ? (
+          <DetailSection title={t('inscDetailFees')} icon="money" rtl={isRTL} locked={contentLocked}>
             <Text style={[styles.feeTxt, isRTL && styles.rtl]}>
-              {fee ?? t('inscDetailFreeRegistration')}
+              {fee ?? (contentLocked ? '—' : t('inscDetailFreeRegistration'))}
             </Text>
-          </Section>
+          </DetailSection>
         ) : null}
 
         {/* ── Tutoriel vidéo (YouTube) ── */}
@@ -758,7 +792,13 @@ export default function InscriptionDetailScreen() {
         ) : null}
 
         {/* ── Description ── */}
-        <Section title={t('inscDetailAnnouncementDescription')} icon="info-circle" rtl={isRTL}>
+        <DetailSection
+          title={t('inscDetailAnnouncementDescription')}
+          icon="info-circle"
+          rtl={isRTL}
+          locked={contentLocked}
+          minHeight={contentLocked ? 160 : undefined}
+        >
           {data.descriptionLeadImage ? (
             <Image
               source={{ uri: data.descriptionLeadImage }}
@@ -770,7 +810,7 @@ export default function InscriptionDetailScreen() {
             description={descriptionHtml}
             emptyLabel={t('inscDetailAnnouncementDescription')}
           />
-        </Section>
+        </DetailSection>
 
         {/* ── Eligibilité ── */}
         <Section title={t('inscDetailEligibility')} icon="users" rtl={isRTL}>
@@ -779,9 +819,7 @@ export default function InscriptionDetailScreen() {
               {t('inscDetailNoEligibilityCriteria')}
             </Text>
           ) : isLoggedIn && eligibilityProfileLoading ? (
-            <View style={styles.eligibilitySectionLoading}>
-              <ActivityIndicator color={brand.primary} />
-            </View>
+            <LoadingCardStack count={1} isRTL={isRTL} style={styles.eligibilitySectionLoading} />
           ) : (
             <EligibilitySummary
               result={eligibility}
@@ -792,35 +830,50 @@ export default function InscriptionDetailScreen() {
         </Section>
 
         {/* ── Liens utiles ── */}
-        {data.liensUtiles.length > 0 ? (
-          <Section title={t('inscDetailUsefulLinks')} icon="link" rtl={isRTL}>
-            <View style={[styles.linksWrap, isRTL && styles.rowRtl]}>
-              {data.liensUtiles.map((l, i) => (
-                <Pressable
-                  key={`${l.url}-${i}`}
-                  onPress={() => {
-                    void Linking.openURL(l.url).catch(() => undefined);
-                  }}
-                  style={({ pressed }) => [
-                    styles.linkChip,
-                    isRTL && styles.rowRtl,
-                    pressed && { opacity: 0.85 },
-                  ]}
-                >
-                  <FontAwesome name="external-link" size={11} color={brand.primary} />
-                  <Text style={[styles.linkChipTxt, isRTL && styles.rtl]} numberOfLines={1}>
-                    {l.titre || l.url}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </Section>
+        {data.liensUtiles.length > 0 || contentLocked ? (
+          <DetailSection title={t('inscDetailUsefulLinks')} icon="link" rtl={isRTL} locked={contentLocked}>
+            {data.liensUtiles.length > 0 ? (
+              <View style={[styles.linksWrap, isRTL && styles.rowRtl]}>
+                {data.liensUtiles.map((l, i) => (
+                  <Pressable
+                    key={`${l.url}-${i}`}
+                    onPress={() => {
+                      if (contentLocked) {
+                        openTawjihPlusProduct();
+                        return;
+                      }
+                      void Linking.openURL(l.url).catch(() => undefined);
+                    }}
+                    style={({ pressed }) => [
+                      styles.linkChip,
+                      isRTL && styles.rowRtl,
+                      pressed && { opacity: 0.85 },
+                    ]}
+                  >
+                    <FontAwesome name="external-link" size={11} color={brand.primary} />
+                    <Text style={[styles.linkChipTxt, isRTL && styles.rtl]} numberOfLines={1}>
+                      {l.titre || l.url}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            ) : (
+              <Text style={[styles.muted, isRTL && styles.rtl]}>—</Text>
+            )}
+          </DetailSection>
         ) : null}
 
         {/* ── Autres annonces (même établissement) : plus récentes / plus anciennes ── */}
-        {hasSiblingHistory ? (
-          <Section title={t('inscDetailSiblingHistoryTitle')} icon="history" rtl={isRTL}>
+        {hasSiblingHistory || contentLocked ? (
+          <DetailSection
+            title={t('inscDetailSiblingHistoryTitle')}
+            icon="history"
+            rtl={isRTL}
+            locked={contentLocked}
+          >
             <Text style={[styles.siblingHint, isRTL && styles.rtl]}>{t('inscDetailSiblingHistoryHint')}</Text>
+            {hasSiblingHistory ? (
+              <>
             {siblingBlocks.newer.length > 0 ? (
               <View style={{ gap: spacing.xs }}>
                 <Text style={[styles.siblingSubheading, isRTL && styles.rtl]}>
@@ -845,7 +898,7 @@ export default function InscriptionDetailScreen() {
                       </Text>
                       <Text style={[styles.siblingRowMeta, isRTL && styles.rtl]} numberOfLines={2}>
                         {formatShortDate(s.dateDebut, locale)} → {formatShortDate(s.dateFin, locale)} ·{' '}
-                        {siblingStatusLabel(s)} · {s.typeAnnonce}
+                        {siblingStatusLabel(s)} · {pickAnnouncementTypeLabel(s.typeAnnonce, t)}
                       </Text>
                     </View>
                     <FontAwesome
@@ -881,7 +934,7 @@ export default function InscriptionDetailScreen() {
                       </Text>
                       <Text style={[styles.siblingRowMeta, isRTL && styles.rtl]} numberOfLines={2}>
                         {formatShortDate(s.dateDebut, locale)} → {formatShortDate(s.dateFin, locale)} ·{' '}
-                        {siblingStatusLabel(s)} · {s.typeAnnonce}
+                        {siblingStatusLabel(s)} · {pickAnnouncementTypeLabel(s.typeAnnonce, t)}
                       </Text>
                     </View>
                     <FontAwesome
@@ -893,44 +946,44 @@ export default function InscriptionDetailScreen() {
                 ))}
               </View>
             ) : null}
-          </Section>
+              </>
+            ) : (
+              <Text style={[styles.muted, isRTL && styles.rtl]}>—</Text>
+            )}
+          </DetailSection>
         ) : null}
 
         {/* ── Documents utiles (aperçu in-app + téléchargement) ── */}
-        {data.documentsUtiles.length > 0 ? (
-          <Section title={t('inscDetailDocuments')} icon="file-text-o" rtl={isRTL}>
-            <View style={{ gap: spacing.sm }}>
-              {data.documentsUtiles.map((d, i) => (
-                <DocumentRow
-                  key={`${d.url}-${i}`}
-                  url={d.url}
-                  title={d.titre || d.url}
-                  rtl={isRTL}
-                  viewLabel={t('inscDetailDocumentView')}
-                  downloadLabel={t('inscDetailDocumentDownload')}
-                  downloadingLabel={t('inscDetailDocumentDownloading')}
-                  errorTitle={t('inscDetailDocumentDownloadErrorTitle')}
-                  errorMsg={t('inscDetailDocumentDownloadErrorMsg')}
-                  sharingUnavailableTitle={t('inscDetailDocumentSharingUnavailableTitle')}
-                  sharingUnavailableMsg={t('inscDetailDocumentSharingUnavailableMsg')}
-                />
-              ))}
-            </View>
-          </Section>
+        {data.documentsUtiles.length > 0 || contentLocked ? (
+          <DetailSection title={t('inscDetailDocuments')} icon="file-text-o" rtl={isRTL} locked={contentLocked}>
+            {data.documentsUtiles.length > 0 ? (
+              <View style={{ gap: spacing.sm }}>
+                {data.documentsUtiles.map((d, i) => (
+                  <DocumentRow
+                    key={`${d.url}-${i}`}
+                    url={d.url}
+                    title={d.titre || d.url}
+                    rtl={isRTL}
+                    viewLabel={t('inscDetailDocumentView')}
+                    downloadLabel={t('inscDetailDocumentDownload')}
+                    downloadingLabel={t('inscDetailDocumentDownloading')}
+                    errorTitle={t('inscDetailDocumentDownloadErrorTitle')}
+                    errorMsg={t('inscDetailDocumentDownloadErrorMsg')}
+                    sharingUnavailableTitle={t('inscDetailDocumentSharingUnavailableTitle')}
+                    sharingUnavailableMsg={t('inscDetailDocumentSharingUnavailableMsg')}
+                  />
+                ))}
+              </View>
+            ) : (
+              <Text style={[styles.muted, isRTL && styles.rtl]}>—</Text>
+            )}
+          </DetailSection>
         ) : null}
 
-        {id > 0 ? (
-          <CommunityQnaSection
-            contextType="contest_announcement"
-            contextId={id}
-            highlightQuestionId={highlightQuestionId}
-            scrollParentRef={scrollRef}
-          />
-        ) : null}
       </ScrollView>
 
-      {/* ── Footer sticky : Ouvrir le lien d'inscription ── */}
-      {data.registrationUrl ? (
+      {/* ── Footer sticky : lien d'inscription (padding scroll pour ne pas masquer la dernière section) ── */}
+      {showRegistrationFooter ? (
         <View
           style={[
             styles.footer,
@@ -940,15 +993,30 @@ export default function InscriptionDetailScreen() {
         >
           <Pressable
             onPress={onPressOpenLink}
-            style={({ pressed }) => [styles.cta, isRTL && styles.rowRtl, pressed && { opacity: 0.9 }]}
+            style={({ pressed }) => [
+              styles.cta,
+              contentLocked && styles.ctaLocked,
+              isRTL && styles.rowRtl,
+              pressed && { opacity: 0.9 },
+            ]}
           >
-            <FontAwesome name="external-link" size={14} color={brand.white} />
-            <Text style={styles.ctaTxt} numberOfLines={1}>
-              {pickRegistrationUrlLabel(
-                data.registrationUrlLabel,
-                data.announcementType || data.type,
-                t,
-              )}
+            <FontAwesome
+              name={contentLocked ? 'lock' : 'external-link'}
+              size={14}
+              color={contentLocked ? '#64748B' : brand.white}
+            />
+            <Text
+              style={contentLocked ? styles.ctaTxtLocked : styles.ctaTxt}
+              numberOfLines={2}
+            >
+              {contentLocked
+                ? registrationLinkLabel
+                : pickRegistrationUrlLabel(
+                    data.registrationUrlLabel,
+                    data.announcementType || data.type,
+                    t,
+                    locale,
+                  )}
             </Text>
           </Pressable>
         </View>
@@ -996,6 +1064,30 @@ function Section({
       </View>
       <View style={{ gap: spacing.sm }}>{children}</View>
     </View>
+  );
+}
+
+function DetailSection({
+  title,
+  icon,
+  rtl,
+  locked,
+  minHeight,
+  children,
+}: {
+  title: string;
+  icon?: React.ComponentProps<typeof FontAwesome>['name'];
+  rtl: boolean;
+  locked: boolean;
+  minHeight?: number;
+  children: React.ReactNode;
+}) {
+  return (
+    <Section title={title} icon={icon} rtl={rtl}>
+      <TawjihPlusSectionLock locked={locked} minHeight={minHeight}>
+        {children}
+      </TawjihPlusSectionLock>
+    </Section>
   );
 }
 
@@ -1167,23 +1259,6 @@ const styles = StyleSheet.create({
   },
   topBarTitle: { color: brand.white, fontWeight: '800', fontSize: fontSize.md, flex: 1, textAlign: 'center' },
 
-  /* Lang switcher (FR / AR) */
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderRadius: radius.full,
-    padding: 3,
-  },
-  langPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-  },
-  langPillActive: { backgroundColor: brand.white },
-  langPillTxt: { color: brand.white, fontSize: fontSize.xs, fontWeight: '700' },
-  langPillTxtActive: { color: brand.primary },
-
   /* Cover */
   cover: { width: '100%', height: 170, backgroundColor: brand.borderLight },
   coverFallback: { backgroundColor: brand.primary, alignItems: 'center', justifyContent: 'center' },
@@ -1320,6 +1395,12 @@ const styles = StyleSheet.create({
     gap: 6,
     flexWrap: 'wrap',
   },
+  candidacyStatusBtnLocked: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#CBD5E1',
+  },
+  candidacyStatusBtnTxtLocked: { color: '#64748B', fontWeight: '800', fontSize: fontSize.xs },
   candidacyStatusBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1526,6 +1607,12 @@ const styles = StyleSheet.create({
     backgroundColor: brand.primary,
   },
   ctaTxt: { color: brand.white, fontSize: fontSize.md, fontWeight: '800' },
+  ctaLocked: {
+    backgroundColor: '#F1F5F9',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#CBD5E1',
+  },
+  ctaTxtLocked: { color: '#64748B', fontSize: fontSize.md, fontWeight: '800', flexShrink: 1 },
 
   rtl: { textAlign: 'right', writingDirection: 'rtl' },
 });

@@ -32,9 +32,9 @@ export function useLoyaltyRewardCatalog(_balance?: number) {
       setPointsBalance(payload.pointsBalance);
       setPointsPending(payload.pointsPending);
       setPointsEnabled(payload.pointsEnabled);
-    } catch (e) {
+    } catch {
       setTiers([]);
-      setError(e instanceof Error ? e.message : 'load_failed');
+      setError('load_failed');
     } finally {
       setLoading(false);
     }

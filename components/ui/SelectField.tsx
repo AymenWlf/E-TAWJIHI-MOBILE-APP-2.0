@@ -14,10 +14,11 @@
 
 import { FontAwesome } from '@expo/vector-icons';
 import React from 'react';
-import { Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { homeShell } from '@/theme/homeShell';
+import { brand } from '@/theme/tokens';
 
 export type SelectFieldProps = {
   /** Libellé affiché au-dessus du champ. */
@@ -36,6 +37,10 @@ export type SelectFieldProps = {
   onPress: () => void;
   /** Désactive l'interaction et grise le champ. */
   disabled?: boolean;
+  /** Liste en cours de chargement : spinner, pas d’ouverture du picker. */
+  loading?: boolean;
+  /** Libellé pendant le chargement (défaut : « Chargement… »). */
+  loadingLabel?: string;
   /** Style additionnel pour le bouton. */
   style?: ViewStyle;
 };
@@ -49,8 +54,12 @@ export function SelectField({
   hasError = false,
   onPress,
   disabled = false,
+  loading = false,
+  loadingLabel = 'Chargement…',
   style,
 }: SelectFieldProps) {
+  const isLocked = disabled || loading;
+
   return (
     <View style={styles.field}>
       <View style={styles.labelRow}>
@@ -61,29 +70,43 @@ export function SelectField({
       </View>
 
       <Pressable
-        onPress={onPress}
-        disabled={disabled}
+        onPress={loading ? undefined : onPress}
+        disabled={isLocked}
         accessibilityRole="button"
-        accessibilityLabel={label}
-        accessibilityState={{ disabled }}
+        accessibilityLabel={loading ? `${label} — ${loadingLabel}` : label}
+        accessibilityState={{ disabled: isLocked, busy: loading }}
         style={({ pressed }) => [
           styles.input,
           rtl && styles.inputRtl,
           hasError && styles.inputError,
-          pressed && !disabled && { opacity: 0.85 },
-          disabled && { opacity: 0.6 },
+          loading && styles.inputLoading,
+          pressed && !isLocked && { opacity: 0.85 },
+          disabled && !loading && { opacity: 0.6 },
           style,
         ]}>
-        <Text
-          numberOfLines={1}
-          style={[
-            styles.inputText,
-            !value && styles.inputTextPlaceholder,
-            rtl && styles.inputTextRtl,
-          ]}>
-          {value || '—'}
-        </Text>
-        <FontAwesome name="chevron-down" size={12} color={homeShell.cardMuted} />
+        {loading ? (
+          <>
+            <ActivityIndicator size="small" color={brand.primary} style={styles.loadingSpinner} />
+            <Text
+              numberOfLines={1}
+              style={[styles.inputText, styles.inputTextLoading, rtl && styles.inputTextRtl]}>
+              {loadingLabel}
+            </Text>
+          </>
+        ) : (
+          <>
+            <Text
+              numberOfLines={1}
+              style={[
+                styles.inputText,
+                !value && styles.inputTextPlaceholder,
+                rtl && styles.inputTextRtl,
+              ]}>
+              {value || '—'}
+            </Text>
+            <FontAwesome name="chevron-down" size={12} color={homeShell.cardMuted} />
+          </>
+        )}
       </Pressable>
 
       {hint ? (
@@ -124,11 +147,20 @@ const styles = StyleSheet.create({
     minHeight: 48,
     gap: 10,
   },
-  inputRtl: { flexDirection: 'row-reverse' },
+  inputRtl: { direction: 'rtl' },
   inputError: {
     borderColor: '#DC2626',
     borderWidth: 2,
     backgroundColor: '#FEF2F2',
+  },
+  inputLoading: {
+    backgroundColor: 'rgba(51, 62, 143, 0.05)',
+    borderColor: 'rgba(51, 62, 143, 0.18)',
+  },
+  loadingSpinner: { marginEnd: 2 },
+  inputTextLoading: {
+    color: brand.primary,
+    fontWeight: '600',
   },
   requiredMark: { color: '#DC2626', fontWeight: '800' },
   inputText: {

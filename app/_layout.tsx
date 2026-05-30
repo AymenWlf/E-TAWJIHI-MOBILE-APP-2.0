@@ -10,15 +10,20 @@ import { ThemeProvider } from '@react-navigation/native';
 import { useFonts } from 'expo-font';
 import { Stack, router, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { AppState, StyleSheet, View, type AppStateStatus } from 'react-native';
 import 'react-native-reanimated';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplash } from '@/components/AnimatedSplash';
+import { FloatingBubbleHub } from '@/components/global/FloatingBubbleHub';
+import { AppUpdateGate } from '@/components/appUpdate/AppUpdateGate';
+import { MaintenanceGate } from '@/components/maintenance/MaintenanceGate';
 import { AppSidebarPanel } from '@/components/AppSidebarPanel';
 import { MobileAnalyticsTracker } from '@/components/MobileAnalyticsTracker';
 import { NotificationsOffcanvas } from '@/components/notifications/NotificationsOffcanvas';
+import { AppFeedbackProvider } from '@/contexts/AppFeedbackContext';
 import { AppSidebarProvider } from '@/contexts/AppSidebarContext';
 import { NotificationsDrawerProvider } from '@/contexts/NotificationsDrawerContext';
 import { useColorScheme } from '@/components/useColorScheme';
@@ -26,9 +31,18 @@ import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { GlobalWallUnreadProvider } from '@/contexts/GlobalWallUnreadContext';
 import { LocaleProvider } from '@/contexts/LocaleContext';
 import { SharePreviewProvider } from '@/contexts/SharePreviewContext';
+import { SchoolDiagnosticRecommendationsProvider } from '@/contexts/SchoolDiagnosticRecommendationsContext';
 import { ShopCartProvider } from '@/contexts/ShopCartContext';
+import { isOrientation1BacUnlocked } from '@/constants/orientation1bacAccess';
+import {
+  GLOBAL_WALL_MOBILE_ENABLED,
+  ORIENTATION_1BAC_MOBILE_ENABLED,
+} from '@/constants/mobileFeatureFlags';
+import { NotificationPermissionModal } from '@/components/notifications/NotificationPermissionModal';
 import {
   attachNotificationListeners,
+  getNotificationPermissionStatus,
+  isNativePushRegistrationSupported,
   registerForPushAndSubmit,
 } from '@/services/pushNotifications';
 import { appNavigationTheme } from '@/theme/navigation';
@@ -39,7 +53,11 @@ export const unstable_settings = {
   initialRouteName: '(tabs)',
 };
 
-SplashScreen.preventAutoHideAsync();
+void SplashScreen.preventAutoHideAsync().catch(() => {
+  /* Fast refresh / Expo Go : splash déjà libéré côté natif. */
+});
+
+const SPLASH_BG = '#333E8F';
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -55,25 +73,33 @@ export default function RootLayout() {
   }, [error]);
 
   const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
-  const [canHideNativeSplash, setCanHideNativeSplash] = useState(false);
+  const nativeSplashHiddenRef = useRef(false);
 
-  const maybeHideNativeSplash = useCallback(async () => {
-    if (!loaded || !canHideNativeSplash) return;
-    await SplashScreen.hideAsync();
-  }, [loaded, canHideNativeSplash]);
+  const hideNativeSplashOnce = useCallback(async () => {
+    if (nativeSplashHiddenRef.current) return;
+    nativeSplashHiddenRef.current = true;
+    try {
+      await SplashScreen.hideAsync();
+    } catch {
+      /* iOS : VC sans splash enregistré (reload, double hide). */
+    }
+  }, []);
 
   useEffect(() => {
-    void maybeHideNativeSplash();
-  }, [maybeHideNativeSplash]);
+    if (!loaded) return;
+    void hideNativeSplashOnce();
+  }, [loaded, hideNativeSplashOnce]);
 
   if (!loaded) {
-    return null;
+    return <View style={splashStyles.bootPlaceholder} />;
   }
 
   if (showAnimatedSplash) {
     return (
       <AnimatedSplash
-        onReadyForHideNativeSplash={() => setCanHideNativeSplash(true)}
+        onReadyForHideNativeSplash={() => {
+          void hideNativeSplashOnce();
+        }}
         onDone={() => setShowAnimatedSplash(false)}
       />
     );
@@ -85,11 +111,19 @@ export default function RootLayout() {
         <LocaleProvider>
           <SharePreviewProvider>
             <AuthProvider>
-              <GlobalWallUnreadProvider>
-                <ShopCartProvider>
-                  <RootLayoutNav />
-                </ShopCartProvider>
-              </GlobalWallUnreadProvider>
+              <MaintenanceGate>
+                <AppUpdateGate>
+                <AppFeedbackProvider>
+                  <SchoolDiagnosticRecommendationsProvider>
+                    <GlobalWallUnreadProvider>
+                      <ShopCartProvider>
+                        <RootLayoutNav />
+                      </ShopCartProvider>
+                    </GlobalWallUnreadProvider>
+                  </SchoolDiagnosticRecommendationsProvider>
+                </AppFeedbackProvider>
+                </AppUpdateGate>
+              </MaintenanceGate>
             </AuthProvider>
           </SharePreviewProvider>
         </LocaleProvider>
@@ -97,6 +131,13 @@ export default function RootLayout() {
     </GestureHandlerRootView>
   );
 }
+
+const splashStyles = StyleSheet.create({
+  bootPlaceholder: {
+    flex: 1,
+    backgroundColor: SPLASH_BG,
+  },
+});
 
 function RootLayoutNav() {
   const colorScheme = useColorScheme() ?? 'light';
@@ -113,32 +154,88 @@ function RootLayoutNav() {
       <AppSidebarProvider>
         <NotificationsDrawerProvider>
           <MobileAnalyticsTracker />
-          <AppSidebarPanel />
-          <Stack>
-            <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-            <Stack.Screen name="login" options={{ headerShown: false }} />
-            <Stack.Screen name="register" options={{ headerShown: false }} />
-            <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
-            <Stack.Screen name="account-setup" options={{ headerShown: false }} />
-            <Stack.Screen name="logout" options={{ headerShown: false }} />
-            <Stack.Screen name="boutique/[slug]" options={{ headerShown: false }} />
-            <Stack.Screen name="boutique/service/[slug]" options={{ headerShown: false }} />
-            <Stack.Screen name="boutique/cart" options={{ headerShown: false }} />
-            <Stack.Screen name="boutique/checkout" options={{ headerShown: false }} />
-            <Stack.Screen name="boutique/thank-you" options={{ headerShown: false }} />
-            <Stack.Screen name="compte/commande/[publicId]" options={{ headerShown: false }} />
-            <Stack.Screen name="compte/fidelite" options={{ headerShown: false }} />
-            <Stack.Screen name="compte/fidelite-catalogue" options={{ headerShown: false }} />
-            <Stack.Screen name="compte/parrainage" options={{ headerShown: false }} />
-            <Stack.Screen name="inscriptions/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="inscriptions/follow/[id]" options={{ headerShown: false }} />
-            <Stack.Screen name="communaute" options={{ headerShown: false }} />
-            <Stack.Screen name="daily-challenge" options={{ headerShown: false }} />
-          </Stack>
-          <NotificationsOffcanvas />
+          <View style={{ flex: 1 }}>
+            <Stack>
+              <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="login" options={{ headerShown: false }} />
+              <Stack.Screen name="register" options={{ headerShown: false }} />
+              <Stack.Screen name="device-transfer" options={{ headerShown: false }} />
+              <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+              <Stack.Screen name="forgot-password-sent" options={{ headerShown: false }} />
+              <Stack.Screen name="verify-reset-otp" options={{ headerShown: false }} />
+              <Stack.Screen name="reset-password" options={{ headerShown: false }} />
+              <Stack.Screen name="account-setup" options={{ headerShown: false }} />
+              <Stack.Screen name="logout" options={{ headerShown: false }} />
+              <Stack.Screen name="boutique/[slug]" options={{ headerShown: false }} />
+              <Stack.Screen name="boutique/service/[slug]" options={{ headerShown: false }} />
+              <Stack.Screen name="boutique/cart" options={{ headerShown: false }} />
+              <Stack.Screen name="boutique/checkout" options={{ headerShown: false }} />
+              <Stack.Screen name="boutique/thank-you" options={{ headerShown: false }} />
+              <Stack.Screen name="compte/commande/[publicId]" options={{ headerShown: false }} />
+              <Stack.Screen name="compte/fidelite" options={{ headerShown: false }} />
+              <Stack.Screen name="compte/fidelite-catalogue" options={{ headerShown: false }} />
+              <Stack.Screen name="compte/parrainage" options={{ headerShown: false }} />
+              <Stack.Screen name="inscriptions" options={{ headerShown: false }} />
+              <Stack.Screen name="etablissements" options={{ headerShown: false }} />
+              <Stack.Screen name="communaute" options={{ headerShown: false }} />
+              <Stack.Screen name="daily-challenge" options={{ headerShown: false }} />
+              <Stack.Screen name="diagnostic-ecoles" options={{ headerShown: false }} />
+              {ORIENTATION_1BAC_MOBILE_ENABLED ? (
+                <Stack.Screen name="orientation-1bac" options={{ headerShown: false }} />
+              ) : null}
+            </Stack>
+            <AppSidebarPanel />
+            <NotificationsOffcanvas />
+            <FloatingBubbleHub />
+            <NotificationPermissionGate />
+          </View>
         </NotificationsDrawerProvider>
       </AppSidebarProvider>
     </ThemeProvider>
+  );
+}
+
+/** Modal si notifications refusées — affiché à chaque retour au premier plan. */
+function NotificationPermissionGate() {
+  const { user, isLoading, getValidAccessToken } = useAuth();
+  const [showDeniedModal, setShowDeniedModal] = useState(false);
+
+  const checkPermission = useCallback(async () => {
+    if (isLoading || !user || !isNativePushRegistrationSupported()) {
+      setShowDeniedModal(false);
+      return;
+    }
+    const status = await getNotificationPermissionStatus();
+    if (status === 'denied') {
+      setShowDeniedModal(true);
+      return;
+    }
+    setShowDeniedModal(false);
+    if (status === 'granted') {
+      void registerForPushAndSubmit(getValidAccessToken);
+    }
+  }, [getValidAccessToken, isLoading, user]);
+
+  useEffect(() => {
+    void checkPermission();
+  }, [checkPermission]);
+
+  useEffect(() => {
+    if (isLoading || !user) return;
+    const onAppState = (state: AppStateStatus) => {
+      if (state === 'active') {
+        void checkPermission();
+      }
+    };
+    const sub = AppState.addEventListener('change', onAppState);
+    return () => sub.remove();
+  }, [checkPermission, isLoading, user]);
+
+  return (
+    <NotificationPermissionModal
+      visible={showDeniedModal}
+      onDismiss={() => setShowDeniedModal(false)}
+    />
   );
 }
 
@@ -153,46 +250,71 @@ function RootLayoutNav() {
  *   RAM (dans le service) évite d'envoyer plusieurs fois le même token.
  */
 function usePushNotificationsBootstrap() {
-  const { user, isLoading, getValidAccessToken } = useAuth();
+  const { getValidAccessToken } = useAuth();
 
   useEffect(() => {
-    // Listeners installés au boot — fonctionnent même avant login (utiles
-    // pour le cas « notif tappée juste avant l'auth se ré-hydrate »).
     const detach = attachNotificationListeners(getValidAccessToken);
     return detach;
   }, [getValidAccessToken]);
-
-  useEffect(() => {
-    if (isLoading || !user) return;
-    void registerForPushAndSubmit(getValidAccessToken);
-  }, [isLoading, user, getValidAccessToken]);
 }
 
 function useSetupRedirectGate() {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, sessionReady, accessToken, refreshToken } = useAuth();
   const segments = useSegments();
+  const routeKey = segments.join('/');
 
   useEffect(() => {
     if (isLoading) return;
+    if (!sessionReady && (accessToken || refreshToken)) return;
 
-    const route = segments.join('/');
+    const route = routeKey;
     const isOnAuth =
-      route === 'login' || route === 'register' || route === 'forgot-password';
+      route === 'login' ||
+      route === 'register' ||
+      route === 'device-transfer' ||
+      route === 'forgot-password' ||
+      route === 'forgot-password-sent' ||
+      route === 'verify-reset-otp' ||
+      route === 'reset-password';
     const isOnLogout = route === 'logout';
+    const isOnSetup = route === 'account-setup';
+    const isOnTabs = route === '(tabs)' || route.startsWith('(tabs)/');
     const isPublicDailyChallenge = route === 'daily-challenge';
+    const isCommunauteRoute = route === 'communaute' || route.startsWith('communaute/');
+    const isOrientation1BacRoute =
+      route === 'orientation-1bac' || route.startsWith('orientation-1bac/');
 
     // Defer navigation to next tick so Expo Router state is settled
     const navigate = (dest: string) => {
+      if (dest === '/login' && isOnAuth) return;
+      if (dest === '/account-setup' && isOnSetup) return;
+      if (dest === '/(tabs)' && isOnTabs) return;
       setTimeout(() => router.replace(dest as Parameters<typeof router.replace>[0]), 10);
     };
 
-    // Not logged in → login (unless already on an auth/logout screen)
-    if (!user) {
-      if (!isOnAuth && !isOnLogout && !isPublicDailyChallenge) navigate('/login');
+    if (isCommunauteRoute && !GLOBAL_WALL_MOBILE_ENABLED) {
+      navigate('/(tabs)');
       return;
     }
 
-    const isOnSetup = route === 'account-setup';
+    if (isOrientation1BacRoute && (!ORIENTATION_1BAC_MOBILE_ENABLED || !isOrientation1BacUnlocked())) {
+      navigate('/(tabs)');
+      return;
+    }
+
+    // Session expirée ou déconnecté → login (sauf écrans auth / défi public)
+    if (!user) {
+      if (!isOnAuth && !isOnLogout && !isPublicDailyChallenge) {
+        navigate('/login');
+      }
+      return;
+    }
+
+    const hasSessionTokens = Boolean(accessToken || refreshToken);
+    if (!hasSessionTokens) {
+      navigate('/login');
+      return;
+    }
 
     // Logged in + setup not done → setup wizard
     if (!user.is_setup && !isOnSetup) {
@@ -204,5 +326,5 @@ function useSetupRedirectGate() {
     if (user.is_setup && (isOnSetup || isOnAuth)) {
       navigate('/(tabs)');
     }
-  }, [isLoading, segments, user]);
+  }, [isLoading, sessionReady, accessToken, refreshToken, routeKey, user]);
 }

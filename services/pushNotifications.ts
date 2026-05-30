@@ -8,7 +8,8 @@
  *          iOS implicite via `getExpoPushTokenAsync`).
  *        - récupère le `ExpoPushToken[…]` projet (avec `projectId` issu
  *          d'`expo-constants` si disponible).
- *        - POST le token vers `/api/me/push-token` (idempotent).
+ *        - POST le token vers `/api/me/push-token` (idempotent, avec
+ *          `deviceId` + `installationId` pour la politique multi-appareils).
  *   2. `attachNotificationListeners()` installe :
  *        - listener tap (notification ouverte depuis la barre des tâches)
  *          → record-push-click + deep-link `/inscriptions/{id}`.
@@ -24,13 +25,21 @@
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
-import { DeviceEventEmitter, Platform } from 'react-native';
+import { DeviceEventEmitter, Linking, Platform } from 'react-native';
 import { router } from 'expo-router';
 
 import { buildApiUrl } from '@/constants/api';
+import { GLOBAL_WALL_MOBILE_ENABLED, isGlobalWallMobileRoute } from '@/constants/mobileFeatureFlags';
 import { NOTIFICATIONS_IN_APP_REFRESH_EVENT } from '@/services/notifications';
 import { httpDeleteJson, httpPostJson } from '@/services/http';
+import { getOrCreateDeviceId } from '@/utils/deviceId';
 import { getMobileVisitorId } from '@/utils/visitorId';
+import { ensureAndroidNotificationChannels } from '@/services/pushNotificationChannels';
+import { navigateToContestAnnouncement } from '@/utils/contestAnnouncementNavigation';
+import { navigateFromAppNotification } from '@/utils/notificationNavigation';
+import type { AppNotification } from '@/types/inscriptions';
+
+export type NotificationPermissionStatus = 'granted' | 'denied' | 'undetermined';
 
 type AuthTokenGetter = () => Promise<string | null>;
 
@@ -48,6 +57,25 @@ let listenersAttached = false;
 let lastRegisteredToken: string | null = null;
 let receivedSubscription: Notifications.EventSubscription | null = null;
 let responseSubscription: Notifications.EventSubscription | null = null;
+/** Push indisponible pour toute la session (projectId manquant, Expo Go, etc.). */
+let sessionPushBlocked = false;
+let sessionPushBlockLogged = false;
+let registerInFlight: Promise<string | null> | null = null;
+let lastRegisterAttemptAt = 0;
+
+const REGISTER_RETRY_MS = 5 * 60_000;
+
+function logPushBlockedOnce(message: string): void {
+  if (sessionPushBlockLogged) return;
+  sessionPushBlockLogged = true;
+  // eslint-disable-next-line no-console
+  console.warn(message);
+}
+
+function markSessionPushBlocked(message: string): void {
+  sessionPushBlocked = true;
+  logPushBlockedOnce(message);
+}
 
 /**
  * Configure le rendu d'une notif **reçue alors que l'app est au premier
@@ -84,20 +112,80 @@ async function ensureAndroidDefaultChannel(): Promise<void> {
   });
 }
 
-/** Vérifie / demande la permission notification. Renvoie `true` si granted. */
-async function requestPermissionsIfNeeded(): Promise<boolean> {
-  const { status: existing } = await Notifications.getPermissionsAsync();
-  if (existing === 'granted') return true;
-  const { status: next } = await Notifications.requestPermissionsAsync();
-  return next === 'granted';
+function mapPermissionStatus(status: Notifications.PermissionStatus): NotificationPermissionStatus {
+  if (status === 'granted') return 'granted';
+  if (status === 'denied') return 'denied';
+  return 'undetermined';
 }
 
-/** Récupère le projectId Expo (config / EAS) si disponible. */
+/** État actuel de la permission notification (sans afficher de dialogue). */
+export async function getNotificationPermissionStatus(): Promise<NotificationPermissionStatus> {
+  if (IS_WEB) return 'denied';
+  const { status } = await Notifications.getPermissionsAsync();
+  return mapPermissionStatus(status);
+}
+
+/** Demande la permission système (dialogue iOS / Android). */
+export async function requestNotificationPermission(): Promise<NotificationPermissionStatus> {
+  if (IS_WEB) return 'denied';
+  const current = await getNotificationPermissionStatus();
+  if (current === 'granted') return 'granted';
+  const { status } = await Notifications.requestPermissionsAsync();
+  return mapPermissionStatus(status);
+}
+
+/** Ouvre les réglages de l’app (notifications) selon la plateforme. */
+export function openNotificationSettings(): void {
+  void Linking.openSettings();
+}
+
+/** Vérifie / demande la permission notification. Renvoie `true` si granted. */
+async function requestPermissionsIfNeeded(): Promise<boolean> {
+  const status = await requestNotificationPermission();
+  return status === 'granted';
+}
+
+/**
+ * Après login, inscription ou fin de setup : demande la permission si jamais demandée,
+ * puis enregistre le token Expo côté backend.
+ */
+export async function promptNotificationPermissionAfterAuth(
+  getAuthToken: AuthTokenGetter,
+): Promise<void> {
+  if (IS_WEB || !isNativePushRegistrationSupported()) return;
+  const status = await getNotificationPermissionStatus();
+  if (status === 'undetermined') {
+    await requestNotificationPermission();
+  }
+  void registerForPushAndSubmit(getAuthToken);
+}
+
+/** Récupère le projectId Expo (config / EAS / env) si disponible. */
 function resolveProjectId(): string | undefined {
-  // `expoConfig` (dev) puis `easConfig` (build EAS).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const cfg = Constants.expoConfig as any;
-  return cfg?.extra?.eas?.projectId ?? cfg?.extra?.expoProjectId ?? undefined;
+  const fromExtra = cfg?.extra?.eas?.projectId ?? cfg?.extra?.expoProjectId;
+  const fromEas = Constants.easConfig?.projectId;
+  const fromEnv =
+    typeof process.env.EXPO_PUBLIC_EAS_PROJECT_ID === 'string'
+      ? process.env.EXPO_PUBLIC_EAS_PROJECT_ID.trim()
+      : '';
+  const id = fromExtra ?? fromEas ?? (fromEnv || undefined);
+  return typeof id === 'string' && id.length > 0 ? id : undefined;
+}
+
+/** Indique si l’enregistrement push natif est possible sur cet appareil / build. */
+export function isNativePushRegistrationSupported(): boolean {
+  if (IS_WEB || sessionPushBlocked) return false;
+  if (!Device.isDevice) return false;
+  const projectId = resolveProjectId();
+  if (!projectId) {
+    markSessionPushBlocked(
+      '[push] Expo projectId manquant — push désactivé. Définissez EXPO_PUBLIC_EAS_PROJECT_ID dans .env ou extra.eas.projectId (npx eas init).',
+    );
+    return false;
+  }
+  return true;
 }
 
 /**
@@ -107,26 +195,35 @@ function resolveProjectId(): string | undefined {
  *   - exécution dans Expo Go (SDK 53+) — message clair en console pour debug
  */
 export async function getExpoPushTokenIfPossible(): Promise<string | null> {
-  if (IS_WEB) return null;
+  if (IS_WEB || sessionPushBlocked) return null;
   if (!Device.isDevice) {
-    // Émulateurs/simulateurs : pas de push réel.
     return null;
   }
+
+  const projectId = resolveProjectId();
+  if (!projectId) {
+    markSessionPushBlocked(
+      '[push] Expo projectId manquant — push désactivé. Définissez EXPO_PUBLIC_EAS_PROJECT_ID dans .env ou extra.eas.projectId (npx eas init).',
+    );
+    return null;
+  }
+
   const ok = await requestPermissionsIfNeeded();
   if (!ok) return null;
 
   await ensureAndroidDefaultChannel();
 
   try {
-    const projectId = resolveProjectId();
-    const tokenResp = await Notifications.getExpoPushTokenAsync(
-      projectId ? { projectId } : undefined,
-    );
+    const tokenResp = await Notifications.getExpoPushTokenAsync({ projectId });
     return tokenResp.data ?? null;
   } catch (e) {
-    // Expo Go SDK 53+ rejette explicitement.
-    // eslint-disable-next-line no-console
-    console.warn('[push] getExpoPushTokenAsync failed:', e);
+    const msg = e instanceof Error ? e.message : String(e);
+    if (/projectId|expo go|not available/i.test(msg)) {
+      markSessionPushBlocked(`[push] Enregistrement push impossible : ${msg}`);
+    } else {
+      // eslint-disable-next-line no-console
+      console.warn('[push] getExpoPushTokenAsync failed:', e);
+    }
     return null;
   }
 }
@@ -137,39 +234,62 @@ export async function getExpoPushTokenIfPossible(): Promise<string | null> {
  * (les erreurs réseau ne doivent pas bloquer le rendu).
  */
 export async function registerForPushAndSubmit(getAuthToken: AuthTokenGetter): Promise<string | null> {
-  if (IS_WEB) return null;
-  try {
-    const expoToken = await getExpoPushTokenIfPossible();
-    if (!expoToken) return null;
+  if (IS_WEB || sessionPushBlocked) return null;
 
-    const authToken = await getAuthToken();
-    if (!authToken) return null;
-
-    if (lastRegisteredToken === expoToken) {
-      // Token déjà soumis pour cette session → pas besoin de re-poster.
-      return expoToken;
-    }
-
-    const installationId = await getMobileVisitorId();
-    const url = buildApiUrl('/api/me/push-token');
-    const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
-    await httpPostJson<
-      { success: boolean },
-      { token: string; platform: string; installationId: string }
-    >(url, {
-      token: expoToken,
-      platform,
-      installationId,
-    }, {
-      headers: { Authorization: `Bearer ${authToken}` },
-    });
-    lastRegisteredToken = expoToken;
-    return expoToken;
-  } catch (e) {
-    // eslint-disable-next-line no-console
-    console.warn('[push] register failed:', e);
+  const now = Date.now();
+  if (
+    lastRegisteredToken == null &&
+    now - lastRegisterAttemptAt < REGISTER_RETRY_MS &&
+    lastRegisterAttemptAt > 0
+  ) {
     return null;
   }
+
+  if (registerInFlight) {
+    return registerInFlight;
+  }
+
+  registerInFlight = (async () => {
+    lastRegisterAttemptAt = Date.now();
+    try {
+      const expoToken = await getExpoPushTokenIfPossible();
+      if (!expoToken) return null;
+
+      const authToken = await getAuthToken();
+      if (!authToken) return null;
+
+      if (lastRegisteredToken === expoToken) {
+        return expoToken;
+      }
+
+      await ensureAndroidNotificationChannels();
+      const installationId = await getMobileVisitorId();
+      const deviceId = await getOrCreateDeviceId();
+      const url = buildApiUrl('/api/me/push-token');
+      const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
+      await httpPostJson<
+        { success: boolean },
+        { token: string; platform: string; installationId: string; deviceId: string }
+      >(url, {
+        token: expoToken,
+        platform,
+        installationId,
+        deviceId,
+      }, {
+        headers: { Authorization: `Bearer ${authToken}` },
+      });
+      lastRegisteredToken = expoToken;
+      return expoToken;
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.warn('[push] register failed:', e);
+      return null;
+    } finally {
+      registerInFlight = null;
+    }
+  })();
+
+  return registerInFlight;
 }
 
 /**
@@ -177,10 +297,43 @@ export async function registerForPushAndSubmit(getAuthToken: AuthTokenGetter): P
  * Le token mémorisé en RAM est purgé pour permettre une nouvelle
  * registration sur la session suivante.
  */
+/**
+ * Notification locale immédiate pour l’étape 1 du tutoriel inscriptions.
+ * N’utilise pas le serveur Expo Push : fonctionne sans token enregistré.
+ * Le tap est ignoré (`type: apply_tour_demo`) pour rester dans le guide.
+ */
+export async function presentApplyTourDemoPush(params: {
+  title: string;
+  body: string;
+}): Promise<boolean> {
+  if (IS_WEB) return false;
+  ensureForegroundHandler();
+  const ok = await requestPermissionsIfNeeded();
+  if (!ok) return false;
+  await ensureAndroidDefaultChannel();
+  try {
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: params.title,
+        body: params.body,
+        data: { type: 'apply_tour_demo' },
+        sound: true,
+      },
+      trigger: null,
+    });
+    return true;
+  } catch (e) {
+    // eslint-disable-next-line no-console
+    console.warn('[push] tour demo local notification failed:', e);
+    return false;
+  }
+}
+
 export async function unregisterPushToken(getAuthToken: AuthTokenGetter): Promise<void> {
   if (IS_WEB) return;
   const token = lastRegisteredToken;
   lastRegisteredToken = null;
+  registerInFlight = null;
   if (!token) return;
 
   try {
@@ -217,12 +370,45 @@ async function recordPushClick(contestId: number, getAuthToken: AuthTokenGetter)
  * Le serveur émet `{ type: 'contest_announcement', contestId, route }` ou
  * `{ type: 'daily_challenge', route }`.
  */
-type ContestPushData = {
+type PushData = Record<string, unknown> & {
   type?: string;
   contestId?: number | string;
   route?: string;
   referral_event?: string;
+  public_code?: string;
+  deep_link?: string;
+  notification_id?: number | string;
+  contest_announcement_id?: number | string;
+  commercial_client?: boolean | string | number;
+  tab?: string;
 };
+
+function navigateFromPushPayload(data: PushData): boolean {
+  const route = typeof data.route === 'string' ? data.route.trim() : '';
+  if (route && isGlobalWallMobileRoute(route)) {
+    if (GLOBAL_WALL_MOBILE_ENABLED) {
+      try {
+        router.push(route as Parameters<typeof router.push>[0]);
+        return true;
+      } catch {
+        return false;
+      }
+    }
+    return false;
+  }
+  const type = String(data.type ?? '');
+  const meta = data as Record<string, unknown>;
+  const n: AppNotification = {
+    id: Number(data.notification_id) || 0,
+    type,
+    title: '',
+    message: '',
+    isRead: false,
+    createdAt: new Date().toISOString(),
+    metadata: meta,
+  };
+  return navigateFromAppNotification(n);
+}
 
 /**
  * Lit la `data` d'une notification (avec tolérance sur le format) et
@@ -233,49 +419,42 @@ async function handleNotificationTap(
   getAuthToken: AuthTokenGetter,
 ): Promise<void> {
   if (!raw) return;
-  const data = (raw.data ?? {}) as ContestPushData;
+  const data = (raw.data ?? {}) as PushData;
 
-  if (data.type === 'daily_challenge') {
-    const route =
-      typeof data.route === 'string' && data.route.trim() !== ''
-        ? data.route.trim()
-        : '/daily-challenge';
-    try {
-      router.push(route as Parameters<typeof router.push>[0]);
-    } catch {
-      /* noop */
+  /** Démo tutoriel « Gestion des inscriptions » : affichage uniquement, pas de navigation. */
+  if (data.type === 'apply_tour_demo') {
+    return;
+  }
+
+  if (data.type === 'contest_announcement') {
+    const idRaw = data.contestId ?? data.contest_announcement_id;
+    const id = typeof idRaw === 'string' ? Number(idRaw) : idRaw;
+    if (id && Number.isFinite(id)) {
+      await recordPushClick(id, getAuthToken);
+      navigateToContestAnnouncement(id, data as Record<string, unknown>);
     }
     return;
   }
 
-  if (data.type === 'referral') {
-    const route =
-      typeof data.route === 'string' && data.route.trim() !== ''
-        ? data.route.trim()
-        : '/compte/fidelite';
-    try {
-      router.push(route as Parameters<typeof router.push>[0]);
-    } catch {
-      /* noop */
-    }
+  if (navigateFromPushPayload(data)) {
     return;
   }
 
-  const idRaw = data.contestId;
-  const id = typeof idRaw === 'string' ? Number(idRaw) : idRaw;
-  if (!id || !Number.isFinite(id)) return;
-
-  // Tracking d'abord (silencieux), puis navigation.
-  await recordPushClick(id, getAuthToken);
+  const fallbackIdRaw = data.contestId ?? data.contest_announcement_id;
+  const fallbackId = typeof fallbackIdRaw === 'string' ? Number(fallbackIdRaw) : fallbackIdRaw;
+  if (!fallbackId || !Number.isFinite(fallbackId)) return;
 
   const route =
     typeof data.route === 'string' && data.route.trim() !== ''
       ? data.route.trim()
-      : `/inscriptions/${id}`;
+      : `/inscriptions/${fallbackId}`;
+  if (isGlobalWallMobileRoute(route)) {
+    return;
+  }
   try {
     router.push(route as Parameters<typeof router.push>[0]);
   } catch {
-    /* noop : routeur peut être indisponible si app pas montée */
+    /* noop */
   }
 }
 
@@ -311,7 +490,7 @@ export function attachNotificationListeners(getAuthToken: AuthTokenGetter): () =
   // (utile si on veut afficher un toast / mettre à jour un badge).
   receivedSubscription = Notifications.addNotificationReceivedListener(() => {
     /** Nouvelle notif (y compris premier plan) → même flux que messages : badge + liste API à jour sans ouvrir le panneau. */
-    DeviceEventEmitter.emit(NOTIFICATIONS_IN_APP_REFRESH_EVENT);
+    DeviceEventEmitter.emit(NOTIFICATIONS_IN_APP_REFRESH_EVENT, { force: true });
   });
 
   // Cas 3 : user tap sur une notification (foreground OU background).

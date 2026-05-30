@@ -32,6 +32,7 @@ import {
   ChatConversationBackground,
 } from '@/components/chatbot/ChatConversationBackground';
 import { ChatbotThinkingSteps } from '@/components/chatbot/ChatbotThinkingSteps';
+import { LoadingCardStack } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -63,6 +64,7 @@ import {
   type ChatbotNavRecommendation,
 } from '@/utils/chatbotInternalRoutes';
 import { chatbotMarkdownToHtml } from '@/utils/chatbotMarkdown';
+import { safeOpenUrl } from '@/utils/safeOpenUrl';
 import {
   matchContestAnnouncementFromList,
   parseContestAnnouncementQueriesFromChatReply,
@@ -512,7 +514,8 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
     contestLoadingRef.current.add(key);
     setContestLoadingById((prev) => ({ ...prev, [key]: true }));
     try {
-      const d = await fetchContestAnnouncementDetail(contestId);
+      const payload = await fetchContestAnnouncementDetail(contestId);
+      const d = payload?.detail;
       if (d && d.title) {
         const estName = d.establishment?.nom ? String(d.establishment.nom) : null;
         const estLogo = d.establishment?.logo ? getEstablishmentLogoUrl(d.establishment.logo) : null;
@@ -540,7 +543,7 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
     setContestAnnouncementCardsLoadingByMessageId((prev) => ({ ...prev, [messageId]: true }));
 
     try {
-      const list = await fetchContestAnnouncementsCached();
+      const { items: list } = await fetchContestAnnouncementsCached();
       const byId = new Map<number, ContestAnnouncementCard>();
       const order: number[] = [];
 
@@ -550,7 +553,8 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
           byId.set(id, fromList);
           order.push(id);
         } else {
-          const detail = await fetchContestAnnouncementDetail(id);
+          const detailPayload = await fetchContestAnnouncementDetail(id);
+          const detail = detailPayload?.detail;
           if (detail?.title) {
             byId.set(id, contestDetailToListCard(detail));
             order.push(id);
@@ -788,9 +792,7 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
             <ChatConversationBackground width={chatBodyLayout.width} height={chatBodyLayout.height} />
 
           {historyLoading ? (
-            <View style={styles.historyLoading}>
-              <ActivityIndicator color={brand.primary} />
-            </View>
+            <LoadingCardStack count={2} isRTL={isRTL} style={styles.historyLoading} />
           ) : null}
 
           <Modal
@@ -964,7 +966,7 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
                               return;
                             }
                             // Lien externe (WhatsApp, Maps, etc.)
-                            void Linking.openURL(href);
+                            void safeOpenUrl(href);
                           },
                         },
                       }}

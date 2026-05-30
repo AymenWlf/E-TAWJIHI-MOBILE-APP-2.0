@@ -7,7 +7,7 @@ import { clearPendingReferralCode, getPendingReferralCode } from '@/utils/referr
 export function useUserReferral(enabled = true) {
   const { getValidAccessToken } = useAuth();
   const [data, setData] = useState<UserReferralProgram | null>(null);
-  const [loading, setLoading] = useState(false);
+  const [loading, setLoading] = useState(enabled);
   const [error, setError] = useState<string | null>(null);
 
   const reload = useCallback(async () => {
@@ -27,17 +27,23 @@ export function useUserReferral(enabled = true) {
       if (!program) {
         setError('load_failed');
       }
-    } catch (e) {
+    } catch {
       setData(null);
-      setError(e instanceof Error ? e.message : 'load_failed');
+      setError('load_failed');
     } finally {
       setLoading(false);
     }
   }, [enabled, getValidAccessToken]);
 
   useEffect(() => {
+    if (!enabled) {
+      setData(null);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     void reload();
-  }, [reload]);
+  }, [enabled, reload]);
 
   useEffect(() => {
     const ownCode = data?.referralCode?.trim().toUpperCase();

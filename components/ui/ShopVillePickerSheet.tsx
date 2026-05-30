@@ -7,7 +7,6 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   TextInput,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { PlatformSheetOverlay } from '@/components/ui/PlatformSheetOverlay';
 import { Text } from '@/components/ui/Text';
 import { brand, radius, spacing } from '@/theme/tokens';
 import {
@@ -60,12 +60,7 @@ export function ShopVillePickerSheet({
   }, [query]);
 
   return (
-    <Modal
-      visible={visible}
-      animationType="slide"
-      transparent
-      onRequestClose={onClose}
-    >
+    <PlatformSheetOverlay visible={visible} onRequestClose={onClose} animationType="slide">
       <View style={styles.root}>
         <Pressable style={styles.backdrop} onPress={onClose} />
         <SafeAreaView edges={['bottom']} style={styles.sheet}>
@@ -160,7 +155,7 @@ export function ShopVillePickerSheet({
           />
         </SafeAreaView>
       </View>
-    </Modal>
+    </PlatformSheetOverlay>
   );
 }
 

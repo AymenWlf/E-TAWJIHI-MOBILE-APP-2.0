@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Linking from 'expo-linking';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -17,11 +17,15 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { LiveNowPill } from '@/components/events/LiveNowPill';
 import { SidebarMenuIconButton } from '@/components/SidebarMenuIconButton';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
+import { EventsListSkeleton } from '@/components/events/EventsListSkeleton';
+import { LoadErrorState, loadErrorRetryLabel } from '@/components/ui/LoadErrorState';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { fetchPlatformEvents, type PlatformEventBrief, type PlatformEventKind } from '@/services/platformEvents';
+import { getUserFacingLoadError } from '@/utils/apiError';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { platformEventDaysRemainingLabel } from '@/utils/platformEventCountdown';
@@ -45,19 +49,27 @@ function kindBadgeColors(kind: PlatformEventKind): { bg: string; text: string } 
 
 export default function EvenementsScreen() {
   const router = useRouter();
-  const { t, isRTL, locale, setLocale } = useLocale();
+  const { t, isRTL, locale } = useLocale();
   const { presentShare } = useSharePreview();
   const { getValidAccessToken } = useAuth();
   const [tab, setTab] = useState<TabScope>('upcoming');
   const [items, setItems] = useState<PlatformEventBrief[]>([]);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const refreshInFlightRef = useRef(false);
 
   const load = useCallback(async () => {
+    setLoadError(null);
     const token = await getValidAccessToken();
-    const rows = await fetchPlatformEvents(token ?? undefined, tab);
-    setItems(rows);
-  }, [getValidAccessToken, tab]);
+    try {
+      const rows = await fetchPlatformEvents(token ?? undefined, tab, { throwOnError: true });
+      setItems(rows);
+    } catch (e) {
+      setItems([]);
+      setLoadError(getUserFacingLoadError(e, t, { context: 'events' }));
+    }
+  }, [getValidAccessToken, tab, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -89,36 +101,7 @@ export default function EvenementsScreen() {
           <View style={styles.heroTitles}>
             <Text style={[styles.heroTitle, isRTL && styles.rtl]}>{t('eventsAgendaTitle')}</Text>
           </View>
-          <View
-            style={[styles.langSwitch, isRTL && styles.rowRtl]}
-            accessibilityRole="tablist"
-            accessibilityLabel={t('languageSwitcher')}
-          >
-            <Pressable
-              onPress={() => setLocale('fr')}
-              style={({ pressed }) => [
-                styles.langPill,
-                locale === 'fr' && styles.langPillActive,
-                pressed && { opacity: 0.85 },
-              ]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: locale === 'fr' }}
-            >
-              <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>{t('langFr')}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setLocale('ar')}
-              style={({ pressed }) => [
-                styles.langPill,
-                locale === 'ar' && styles.langPillActive,
-                pressed && { opacity: 0.85 },
-              ]}
-              accessibilityRole="tab"
-              accessibilityState={{ selected: locale === 'ar' }}
-            >
-              <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>{t('langAr')}</Text>
-            </Pressable>
-          </View>
+          <HeroLangSwitch />
         </View>
         <View style={styles.tabsRow}>
           {(['upcoming', 'live', 'past'] as const).map((id) => {
@@ -160,18 +143,32 @@ export default function EvenementsScreen() {
             contentContainerStyle={styles.centerGrow}
             keyboardShouldPersistTaps="handled"
             refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
-            <ActivityIndicator color={brand.primary} />
+            <EventsListSkeleton count={3} isRTL={isRTL} />
+          </ScrollView>
+        ) : loadError ? (
+          <ScrollView
+            style={styles.bodyFill}
+            contentContainerStyle={styles.centerGrow}
+            keyboardShouldPersistTaps="handled"
+            refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}>
+            <LoadErrorState
+              message={loadError}
+              onRetry={() => void load()}
+              retryLabel={loadErrorRetryLabel(t)}
+              isRTL={isRTL}
+            />
           </ScrollView>
         ) : (
-          <FlatList
-            data={items}
-            keyExtractor={(item) => `ev-${item.id}`}
-            style={[styles.bodyFill, isRTL ? { direction: 'rtl' } : undefined]}
-            contentContainerStyle={styles.list}
-            refreshControl={
-              <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-            }
-            renderItem={({ item }) => {
+          <View style={styles.listRegionInner}>
+            <FlatList
+              data={items}
+              keyExtractor={(item) => `ev-${item.id}`}
+              style={[styles.bodyFill, isRTL ? { direction: 'rtl' } : undefined]}
+              contentContainerStyle={styles.list}
+              refreshControl={
+                <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+              }
+              renderItem={({ item }) => {
               const coverUri = resolvePlatformEventCoverUri(item);
               const kColors = kindBadgeColors(item.kind);
               const daysLeftLabel = !item.isPast
@@ -341,15 +338,24 @@ export default function EvenementsScreen() {
                 </Pressable>
               );
             }}
-            ListEmptyComponent={
-              <View style={styles.empty}>
-                <FontAwesome name="calendar-o" size={32} color={brand.primary} />
-                <Text style={styles.emptyTxt}>
-                  {tab === 'live' ? t('eventsEmptyLive') : t('eventsEmpty')}
-                </Text>
+              ListEmptyComponent={
+                <View style={styles.empty}>
+                  <FontAwesome name="calendar-o" size={32} color={brand.primary} />
+                  <Text style={styles.emptyTxt}>
+                    {tab === 'live' ? t('eventsEmptyLive') : t('eventsEmpty')}
+                  </Text>
+                </View>
+              }
+            />
+            {refreshing ? (
+              <View style={styles.refreshOverlay} pointerEvents="none">
+                <View style={[styles.refreshOverlayInner, isRTL && styles.refreshOverlayInnerRtl]}>
+                  <ActivityIndicator size="large" color={brand.primary} />
+                  <Text style={styles.refreshOverlayTxt}>{t('eventsRefreshing')}</Text>
+                </View>
               </View>
-            }
-          />
+            ) : null}
+          </View>
         )}
       </View>
     </SafeAreaView>
@@ -366,6 +372,34 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingVertical: spacing.xxl,
   },
+  listRegionInner: { flex: 1, position: 'relative' },
+  refreshOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'flex-start',
+    paddingTop: spacing.xl,
+    backgroundColor: 'rgba(255, 255, 255, 0.72)',
+    zIndex: 8,
+  },
+  refreshOverlayInner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: brand.white,
+    borderWidth: 1,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
+  },
+  refreshOverlayInnerRtl: {
+    flexDirection: 'row-reverse',
+  },
+  refreshOverlayTxt: {
+    color: brand.primary,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+  },
   rowRtl: { flexDirection: 'row-reverse' },
   rtl: { textAlign: 'right', writingDirection: 'rtl' },
   hero: {
@@ -378,22 +412,6 @@ const styles = StyleSheet.create({
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   heroTitles: { flex: 1, minWidth: 0 },
   heroTitle: { color: brand.white, fontSize: fontSize.xl, fontWeight: '900' },
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: radius.full,
-    padding: 3,
-    flexShrink: 0,
-  },
-  langPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.full,
-  },
-  langPillActive: { backgroundColor: brand.white },
-  langPillTxt: { color: brand.white, fontSize: fontSize.xs, fontWeight: '700' },
-  langPillTxtActive: { color: brand.primary },
   tabsRow: {
     flexDirection: 'row',
     gap: 6,

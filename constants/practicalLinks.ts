@@ -2,6 +2,7 @@ import type { ComponentProps } from 'react';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
 import type { HomeCopyKey } from '@/constants/i18n';
+import type { OrientationPracticalLinkId } from '@/utils/practicalLinkParcoursLock';
 import { homeShell } from '@/theme/homeShell';
 
 export type PracticalLinkDef = {
@@ -11,6 +12,24 @@ export type PracticalLinkDef = {
   icon: ComponentProps<typeof FontAwesome>['name'];
   accent: string;
 };
+
+/** Liens du parcours d’orientation (verrou selon `PlanParcoursCompletion`). */
+export const ORIENTATION_PRACTICAL_LINK_DEFS: (PracticalLinkDef & { id: OrientationPracticalLinkId })[] = [
+  {
+    id: 'diagnostic-ecoles',
+    labelKey: 'practical_diagnostic_ecoles',
+    descriptionKey: 'practical_diagnostic_ecoles_desc',
+    icon: 'compass',
+    accent: homeShell.green,
+  },
+  {
+    id: 'diagnostic-recommandations',
+    labelKey: 'practical_diagnostic_recommandations',
+    descriptionKey: 'practical_diagnostic_recommandations_desc',
+    icon: 'star',
+    accent: homeShell.blue,
+  },
+];
 
 /** Ordre aligné sur la rangée « Liens pratiques » accueil. */
 export const PRACTICAL_LINK_DEFS: PracticalLinkDef[] = [
@@ -36,18 +55,11 @@ export const PRACTICAL_LINK_DEFS: PracticalLinkDef[] = [
     accent: homeShell.blue,
   },
   {
-    id: 'tests-orientation',
-    labelKey: 'practical_testsOrientation',
-    descriptionKey: 'practical_testsOrientation_desc',
-    icon: 'compass',
-    accent: homeShell.green,
-  },
-  {
-    id: 'resultats-orientation',
-    labelKey: 'practical_resultatsOrientation',
-    descriptionKey: 'practical_resultatsOrientation_desc',
-    icon: 'line-chart',
-    accent: homeShell.blue,
+    id: 'evenements',
+    labelKey: 'eventsAgendaTitle',
+    descriptionKey: 'practical_evenements_desc',
+    icon: 'calendar',
+    accent: homeShell.greenDark,
   },
   {
     id: 'ecoles-inscription',

@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import {
   ActivityIndicator,
@@ -18,19 +17,24 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import RenderHtml from 'react-native-render-html';
+import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { DailyChallengeHubLoadingSkeleton } from '@/components/daily-challenge/DailyChallengeHubLoadingSkeleton';
+import { LoadingCardStack } from '@/components/ui/CardLoadingSkeleton';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { QuestMilestoneIcon } from '@/components/daily-challenge/QuestMilestoneIcon';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { getUserFacingApiError, getUserFacingApiFailureMessage } from '@/utils/apiError';
+import { formatDailyChallengeRecordTime, formatZipDurationMs } from '@/utils/dailyChallengeTime';
 import {
   fetchDailyChallengeLeaderboard,
   fetchDailyChallengeToday,
   resetDailyChallengeDevToday,
   submitDailyChallenge,
+  DAILY_CHALLENGE_LEADERBOARD_PAGE_SIZE,
   type DailyChallengeGameEntry,
   type DailyChallengeLeaderboardData,
   type DailyChallengeLeaderboardRow,
@@ -68,13 +72,6 @@ function isZipGridV2(zip: NonNullable<DailyChallengeGameEntry['zip']>): boolean 
     return false;
   }
   return zip.cells.length === rows * cols;
-}
-
-function formatZipDurationMs(ms: number): string {
-  const s = Math.max(0, Math.floor(ms / 1000));
-  const m = Math.floor(s / 60);
-  const sec = s % 60;
-  return `${m}:${sec.toString().padStart(2, '0')}`;
 }
 
 function beatPlayersPercentile(rank: number | null, totalPlayers: number): number | null {
@@ -355,8 +352,7 @@ function leaderboardDataToVm(d: DailyChallengeLeaderboardData): LeaderboardVm {
 }
 
 export default function DailyChallengeScreen() {
-  const params = useLocalSearchParams<{ openInfo?: string }>();
-  const { t, isRTL, locale, setLocale } = useLocale();
+  const { t, isRTL, locale } = useLocale();
   const { getValidAccessToken, user } = useAuth();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
@@ -373,12 +369,12 @@ export default function DailyChallengeScreen() {
   const lbVmRef = useRef<LeaderboardVm | null>(null);
   const lbLoadMoreBusyRef = useRef(false);
   const [lbOpen, setLbOpen] = useState(false);
-  const [infoOpen, setInfoOpen] = useState(false);
-  const [microLearnRead, setMicroLearnRead] = useState(false);
   const [zipRulesOpen, setZipRulesOpen] = useState(false);
   const [iceExplainOpen, setIceExplainOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
-  const [submitResult, setSubmitResult] = useState<DailyChallengeTodayData['myAttempt'] | null>(null);
+  const [submitResult, setSubmitResult] = useState<
+    (NonNullable<DailyChallengeTodayData['myAttempt']> & { bestSnakeTimeMs?: number }) | null
+  >(null);
   const [badgesEarned, setBadgesEarned] = useState<
     Array<{ code: string; labelFr: string; labelAr: string | null; pointsEarned?: number }>
   >(
@@ -386,6 +382,8 @@ export default function DailyChallengeScreen() {
   );
   const startedAt = useRef<number>(0);
   const [zipOrder, setZipOrder] = useState<number[]>([]);
+  const [zipSnakeStarted, setZipSnakeStarted] = useState(false);
+  const zipSnakeStartedRef = useRef(false);
   const [zipHintHighlightIdx, setZipHintHighlightIdx] = useState<number | null>(null);
   const [zipHelpCooldownLeftSec, setZipHelpCooldownLeftSec] = useState(0);
   const [zipHelpNoHintVisible, setZipHelpNoHintVisible] = useState(false);
@@ -428,7 +426,7 @@ export default function DailyChallengeScreen() {
     const ag = activeGameRef.current;
     const inZipQuiz = st === 'quiz' && ag?.type === 'zip';
     const appUp = AppState.currentState === 'active';
-    const shouldRun = inZipQuiz && appUp && isScreenFocusedRef.current;
+    const shouldRun = inZipQuiz && appUp && isScreenFocusedRef.current && zipSnakeStartedRef.current;
     if (shouldRun) {
       if (zipTimerRunStartRef.current === null) {
         zipTimerRunStartRef.current = Date.now();
@@ -454,6 +452,11 @@ export default function DailyChallengeScreen() {
     stepRef.current = step;
     activeGameRef.current = activeGame;
   }, [step, activeGame]);
+
+  useEffect(() => {
+    zipSnakeStartedRef.current = zipSnakeStarted;
+    syncZipTimerRunning();
+  }, [zipSnakeStarted, syncZipTimerRunning]);
 
   useFocusEffect(
     useCallback(() => {
@@ -532,11 +535,6 @@ export default function DailyChallengeScreen() {
     };
   }, [step, activeGame?.type, zipSnakePulse, zipSnakeHeadScale]);
 
-  const mainMicroLearnHtml = useMemo(() => {
-    const zipG = games.find((g) => g.type === 'zip');
-    return (zipG?.microLearnHtml || today?.microLearnHtml || '').trim();
-  }, [games, today?.microLearnHtml]);
-
   const primaryLeaderboardGameId = games.find((g) => g.type === 'zip')?.id ?? games[0]?.id ?? 0;
 
   const showHubLeaderboardCta =
@@ -554,21 +552,13 @@ export default function DailyChallengeScreen() {
       const token = await getValidAccessToken();
       const res = await fetchDailyChallengeToday(token);
       if (!res.success) {
-        setError('Erreur API');
+        setError(getUserFacingApiFailureMessage(t, { context: 'dailyChallenge' }));
         if (!silent) {
           setStep('hub');
         }
         return;
       }
       setToday(res.data);
-      const micro = (() => {
-        const gs = res.data.games ?? [];
-        const z = gs.find((g) => g.type === 'zip');
-        return (z?.microLearnHtml || res.data.microLearnHtml || '').trim();
-      })();
-      if (params.openInfo === '1' && micro) {
-        setInfoOpen(true);
-      }
       if (!res.data.available) {
         if (!silent) {
           setStep('hub');
@@ -579,37 +569,16 @@ export default function DailyChallengeScreen() {
         setStep('hub');
       }
     } catch (e: unknown) {
-      const msg = e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Erreur';
-      setError(msg);
+      setError(getUserFacingApiError(e, t, { context: 'dailyChallenge' }));
       if (!silent) {
         setStep('hub');
       }
     }
-  }, [getValidAccessToken, params.openInfo]);
+  }, [getValidAccessToken, t]);
 
   useEffect(() => {
     void load();
   }, [load]);
-
-  useEffect(() => {
-    let alive = true;
-    const date = today?.challengeDate;
-    if (!date) {
-      setMicroLearnRead(false);
-      return;
-    }
-    void (async () => {
-      try {
-        const v = await AsyncStorage.getItem(`daily_info_read_${date}`);
-        if (alive) setMicroLearnRead(v === '1');
-      } catch {
-        if (alive) setMicroLearnRead(false);
-      }
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [today?.challengeDate]);
 
   useEffect(() => {
     if (step !== 'hub' || !user) return;
@@ -648,6 +617,8 @@ export default function DailyChallengeScreen() {
   const startQuizFor = (g: DailyChallengeGameEntry) => {
     if (g.played) return;
     if (g.type === 'zip' && g.zip) {
+      setZipSnakeStarted(false);
+      zipSnakeStartedRef.current = false;
       if (isZipGridV2(g.zip)) {
         initZipTimerForGame(g.id, false);
         setActiveGame(g);
@@ -660,6 +631,8 @@ export default function DailyChallengeScreen() {
         return;
       }
       if (g.zip.items?.length) {
+        setZipSnakeStarted(true);
+        zipSnakeStartedRef.current = true;
         initZipTimerForGame(g.id, false);
         setActiveGame(g);
         setZipOrder([]);
@@ -715,7 +688,7 @@ export default function DailyChallengeScreen() {
     try {
       const res = await submitDailyChallenge(token, activeGame.id, finalAnswers, duration);
       if (!res.success || !res.data) {
-        setError(res.message ?? 'Soumission impossible');
+        setError(getUserFacingApiFailureMessage(t, { context: 'dailyChallenge' }));
         setStep('quiz');
         zipAutoSubmittedRef.current = false;
         return;
@@ -725,6 +698,7 @@ export default function DailyChallengeScreen() {
         durationMs: duration,
         rank: res.data.rank,
         totalPlayers: res.data.totalPlayers,
+        bestSnakeTimeMs: res.data.bestSnakeTimeMs,
       });
       setBadgesEarned(res.data.badgesEarned ?? []);
       const sns = res.data.streakNotices;
@@ -744,8 +718,7 @@ export default function DailyChallengeScreen() {
       void load({ silent: true });
       void openLeaderboard(activeGame.id);
     } catch (e: unknown) {
-      const msg = e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Erreur';
-      setError(msg);
+      setError(getUserFacingApiError(e, t, { context: 'dailyChallenge' }));
       setStep('quiz');
       zipAutoSubmittedRef.current = false;
     } finally {
@@ -840,7 +813,9 @@ export default function DailyChallengeScreen() {
       lbLoadMoreBusyRef.current = false;
       setLbLoadMoreBusy(false);
       const token = await getValidAccessToken();
-      const res = await fetchDailyChallengeLeaderboard(token, today?.challengeDate, challengeId);
+      const res = await fetchDailyChallengeLeaderboard(token, today?.challengeDate, challengeId, {
+        limit: DAILY_CHALLENGE_LEADERBOARD_PAGE_SIZE,
+      });
       if (res.success && res.data) {
         setLbVm(leaderboardDataToVm(res.data));
         setLbOpen(true);
@@ -860,7 +835,7 @@ export default function DailyChallengeScreen() {
       const token = await getValidAccessToken();
       const res = await fetchDailyChallengeLeaderboard(token, v.challengeDate, v.challengeId, {
         offset: v.nextOffset,
-        limit: 10,
+        limit: DAILY_CHALLENGE_LEADERBOARD_PAGE_SIZE,
       });
       if (!res.success || !res.data) return;
       setLbVm((prev) => {
@@ -893,7 +868,7 @@ export default function DailyChallengeScreen() {
       }
       const res = await resetDailyChallengeDevToday(token);
       if (!res.success) {
-        setError(res.message ?? 'Reset impossible');
+        setError(getUserFacingApiFailureMessage(t, { context: 'dailyChallenge' }));
         return;
       }
       setLbOpen(false);
@@ -901,28 +876,22 @@ export default function DailyChallengeScreen() {
       setActiveGame(null);
       setZipOrder([]);
       setShuffledZipItems([]);
+      setZipSnakeStarted(false);
+      zipSnakeStartedRef.current = false;
       setStep('hub');
       await load();
     } catch (e: unknown) {
-      const msg =
-        e && typeof e === 'object' && 'message' in e ? String((e as { message: string }).message) : 'Erreur';
-      setError(msg);
+      setError(getUserFacingApiError(e, t, { context: 'dailyChallenge' }));
     } finally {
       setDevResetBusy(false);
     }
   }, [user, getValidAccessToken, load, t]);
 
-  const closeInfoModal = useCallback(async () => {
-    if (today?.challengeDate) {
-      try {
-        await AsyncStorage.setItem(`daily_info_read_${today.challengeDate}`, '1');
-      } catch {
-        /* noop */
-      }
-    }
-    setMicroLearnRead(true);
-    setInfoOpen(false);
-  }, [today?.challengeDate]);
+  const beginZipSnakeSession = useCallback(() => {
+    setZipSnakeStarted(true);
+    zipSnakeStartedRef.current = true;
+    syncZipTimerRunning();
+  }, [syncZipTimerRunning]);
 
   const zipPrompt = useCallback(
     (z: NonNullable<DailyChallengeGameEntry['zip']>) =>
@@ -1001,7 +970,7 @@ export default function DailyChallengeScreen() {
   }, [step, activeGame, width, height, headerPadTop, insets.bottom]);
 
   const zipGridPanResponder = useMemo(() => {
-    if (!zipGridLayout) return null;
+    if (!zipGridLayout || !zipSnakeStarted) return null;
     const { rows, cols, cellSize } = zipGridLayout;
     const pick = (lx: number, ly: number): number | null => {
       const col = Math.floor(lx / cellSize);
@@ -1036,7 +1005,7 @@ export default function DailyChallengeScreen() {
         lastDragZipCell.current = null;
       },
     });
-  }, [zipGridLayout, applyZipGridCellTap, applyZipGridCellDrag]);
+  }, [zipGridLayout, zipSnakeStarted, applyZipGridCellTap, applyZipGridCellDrag]);
 
   const onTapZipItem = (id: number) => {
     if (!activeGame?.zip || isZipGridV2(activeGame.zip)) return;
@@ -1048,27 +1017,6 @@ export default function DailyChallengeScreen() {
   const currentQ: DailyChallengeQuestion | undefined = activeGame?.type === 'quiz' ? questions[qIndex] : undefined;
   const activeMaxPoints = activeGame ? maxScoreForGame(activeGame) : 0;
 
-  const tagsStyles = useMemo(
-    () => ({
-      body: {
-        color: brand.text,
-        fontSize: fontSize.sm,
-        lineHeight: 22,
-        textAlign: isRTL ? ('right' as const) : ('left' as const),
-      },
-      p: { marginBottom: spacing.sm },
-      h1: { fontSize: fontSize.lg, fontWeight: '800' as const, color: brand.text, marginBottom: spacing.sm },
-      h2: { fontSize: fontSize.md, fontWeight: '800' as const, color: brand.text, marginBottom: spacing.xs },
-      h3: { fontSize: fontSize.md, fontWeight: '700' as const, color: brand.text, marginBottom: spacing.xs },
-      ul: { marginBottom: spacing.sm, paddingLeft: isRTL ? 0 : spacing.md, paddingRight: isRTL ? spacing.md : 0 },
-      ol: { marginBottom: spacing.sm, paddingLeft: isRTL ? 0 : spacing.md, paddingRight: isRTL ? spacing.md : 0 },
-      li: { marginBottom: 4, color: brand.text, fontSize: fontSize.sm },
-      strong: { fontWeight: '800' as const, color: brand.text },
-      a: { color: brand.primary, textDecorationLine: 'underline' as const },
-    }),
-    [isRTL],
-  );
-
   const renderLbRow = useCallback(
     (
       row: {
@@ -1077,6 +1025,7 @@ export default function DailyChallengeScreen() {
         profileImageUrl?: string | null;
         score: number;
         durationMs: number;
+        isPremium?: boolean;
       },
       rowKey: string,
       isYou: boolean,
@@ -1103,9 +1052,11 @@ export default function DailyChallengeScreen() {
             />
           </View>
           <View style={styles.lbCardMid}>
-            <Text style={[styles.lbCardName, isRTL && styles.rtl]} numberOfLines={1}>
-              {row.displayName}
-            </Text>
+            <View style={[styles.lbNameRow, isRTL && styles.rowReverse]}>
+              <Text style={[styles.lbCardName, isRTL && styles.rtl, styles.lbCardNameFlex]} numberOfLines={1}>
+                {row.displayName}
+              </Text>
+            </View>
             {isYou ? <Text style={[styles.lbYouTag, isRTL && styles.rtl]}>{t('dailyChallengeYouLabel')}</Text> : null}
           </View>
           <View style={styles.lbRightCol}>
@@ -1129,6 +1080,8 @@ export default function DailyChallengeScreen() {
   const backIcon = isRTL ? 'chevron-right' : 'chevron-left';
 
   const streakVal = today?.streak?.current ?? 0;
+  const recordTimeMs = today?.streak?.bestSnakeTimeMs ?? 0;
+  const recordTimeLabel = formatDailyChallengeRecordTime(recordTimeMs);
 
   const streakGamifyMeta = useMemo(() => {
     const s = today?.streak?.current ?? 0;
@@ -1197,7 +1150,9 @@ export default function DailyChallengeScreen() {
               ? (setStep('hub'),
                 setActiveGame(null),
                 setZipOrder([]),
-                setShuffledZipItems([]))
+                setShuffledZipItems([]),
+                setZipSnakeStarted(false),
+                (zipSnakeStartedRef.current = false))
               : router.back()
           }
           style={styles.iconBtn}
@@ -1210,48 +1165,18 @@ export default function DailyChallengeScreen() {
         <Text style={[styles.topBarTitle, isRTL && styles.rtl]} numberOfLines={1}>
           {t('dailyChallengeTitle')}
         </Text>
-        <View
-          style={[styles.langSwitch, isRTL && styles.rowReverse]}
-          accessibilityRole="tablist"
-          accessibilityLabel={t('languageSwitcher')}
-        >
-          <Pressable
-            onPress={() => setLocale('fr')}
-            style={({ pressed }) => [
-              styles.langPill,
-              locale === 'fr' && styles.langPillActive,
-              pressed && { opacity: 0.85 },
-            ]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: locale === 'fr' }}
-            hitSlop={4}
-          >
-            <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive, isRTL && styles.langPillFrLbl]}>
-              {t('langFr')}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setLocale('ar')}
-            style={({ pressed }) => [
-              styles.langPill,
-              locale === 'ar' && styles.langPillActive,
-              pressed && { opacity: 0.85 },
-            ]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: locale === 'ar' }}
-            hitSlop={4}
-          >
-            <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive, isRTL && styles.rtl]}>
-              {t('langAr')}
-            </Text>
-          </Pressable>
-        </View>
+        <HeroLangSwitch />
       </View>
 
       {step === 'load' ? (
-        <View style={styles.center}>
-          <ActivityIndicator color={brand.primary} size="large" />
-          <Text style={[styles.loadingHint, isRTL && styles.rtl]}>{t('setupLoading')}</Text>
+        <View style={styles.mainFlex}>
+          <ScrollView
+            style={styles.scrollFlex}
+            contentContainerStyle={[styles.scroll, { paddingBottom: scrollBottomPad }]}
+            showsVerticalScrollIndicator={false}
+          >
+            <DailyChallengeHubLoadingSkeleton isRTL={isRTL} showProgress={Boolean(user)} />
+          </ScrollView>
         </View>
       ) : (
         <View style={styles.mainFlex}>
@@ -1299,15 +1224,96 @@ export default function DailyChallengeScreen() {
                     ) : null}
                   </View>
                 </View>
-                <View style={[styles.streakHero, isRTL && styles.rowReverse]}>
-                  <View style={styles.streakHeroIcon}>
-                    <FontAwesome name="fire" size={20} color={brand.white} />
+                <View style={[styles.hubHeroStatsRow, isRTL && styles.rowReverse]}>
+                  <View style={[styles.streakHero, styles.hubHeroStatCard, isRTL && styles.rowReverse]}>
+                    <View style={styles.streakHeroIcon}>
+                      <FontAwesome name="fire" size={20} color={brand.white} />
+                    </View>
+                    <View style={styles.streakHeroTextWrap}>
+                      <Text style={[styles.streakHeroLabel, isRTL && styles.rtl]}>{t('dailyChallengeStreak')}</Text>
+                      <Text style={[styles.streakHeroValue, isRTL && styles.rtl]}>{streakVal}</Text>
+                    </View>
                   </View>
-                  <View style={styles.streakHeroTextWrap}>
-                    <Text style={[styles.streakHeroLabel, isRTL && styles.rtl]}>{t('dailyChallengeStreak')}</Text>
-                    <Text style={[styles.streakHeroValue, isRTL && styles.rtl]}>{streakVal}</Text>
-                  </View>
+                  {user ? (
+                    <View style={[styles.streakHero, styles.hubHeroStatCard, isRTL && styles.rowReverse]}>
+                      <View style={[styles.streakHeroIcon, styles.recordScoreHeroIcon]}>
+                        <FontAwesome name="clock-o" size={20} color={brand.white} />
+                      </View>
+                      <View style={styles.streakHeroTextWrap}>
+                        <Text style={[styles.streakHeroLabel, isRTL && styles.rtl]}>
+                          {t('dailyChallengeProgressBestTimeShort')}
+                        </Text>
+                        <Text style={[styles.streakHeroValue, styles.recordTimeHeroValue, isRTL && styles.rtl]}>
+                          {recordTimeLabel}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
+              </View>
+
+              <View style={styles.card}>
+                <Text style={[styles.missionsTitle, isRTL && styles.rtl]}>{t('dailyChallengeMissionsTitle')}</Text>
+                <Text style={[styles.hubIntro, isRTL && styles.rtl]}>{t('dailyChallengePickGames')}</Text>
+                {allDone ? (
+                  <Text style={[styles.allDone, isRTL && styles.rtl]}>{t('dailyChallengeAllDone')}</Text>
+                ) : null}
+                {!user ? (
+                  <Text style={[styles.hint, isRTL && styles.rtl]}>{t('dailyChallengeLoginHint')}</Text>
+                ) : null}
+                {!user ? (
+                  <Pressable style={styles.btn} onPress={() => router.push('/login')}>
+                    <Text style={styles.btnTxt}>{t('dailyChallengeLoginCta')}</Text>
+                  </Pressable>
+                ) : null}
+                {games.length === 0 ? (
+                  <Text style={[styles.body, isRTL && styles.rtl]}>{t('dailyChallengeNoChallenge')}</Text>
+                ) : (
+                  games.map((g) => (
+                    <View key={g.id} style={[styles.missionCard, isRTL && styles.rowReverse]}>
+                      <View style={styles.missionAccentBar} />
+                      <View style={styles.missionCardInner}>
+                        <View style={[styles.missionCardTop, isRTL && styles.rowReverse]}>
+                          <View style={styles.missionIconWrap}>
+                            <FontAwesome
+                              name={g.type === 'zip' ? 'th' : 'question'}
+                              size={16}
+                              color={brand.primary}
+                            />
+                          </View>
+                          <Text style={[styles.gameTitle, isRTL && styles.rtl]} numberOfLines={2}>
+                            {gameTitle(g)}
+                          </Text>
+                          {g.played ? (
+                            <View style={styles.donePill}>
+                              <Text style={styles.donePillTxt}>{t('dailyChallengeGameDone')}</Text>
+                            </View>
+                          ) : null}
+                        </View>
+                        {g.played && g.myAttempt ? (
+                          <Text style={[styles.gameScore, isRTL && styles.rtl]}>
+                            {g.myAttempt.score}/{maxScoreForGame(g)} — {t('dailyChallengeRank')}{' '}
+                            {g.myAttempt.rank ?? '—'} / {g.myAttempt.totalPlayers}
+                          </Text>
+                        ) : null}
+                        {user && g.played && games.length > 1 ? (
+                          <Pressable style={styles.btnSecMission} onPress={() => void openLeaderboard(g.id)}>
+                            <Text style={styles.btnSecTxt}>{t('dailyChallengeSeeScore')}</Text>
+                          </Pressable>
+                        ) : null}
+                        {g.type === 'zip' && user && !g.played && canPlayGame(g) ? (
+                          <View style={styles.missionPlayWrap}>
+                            <AnimatedPlayButton
+                              label={t('dailyChallengePlayThis')}
+                              onPress={() => startQuizFor(g)}
+                              isRTL={isRTL}
+                            />
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  ))
+                )}
               </View>
 
               {user && today.streak ? (
@@ -1377,6 +1383,15 @@ export default function DailyChallengeScreen() {
                       </Text>
                       <Text style={[styles.progressStatLabel, isRTL && styles.rtl]}>
                         {t('dailyChallengeProgressRecordShort')}
+                      </Text>
+                    </View>
+                    <View style={[styles.progressStatCard, styles.progressStatCardGold]}>
+                      <FontAwesome name="clock-o" size={18} color={brand.warning} />
+                      <Text style={[styles.progressStatValue, styles.recordTimeStatValue, isRTL && styles.rtl]}>
+                        {formatDailyChallengeRecordTime(today.streak.bestSnakeTimeMs)}
+                      </Text>
+                      <Text style={[styles.progressStatLabel, isRTL && styles.rtl]}>
+                        {t('dailyChallengeProgressBestTimeShort')}
                       </Text>
                     </View>
                     <Pressable
@@ -1488,103 +1503,6 @@ export default function DailyChallengeScreen() {
                   </ScrollView>
                 </View>
               ) : null}
-
-              <View style={styles.card}>
-                <Text style={[styles.missionsTitle, isRTL && styles.rtl]}>{t('dailyChallengeMissionsTitle')}</Text>
-                <Text style={[styles.hubIntro, isRTL && styles.rtl]}>{t('dailyChallengePickGames')}</Text>
-                {allDone ? (
-                  <Text style={[styles.allDone, isRTL && styles.rtl]}>{t('dailyChallengeAllDone')}</Text>
-                ) : null}
-                {!user ? (
-                  <Text style={[styles.hint, isRTL && styles.rtl]}>{t('dailyChallengeLoginHint')}</Text>
-                ) : null}
-                {!user ? (
-                  <Pressable style={styles.btn} onPress={() => router.push('/login')}>
-                    <Text style={styles.btnTxt}>{t('dailyChallengeLoginCta')}</Text>
-                  </Pressable>
-                ) : null}
-                {mainMicroLearnHtml ? (
-                  microLearnRead ? (
-                    <Pressable
-                      onPress={() => setInfoOpen(true)}
-                      style={[styles.microLearnSubtleRow, isRTL && styles.rowReverse]}
-                      accessibilityRole="button"
-                      accessibilityLabel={t('dailyChallengeMicroLearnReopen')}
-                    >
-                      <FontAwesome name="lightbulb-o" size={14} color={brand.textMuted} />
-                      <Text style={[styles.microLearnSubtleTxt, isRTL && styles.rtl]}>
-                        {t('dailyChallengeMicroLearnReopen')}
-                      </Text>
-                    </Pressable>
-                  ) : (
-                    <Pressable
-                      onPress={() => setInfoOpen(true)}
-                      style={({ pressed }) => [styles.microLearnBanner, pressed && styles.microLearnBannerPressed]}
-                      accessibilityRole="button"
-                      accessibilityLabel={`${t('dailyChallengeMicroLearn')}. ${t('dailyChallengeMicroLearnTeaser')}`}
-                    >
-                      <View style={[styles.microLearnBannerInner, isRTL && styles.rowReverse]}>
-                        <View style={styles.microLearnBannerIconWrap}>
-                          <FontAwesome name="lightbulb-o" size={22} color={brand.primary} />
-                        </View>
-                        <View style={styles.microLearnBannerTextCol}>
-                          <Text style={[styles.microLearnBannerKicker, isRTL && styles.rtl]}>
-                            {t('dailyChallengeMicroLearn')}
-                          </Text>
-                          <Text style={[styles.microLearnBannerTeaser, isRTL && styles.rtl]} numberOfLines={3}>
-                            {t('dailyChallengeMicroLearnTeaser')}
-                          </Text>
-                        </View>
-                        <FontAwesome
-                          name={isRTL ? 'chevron-left' : 'chevron-right'}
-                          size={16}
-                          color={brand.primary}
-                          style={styles.microLearnBannerChevron}
-                        />
-                      </View>
-                    </Pressable>
-                  )
-                ) : null}
-                {games.length === 0 ? (
-                  <Text style={[styles.body, isRTL && styles.rtl]}>{t('dailyChallengeNoChallenge')}</Text>
-                ) : (
-                  games.map((g) => (
-                    <View key={g.id} style={[styles.missionCard, isRTL && styles.rowReverse]}>
-                      <View style={styles.missionAccentBar} />
-                      <View style={styles.missionCardInner}>
-                        <View style={[styles.missionCardTop, isRTL && styles.rowReverse]}>
-                          <View style={styles.missionIconWrap}>
-                            <FontAwesome
-                              name={g.type === 'zip' ? 'th' : 'question'}
-                              size={16}
-                              color={brand.primary}
-                            />
-                          </View>
-                          <Text style={[styles.gameTitle, isRTL && styles.rtl]} numberOfLines={2}>
-                            {gameTitle(g)}
-                          </Text>
-                          {g.played ? (
-                            <View style={styles.donePill}>
-                              <Text style={styles.donePillTxt}>{t('dailyChallengeGameDone')}</Text>
-                            </View>
-                          ) : null}
-                        </View>
-                        {g.played && g.myAttempt ? (
-                          <Text style={[styles.gameScore, isRTL && styles.rtl]}>
-                            {g.myAttempt.score}/{maxScoreForGame(g)} — {t('dailyChallengeRank')}{' '}
-                            {g.myAttempt.rank ?? '—'} / {g.myAttempt.totalPlayers}
-                          </Text>
-                        ) : null}
-                        {user && g.played && games.length > 1 ? (
-                          <Pressable style={styles.btnSecMission} onPress={() => void openLeaderboard(g.id)}>
-                            <Text style={styles.btnSecTxt}>{t('dailyChallengeSeeScore')}</Text>
-                          </Pressable>
-                        ) : null}
-                      </View>
-                    </View>
-                  ))
-                )}
-              </View>
             </>
           ) : null}
 
@@ -1663,6 +1581,8 @@ export default function DailyChallengeScreen() {
                         style={[styles.zipCompactBtn, styles.zipDevResetBtn]}
                         onPress={() => {
                           zipAutoSubmittedRef.current = false;
+                          setZipSnakeStarted(false);
+                          zipSnakeStartedRef.current = false;
                           initZipTimerForGame(activeGame.id, true);
                           setZipOrder([]);
                           if (activeGame.zip && !isZipGridV2(activeGame.zip) && activeGame.zip.items?.length) {
@@ -1805,6 +1725,16 @@ export default function DailyChallengeScreen() {
                             />
                           </View>
                         ) : null}
+                        {!zipSnakeStarted ? (
+                          <View style={styles.zipStartOverlay}>
+                            <AnimatedPlayButton
+                              label={t('dailyChallengePlayThis')}
+                              onPress={beginZipSnakeSession}
+                              isRTL={isRTL}
+                              size="lg"
+                            />
+                          </View>
+                        ) : null}
                       </View>
                       {zipPathError ? (
                         <Text style={[styles.zipGridErrorBanner, isRTL && styles.rtl]}>
@@ -1814,7 +1744,7 @@ export default function DailyChallengeScreen() {
                         </Text>
                       ) : null}
                       {submitting && zipOrder.length === n ? (
-                        <ActivityIndicator style={{ marginTop: spacing.md }} color={brand.primary} />
+                        <LoadingCardStack count={2} isRTL={isRTL} style={{ marginTop: spacing.md }} />
                       ) : null}
                       </View>
                       <View style={styles.zipPlayFooterBottom}>
@@ -1974,6 +1904,18 @@ export default function DailyChallengeScreen() {
                     {submitResult.rank ?? '—'} / {submitResult.totalPlayers}
                   </Text>
                 </View>
+                {(submitResult.bestSnakeTimeMs ?? today?.streak?.bestSnakeTimeMs ?? 0) > 0 ? (
+                  <View style={[styles.resultStatRow, isRTL && styles.rowReverse]}>
+                    <Text style={[styles.resultStatLabel, isRTL && styles.rtl]}>
+                      {t('dailyChallengeProgressBestTimeShort')}
+                    </Text>
+                    <Text style={[styles.resultStatValue, styles.recordTimeStatValue]}>
+                      {formatDailyChallengeRecordTime(
+                        submitResult.bestSnakeTimeMs ?? today?.streak?.bestSnakeTimeMs,
+                      )}
+                    </Text>
+                  </View>
+                ) : null}
                 {beatPlayersPercentile(submitResult.rank, submitResult.totalPlayers) != null ? (
                   <View style={[styles.resultBeatBanner, isRTL && styles.rowReverse]}>
                     <FontAwesome name="globe" size={15} color={brand.primary} />
@@ -2010,6 +1952,8 @@ export default function DailyChallengeScreen() {
                   onPress={() => {
                     setStep('hub');
                     setActiveGame(null);
+                    setZipSnakeStarted(false);
+                    zipSnakeStartedRef.current = false;
                     void load();
                   }}
                   style={styles.resultSecondaryCta}
@@ -2126,7 +2070,7 @@ export default function DailyChallengeScreen() {
                 accessibilityLabel={t('dailyChallengeLeaderboardLoadMore')}
               >
                 {lbLoadMoreBusy ? (
-                  <ActivityIndicator color={brand.primary} />
+                  <LoadingCardStack count={2} isRTL={isRTL} />
                 ) : (
                   <Text style={[styles.lbLoadMoreBtnTxt, isRTL && styles.rtl]}>
                     {t('dailyChallengeLeaderboardLoadMore')}
@@ -2145,59 +2089,6 @@ export default function DailyChallengeScreen() {
           <View style={[styles.lbModalFooter, { paddingBottom: insets.bottom + spacing.md }]}>
             <Pressable style={styles.lbModalCloseBtn} onPress={() => setLbOpen(false)}>
               <Text style={styles.lbModalCloseBtnTxt}>{t('dailyChallengeClose')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
-
-      <Modal
-        visible={infoOpen}
-        animationType="slide"
-        presentationStyle={Platform.OS === 'ios' ? 'pageSheet' : 'fullScreen'}
-        onRequestClose={() => void closeInfoModal()}
-      >
-        <View style={styles.modalRoot}>
-          <View style={[styles.modalHeader, { paddingTop: insets.top + spacing.md }]}>
-            <View style={[styles.microModalHeaderRow, isRTL && styles.rowReverse]}>
-              <View style={[styles.microModalHeaderLead, isRTL && styles.rowReverse]}>
-                <View style={styles.microModalIconCircle}>
-                  <FontAwesome name="lightbulb-o" size={22} color={brand.white} />
-                </View>
-                <View style={styles.microModalTitleCol}>
-                  <Text style={[styles.modalTitle, isRTL && styles.rtl]}>{t('dailyChallengeMicroLearn')}</Text>
-                  <Text style={[styles.modalMicroSubtitle, isRTL && styles.rtl]}>
-                    {t('dailyChallengeMicroLearnModalSubtitle')}
-                  </Text>
-                </View>
-              </View>
-              <Pressable
-                onPress={() => void closeInfoModal()}
-                hitSlop={12}
-                style={styles.microModalCloseHit}
-                accessibilityRole="button"
-                accessibilityLabel={t('dailyChallengeClose')}
-              >
-                <FontAwesome name="times" size={22} color="rgba(255,255,255,0.92)" />
-              </Pressable>
-            </View>
-          </View>
-          <ScrollView style={styles.modalScroll} contentContainerStyle={styles.infoScrollContent}>
-            <View style={styles.microModalIntroBox}>
-              <Text style={[styles.microModalIntroTxt, isRTL && styles.rtl]}>
-                {t('dailyChallengeMicroLearnModalIntro')}
-              </Text>
-            </View>
-            {mainMicroLearnHtml ? (
-              <RenderHtml
-                contentWidth={width - spacing.lg * 2}
-                source={{ html: mainMicroLearnHtml }}
-                tagsStyles={tagsStyles}
-              />
-            ) : null}
-          </ScrollView>
-          <View style={[styles.modalFooter, { paddingBottom: insets.bottom + spacing.md }]}>
-            <Pressable style={styles.modalClosePill} onPress={() => void closeInfoModal()}>
-              <Text style={styles.modalClosePillTxt}>{t('dailyChallengeMicroLearnGotIt')}</Text>
             </Pressable>
           </View>
         </View>
@@ -2282,24 +2173,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     minWidth: 0,
   },
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderRadius: radius.full,
-    padding: 3,
-    flexShrink: 0,
-  },
-  langPill: {
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: radius.full,
-  },
-  langPillActive: { backgroundColor: brand.white },
-  langPillTxt: { color: brand.white, fontSize: fontSize.xs, fontWeight: '700' },
-  langPillTxtActive: { color: brand.primary },
-  /** Libellé « FR » toujours en lecture gauche-droite sous interface arabe. */
-  langPillFrLbl: { writingDirection: 'ltr' },
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', gap: spacing.md, paddingHorizontal: spacing.xl },
   loadingHint: { fontSize: fontSize.sm, color: brand.textMuted, fontWeight: '600', textAlign: 'center' },
   scroll: { padding: spacing.lg },
@@ -2390,6 +2263,20 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.md,
   },
+  hubHeroStatsRow: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.sm,
+  },
+  hubHeroStatCard: {
+    flex: 1,
+    minWidth: 0,
+    marginTop: 0,
+  },
+  recordScoreHeroIcon: {
+    backgroundColor: 'rgba(250,204,21,0.38)',
+  },
   streakHeroIcon: {
     width: 40,
     height: 40,
@@ -2401,6 +2288,8 @@ const styles = StyleSheet.create({
   streakHeroTextWrap: { flex: 1, minWidth: 0 },
   streakHeroLabel: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.9)', fontWeight: '600' },
   streakHeroValue: { fontSize: fontSize.xxl, fontWeight: '800', color: brand.white, marginTop: 2 },
+  recordTimeHeroValue: { fontVariant: ['tabular-nums'] as const, letterSpacing: 0.5 },
+  recordTimeStatValue: { fontVariant: ['tabular-nums'] as const, letterSpacing: 0.3 },
   streakExtras: { marginTop: spacing.sm, gap: spacing.xs },
   streakMetaRow: { flexDirection: 'row', justifyContent: 'space-between', gap: spacing.sm },
   streakMetaTxt: { fontSize: fontSize.xs, color: 'rgba(255,255,255,0.92)', flex: 1, fontWeight: '600' },
@@ -2517,7 +2406,13 @@ const styles = StyleSheet.create({
     borderTopLeftRadius: 6,
     borderTopRightRadius: 6,
   },
-  progressStatDeck: { flexDirection: 'row', gap: spacing.sm, paddingHorizontal: spacing.lg, paddingVertical: spacing.md },
+  progressStatDeck: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+  },
   progressStatCard: {
     flex: 1,
     minWidth: 0,
@@ -2759,61 +2654,66 @@ const styles = StyleSheet.create({
   btnSecTxt: { color: brand.primary, fontWeight: '700' },
   linkBtn: { marginTop: spacing.md, alignItems: 'center' },
   linkTxt: { color: brand.primary, fontWeight: '600', fontSize: fontSize.sm },
-  microLearnBanner: {
-    marginTop: spacing.md,
-    borderRadius: radius.lg,
-    borderWidth: 1.5,
-    borderColor: 'rgba(79, 70, 229, 0.35)',
-    backgroundColor: '#f5f3ff',
-    overflow: 'hidden',
+  missionPlayWrap: { marginTop: spacing.md, alignItems: 'center' },
+  animatedPlayWrap: { alignItems: 'center', justifyContent: 'center' },
+  animatedPlayRing: {
+    position: 'absolute',
+    width: 148,
+    height: 48,
+    borderRadius: radius.full,
+    backgroundColor: brand.primary,
+  },
+  animatedPlayRingLg: { width: 168, height: 56 },
+  animatedPlayBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    minWidth: 132,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: radius.full,
+    backgroundColor: brand.primary,
     ...Platform.select({
       ios: {
         shadowColor: brand.primary,
-        shadowOffset: { width: 0, height: 3 },
-        shadowOpacity: 0.12,
-        shadowRadius: 10,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.28,
+        shadowRadius: 8,
       },
-      android: { elevation: 3 },
+      android: { elevation: 6 },
     }),
   },
-  microLearnBannerPressed: { opacity: 0.9 },
-  microLearnBannerInner: {
+  animatedPlayBtnLg: {
     flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-  },
-  microLearnBannerIconWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.95)',
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(79, 70, 229, 0.2)',
-  },
-  microLearnBannerTextCol: { flex: 1, minWidth: 0 },
-  microLearnBannerKicker: { fontSize: fontSize.md, fontWeight: '800', color: brand.primary },
-  microLearnBannerTeaser: {
-    fontSize: fontSize.sm,
-    color: brand.text,
-    marginTop: 4,
-    lineHeight: 20,
-    opacity: 0.92,
-  },
-  microLearnBannerChevron: { marginLeft: 2, marginRight: 2 },
-  microLearnSubtleRow: {
-    marginTop: spacing.sm,
-    flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.sm,
-    alignSelf: 'flex-start',
-    paddingVertical: spacing.xs,
-    paddingHorizontal: 0,
+    minWidth: 152,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.md,
+    borderRadius: radius.full,
+    backgroundColor: brand.primary,
+    ...Platform.select({
+      ios: {
+        shadowColor: brand.primary,
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.32,
+        shadowRadius: 12,
+      },
+      android: { elevation: 8 },
+    }),
   },
-  microLearnSubtleTxt: { fontSize: fontSize.sm, color: brand.textMuted, fontWeight: '600' },
+  animatedPlayBtnTxt: { color: brand.white, fontWeight: '800', fontSize: fontSize.sm },
+  animatedPlayBtnTxtLg: { color: brand.white, fontWeight: '800', fontSize: fontSize.md },
+  zipStartOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(248, 250, 252, 0.82)',
+    borderRadius: radius.md,
+    zIndex: 4,
+  },
   progress: { fontSize: fontSize.sm, color: brand.textMuted, marginBottom: spacing.sm },
   qPrompt: { fontSize: fontSize.lg, fontWeight: '700', color: brand.text, marginBottom: spacing.md },
   choice: {
@@ -3056,70 +2956,8 @@ const styles = StyleSheet.create({
     color: '#b91c1c',
     textAlign: 'center',
   },
-  modalRoot: { flex: 1, backgroundColor: brand.white },
-  modalHeader: {
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.md,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: 'rgba(255,255,255,0.2)',
-    backgroundColor: brand.primary,
-  },
-  modalTitle: { fontSize: fontSize.lg, fontWeight: '800', color: brand.white },
-  modalMicroSubtitle: {
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    color: 'rgba(255,255,255,0.88)',
-    marginTop: 4,
-    lineHeight: 20,
-  },
-  microModalHeaderRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  microModalHeaderLead: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: spacing.md, minWidth: 0 },
-  microModalIconCircle: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: 'rgba(255,255,255,0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  microModalTitleCol: { flex: 1, minWidth: 0 },
-  microModalCloseHit: { padding: spacing.xs },
-  microModalIntroBox: {
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.md,
-    backgroundColor: '#f1f5f9',
-    borderWidth: 1,
-    borderColor: brand.border,
-  },
-  microModalIntroTxt: {
-    fontSize: fontSize.sm,
-    lineHeight: 21,
-    color: brand.text,
-    fontWeight: '600',
-  },
   modalScroll: { flex: 1 },
   modalScrollContent: { paddingHorizontal: spacing.lg, paddingTop: spacing.md, paddingBottom: spacing.sm },
-  infoScrollContent: { padding: spacing.lg, paddingBottom: spacing.sm },
-  modalFooter: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: brand.border,
-    backgroundColor: '#f8fafc',
-  },
-  modalClosePill: {
-    backgroundColor: brand.primary,
-    paddingVertical: spacing.md,
-    borderRadius: radius.lg,
-    alignItems: 'center',
-  },
-  modalClosePillTxt: { color: '#fff', fontWeight: '800', fontSize: fontSize.md },
   resultCelebrationRoot: { alignSelf: 'stretch', width: '100%', marginBottom: spacing.section },
   resultHero: {
     backgroundColor: brand.primary,
@@ -3332,7 +3170,9 @@ const styles = StyleSheet.create({
   },
   lbAvatarImg: { width: '100%', height: '100%' },
   lbCardMid: { flex: 1, minWidth: 0 },
+  lbNameRow: { flexDirection: 'row', alignItems: 'center', gap: 6, minWidth: 0 },
   lbCardName: { fontSize: fontSize.md, fontWeight: '700', color: brand.text },
+  lbCardNameFlex: { flex: 1, minWidth: 0 },
   lbYouTag: { fontSize: fontSize.xs, fontWeight: '800', color: brand.emerald, marginTop: 2 },
   lbRightCol: { alignItems: 'flex-end', minWidth: 72 },
   lbTimeRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
@@ -3376,6 +3216,92 @@ const styles = StyleSheet.create({
   },
   lbModalCloseBtnTxt: { color: brand.white, fontWeight: '800', fontSize: fontSize.md },
 });
+
+function AnimatedPlayButton({
+  label,
+  onPress,
+  isRTL,
+  disabled,
+  size = 'md',
+}: {
+  label: string;
+  onPress: () => void;
+  isRTL: boolean;
+  disabled?: boolean;
+  size?: 'md' | 'lg';
+}) {
+  const scale = useRef(new Animated.Value(1)).current;
+  const ring = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (disabled) return;
+    const anim = Animated.loop(
+      Animated.sequence([
+        Animated.parallel([
+          Animated.timing(scale, {
+            toValue: 1.05,
+            duration: 850,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring, {
+            toValue: 1,
+            duration: 850,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.parallel([
+          Animated.timing(scale, {
+            toValue: 1,
+            duration: 850,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(ring, {
+            toValue: 0,
+            duration: 850,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ]),
+      ]),
+    );
+    anim.start();
+    return () => anim.stop();
+  }, [disabled, scale, ring]);
+
+  const ringScale = ring.interpolate({ inputRange: [0, 1], outputRange: [1, 1.2] });
+  const ringOpacity = ring.interpolate({ inputRange: [0, 1], outputRange: [0.32, 0] });
+  const btnStyle = size === 'lg' ? styles.animatedPlayBtnLg : styles.animatedPlayBtn;
+  const txtStyle = size === 'lg' ? styles.animatedPlayBtnTxtLg : styles.animatedPlayBtnTxt;
+  const iconSize = size === 'lg' ? 18 : 14;
+
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => (pressed && !disabled ? { opacity: 0.92 } : undefined)}
+    >
+      <View style={styles.animatedPlayWrap}>
+        <Animated.View
+          pointerEvents="none"
+          style={[
+            styles.animatedPlayRing,
+            size === 'lg' ? styles.animatedPlayRingLg : null,
+            { opacity: ringOpacity, transform: [{ scale: ringScale }] },
+          ]}
+        />
+        <Animated.View style={[btnStyle, isRTL && styles.rowReverse, { transform: [{ scale }] }]}>
+          <FontAwesome name="play" size={iconSize} color={brand.white} />
+          <Text style={txtStyle}>{label}</Text>
+        </Animated.View>
+      </View>
+    </Pressable>
+  );
+}
 
 function splitZipPromptObjective(text: string): { badge: string; body: string } | null {
   const trimmed = text.trim();

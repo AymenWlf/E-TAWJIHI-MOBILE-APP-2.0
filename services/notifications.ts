@@ -1,3 +1,5 @@
+import { DeviceEventEmitter } from 'react-native';
+
 import { buildApiUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
 import type { AppNotification, NotificationsListResponse } from '@/types/inscriptions';
@@ -7,6 +9,13 @@ import type { AppNotification, NotificationsListResponse } from '@/types/inscrip
  * Pas lié au formulaire du bandeau système : uniquement données `/api/notifications`.
  */
 export const NOTIFICATIONS_IN_APP_REFRESH_EVENT = 'notifications:in-app-refresh';
+
+export type NotificationsRefreshPayload = { force?: boolean };
+
+/** Rafraîchit badge + tiroir notifications (après étape parcours, push, reco IA, etc.). */
+export function emitNotificationsRefresh(options?: NotificationsRefreshPayload): void {
+  DeviceEventEmitter.emit(NOTIFICATIONS_IN_APP_REFRESH_EVENT, options);
+}
 
 type ListResponse = {
   success: boolean;
@@ -39,6 +48,24 @@ export async function fetchNotifications(
   } catch {
     return { items: [], total: 0, unreadCount: 0 };
   }
+}
+
+export async function fetchUnreadAnnouncementCount(accessToken: string): Promise<number> {
+  const res = await fetchNotifications(accessToken, {
+    limit: 100,
+    offset: 0,
+    unreadOnly: true,
+  });
+  return unreadContestAnnouncementIdsFromNotifications(res.items).size;
+}
+
+export async function fetchUnreadAnnouncementState(accessToken: string): Promise<Set<number>> {
+  const res = await fetchNotifications(accessToken, {
+    limit: 100,
+    offset: 0,
+    unreadOnly: true,
+  });
+  return unreadContestAnnouncementIdsFromNotifications(res.items);
 }
 
 export async function fetchUnreadCount(accessToken: string): Promise<number> {
@@ -75,6 +102,54 @@ export async function markAllNotificationsRead(accessToken: string): Promise<boo
   } catch {
     return false;
   }
+}
+
+/**
+ * Indique si une notification in-app pointe vers une annonce concours.
+ */
+export function isAnnouncementRelatedNotification(n: AppNotification): boolean {
+  if (n.type === 'announcement' || n.type === 'follow_school_new_announcement') return true;
+  const meta = (n.metadata ?? {}) as Record<string, unknown>;
+  const direct = Number(meta.announcement_id ?? meta.contest_announcement_id ?? 0);
+  if (Number.isFinite(direct) && direct > 0) return true;
+  if (
+    meta.deep_link === 'community_qna' &&
+    String(meta.context_type ?? '') === 'contest_announcement' &&
+    Number(meta.context_id ?? 0) > 0
+  ) {
+    return true;
+  }
+  return false;
+}
+
+/** ID annonce concours référencé par la notification, si identifiable. */
+export function contestAnnouncementIdFromNotification(n: AppNotification): number | null {
+  const meta = (n.metadata ?? {}) as Record<string, unknown>;
+  const direct = Number(meta.announcement_id ?? meta.contest_announcement_id ?? 0);
+  if (Number.isFinite(direct) && direct > 0) return direct;
+  if (
+    meta.deep_link === 'community_qna' &&
+    String(meta.context_type ?? '') === 'contest_announcement'
+  ) {
+    const cid = Number(meta.context_id ?? 0);
+    if (Number.isFinite(cid) && cid > 0) return cid;
+  }
+  return null;
+}
+
+/**
+ * Annonces concours ayant au moins une notification in-app non lue.
+ */
+export function unreadContestAnnouncementIdsFromNotifications(
+  items: readonly AppNotification[],
+): Set<number> {
+  const out = new Set<number>();
+  for (const n of items) {
+    if (n.isRead || !isAnnouncementRelatedNotification(n)) continue;
+    const aid = contestAnnouncementIdFromNotification(n);
+    if (aid != null) out.add(aid);
+  }
+  return out;
 }
 
 /**

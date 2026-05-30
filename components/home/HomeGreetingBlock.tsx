@@ -1,5 +1,6 @@
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { HomeGreetingSubtitleSkeleton } from '@/components/home/HomeGreetingSubtitleSkeleton';
 import { Text } from '@/components/ui/Text';
 
 import { homeShell } from '@/theme/homeShell';
@@ -32,9 +33,7 @@ export function HomeGreetingBlock({
         accessibilityLabel={subtitleLoading ? undefined : subtitle}
       >
         {subtitleLoading ? (
-          <View style={[styles.subLoading, rtl && styles.subLoadingRtl]}>
-            <ActivityIndicator size="small" color="rgba(255,255,255,0.95)" />
-          </View>
+          <HomeGreetingSubtitleSkeleton isRTL={rtl} />
         ) : (
           <Text style={[styles.subText, rtl && styles.textRtl]} numberOfLines={2}>
             {subtitle}
@@ -81,14 +80,5 @@ const styles = StyleSheet.create({
     color: homeShell.text,
     fontSize: fontSize.sm,
     fontWeight: '700',
-  },
-  subLoading: {
-    minHeight: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingVertical: 2,
-  },
-  subLoadingRtl: {
-    alignSelf: 'stretch',
   },
 });

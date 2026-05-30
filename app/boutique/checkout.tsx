@@ -23,21 +23,29 @@ import {
 import { AppTextInput } from '@/components/ui/AppTextInput';
 import { SelectField } from '@/components/ui/SelectField';
 import { ShopVillePickerSheet } from '@/components/ui/ShopVillePickerSheet';
+import { CheckoutPlatformServiceUpgradePrice } from '@/components/shop/CheckoutPlatformServiceUpgradePrice';
 import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVisualThumb';
 import { Text } from '@/components/ui/Text';
 import {
   BAC_TYPES,
-  FILIERE_BAC_OPTIONS,
   type LabeledOption,
   NIVEAU_ETUDE_OPTIONS,
   SPECIALITES_MISSION,
 } from '@/constants/academicSetup';
+import { isValidOrientation1BacFiliereId } from '@/constants/orientation1bacFilieres';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { createShopOrder, fetchShopPublicSettings, hydrateCartLinesPricesViaApi } from '@/services/shop';
-import { checkPlatformServicePurchaseEligibility } from '@/services/platformServices';
+import { usePlatformServiceCatalogEntitlements } from '@/hooks/usePlatformServiceCatalogEntitlements';
+import { useShopFlowSystemBars } from '@/hooks/useShopFlowSystemBars';
+import {
+  checkPlatformServicePurchaseEligibility,
+  fetchPlatformServices,
+  type PlatformServiceItem,
+} from '@/services/platformServices';
 import { isPlatformServiceCartLine } from '@/utils/platformServiceCart';
+import { resolveUpgradeSourceName } from '@/utils/platformServiceEntitlementUi';
 import type { ShopPromoDiscountType } from '@/services/shopPromo';
 import {
   fetchShopAutoApplyPromo,
@@ -57,7 +65,14 @@ import {
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
 import { saveShopOrderAccessToken } from '@/utils/shopOrderTokenStorage';
 import { getMobileVisitorId } from '@/utils/visitorId';
+import { getUserFacingApiError, getUserFacingApiFailureMessage } from '@/utils/apiError';
 import { isBacStudyProfileLevel } from '@/utils/academicProfileLevels';
+import {
+  filiereOptionsForNiveau,
+  isPremiereBacNiveau,
+  resolveFiliereDisplayLabel,
+  sanitizeFiliereForNiveau,
+} from '@/utils/academicFiliere';
 import { getActiveShopVilles, parseShopVillePriceAmount, shopVilleListLabel, type ShopVilleRow } from '@/utils/shopVilles';
 
 type ServicePaymentChoice = NonNullable<CreateShopOrderInput['servicePaymentModality']>;
@@ -167,8 +182,14 @@ function collectCheckoutValidationErrors(params: {
           if (!params.specialiteMission1.trim()) add('specialiteMission1', params.t('shopCheckoutErrMissionSpecs'));
           if (!params.specialiteMission2.trim()) add('specialiteMission2', params.t('shopCheckoutErrMissionSpecs'));
         }
-      } else if (!params.filiere.trim()) {
-        add('filiere', params.t('shopCheckoutErrFiliere'));
+      } else if (params.bacType === 'normal') {
+        if (isPremiereBacNiveau(params.studyLevel)) {
+          if (!isValidOrientation1BacFiliereId(params.filiere.trim())) {
+            add('filiere', params.t('shopCheckoutErrFiliere'));
+          }
+        } else if (!params.filiere.trim()) {
+          add('filiere', params.t('shopCheckoutErrFiliere'));
+        }
       }
     }
     if (params.studentVilleCheckCode <= 0 || !params.studentCity.trim()) {
@@ -283,7 +304,7 @@ export default function BoutiqueCheckoutScreen() {
       },
       filiere: {
         title: t('setupFiliere'),
-        items: toPickItems(FILIERE_BAC_OPTIONS),
+        items: toPickItems(filiereOptionsForNiveau(studyLevel)),
         value: filiere,
       },
       specialiteMission1: {
@@ -392,7 +413,11 @@ export default function BoutiqueCheckoutScreen() {
 
           const fil = (p.filiere ?? '').trim();
           if (fil) {
-            setFiliere((prev) => (prev.trim() === '' ? fil : prev));
+            setFiliere((prev) => {
+              if (prev.trim() !== '') return prev;
+              const levelForFiliere = nv || studyLevel;
+              return sanitizeFiliereForNiveau(levelForFiliere, fil);
+            });
           }
 
           const s1 = (p.specialite1 ?? '').trim();
@@ -453,6 +478,33 @@ export default function BoutiqueCheckoutScreen() {
     }));
   }, [hasPhysicalProducts, t]);
 
+  const cartServiceSlugs = useMemo(
+    () =>
+      lines
+        .filter(isPlatformServiceCartLine)
+        .map((l) => (l.platformServiceSlug ?? l.slug).trim())
+        .filter(Boolean),
+    [lines],
+  );
+  const { bySlug: serviceEntitlementsBySlug, loading: entitlementsLoading } =
+    usePlatformServiceCatalogEntitlements(cartServiceSlugs);
+  const [serviceBySlug, setServiceBySlug] = useState<Map<string, PlatformServiceItem>>(new Map());
+  const [serviceNameBySlug, setServiceNameBySlug] = useState<Map<string, string>>(new Map());
+
+  useEffect(() => {
+    if (cartServiceSlugs.length === 0) return;
+    void fetchPlatformServices().then((list) => {
+      const bySlug = new Map<string, PlatformServiceItem>();
+      const names = new Map<string, string>();
+      for (const s of list) {
+        bySlug.set(s.slug, s);
+        names.set(s.slug, s.name);
+      }
+      setServiceBySlug(bySlug);
+      setServiceNameBySlug(names);
+    });
+  }, [cartServiceSlugs.join(',')]);
+
   const subtotal = useMemo(
     () => lines.reduce((acc, l) => acc + shopParsePriceString(l.price) * l.quantity, 0),
     [lines],
@@ -490,21 +542,33 @@ export default function BoutiqueCheckoutScreen() {
     setPromoMessage(null);
   }, []);
 
+  const hydrateCheckoutCartPrices = useCallback(async () => {
+    if (lines.length === 0) return;
+    if (cartServiceSlugs.length > 0 && entitlementsLoading) return;
+    const accessToken = user ? await getValidAccessToken() : null;
+    const priced = await hydrateCartLinesPricesViaApi(lines, {
+      phone: phone.trim() || user?.phone?.trim() || undefined,
+      accessToken,
+      entitlementsBySlug: serviceEntitlementsBySlug,
+    });
+    if (JSON.stringify(priced) !== JSON.stringify(lines)) {
+      await replaceLines(priced);
+    }
+  }, [
+    lines,
+    cartServiceSlugs.length,
+    entitlementsLoading,
+    serviceEntitlementsBySlug,
+    user,
+    phone,
+    getValidAccessToken,
+    replaceLines,
+  ]);
+
   useFocusEffect(
     useCallback(() => {
-      if (lines.length === 0) return;
-      let cancelled = false;
-      void (async () => {
-        const priced = await hydrateCartLinesPricesViaApi(lines);
-        if (cancelled) return;
-        if (JSON.stringify(priced) !== JSON.stringify(lines)) {
-          await replaceLines(priced);
-        }
-      })();
-      return () => {
-        cancelled = true;
-      };
-    }, [lines, replaceLines]),
+      void hydrateCheckoutCartPrices();
+    }, [hydrateCheckoutCartPrices]),
   );
 
   const applyPromoCode = useCallback(async () => {
@@ -681,31 +745,43 @@ export default function BoutiqueCheckoutScreen() {
     return t('shopCheckoutDisclaimerSecure');
   }, [hasAnyService, servicePayment, t]);
 
+  const hasFooter = lines.length > 0;
+  const { headerColor, bottomColor } = useShopFlowSystemBars({
+    headerColor: brand.white,
+    bottomColor: hasFooter ? brand.white : brand.backgroundSoft,
+  });
+
   if (lines.length === 0) {
     return (
-      <SafeAreaView style={[styles.root, isRTL && styles.rtlRoot]} edges={['top']}>
-        <StatusBar style="dark" />
-        <View style={[styles.topBar, isRTL && styles.rowRtl]}>
-          <Pressable onPress={() => router.back()} style={styles.backBtn}>
-            <FontAwesome name={isRTL ? 'chevron-right' : 'chevron-left'} size={16} color={brand.text} />
-          </Pressable>
-          <Text style={[styles.topTitle, isRTL && styles.headerTxtRtl]}>{t('shopCheckoutTitle')}</Text>
-          <View style={{ width: 40 }} />
-        </View>
-        <View style={styles.emptyWrap}>
-          <View style={styles.emptyIcon}>
-            <FontAwesome name="shopping-bag" size={36} color={brand.primary} />
+      <View style={[styles.screen, isRTL && styles.rtlRoot]}>
+        <StatusBar style="dark" backgroundColor={headerColor} />
+        <SafeAreaView edges={['top']} style={[styles.headerSafe, { backgroundColor: headerColor }]}>
+          <View style={[styles.topBar, isRTL && styles.rowRtl]}>
+            <Pressable onPress={() => router.back()} style={styles.backBtn}>
+              <FontAwesome name={isRTL ? 'chevron-right' : 'chevron-left'} size={16} color={brand.text} />
+            </Pressable>
+            <Text style={[styles.topTitle, isRTL && styles.headerTxtRtl]}>{t('shopCheckoutTitle')}</Text>
+            <View style={{ width: 40 }} />
           </View>
-          <Text style={[styles.emptyTitle, isRTL && styles.txtRtl]}>{t('shopCartEmptyTitle')}</Text>
-          <Text style={[styles.emptyDesc, isRTL && styles.txtRtl]}>{t('shopCartEmptyDesc')}</Text>
-          <Pressable
-            style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.9 }]}
-            onPress={() => router.replace('/(tabs)/boutique')}
-          >
-            <Text style={styles.btnPrimaryTxt}>{t('shopCartEmptyCta')}</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
+        </SafeAreaView>
+        <SafeAreaView
+          edges={['bottom']}
+          style={[styles.screenSafe, { backgroundColor: brand.backgroundSoft }]}>
+          <View style={styles.emptyWrap}>
+            <View style={styles.emptyIcon}>
+              <FontAwesome name="shopping-bag" size={36} color={brand.primary} />
+            </View>
+            <Text style={[styles.emptyTitle, isRTL && styles.txtRtl]}>{t('shopCartEmptyTitle')}</Text>
+            <Text style={[styles.emptyDesc, isRTL && styles.txtRtl]}>{t('shopCartEmptyDesc')}</Text>
+            <Pressable
+              style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.9 }]}
+              onPress={() => router.replace('/(tabs)/boutique')}
+            >
+              <Text style={styles.btnPrimaryTxt}>{t('shopCartEmptyCta')}</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
@@ -751,13 +827,13 @@ export default function BoutiqueCheckoutScreen() {
           accessToken,
         );
         if (!elig.allowed) {
-          const msg = elig.message ?? t('shopCheckoutErrGeneric');
+          const msg = getUserFacingApiFailureMessage(t, { context: 'checkout' });
           setError(msg);
           Alert.alert(t('commonErrorTitle'), msg);
           return;
         }
       } catch (e) {
-        const msg = e instanceof Error ? e.message : t('shopCheckoutErrGeneric');
+        const msg = getUserFacingApiError(e, t, { context: 'checkout' });
         setError(msg);
         Alert.alert(t('commonErrorTitle'), msg);
         return;
@@ -806,8 +882,7 @@ export default function BoutiqueCheckoutScreen() {
       await clear();
       router.replace({ pathname: '/boutique/thank-you', params: { publicId: result.publicId } });
     } catch (e) {
-      const rawMsg = e instanceof Error && e.message ? e.message : t('shopCheckoutErrSubmit');
-      const errMsg = extractApiErrorMessage(rawMsg) || t('shopCheckoutErrGeneric');
+      const errMsg = getUserFacingApiError(e, t, { context: 'checkout', fallbackKey: 'shopCheckoutErrSubmit' });
       setError(errMsg);
       Alert.alert(t('commonErrorTitle'), errMsg);
     } finally {
@@ -816,8 +891,9 @@ export default function BoutiqueCheckoutScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.root, isRTL && styles.rtlRoot]} edges={['top']}>
-      <StatusBar style="dark" />
+    <View style={[styles.screen, isRTL && styles.rtlRoot]}>
+      <StatusBar style="dark" backgroundColor={headerColor} />
+      <SafeAreaView edges={['top']} style={[styles.headerSafe, { backgroundColor: headerColor }]}>
       <View style={[styles.topBar, isRTL && styles.rowRtl]}>
         <Pressable onPress={() => router.back()} style={styles.backBtn} hitSlop={6}>
           <FontAwesome name={isRTL ? 'chevron-right' : 'chevron-left'} size={16} color={brand.text} />
@@ -831,6 +907,7 @@ export default function BoutiqueCheckoutScreen() {
         </View>
         <View style={{ width: 40 }} />
       </View>
+      </SafeAreaView>
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -925,7 +1002,10 @@ export default function BoutiqueCheckoutScreen() {
                     {bacType === 'normal' ? (
                       <SelectField
                         label={t('setupFiliere')}
-                        value={labelFor(filiere, checkoutAcademicConfig.filiere.items)}
+                        value={
+                          resolveFiliereDisplayLabel(filiere, locale === 'ar' ? 'ar' : 'fr') ||
+                          labelFor(filiere, checkoutAcademicConfig.filiere.items)
+                        }
                         rtl={isRTL}
                         required
                         hasError={fieldHasError('filiere')}
@@ -1097,6 +1177,10 @@ export default function BoutiqueCheckoutScreen() {
               const opts = shopPriceFormatOptsForCatalogOrCartLine(l);
               const lineTotal = shopParsePriceString(l.price) * l.quantity;
               const isSvc = isPlatformServiceCartLine(l);
+              const serviceSlug = isSvc ? (l.platformServiceSlug ?? l.slug).trim() : '';
+              const entitlement = serviceSlug ? serviceEntitlementsBySlug[serviceSlug] : undefined;
+              const catalogService = serviceSlug ? serviceBySlug.get(serviceSlug) : undefined;
+              const upgradeSourceName = resolveUpgradeSourceName(entitlement, serviceNameBySlug, locale);
               return (
                 <View key={`${l.lineKind ?? 'shop'}-${l.productId}`} style={[styles.summaryLine, isRTL && styles.rowRtl]}>
                   {isSvc ? (
@@ -1117,6 +1201,18 @@ export default function BoutiqueCheckoutScreen() {
                     <Text style={[styles.summaryLineTitle, isRTL && styles.txtRtl]} numberOfLines={2}>
                       {l.title}
                     </Text>
+                    {isSvc ? (
+                      <CheckoutPlatformServiceUpgradePrice
+                        line={l}
+                        listPrice={catalogService?.price}
+                        promoPrice={catalogService?.promotionalPrice}
+                        entitlement={entitlement}
+                        sourceServiceName={upgradeSourceName}
+                        isRTL={isRTL}
+                        catalogLabel={t('shopCheckoutUpgradeCatalog')}
+                        creditLabelTemplate={t('shopCheckoutUpgradeCredit')}
+                      />
+                    ) : null}
                   </View>
                   <Text style={[styles.summaryLineMeta, isRTL && styles.txtRtl]}>× {l.quantity}</Text>
                   <Text style={[styles.summaryLineVal, isRTL && styles.summaryLineValRtl]}>
@@ -1230,27 +1326,29 @@ export default function BoutiqueCheckoutScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
 
-        <View style={styles.bottomBar}>
-          <Pressable
-            disabled={submitting}
-            onPress={onSubmit}
-            style={({ pressed }) => [
-              styles.confirmBtn,
-              isRTL && styles.rowRtl,
-              (submitting || pressed) && { opacity: 0.85 },
-            ]}
-          >
-            {submitting ? (
-              <ActivityIndicator color={brand.white} />
-            ) : (
-              <>
-                <FontAwesome name="lock" size={13} color={brand.white} />
-                <Text style={[styles.confirmTxt, isRTL && styles.txtRtl]}>{t('shopCheckoutConfirmBtn')}</Text>
-              </>
-            )}
-          </Pressable>
-          <Text style={[styles.bottomDisclaimer, isRTL && styles.bottomDisclaimerRtl]}>{bottomDisclaimerText}</Text>
-        </View>
+        <SafeAreaView edges={['bottom']} style={[styles.footerSafe, { backgroundColor: bottomColor }]}>
+          <View style={styles.bottomBar}>
+            <Pressable
+              disabled={submitting}
+              onPress={onSubmit}
+              style={({ pressed }) => [
+                styles.confirmBtn,
+                isRTL && styles.rowRtl,
+                (submitting || pressed) && { opacity: 0.85 },
+              ]}
+            >
+              {submitting ? (
+                <ActivityIndicator color={brand.white} />
+              ) : (
+                <>
+                  <FontAwesome name="lock" size={13} color={brand.white} />
+                  <Text style={[styles.confirmTxt, isRTL && styles.txtRtl]}>{t('shopCheckoutConfirmBtn')}</Text>
+                </>
+              )}
+            </Pressable>
+            <Text style={[styles.bottomDisclaimer, isRTL && styles.bottomDisclaimerRtl]}>{bottomDisclaimerText}</Text>
+          </View>
+        </SafeAreaView>
       </KeyboardAvoidingView>
 
       <ShopVillePickerSheet
@@ -1292,7 +1390,9 @@ export default function BoutiqueCheckoutScreen() {
             if (!field) return;
             if (field === 'studyLevel') {
               setStudyLevel(v);
+              setFiliere((prev) => sanitizeFiliereForNiveau(v, prev));
               clearFieldError('studyLevel');
+              clearFieldError('filiere');
               return;
             }
             if (field === 'bacType') {
@@ -1335,19 +1435,8 @@ export default function BoutiqueCheckoutScreen() {
           rtl={isRTL}
         />
       ) : null}
-    </SafeAreaView>
+    </View>
   );
-}
-
-function extractApiErrorMessage(raw: string): string {
-  if (!raw) return '';
-  try {
-    const obj = JSON.parse(raw) as { message?: string };
-    if (obj && typeof obj.message === 'string' && obj.message) return obj.message;
-  } catch {
-    /* not JSON */
-  }
-  return raw;
 }
 
 function SectionCard({
@@ -1395,6 +1484,10 @@ function Field({
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: brand.backgroundSoft },
+  screenSafe: { flex: 1 },
+  headerSafe: {},
+  footerSafe: {},
   root: { flex: 1, backgroundColor: brand.backgroundSoft },
   rtlRoot: { direction: 'rtl' },
   rowRtl: { flexDirection: 'row-reverse' },
@@ -1552,7 +1645,7 @@ const styles = StyleSheet.create({
   summaryTitle: { fontSize: fontSize.md, fontWeight: '800', color: brand.text, marginBottom: 4 },
   summaryLine: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 8,
     paddingVertical: 6,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -1623,7 +1716,7 @@ const styles = StyleSheet.create({
   bottomBar: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.lg + 4,
+    paddingBottom: spacing.md,
     backgroundColor: brand.white,
     borderTopWidth: 1,
     borderTopColor: brand.border,

@@ -139,6 +139,28 @@ export type EstablishmentListQuery = {
   includeUnpublishedDetailPages?: boolean;
 };
 
+/** Carte légère pour la section « écoles les plus visitées » sur l'accueil. */
+export type MostVisitedEstablishment = {
+  id: number;
+  slug: string;
+  nom: string;
+  nomArabe?: string | null;
+  sigle?: string | null;
+  logo?: string | null;
+  ville?: string | null;
+  villes?: string[];
+  type?: string | null;
+};
+
+export async function fetchMostVisitedEstablishments(
+  limit = 10,
+): Promise<MostVisitedEstablishment[]> {
+  const url = buildApiUrl('/api/establishments/most-visited', { limit });
+  const res = await httpGetJson<{ success: boolean; data: MostVisitedEstablishment[] }>(url);
+  if (!res.success || !Array.isArray(res.data)) return [];
+  return res.data;
+}
+
 export async function listEstablishments(
   query: EstablishmentListQuery,
 ): Promise<PaginatedResponse<EstablishmentNormalized>> {

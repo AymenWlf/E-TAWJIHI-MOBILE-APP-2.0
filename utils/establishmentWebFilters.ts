@@ -1,4 +1,8 @@
 import type { EstablishmentNormalized } from '@/services/establishments';
+import {
+  matchesAcceptedStudyPathFilter,
+  type AcceptedStudyPathFilter,
+} from '@/utils/eligibility';
 
 /** Liste diplômes alignée sur `EcolesSupérieures.tsx` (Global Front). */
 export const DIPLOME_OPTIONS = [
@@ -53,7 +57,6 @@ export type WebLikeClientFilters = {
   diplomeExact: string | null;
   fraisMin: number;
   fraisMax: number;
-  eTawjihiInscription: boolean;
 };
 
 export function applyEstablishmentWebClientFilters(
@@ -82,10 +85,6 @@ export function applyEstablishmentWebClientFilters(
   }
 
   out = out.filter((e) => feesOverlapFilter(e, f.fraisMin, f.fraisMax));
-
-  if (f.eTawjihiInscription) {
-    out = out.filter((e) => e.eTawjihiInscription === true);
-  }
 
   return out;
 }
@@ -197,11 +196,6 @@ export function sortEstablishmentsLikeEcolesSuperieuresWeb(
  * Critères « complets » (combinaison serveur + client) appliqués à une seule
  * école. Utilisé par l'onglet « Annonces » de « Mes inscriptions » pour
  * filtrer les annonces en croisant chaque annonce avec son école parente.
- *
- * Les booléens `featured/recommended/sponsored/accreditationEtat/echangeInternational`
- * sont normalement gérés côté serveur dans le listing principal mais doivent
- * aussi être contrôlés côté client lorsqu'on filtre une liste arbitraire
- * (ex. annonces) en local.
  */
 export type EstablishmentFullFilters = {
   type: string;
@@ -212,14 +206,10 @@ export type EstablishmentFullFilters = {
   diplome: string;
   fraisMin: number;
   fraisMax: number;
-  eTawjihiOnly: boolean;
-  featuredOnly: boolean;
-  recommendedOnly: boolean;
-  sponsoredOnly: boolean;
-  accreditationEtat: boolean;
-  echangeInternational: boolean;
   /** Liste pré-calculée des villes appartenant à la région choisie (vide ⇒ ignoré). */
   villesInRegion?: Set<string> | null;
+  acceptedStudyBacType?: '' | 'normal' | 'mission';
+  acceptedStudyValue?: string;
 };
 
 export function establishmentMatchesAllFilters(
@@ -257,12 +247,18 @@ export function establishmentMatchesAllFilters(
 
   if (!feesOverlapFilter(e, f.fraisMin, f.fraisMax)) return false;
 
-  if (f.eTawjihiOnly && e.eTawjihiInscription !== true) return false;
-  if (f.recommendedOnly && e.isRecommended !== true) return false;
-  if (f.sponsoredOnly && e.isSponsored !== true) return false;
-  if (f.featuredOnly && e.isFeatured !== true) return false;
-  if (f.accreditationEtat && e.accreditationEtat !== true) return false;
-  if (f.echangeInternational && e.echangeInternational !== true) return false;
+  const studyBac = f.acceptedStudyBacType;
+  const studyVal = (f.acceptedStudyValue ?? '').trim();
+  if ((studyBac === 'normal' || studyBac === 'mission') && studyVal) {
+    const ok = matchesAcceptedStudyPathFilter(
+      {
+        filieresAcceptees: e.filieresAcceptees ?? null,
+        specialitesBacMissionAcceptees: e.specialitesBacMissionAcceptees ?? null,
+      },
+      { bacType: studyBac, value: studyVal } satisfies AcceptedStudyPathFilter,
+    );
+    if (!ok) return false;
+  }
 
   return true;
 }

@@ -3,7 +3,6 @@ import type { ComponentProps } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import {
   FlatList,
-  Modal,
   Platform,
   Pressable,
   StyleSheet,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PlatformSheetOverlay } from '@/components/ui/PlatformSheetOverlay';
 import { Text } from '@/components/ui/Text';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, radius, spacing } from '@/theme/tokens';
@@ -88,6 +88,12 @@ type PanelProps = {
    * ville dans le profil utilisateur, où l'utilisateur cherche par nom de ville).
    */
   searchInSubtitle?: boolean;
+  /** Sélection multiple : coche plusieurs lignes, fermeture via la croix (pas `closeOnPick`). */
+  multiSelect?: boolean;
+  /** Valeurs sélectionnées lorsque `multiSelect` est actif. */
+  selectedValues?: readonly string[];
+  /** Ferme la feuille après `onPick` (défaut `true`). */
+  closeOnPick?: boolean;
 };
 
 /**
@@ -105,6 +111,9 @@ export function SearchablePickPanel({
   rtl,
   isActive,
   searchInSubtitle = false,
+  multiSelect = false,
+  selectedValues,
+  closeOnPick = true,
 }: PanelProps) {
   const [query, setQuery] = useState('');
   const insets = useSafeAreaInsets();
@@ -183,30 +192,32 @@ export function SearchablePickPanel({
         maxToRenderPerBatch={24}
         windowSize={10}
         ListHeaderComponent={
-          <>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => {
-                onPick('');
-                onClose();
-              }}
-              style={({ pressed }) => [
-                styles.row,
-                rtl && styles.rowRtl,
-                pressed && { backgroundColor: 'rgba(15,23,42,0.05)' },
-              ]}>
-              <View style={[styles.rowMain, rtl && styles.rowMainRtl]}>
-                {needsStatusSwatchColumn ? <View style={styles.statusSwatchPlaceholder} /> : null}
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.rowText, rtl && styles.rtlText, !selectedValue && styles.rowTextActive]}>
-                    {allLabel}
-                  </Text>
+          multiSelect ? null : (
+            <>
+              <Pressable
+                accessibilityRole="button"
+                onPress={() => {
+                  onPick('');
+                  onClose();
+                }}
+                style={({ pressed }) => [
+                  styles.row,
+                  rtl && styles.rowRtl,
+                  pressed && { backgroundColor: 'rgba(15,23,42,0.05)' },
+                ]}>
+                <View style={[styles.rowMain, rtl && styles.rowMainRtl]}>
+                  {needsStatusSwatchColumn ? <View style={styles.statusSwatchPlaceholder} /> : null}
+                  <View style={{ flex: 1, minWidth: 0 }}>
+                    <Text style={[styles.rowText, rtl && styles.rtlText, !selectedValue && styles.rowTextActive]}>
+                      {allLabel}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-              {!selectedValue ? <FontAwesome name="check" size={14} color={homeShell.blue} /> : null}
-            </Pressable>
-            <View style={styles.sep} />
-          </>
+                {!selectedValue ? <FontAwesome name="check" size={14} color={homeShell.blue} /> : null}
+              </Pressable>
+              <View style={styles.sep} />
+            </>
+          )
         }
         ListEmptyComponent={
           query.trim() && filtered.length === 0 ? (
@@ -218,14 +229,16 @@ export function SearchablePickPanel({
         }
         ItemSeparatorComponent={() => <View style={styles.sep} />}
         renderItem={({ item }) => {
-          const active = selectedValue !== '' && selectedValue === item.value;
+          const active = multiSelect
+            ? (selectedValues?.includes(item.value) ?? false)
+            : selectedValue !== '' && selectedValue === item.value;
           const vis = item.statusAppearance;
           return (
             <Pressable
               accessibilityRole="button"
               onPress={() => {
                 onPick(item.value);
-                onClose();
+                if (closeOnPick) onClose();
               }}
               style={({ pressed }) => [
                 styles.row,
@@ -266,15 +279,19 @@ type SheetProps = Omit<PanelProps, 'isActive'> & {
   visible: boolean;
 };
 
-/** Modal autonome (ex. hors écran filtres) — un seul Modal à la fois. */
+/** Sheet autonome (ex. diagnostic) — overlay iOS sans Modal natif (crash Fabric). */
 export function SearchablePickSheet({ visible, onClose, ...panel }: SheetProps) {
+  const sheet = (
+    <View style={styles.sheetRoot}>
+      <Pressable style={styles.backdrop} onPress={onClose} />
+      <SearchablePickPanel {...panel} onClose={onClose} isActive />
+    </View>
+  );
+
   return (
-    <Modal visible={visible} animationType="slide" transparent onRequestClose={onClose} statusBarTranslucent>
-      <View style={styles.sheetRoot}>
-        <Pressable style={styles.backdrop} onPress={onClose} />
-        <SearchablePickPanel {...panel} onClose={onClose} isActive={visible} />
-      </View>
-    </Modal>
+    <PlatformSheetOverlay visible={visible} onRequestClose={onClose} animationType="slide">
+      {sheet}
+    </PlatformSheetOverlay>
   );
 }
 

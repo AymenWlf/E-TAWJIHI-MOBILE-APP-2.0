@@ -25,6 +25,12 @@ type StateResponse = {
 type TimelineResponse = {
   success: boolean;
   data: EstablishmentFollowTimeline;
+  meta?: { inscriptionsFullAccess?: boolean };
+};
+
+export type EstablishmentFollowTimelineResult = {
+  timeline: EstablishmentFollowTimeline;
+  inscriptionsFullAccess: boolean;
 };
 
 type SimpleResponse = { success: boolean; message?: string };
@@ -43,6 +49,7 @@ export type EstablishmentFollowsPayload = {
  */
 export async function fetchEstablishmentFollows(
   accessToken: string,
+  options?: { throwOnError?: boolean },
 ): Promise<EstablishmentFollowsPayload> {
   try {
     const url = buildApiUrl('/api/establishment-follows');
@@ -52,7 +59,8 @@ export async function fetchEstablishmentFollows(
     return {
       items: Array.isArray(res.data) ? res.data : [],
     };
-  } catch {
+  } catch (e) {
+    if (options?.throwOnError) throw e;
     return { items: [] };
   }
 }
@@ -150,13 +158,17 @@ export async function fetchFollowStateByEstablishment(
 export async function fetchEstablishmentFollowTimeline(
   accessToken: string,
   id: number,
-): Promise<EstablishmentFollowTimeline | null> {
+): Promise<EstablishmentFollowTimelineResult | null> {
   try {
     const url = buildApiUrl(`/api/establishment-follows/${id}/timeline`);
     const res = await httpGetJson<TimelineResponse>(url, {
       headers: { Authorization: `Bearer ${accessToken}` },
     });
-    return res.success ? res.data : null;
+    if (!res.success || !res.data) return null;
+    return {
+      timeline: res.data,
+      inscriptionsFullAccess: res.meta?.inscriptionsFullAccess === true,
+    };
   } catch {
     return null;
   }

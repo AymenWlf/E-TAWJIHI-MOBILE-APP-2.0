@@ -10,6 +10,7 @@ import {
   View,
 } from 'react-native';
 
+import { LoadingMiniIconSkeleton } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { getEstablishmentLogoUrl } from '@/constants/establishmentMedia';
@@ -130,8 +131,9 @@ export function GlobalWallAttachedPagePreview({ href, fallbackTitle, inMineBubbl
     }
     if (internal.kind === 'contest_announcement' && internal.id) {
       void fetchContestAnnouncementDetail(internal.id)
-        .then((d) => {
+        .then((payload) => {
           if (cancelled) return;
+          const d = payload?.detail;
           setInternalTitleFr(d?.title?.trim() || null);
           setInternalTitleAr(d?.titleAr?.trim() || null);
           const rawLogo = d?.establishment?.logo ?? null;
@@ -168,7 +170,7 @@ export function GlobalWallAttachedPagePreview({ href, fallbackTitle, inMineBubbl
           <View style={styles.squareMedia}>
             {loading ? (
               <View style={styles.squarePlaceholder}>
-                <ActivityIndicator color={brand.primary} />
+                <LoadingMiniIconSkeleton size={28} />
               </View>
             ) : favicon && !faviconBroken ? (
               <Image
@@ -229,7 +231,7 @@ export function GlobalWallAttachedPagePreview({ href, fallbackTitle, inMineBubbl
         <View style={styles.squareMedia}>
           {loading ? (
             <View style={styles.squarePlaceholder}>
-              <ActivityIndicator color={brand.primary} />
+              <LoadingMiniIconSkeleton size={28} />
             </View>
           ) : internalLogoUrl && !logoBroken ? (
             <Image

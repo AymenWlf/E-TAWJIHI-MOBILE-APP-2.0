@@ -1,6 +1,14 @@
 import { buildApiUrl } from '@/constants/api';
-import type { ApiError } from '@/services/http';
+import type { HomeCopyKey } from '@/constants/i18n';
 import { httpDeleteJson, httpGetJson, httpPostJson } from '@/services/http';
+import { getUserFacingApiError } from '@/utils/apiError';
+
+export function formatCommunityQnaApiError(
+  e: unknown,
+  t: (key: HomeCopyKey) => string,
+): string {
+  return getUserFacingApiError(e, t, { context: 'qna' });
+}
 
 export type CommunityQnaContextType =
   | 'establishment'
@@ -126,20 +134,4 @@ export async function setCommunityQnaMeToo(
     throw new Error(json.message || 'Erreur');
   }
   return json.data;
-}
-
-export function formatCommunityQnaApiError(e: unknown): string {
-  if (e && typeof e === 'object' && 'message' in e) {
-    const m = (e as ApiError).message;
-    if (typeof m === 'string' && m.trim().startsWith('{')) {
-      try {
-        const parsed = JSON.parse(m) as { message?: string };
-        if (typeof parsed.message === 'string' && parsed.message.trim()) return parsed.message.trim();
-      } catch {
-        /* ignore */
-      }
-    }
-    if (typeof m === 'string' && m.trim()) return m.trim();
-  }
-  return 'Erreur réseau';
 }

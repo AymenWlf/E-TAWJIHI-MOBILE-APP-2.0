@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Linking from 'expo-linking';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -17,15 +17,26 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { SidebarMenuIconButton } from '@/components/SidebarMenuIconButton';
 import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
+import { AnnouncementCardSkeletonStack } from '@/components/inscriptions/AnnouncementCardSkeleton';
+import { InscriptionsAnnouncementsFiltersSkeleton } from '@/components/inscriptions/InscriptionsAnnouncementsFiltersSkeleton';
+import { LoadErrorState, loadErrorRetryLabel } from '@/components/ui/LoadErrorState';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
-import { ContestAnnouncementQnaBottomSheet } from '@/components/inscriptions/ContestAnnouncementQnaBottomSheet';
 import { FollowedSchoolCard } from '@/components/inscriptions/FollowedSchoolCard';
 import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
+import { TawjihPlusLockBanner } from '@/components/inscriptions/TawjihPlusPaywall';
 import {
+  TawjihPlusAccessProvider,
+  useTawjihPlusAccessContext,
+} from '@/contexts/TawjihPlusAccessContext';
+import {
+  announcementEstablishmentFiltersFromProfile,
   countActiveEstablishmentFilters,
-  defaultEstablishmentFilters,
+  countAnnouncementTabFiltersActive,
+  defaultAnnouncementEstablishmentFilters,
   EstablishmentFiltersModal,
+  neutralAnnouncementEstablishmentFilters,
   type EstablishmentFiltersValue,
 } from '@/components/schools/EstablishmentFiltersModal';
 import {
@@ -33,6 +44,7 @@ import {
   type SearchablePickItem,
 } from '@/components/schools/SearchablePickSheet';
 import { useAuth } from '@/contexts/AuthContext';
+import { openApplyToSchoolsTour } from '@/utils/applyToSchoolsTourNavigation';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
@@ -67,9 +79,14 @@ import {
 } from '@/services/referenceData';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { CandidacyStatusType, EstablishmentFollow } from '@/types/inscriptions';
-import { evaluateEligibilityByFiliere } from '@/utils/eligibility';
+import {
+  evaluateEligibilityByFiliere,
+  mergeEligibilityCriteria,
+  matchesAcceptedStudyPathFilter,
+} from '@/utils/eligibility';
 import { establishmentMatchesAllFilters } from '@/utils/establishmentWebFilters';
 import { fireAndForget } from '@/utils/fireAndForget';
+import { getUserFacingLoadError } from '@/utils/apiError';
 import {
   followRequiresAttention,
   loadFollowLatestSeenMap,
@@ -77,15 +94,53 @@ import {
   saveFollowLatestSeenMap,
   sortFollowsActionRequiredFirst,
 } from '@/utils/followLatestAnnouncementSeen';
+import { isAnnouncementUnseen } from '@/utils/announcementSeenState';
+
+/** Nombre de cartes chargées par « page » lors du scroll (lazy loading client). */
+const LIST_PAGE_SIZE = 15;
+/** Bandeau partenaire « milieu de liste » : une seule fois, après la 3e annonce. */
+const MID_BANNER_AFTER_CARD_INDEX = 3;
 
 type TabId = 'candidacies' | 'announcements';
 
 export default function InscriptionsTabScreen() {
+  return (
+    <TawjihPlusAccessProvider>
+      <InscriptionsTabScreenInner />
+    </TawjihPlusAccessProvider>
+  );
+}
+
+function InscriptionsTabScreenInner() {
   const router = useRouter();
-  const { tab: tabParam } = useLocalSearchParams<{ tab?: string | string[] }>();
-  const { t, isRTL, locale, setLocale } = useLocale();
+  const {
+    isInscriptionsLocked,
+    isInscriptionsAccessPending,
+    openTawjihPlusProduct,
+    applyServerInscriptionsAccess,
+    resolveInscriptionsAccessWithoutServer,
+  } = useTawjihPlusAccessContext();
+  const showInscriptionsPaywall = !isInscriptionsAccessPending && isInscriptionsLocked;
+  const announcementsFiltersLocked = showInscriptionsPaywall;
+
+  const showAnnouncementsFiltersUpgradeAlert = useCallback(() => {
+    Alert.alert(t('inscTawjihPlusLockTitle'), t('schoolsSearchFiltersLockedHint'), [
+      { text: t('accountLogoutCancel'), style: 'cancel' },
+      { text: t('inscTawjihPlusUpgradeCta'), onPress: openTawjihPlusProduct },
+    ]);
+  }, [openTawjihPlusProduct, t]);
+  const { tab: tabParam, clearFilters: clearFiltersParam } = useLocalSearchParams<{
+    tab?: string | string[];
+    clearFilters?: string | string[];
+  }>();
+  const { t, isRTL, locale } = useLocale();
   const { user, getValidAccessToken, isLoading: authLoading } = useAuth();
-  const { refreshUnread } = useNotificationsDrawer();
+  const {
+    refreshUnread,
+    unreadAnnouncementIds,
+    seenAnnouncementIds,
+    markAnnouncementSeen,
+  } = useNotificationsDrawer();
   const { presentShare } = useSharePreview();
   const isLoggedIn = Boolean(user);
 
@@ -95,6 +150,16 @@ export default function InscriptionsTabScreen() {
     const raw = tabParam === undefined ? undefined : Array.isArray(tabParam) ? tabParam[0] : tabParam;
     return raw === 'candidacies' || raw === 'announcements' ? raw : undefined;
   }, [tabParam]);
+
+  const clearFiltersFromUrl = useMemo(() => {
+    const raw =
+      clearFiltersParam === undefined
+        ? undefined
+        : Array.isArray(clearFiltersParam)
+          ? clearFiltersParam[0]
+          : clearFiltersParam;
+    return raw === '1' || raw === 'true';
+  }, [clearFiltersParam]);
 
   useEffect(() => {
     if (tabFromUrl === 'candidacies') setTab('candidacies');
@@ -141,13 +206,11 @@ export default function InscriptionsTabScreen() {
   );
   const [annStatusSheetOpen, setAnnStatusSheetOpen] = useState(false);
 
-  /** Q&R / commentaires d’une annonce (modal comme sur la liste Écoles). */
-  const [announcementQnaSheet, setAnnouncementQnaSheet] = useState<{ id: number; title: string } | null>(null);
-  const closeAnnouncementQnaSheet = useCallback(() => setAnnouncementQnaSheet(null), []);
-
   // Annonces
   const [announcements, setAnnouncements] = useState<ContestAnnouncementCard[]>([]);
-  const [announcementsLoading, setAnnouncementsLoading] = useState(false);
+  const [announcementsLoading, setAnnouncementsLoading] = useState(true);
+  const [announcementsLoadError, setAnnouncementsLoadError] = useState<string | null>(null);
+  const [followsLoadError, setFollowsLoadError] = useState<string | null>(null);
   const [followBusyId, setFollowBusyId] = useState<number | null>(null);
 
   /* Filtre "École" sur l'onglet Annonces — id établissement choisi (vide ⇒ toutes). */
@@ -177,9 +240,39 @@ export default function InscriptionsTabScreen() {
    * `allEstablishmentsById` puis on évalue tous les critères.
    */
   const [filtersValue, setFiltersValue] = useState<EstablishmentFiltersValue>(
-    defaultEstablishmentFilters(),
+    defaultAnnouncementEstablishmentFilters(),
   );
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  const getAnnouncementDefaultFilters = useCallback((): EstablishmentFiltersValue => {
+    return {
+      ...announcementEstablishmentFiltersFromProfile(eligibilityProfile),
+      eligibilityFilter: 'eligible',
+    };
+  }, [eligibilityProfile]);
+
+  /** Applique la filière du profil une fois chargée, sans écraser un filtrage personnalisé. */
+  useEffect(() => {
+    if (!eligibilityProfile) return;
+    setFiltersValue((prev) => {
+      const base = defaultAnnouncementEstablishmentFilters();
+      const stillProductDefaults =
+        prev.eligibilityFilter === base.eligibilityFilter &&
+        prev.statusFilter === base.statusFilter &&
+        prev.type === base.type &&
+        prev.universite === base.universite &&
+        prev.regionTitle === base.regionTitle &&
+        prev.ville === base.ville &&
+        prev.secteurId === base.secteurId &&
+        prev.diplome === base.diplome &&
+        prev.fraisMin === base.fraisMin &&
+        prev.fraisMax === base.fraisMax &&
+        !prev.acceptedStudyBacType &&
+        !prev.acceptedStudyValue.trim();
+      if (!stillProductDefaults) return prev;
+      return announcementEstablishmentFiltersFromProfile(eligibilityProfile);
+    });
+  }, [eligibilityProfile]);
 
   /* Données de référence partagées avec la page Écoles. */
   const [cities, setCities] = useState<CityRow[]>([]);
@@ -189,12 +282,35 @@ export default function InscriptionsTabScreen() {
   const [filtersDataLoading, setFiltersDataLoading] = useState(false);
 
   const [refreshing, setRefreshing] = useState(false);
+  const [announcementsVisibleEnd, setAnnouncementsVisibleEnd] = useState(LIST_PAGE_SIZE);
+  const [candidaciesVisibleEnd, setCandidaciesVisibleEnd] = useState(LIST_PAGE_SIZE);
+  const [loadingMoreAnnouncements, setLoadingMoreAnnouncements] = useState(false);
+  const [loadingMoreCandidacies, setLoadingMoreCandidacies] = useState(false);
 
   /**
    * Par suivi d’école : id de la dernière annonce considérée comme « vue ».
    * Sert à détecter une nouvelle « dernière annonce » sans champ API dédié.
    */
   const [latestSeenMap, setLatestSeenMap] = useState<Record<string, number>>({});
+
+  const clearAllAnnouncementFilters = useCallback(() => {
+    setFiltersValue(getAnnouncementDefaultFilters());
+    setSchoolFilterId('');
+    setSortByClosingSoon(false);
+  }, [getAnnouncementDefaultFilters]);
+
+  const clearAllCandidacyFilters = useCallback(() => {
+    setCandidacyStatusFilter('');
+    setCandidaciesAttentionFilter('all');
+  }, []);
+
+  useLayoutEffect(() => {
+    if (!clearFiltersFromUrl) return;
+    setFiltersValue(neutralAnnouncementEstablishmentFilters());
+    setSchoolFilterId('');
+    setSortByClosingSoon(false);
+    router.replace('/inscriptions?tab=announcements');
+  }, [clearFiltersFromUrl, router]);
 
   // ── Loaders ──
   useEffect(() => {
@@ -215,45 +331,59 @@ export default function InscriptionsTabScreen() {
       }
       const silent = opts?.silent === true;
       if (!silent) setFollowsLoading(true);
+      setFollowsLoadError(null);
       try {
-        const res = await fetchEstablishmentFollows(token);
+        const res = await fetchEstablishmentFollows(token, { throwOnError: true });
         setFollows(res.items);
         return res.items;
+      } catch (e) {
+        setFollows([]);
+        if (!silent) {
+          setFollowsLoadError(getUserFacingLoadError(e, t, { context: 'inscriptions' }));
+        }
+        return undefined;
       } finally {
         if (!silent) setFollowsLoading(false);
         setFollowsReady(true);
       }
     },
-    [getValidAccessToken, isLoggedIn],
+    [getValidAccessToken, isLoggedIn, t],
   );
 
   const reloadAnnouncements = useCallback(async () => {
     setAnnouncementsLoading(true);
+    setAnnouncementsLoadError(null);
     try {
-      const items = await fetchContestAnnouncements();
+      const token = isLoggedIn ? await getValidAccessToken() : null;
+      const { items, inscriptionsFullAccess } = await fetchContestAnnouncements({
+        throwOnError: true,
+        accessToken: token,
+      });
+      applyServerInscriptionsAccess(inscriptionsFullAccess);
       setAnnouncements(items);
-      // Tracking analytique : enregistre une impression « listing » par annonce
-      // visible, dédupliqué pour la session pour ne pas inflater les KPIs en
-      // cas de pull-to-refresh ou de retour sur l'onglet.
-      recordContestListingImpressionsBatch(items);
+      recordContestListingImpressionsBatch(items.slice(0, LIST_PAGE_SIZE));
+    } catch (e) {
+      setAnnouncements([]);
+      setAnnouncementsLoadError(getUserFacingLoadError(e, t, { context: 'inscriptions' }));
+      resolveInscriptionsAccessWithoutServer();
     } finally {
       setAnnouncementsLoading(false);
     }
-  }, []);
+  }, [
+    applyServerInscriptionsAccess,
+    getValidAccessToken,
+    isLoggedIn,
+    resolveInscriptionsAccessWithoutServer,
+    t,
+  ]);
 
   // Initial loads
   useEffect(() => {
     void reloadAnnouncements();
   }, [reloadAnnouncements]);
 
-  /**
-   * Charge à la volée les données de référence nécessaires aux filtres
-   * avancés (cities, secteurs, écoles complètes). Appelé uniquement au
-   * premier affichage de l'onglet « Annonces » pour éviter de payer le coût
-   * réseau pour les utilisateurs qui n'ouvriront jamais le panneau filtres.
-   */
-  const ensureFiltersDataLoaded = useCallback(async () => {
-    if (filtersDataLoaded || filtersDataLoading) return;
+  /** Recharge villes, secteurs et catalogue complet des établissements (filtres + picker école). */
+  const reloadFiltersData = useCallback(async () => {
     setFiltersDataLoading(true);
     try {
       const [c, s, est] = await Promise.all([
@@ -268,7 +398,17 @@ export default function InscriptionsTabScreen() {
     } finally {
       setFiltersDataLoading(false);
     }
-  }, [filtersDataLoaded, filtersDataLoading]);
+  }, []);
+
+  /**
+   * Charge à la volée les données de référence nécessaires aux filtres
+   * avancés (cities, secteurs, écoles complètes). Appelé au premier affichage
+   * de l'onglet « Annonces ».
+   */
+  const ensureFiltersDataLoaded = useCallback(async () => {
+    if (filtersDataLoaded || filtersDataLoading) return;
+    await reloadFiltersData();
+  }, [filtersDataLoaded, filtersDataLoading, reloadFiltersData]);
 
   /* Pré-charger les données dès qu'on est sur l'onglet annonces. */
   useEffect(() => {
@@ -294,6 +434,7 @@ export default function InscriptionsTabScreen() {
     setRefreshing(true);
     try {
       let freshFollows: EstablishmentFollow[] | undefined;
+      await reloadFiltersData();
       if (tab === 'candidacies') {
         freshFollows = await reloadFollows();
       } else {
@@ -318,7 +459,37 @@ export default function InscriptionsTabScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, [tab, reloadFollows, reloadAnnouncements, isLoggedIn, refetchEligibilityProfile]);
+  }, [tab, reloadFollows, reloadAnnouncements, reloadFiltersData, isLoggedIn, refetchEligibilityProfile]);
+
+  const announcementsBootstrapPending = useMemo(() => {
+    if (tab !== 'announcements') return false;
+    if (isInscriptionsAccessPending) return true;
+    if (announcementsLoading) return true;
+    if (!filtersDataLoaded || filtersDataLoading) return true;
+    if (isLoggedIn && eligibilityProfileLoading) return true;
+    return false;
+  }, [
+    tab,
+    isInscriptionsAccessPending,
+    announcementsLoading,
+    filtersDataLoaded,
+    filtersDataLoading,
+    isLoggedIn,
+    eligibilityProfileLoading,
+  ]);
+
+  const candidaciesBootstrapPending = useMemo(() => {
+    if (tab !== 'candidacies') return false;
+    if (isInscriptionsAccessPending) return true;
+    if (isLoggedIn && !followsReady) return true;
+    if (followsLoading) return true;
+    return false;
+  }, [tab, followsLoading, followsReady, isInscriptionsAccessPending, isLoggedIn]);
+
+  const announcementsListLoading =
+    announcementsBootstrapPending || (refreshing && tab === 'announcements');
+  const candidaciesListLoading =
+    candidaciesBootstrapPending || (refreshing && tab === 'candidacies');
 
   // Set des establishment IDs suivis (utile pour l'AnnouncementCard "déjà suivie ?").
   const followedEstablishmentSet = useMemo(() => {
@@ -448,7 +619,9 @@ export default function InscriptionsTabScreen() {
       // Fallback : utilise les écoles déjà associées à une annonce, le
       // temps que le pré-chargement complet (`ensureFiltersDataLoaded`)
       // se termine.
-      for (const a of announcements) addRow(a.establishment);
+      for (const a of Array.isArray(announcements) ? announcements : []) {
+        if (a) addRow(a.establishment);
+      }
     }
 
     const arr = Array.from(map.entries()).map(([id, v]) => ({
@@ -490,6 +663,20 @@ export default function InscriptionsTabScreen() {
     [filtersValue],
   );
 
+  /** Inclut aussi « ouvertes » et « éligibles » (présélection produit onglet Annonces). */
+  const announcementTabFiltersActiveCount = useMemo(
+    () => countAnnouncementTabFiltersActive(filtersValue),
+    [filtersValue],
+  );
+
+  const hasActiveAnnouncementListingFilters = useMemo(
+    () =>
+      announcementTabFiltersActiveCount > 0 ||
+      Boolean(schoolFilterId.trim()) ||
+      sortByClosingSoon,
+    [announcementTabFiltersActiveCount, schoolFilterId, sortByClosingSoon],
+  );
+
   /**
    * Annonces filtrées par école sélectionnée puis par filtres avancés.
    * On évalue chaque annonce contre son école parente (lookup via map). Si
@@ -498,7 +685,8 @@ export default function InscriptionsTabScreen() {
    * de toute façon un loader au premier accès.
    */
   const visibleAnnouncements = useMemo(() => {
-    let out = announcements;
+    const list = Array.isArray(announcements) ? announcements : [];
+    let out = list;
 
     /* 1) Filtre rapide par école précise */
     const sid = schoolFilterId.trim();
@@ -523,16 +711,7 @@ export default function InscriptionsTabScreen() {
       });
     }
 
-    /* 3) Filtre statut ouvert/fermé (provient de la modale Filtres avancés).
-       On préfère `isExpire` à `daysUntilClose <= 0` car le backend est
-       seul à connaître son fuseau horaire de référence. */
-    if (filtersValue.statusFilter === 'open') {
-      out = out.filter((a) => a.isOpen && !a.isExpire);
-    } else if (filtersValue.statusFilter === 'closed') {
-      out = out.filter((a) => a.isExpire || !a.isOpen);
-    }
-
-    /* 4) Filtre éligibilité (filière du Bac, depuis Filtres avancés).
+    /* 3) Filtre éligibilité (filière du Bac, depuis Filtres avancés).
        Silencieusement ignoré si l'utilisateur n'a pas de profil ⇒ on
        conserve la liste complète pour ne pas piéger un visiteur. */
     if (filtersValue.eligibilityFilter !== 'all' && eligibilityProfile) {
@@ -546,6 +725,32 @@ export default function InscriptionsTabScreen() {
         );
         if (verdict === 'unknown') return true;
         return verdict === filtersValue.eligibilityFilter;
+      });
+    }
+
+    const studyBac = filtersValue.acceptedStudyBacType;
+    const studyVal = filtersValue.acceptedStudyValue.trim();
+    if (
+      filtersDataLoaded &&
+      (studyBac === 'normal' || studyBac === 'mission') &&
+      studyVal
+    ) {
+      out = out.filter((a) => {
+        const est =
+          a.establishment?.id != null ? allEstablishmentsById.get(a.establishment.id) : undefined;
+        const criteria = mergeEligibilityCriteria(
+          {
+            filieresAcceptees: a.filieresAcceptees,
+            specialitesBacMissionAcceptees: a.specialitesBacMissionAcceptees,
+          },
+          est
+            ? {
+                filieresAcceptees: est.filieresAcceptees ?? null,
+                specialitesBacMissionAcceptees: est.specialitesBacMissionAcceptees ?? null,
+              }
+            : null,
+        );
+        return matchesAcceptedStudyPathFilter(criteria, { bacType: studyBac, value: studyVal });
       });
     }
 
@@ -571,7 +776,27 @@ export default function InscriptionsTabScreen() {
     filtersValue,
     villesInRegion,
     eligibilityProfile,
+    filtersDataLoaded,
     sortByClosingSoon,
+  ]);
+
+  const paginatedVisibleAnnouncements = useMemo(
+    () => visibleAnnouncements.slice(0, announcementsVisibleEnd),
+    [visibleAnnouncements, announcementsVisibleEnd],
+  );
+
+  const hasMoreAnnouncements = paginatedVisibleAnnouncements.length < visibleAnnouncements.length;
+
+  useEffect(() => {
+    setAnnouncementsVisibleEnd(LIST_PAGE_SIZE);
+  }, [
+    schoolFilterId,
+    activeAdvancedFiltersCount,
+    filtersValue.eligibilityFilter,
+    filtersValue.acceptedStudyBacType,
+    filtersValue.acceptedStudyValue,
+    sortByClosingSoon,
+    announcements.length,
   ]);
 
   /** Libellé du filtre actif (nom de l'école choisie, ou "Toutes les écoles"). */
@@ -659,6 +884,64 @@ export default function InscriptionsTabScreen() {
     return sortFollowsActionRequiredFirst(rows, latestSeenMap);
   }, [filteredFollows, candidaciesAttentionFilter, latestSeenMap]);
 
+  const paginatedCandidaciesDisplayFollows = useMemo(
+    () => candidaciesDisplayFollows.slice(0, candidaciesVisibleEnd),
+    [candidaciesDisplayFollows, candidaciesVisibleEnd],
+  );
+
+  const hasMoreCandidacies = paginatedCandidaciesDisplayFollows.length < candidaciesDisplayFollows.length;
+
+  useEffect(() => {
+    setCandidaciesVisibleEnd(LIST_PAGE_SIZE);
+  }, [candidacyStatusFilter, candidaciesAttentionFilter, follows.length]);
+
+  const loadMoreAnnouncements = useCallback(() => {
+    if (
+      announcementsListLoading ||
+      loadingMoreAnnouncements ||
+      refreshing ||
+      !hasMoreAnnouncements
+    ) {
+      return;
+    }
+    setLoadingMoreAnnouncements(true);
+    try {
+      const nextEnd = Math.min(visibleAnnouncements.length, announcementsVisibleEnd + LIST_PAGE_SIZE);
+      const batch = visibleAnnouncements.slice(announcementsVisibleEnd, nextEnd);
+      if (batch.length > 0) recordContestListingImpressionsBatch(batch);
+      setAnnouncementsVisibleEnd(nextEnd);
+    } finally {
+      setLoadingMoreAnnouncements(false);
+    }
+  }, [
+    announcementsListLoading,
+    loadingMoreAnnouncements,
+    refreshing,
+    hasMoreAnnouncements,
+    visibleAnnouncements,
+    announcementsVisibleEnd,
+  ]);
+
+  const loadMoreCandidacies = useCallback(() => {
+    if (candidaciesListLoading || loadingMoreCandidacies || refreshing || !hasMoreCandidacies) {
+      return;
+    }
+    setLoadingMoreCandidacies(true);
+    try {
+      const nextEnd = Math.min(candidaciesDisplayFollows.length, candidaciesVisibleEnd + LIST_PAGE_SIZE);
+      setCandidaciesVisibleEnd(nextEnd);
+    } finally {
+      setLoadingMoreCandidacies(false);
+    }
+  }, [
+    candidaciesListLoading,
+    loadingMoreCandidacies,
+    refreshing,
+    hasMoreCandidacies,
+    candidaciesDisplayFollows.length,
+    candidaciesVisibleEnd,
+  ]);
+
   useEffect(() => {
     if (!isLoggedIn) {
       setLatestSeenMap({});
@@ -726,6 +1009,10 @@ export default function InscriptionsTabScreen() {
       url: string,
       contestId: number,
     ) => {
+      if (isInscriptionsLocked) {
+        openTawjihPlusProduct();
+        return;
+      }
       if (!url) {
         Alert.alert(t('inscNoLink'));
         return;
@@ -744,7 +1031,7 @@ export default function InscriptionsTabScreen() {
         }
       }
     },
-    [getValidAccessToken, t],
+    [getValidAccessToken, isInscriptionsLocked, openTawjihPlusProduct, t],
   );
 
   /**
@@ -802,13 +1089,24 @@ export default function InscriptionsTabScreen() {
     [getValidAccessToken],
   );
 
-  const handleOpenFollowStatusSheet = useCallback((f: EstablishmentFollow) => {
-    setActiveFollow(f);
-    setStatusSheetOpen(true);
-  }, []);
+  const handleOpenFollowStatusSheet = useCallback(
+    (f: EstablishmentFollow) => {
+      if (isInscriptionsLocked) {
+        openTawjihPlusProduct();
+        return;
+      }
+      setActiveFollow(f);
+      setStatusSheetOpen(true);
+    },
+    [isInscriptionsLocked, openTawjihPlusProduct],
+  );
 
   const handleConfirmFollowStatus = useCallback(
     async (next: CandidacyStatusType | null) => {
+      if (isInscriptionsLocked) {
+        openTawjihPlusProduct();
+        return;
+      }
       if (!activeFollow) return;
       const token = await getValidAccessToken();
       if (!token) return;
@@ -819,12 +1117,16 @@ export default function InscriptionsTabScreen() {
       setStatusSheetOpen(false);
       setActiveFollow(null);
     },
-    [activeFollow, getValidAccessToken, reloadFollows],
+    [activeFollow, getValidAccessToken, isInscriptionsLocked, openTawjihPlusProduct, reloadFollows],
   );
 
   /** Ouverture de la sheet depuis une carte annonce. Garde sur le login. */
   const handleOpenAnnouncementStatusSheet = useCallback(
     (a: ContestAnnouncementCard) => {
+      if (isInscriptionsLocked) {
+        openTawjihPlusProduct();
+        return;
+      }
       if (!isLoggedIn) {
         router.push('/login' as never);
         return;
@@ -833,7 +1135,7 @@ export default function InscriptionsTabScreen() {
       setActiveAnnouncement(a);
       setAnnStatusSheetOpen(true);
     },
-    [isLoggedIn, router],
+    [isInscriptionsLocked, isLoggedIn, openTawjihPlusProduct, router],
   );
 
   /**
@@ -846,6 +1148,10 @@ export default function InscriptionsTabScreen() {
    */
   const handleConfirmAnnouncementStatus = useCallback(
     async (next: CandidacyStatusType | null) => {
+      if (isInscriptionsLocked) {
+        openTawjihPlusProduct();
+        return;
+      }
       if (!activeAnnouncement) return;
       const eid = activeAnnouncement.establishment?.id ?? 0;
       if (!Number.isFinite(eid) || eid <= 0) return;
@@ -876,7 +1182,14 @@ export default function InscriptionsTabScreen() {
       setAnnStatusSheetOpen(false);
       setActiveAnnouncement(null);
     },
-    [activeAnnouncement, followsByEstId, getValidAccessToken, reloadFollows],
+    [
+      activeAnnouncement,
+      followsByEstId,
+      getValidAccessToken,
+      isInscriptionsLocked,
+      openTawjihPlusProduct,
+      reloadFollows,
+    ],
   );
 
   // ── Renders ──
@@ -890,37 +1203,7 @@ export default function InscriptionsTabScreen() {
           <Text style={[styles.heroTitle, isRTL && styles.rtl]}>{t('inscTitle')}</Text>
         </View>
 
-        {/* Lang switch */}
-        <View
-          style={[styles.langSwitch, isRTL && styles.rowRtl]}
-          accessibilityRole="tablist"
-          accessibilityLabel={t('languageSwitcher')}
-        >
-          <Pressable
-            onPress={() => setLocale('fr')}
-            style={({ pressed }) => [
-              styles.langPill,
-              locale === 'fr' && styles.langPillActive,
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>
-              {t('langFr')}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setLocale('ar')}
-            style={({ pressed }) => [
-              styles.langPill,
-              locale === 'ar' && styles.langPillActive,
-              pressed && { opacity: 0.85 },
-            ]}
-          >
-            <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>
-              {t('langAr')}
-            </Text>
-          </Pressable>
-        </View>
+        <HeroLangSwitch />
       </View>
 
       <Text style={[styles.heroSub, isRTL && styles.rtl]}>{t('inscSubtitle')}</Text>
@@ -1021,15 +1304,26 @@ export default function InscriptionsTabScreen() {
     if (!isLoggedIn) return renderRequireLogin();
     return (
       <FlatList
-        data={candidaciesDisplayFollows}
+        data={candidaciesListLoading ? [] : paginatedCandidaciesDisplayFollows}
         keyExtractor={(f) => `follow-${f.id}`}
         style={{ flex: 1 }}
         contentContainerStyle={styles.list}
         refreshControl={
           <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
+        onEndReachedThreshold={0.35}
+        onEndReached={loadMoreCandidacies}
+        ListFooterComponent={
+          loadingMoreCandidacies ? (
+            <AnnouncementCardSkeletonStack count={1} isRTL={isRTL} style={styles.listFooter} />
+          ) : null
+        }
         ListHeaderComponent={
           <View style={styles.subHeader}>
+            {showInscriptionsPaywall ? (
+              <TawjihPlusLockBanner locked style={{ marginBottom: spacing.sm }} />
+            ) : (
+            <View>
             <View style={[styles.filterBar, isRTL && styles.filterBarRtl]}>
               <Pressable
                 accessibilityRole="button"
@@ -1120,6 +1414,25 @@ export default function InscriptionsTabScreen() {
                 );
               })}
             </View>
+            </View>
+            )}
+
+            {candidacyStatusFilter || candidaciesAttentionFilter !== 'all' ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={t('schoolsReset')}
+                onPress={clearAllCandidacyFilters}
+                hitSlop={10}
+                style={({ pressed }) => [
+                  styles.advancedFilterClear,
+                  isRTL && styles.rowRtl,
+                  pressed && { opacity: 0.85 },
+                  { alignSelf: 'flex-start', marginTop: spacing.xs },
+                ]}>
+                <FontAwesome name="times-circle" size={16} color={brand.primary} />
+                <Text style={styles.advancedFilterClearTxt}>{t('schoolsReset')}</Text>
+              </Pressable>
+            ) : null}
 
             <Text style={[styles.followsCount, isRTL && styles.rtl]}>
               {t('followedSchoolsTitle')} (
@@ -1145,6 +1458,7 @@ export default function InscriptionsTabScreen() {
             actionRequired={followRequiresAttention(item, latestSeenMap)}
             onPress={() => router.push(`/inscriptions/follow/${item.id}` as never)}
             onUpdateStatus={() => handleOpenFollowStatusSheet(item)}
+            statusUpdateLocked={showInscriptionsPaywall}
             onUnfollow={() => {
               Alert.alert(
                 t('followSchoolUnfollowConfirmTitle'),
@@ -1183,10 +1497,15 @@ export default function InscriptionsTabScreen() {
         )}
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         ListEmptyComponent={
-          followsLoading ? (
-            <View style={styles.empty}>
-              <ActivityIndicator color={brand.primary} />
-            </View>
+          candidaciesListLoading ? (
+            <AnnouncementCardSkeletonStack count={2} isRTL={isRTL} style={styles.listLoading} />
+          ) : followsLoadError ? (
+            <LoadErrorState
+              message={followsLoadError}
+              onRetry={() => void reloadFollows()}
+              retryLabel={loadErrorRetryLabel(t)}
+              isRTL={isRTL}
+            />
           ) : follows.length === 0 ? (
             <View style={styles.empty}>
               <View style={styles.emptyIcon}>
@@ -1199,6 +1518,19 @@ export default function InscriptionsTabScreen() {
                 style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
               >
                 <Text style={styles.ctaTxt}>{t('inscCandidaciesEmptyCta')}</Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  if (isInscriptionsLocked) {
+                    openTawjihPlusProduct();
+                    return;
+                  }
+                  openApplyToSchoolsTour();
+                }}
+                style={({ pressed }) => [styles.ctaOutline, pressed && { opacity: 0.85 }]}
+              >
+                <FontAwesome name="graduation-cap" size={14} color={brand.primary} />
+                <Text style={styles.ctaOutlineTxt}>{t('inscCandidaciesEmptyTourCta')}</Text>
               </Pressable>
             </View>
           ) : filteredFollows.length === 0 ? (
@@ -1234,20 +1566,42 @@ export default function InscriptionsTabScreen() {
     );
   };
 
-  const renderAnnouncementsFilterBar = () => (
+  const renderAnnouncementsFilterBar = () => {
+    if (isInscriptionsAccessPending) {
+      return (
+        <View style={styles.filterBarWrap}>
+          <InscriptionsAnnouncementsFiltersSkeleton isRTL={isRTL} />
+        </View>
+      );
+    }
+
+    return (
     <View style={styles.filterBarWrap}>
       <View style={[styles.filterBar, isRTL && styles.filterBarRtl]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('inscFilterSchoolPickTitle')}
-          onPress={() => setSchoolPickerOpen(true)}
+          accessibilityLabel={
+            announcementsFiltersLocked
+              ? t('schoolsSearchFiltersLockedHint')
+              : t('inscFilterSchoolPickTitle')
+          }
+          onPress={
+            announcementsFiltersLocked
+              ? showAnnouncementsFiltersUpgradeAlert
+              : () => setSchoolPickerOpen(true)
+          }
           style={({ pressed }) => [
             styles.filterField,
             isRTL && styles.filterFieldRtl,
-            pressed && { opacity: 0.92 },
+            announcementsFiltersLocked && styles.filterFieldLocked,
+            pressed && !announcementsFiltersLocked && { opacity: 0.92 },
           ]}
         >
-          <FontAwesome name="university" size={14} color={brand.primary} />
+          <FontAwesome
+            name={announcementsFiltersLocked ? 'lock' : 'university'}
+            size={14}
+            color={announcementsFiltersLocked ? '#94A3B8' : brand.primary}
+          />
           <View style={{ flex: 1, minWidth: 0 }}>
             <Text style={[styles.filterFieldLbl, isRTL && styles.rtl]}>
               {t('inscFilterSchoolLabel')}
@@ -1269,7 +1623,7 @@ export default function InscriptionsTabScreen() {
             color={brand.textMuted}
           />
         </Pressable>
-        {schoolFilterId ? (
+        {schoolFilterId && !announcementsFiltersLocked ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('inscFilterReset')}
@@ -1286,21 +1640,40 @@ export default function InscriptionsTabScreen() {
       <View style={[styles.advancedFilterRow, isRTL && styles.rowRtl]}>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('schoolsFiltersTitle')}
-          onPress={() => {
-            void ensureFiltersDataLoaded();
-            setFiltersOpen(true);
-          }}
+          accessibilityLabel={
+            announcementsFiltersLocked
+              ? t('schoolsSearchFiltersLockedHint')
+              : t('schoolsFiltersTitle')
+          }
+          onPress={
+            announcementsFiltersLocked
+              ? showAnnouncementsFiltersUpgradeAlert
+              : () => {
+                  void ensureFiltersDataLoaded();
+                  setFiltersOpen(true);
+                }
+          }
           style={({ pressed }) => [
             styles.advancedFilterBtn,
             isRTL && styles.rowRtl,
-            pressed && { opacity: 0.9 },
+            announcementsFiltersLocked && styles.advancedFilterBtnLocked,
+            pressed && !announcementsFiltersLocked && { opacity: 0.9 },
           ]}>
-          <FontAwesome name="sliders" size={14} color={brand.primary} />
-          <Text style={styles.advancedFilterBtnTxt}>{t('schoolsFiltersTitle')}</Text>
-          {activeAdvancedFiltersCount > 0 ? (
+          <FontAwesome
+            name={announcementsFiltersLocked ? 'lock' : 'sliders'}
+            size={14}
+            color={announcementsFiltersLocked ? '#94A3B8' : brand.primary}
+          />
+          <Text
+            style={[
+              styles.advancedFilterBtnTxt,
+              announcementsFiltersLocked && styles.advancedFilterBtnTxtLocked,
+            ]}>
+            {t('schoolsFiltersTitle')}
+          </Text>
+          {!announcementsFiltersLocked && announcementTabFiltersActiveCount > 0 ? (
             <View style={styles.advancedFilterBadge}>
-              <Text style={styles.advancedFilterBadgeTxt}>{activeAdvancedFiltersCount}</Text>
+              <Text style={styles.advancedFilterBadgeTxt}>{announcementTabFiltersActiveCount}</Text>
             </View>
           ) : null}
         </Pressable>
@@ -1313,52 +1686,80 @@ export default function InscriptionsTabScreen() {
         */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={t('inscSortClosingSoon')}
-          accessibilityState={{ selected: sortByClosingSoon }}
-          onPress={() => setSortByClosingSoon((v) => !v)}
+          accessibilityLabel={
+            announcementsFiltersLocked
+              ? t('schoolsSearchFiltersLockedHint')
+              : t('inscSortClosingSoon')
+          }
+          accessibilityState={{ selected: !announcementsFiltersLocked && sortByClosingSoon }}
+          onPress={
+            announcementsFiltersLocked
+              ? showAnnouncementsFiltersUpgradeAlert
+              : () => setSortByClosingSoon((v) => !v)
+          }
           style={({ pressed }) => [
             styles.advancedFilterBtn,
             isRTL && styles.rowRtl,
-            sortByClosingSoon && styles.advancedFilterBtnActive,
-            pressed && { opacity: 0.9 },
+            announcementsFiltersLocked && styles.advancedFilterBtnLocked,
+            !announcementsFiltersLocked && sortByClosingSoon && styles.advancedFilterBtnActive,
+            pressed && !announcementsFiltersLocked && { opacity: 0.9 },
           ]}>
           <FontAwesome
-            name="sort-amount-asc"
+            name={announcementsFiltersLocked ? 'lock' : 'sort-amount-asc'}
             size={14}
-            color={sortByClosingSoon ? brand.white : brand.primary}
+            color={
+              announcementsFiltersLocked
+                ? '#94A3B8'
+                : sortByClosingSoon
+                  ? brand.white
+                  : brand.primary
+            }
           />
           <Text
             style={[
               styles.advancedFilterBtnTxt,
-              sortByClosingSoon && styles.advancedFilterBtnTxtActive,
+              announcementsFiltersLocked && styles.advancedFilterBtnTxtLocked,
+              !announcementsFiltersLocked && sortByClosingSoon && styles.advancedFilterBtnTxtActive,
             ]}>
             {t('inscSortClosingSoon')}
           </Text>
         </Pressable>
 
-        {activeAdvancedFiltersCount > 0 ? (
+        {hasActiveAnnouncementListingFilters && !announcementsFiltersLocked ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('schoolsReset')}
-            onPress={() => setFiltersValue(defaultEstablishmentFilters())}
+            onPress={clearAllAnnouncementFilters}
             hitSlop={10}
-            style={({ pressed }) => [styles.advancedFilterClear, pressed && { opacity: 0.85 }]}>
+            style={({ pressed }) => [
+              styles.advancedFilterClear,
+              isRTL && styles.rowRtl,
+              pressed && { opacity: 0.85 },
+            ]}>
             <FontAwesome name="times-circle" size={16} color={brand.primary} />
             <Text style={styles.advancedFilterClearTxt}>{t('schoolsReset')}</Text>
           </Pressable>
         ) : null}
       </View>
     </View>
-  );
+    );
+  };
 
   const renderAnnouncements = () => (
     <FlatList
-      data={visibleAnnouncements}
+      data={announcementsListLoading ? [] : paginatedVisibleAnnouncements}
       keyExtractor={(a) => `ann-${a.id}`}
       style={{ flex: 1 }}
       contentContainerStyle={styles.list}
       refreshControl={
         <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+      }
+      onEndReachedThreshold={0.35}
+      onEndReached={loadMoreAnnouncements}
+      ListFooterComponent={
+        loadingMoreAnnouncements ? (
+          <AnnouncementCardSkeletonStack count={1} isRTL={isRTL} style={styles.listFooter} />
+        ) : null
       }
       ListHeaderComponent={
         <View>
@@ -1367,43 +1768,49 @@ export default function InscriptionsTabScreen() {
         </View>
       }
       renderItem={({ item, index }) => {
+        if (!item) return null;
         const eid = item.establishment?.id ?? 0;
         const isFollowed = eid > 0 && followedEstablishmentSet.has(eid);
         return (
         <View>
-          {index > 0 && index % 3 === 0 ? (
+          {index === MID_BANNER_AFTER_CARD_INDEX ? (
             <AppBannerSlot zone="mid" analyticsPage="/mobile/inscriptions/annonces" />
           ) : null}
           <AnnouncementCard
             item={item}
             isFollowed={isFollowed}
+            isUnread={unreadAnnouncementIds.has(item.id)}
+            isUnseen={isAnnouncementUnseen(item.id, seenAnnouncementIds)}
             followStateLoading={isLoggedIn && !followsReady}
             eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
             busy={followBusyId === item.id}
-            onPress={() => router.push(`/inscriptions/${item.id}` as never)}
+            onPress={() => {
+              void markAnnouncementSeen(item.id);
+              router.push(`/inscriptions/${item.id}` as never);
+            }}
             onToggleFollow={() => {
               if (isFollowed) void handleUnfollow(item);
               else void handleFollow(item);
             }}
             onOpenLink={() => handleOpenLink(null, item.registrationUrl, item.id)}
-            onOpenComments={() =>
-              setAnnouncementQnaSheet({
-                id: item.id,
-                title: (isRTL && item.titleAr ? item.titleAr : item.title) || '',
-              })
-            }
             currentStatus={eid > 0 ? followsByEstId.get(eid)?.status ?? null : null}
             onUpdateStatus={() => handleOpenAnnouncementStatusSheet(item)}
+            previewOnly={item.previewOnly ?? showInscriptionsPaywall}
           />
         </View>
         );
       }}
       ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
       ListEmptyComponent={
-        announcementsLoading ? (
-          <View style={styles.empty}>
-            <ActivityIndicator color={brand.primary} />
-          </View>
+        announcementsListLoading ? (
+          <AnnouncementCardSkeletonStack count={2} isRTL={isRTL} style={styles.listLoading} />
+        ) : announcementsLoadError ? (
+          <LoadErrorState
+            message={announcementsLoadError}
+            onRetry={() => void reloadAnnouncements()}
+            retryLabel={loadErrorRetryLabel(t)}
+            isRTL={isRTL}
+          />
         ) : announcements.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
@@ -1412,7 +1819,7 @@ export default function InscriptionsTabScreen() {
             <Text style={styles.emptyTitle}>{t('inscAnnouncementsEmptyTitle')}</Text>
             <Text style={styles.emptyTxt}>{t('inscAnnouncementsEmptyDesc')}</Text>
           </View>
-        ) : (
+        ) : visibleAnnouncements.length === 0 ? (
           <View style={styles.empty}>
             <View style={styles.emptyIcon}>
               <FontAwesome name="filter" size={28} color={brand.primary} />
@@ -1420,17 +1827,13 @@ export default function InscriptionsTabScreen() {
             <Text style={styles.emptyTitle}>{t('inscAnnouncementsFilteredEmptyTitle')}</Text>
             <Text style={styles.emptyTxt}>{t('inscAnnouncementsFilteredEmptyDesc')}</Text>
             <Pressable
-              onPress={() => {
-                setSchoolFilterId('');
-                setFiltersValue(defaultEstablishmentFilters());
-                setSortByClosingSoon(false);
-              }}
+              onPress={clearAllAnnouncementFilters}
               style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}
             >
               <Text style={styles.ctaTxt}>{t('schoolsReset')}</Text>
             </Pressable>
           </View>
-        )
+        ) : null
       }
     />
   );
@@ -1438,7 +1841,7 @@ export default function InscriptionsTabScreen() {
   if (authLoading) {
     return (
       <SafeAreaView style={[styles.root, styles.center]} edges={['top']}>
-        <ActivityIndicator color={brand.primary} />
+        <AnnouncementCardSkeletonStack count={3} isRTL={isRTL} style={styles.center} />
       </SafeAreaView>
     );
   }
@@ -1514,9 +1917,7 @@ export default function InscriptionsTabScreen() {
         rtl={isRTL}
       />
 
-      {/* Modale de filtres avancés — partagée avec la page Écoles, mais
-          on active la section « Statut » uniquement ici car les écoles
-          n'ont pas de notion d'ouverture/fermeture. */}
+      {/* Modale de filtres avancés — partagée avec la page Écoles. */}
       <EstablishmentFiltersModal
         visible={filtersOpen}
         onClose={() => setFiltersOpen(false)}
@@ -1524,15 +1925,9 @@ export default function InscriptionsTabScreen() {
         onChange={setFiltersValue}
         cities={cities}
         secteurs={secteurs}
-        showStatusFilter
+        getDefaultFilters={getAnnouncementDefaultFilters}
       />
 
-      <ContestAnnouncementQnaBottomSheet
-        visible={announcementQnaSheet !== null}
-        announcementId={announcementQnaSheet?.id ?? 0}
-        announcementTitle={announcementQnaSheet?.title ?? ''}
-        onClose={closeAnnouncementQnaSheet}
-      />
     </SafeAreaView>
   );
 }
@@ -1563,22 +1958,6 @@ const styles = StyleSheet.create({
   },
   heroTitle: { color: brand.white, fontSize: fontSize.xxl, fontWeight: '900' },
   heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: fontSize.sm, lineHeight: 19 },
-
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: radius.full,
-    padding: 3,
-  },
-  langPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.full,
-  },
-  langPillActive: { backgroundColor: brand.white },
-  langPillTxt: { color: brand.white, fontSize: fontSize.xs, fontWeight: '700' },
-  langPillTxtActive: { color: brand.primary },
 
   /* Tabs */
   tabsRow: {
@@ -1739,6 +2118,18 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.section * 2,
   },
+  /** Skeleton liste : pleine largeur, sans marges « empty state ». */
+  listLoading: {
+    width: '100%',
+    alignSelf: 'stretch',
+    paddingTop: spacing.xs,
+  },
+  listFooter: {
+    width: '100%',
+    alignSelf: 'stretch',
+    paddingTop: spacing.md,
+    paddingBottom: spacing.lg,
+  },
 
   /* Filter bar (onglet "Annonces") */
   filterBar: {
@@ -1787,6 +2178,11 @@ const styles = StyleSheet.create({
     color: brand.textMuted,
     fontWeight: '600',
   },
+  filterFieldLocked: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    opacity: 0.92,
+  },
   filterClearBtn: {
     width: 36,
     height: 36,
@@ -1796,12 +2192,14 @@ const styles = StyleSheet.create({
     backgroundColor: brand.white,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: brand.border,
+    flexShrink: 0,
   },
 
   /* Conteneur englobant la barre filtre + le bouton "Filtres avancés" */
   filterBarWrap: { marginBottom: spacing.md },
   advancedFilterRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
     gap: spacing.sm,
     marginTop: -spacing.sm + 2,
@@ -1821,6 +2219,14 @@ const styles = StyleSheet.create({
     color: brand.text,
     fontSize: 12,
     fontWeight: '800',
+  },
+  advancedFilterBtnLocked: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+    opacity: 0.92,
+  },
+  advancedFilterBtnTxtLocked: {
+    color: '#94A3B8',
   },
   /* État ON du bouton « Trier par délai » : fond plein bleu primaire. */
   advancedFilterBtnActive: {
@@ -1848,8 +2254,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.md,
     paddingVertical: 8,
+    borderRadius: radius.full,
+    backgroundColor: brand.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: brand.border,
+    flexShrink: 0,
   },
   advancedFilterClearTxt: {
     color: brand.primary,
@@ -1885,4 +2296,22 @@ const styles = StyleSheet.create({
     borderRadius: radius.full,
   },
   ctaTxt: { color: brand.white, fontWeight: '800', fontSize: fontSize.sm },
+  ctaOutline: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: 11,
+    paddingHorizontal: 22,
+    borderRadius: radius.full,
+    borderWidth: 1.5,
+    borderColor: brand.primary,
+    backgroundColor: brand.white,
+  },
+  ctaOutlineTxt: {
+    color: brand.primary,
+    fontWeight: '800',
+    fontSize: fontSize.sm,
+  },
 });

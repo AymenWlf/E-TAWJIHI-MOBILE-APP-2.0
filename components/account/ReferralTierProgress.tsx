@@ -54,10 +54,6 @@ export function ReferralTierProgress({
         </View>
       </View>
 
-      {tierProgress?.singleRewardPerProgram && !tierProgress.rewardTaken ? (
-        <Text style={[styles.programHint, rtl && styles.txtRtl]}>{t('referralSingleRewardHint')}</Text>
-      ) : null}
-
       {(tierProgress?.tiers ?? []).map((tier) => {
         const label = tierLabel(tier, locale);
         const unlocked = tier.unlocked;
@@ -111,7 +107,7 @@ export function ReferralTierProgress({
               {t('referralTierThreshold').replace('{{count}}', String(tier.threshold))}
             </Text>
 
-            {unlocked && (tier.promoClaim || tier.canClaim !== false || tier.rewardTakenOnOtherTier) ? (
+            {unlocked && (tier.promoClaim || tier.canClaim !== false) ? (
               <ReferralTierRewardPanel
                 tier={tier}
                 rtl={rtl}

@@ -19,6 +19,7 @@ import RenderHtml from 'react-native-render-html';
 
 import { EstablishmentRowLogoThumb } from '@/components/shop/EstablishmentRowLogoThumb';
 import { ShareIconButton } from '@/components/share/ShareIconButton';
+import { ShopDetailScreenSkeleton } from '@/components/shop/ShopDetailScreenSkeleton';
 import { Text } from '@/components/ui/Text';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -27,6 +28,7 @@ import { fetchShopProductBySlug } from '@/services/shop';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { ShopProductDetail } from '@/types/shop';
+import { sanitizeRichHtml } from '@/utils/sanitizeRichHtml';
 import { getShopPathAfterBuyNow } from '@/utils/shopCartStorage';
 import {
   formatShopPrice,
@@ -156,17 +158,19 @@ export default function ProductDetailScreen() {
     return (
       <View style={styles.root}>
         <StatusBar style="light" backgroundColor={brand.primary} />
-        <SafeAreaView edges={['top']} style={styles.statusBarTint}>
-          <View style={[styles.navBar, styles.navBarOnPrimary]}>
-            <Pressable onPress={() => router.back()} hitSlop={8} style={styles.navBtnOnPrimary}>
-              <FontAwesome name="chevron-left" size={15} color={brand.white} />
+        <View pointerEvents="none" style={[styles.statusBarFill, { height: insets.top }]} />
+        <SafeAreaView edges={['top']} style={styles.galleryOverlay} pointerEvents="box-none">
+          <View style={styles.galleryOverlayRow}>
+            <Pressable onPress={() => router.back()} hitSlop={8} style={styles.overlayBtn}>
+              <FontAwesome
+                name={isRTL ? 'chevron-right' : 'chevron-left'}
+                size={15}
+                color={brand.text}
+              />
             </Pressable>
           </View>
         </SafeAreaView>
-        <View style={styles.centered}>
-          <ActivityIndicator size="large" color={brand.primary} />
-          <Text style={styles.loadingTxt}>Chargement…</Text>
-        </View>
+        <ShopDetailScreenSkeleton variant="product" gallerySize={width} isRTL={isRTL} />
       </View>
     );
   }
@@ -200,7 +204,7 @@ export default function ProductDetailScreen() {
   }
 
   const htmlSource = product.description?.trim()
-    ? { html: product.description }
+    ? { html: sanitizeRichHtml(product.description) }
     : null;
 
   return (

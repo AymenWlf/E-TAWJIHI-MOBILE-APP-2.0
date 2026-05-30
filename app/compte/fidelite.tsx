@@ -3,18 +3,22 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useState, type ComponentProps } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ReferralProgramSection } from '@/components/account/ReferralProgramSection';
 import { ReferralShareCodeBlock } from '@/components/account/ReferralShareCodeBlock';
 import { ReferralTierProgress } from '@/components/account/ReferralTierProgress';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
+import { ReferralProgramPageSkeleton } from '@/components/account/ReferralProgramSkeleton';
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import type { HomeCopyKey } from '@/constants/i18n';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
+import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { TawjihPlusUpgradeCta } from '@/components/inscriptions/TawjihPlusPaywall';
 import { ReferralLockedBanner } from '@/components/account/ReferralLockedBanner';
 import { useUserReferral } from '@/hooks/useUserReferral';
 import {
@@ -31,6 +35,8 @@ export default function ReferralScreen() {
   const insets = useSafeAreaInsets();
   const { t, isRTL, locale } = useLocale();
   const { getValidAccessToken } = useAuth();
+  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading } = useTawjihPlusAccess();
+  const tawjihPlusLocked = !tawjihPlusLoading && !hasTawjihPlusAccess;
 
   const {
     data: referralProgram,
@@ -110,8 +116,18 @@ export default function ReferralScreen() {
         ]}
         refreshControl={<AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
         showsVerticalScrollIndicator={false}>
-        {referralLoading && !referralProgram ? (
-          <ActivityIndicator color={brand.primary} style={{ marginVertical: spacing.lg }} />
+        {tawjihPlusLocked ? (
+          <View style={[styles.panel, isRTL && styles.panelRtl, styles.tawjihPlusPanel]}>
+            <FontAwesome name="lock" size={22} color={brand.primary} />
+            <Text style={[styles.tawjihPlusTitle, isRTL && styles.txtRtl]}>{t('inscTawjihPlusLockTitle')}</Text>
+            <Text style={[styles.tawjihPlusHint, isRTL && styles.txtRtl]}>{t('inscTawjihPlusLockHint')}</Text>
+            <TawjihPlusUpgradeCta
+              onPress={() => router.push(TAWJIH_PLUS_PRODUCT_PATH as never)}
+              style={styles.tawjihPlusCta}
+            />
+          </View>
+        ) : referralLoading && !referralProgram ? (
+          <ReferralProgramPageSkeleton isRTL={isRTL} style={styles.loadingWrap} />
         ) : referralProgram && !referralUnlocked ? (
           <View style={[styles.panel, isRTL && styles.panelRtl]}>
             <ReferralLockedBanner
@@ -244,6 +260,9 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     gap: spacing.md,
   },
+  loadingWrap: {
+    paddingVertical: spacing.lg,
+  },
   panel: {
     padding: spacing.md,
     borderRadius: radius.lg,
@@ -255,6 +274,25 @@ const styles = StyleSheet.create({
     direction: 'rtl',
     alignItems: 'stretch',
   },
+  tawjihPlusPanel: {
+    alignItems: 'center',
+    gap: spacing.sm,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+  },
+  tawjihPlusTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    color: brand.text,
+    textAlign: 'center',
+  },
+  tawjihPlusHint: {
+    fontSize: fontSize.xs,
+    color: brand.textSecondary,
+    textAlign: 'center',
+    lineHeight: 18,
+  },
+  tawjihPlusCta: { alignSelf: 'stretch' },
   sectionTitle: {
     fontSize: fontSize.sm,
     fontWeight: '800',

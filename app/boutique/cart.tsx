@@ -7,9 +7,9 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text';
 import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVisualThumb';
-import { ETAWJIHI_LOGO_COLOR } from '@/constants/brandAssets';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
+import { useShopFlowSystemBars } from '@/hooks/useShopFlowSystemBars';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { formatShopPrice, shopParsePriceString, shopPriceFormatOptsForCatalogOrCartLine } from '@/utils/shopFormatPrice';
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
@@ -51,10 +51,17 @@ export default function BoutiqueCartScreen() {
     [lines],
   );
 
-  return (
-    <SafeAreaView style={[styles.root, isRTL && styles.rtlRoot]} edges={['top']}>
-      <StatusBar style="dark" />
+  const hasFooter = lines.length > 0;
+  const { headerColor, bottomColor } = useShopFlowSystemBars({
+    headerColor: brand.white,
+    bottomColor: hasFooter ? brand.white : brand.backgroundSoft,
+  });
 
+  return (
+    <View style={[styles.screen, isRTL && styles.rtlRoot]}>
+      <StatusBar style="dark" backgroundColor={headerColor} />
+
+      <SafeAreaView edges={['top']} style={[styles.headerSafe, { backgroundColor: headerColor }]}>
       <View style={[styles.topBar, isRTL && styles.rowRtl]}>
         <Pressable
           onPress={() => (router.canGoBack() ? router.back() : router.replace('/(tabs)/boutique'))}
@@ -69,8 +76,10 @@ export default function BoutiqueCartScreen() {
         </View>
         <View style={{ width: 40 }} />
       </View>
+      </SafeAreaView>
 
       {lines.length === 0 ? (
+        <SafeAreaView edges={['bottom']} style={[styles.screenSafe, { backgroundColor: bottomColor }]}>
         <View style={styles.emptyWrap}>
           <View style={styles.emptyIcon}>
             <FontAwesome name="shopping-bag" size={36} color={brand.primary} />
@@ -84,9 +93,10 @@ export default function BoutiqueCartScreen() {
             <Text style={styles.btnPrimaryTxt}>{t('shopCartEmptyCta')}</Text>
           </Pressable>
         </View>
+        </SafeAreaView>
       ) : (
         <>
-          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+          <ScrollView style={styles.scrollFill} contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
             <Text style={[styles.itemCount, isRTL && styles.txtRtl]}>
               {count === 1 ? t('shopCartItemsOne') : t('shopCartItemsMany').replace('{n}', String(count))}
             </Text>
@@ -103,8 +113,6 @@ export default function BoutiqueCartScreen() {
                       brandColor={l.platformServiceBrandColor}
                       size={86}
                       iconSize={32}
-                      surfaceColor={brand.primary}
-                      imageSource={ETAWJIHI_LOGO_COLOR}
                     />
                   ) : (
                     <Image source={{ uri: shopProductPrimaryImage(l.images) }} style={styles.itemImg} resizeMode="cover" />
@@ -212,27 +220,33 @@ export default function BoutiqueCartScreen() {
             </View>
           </ScrollView>
 
-          <View style={[styles.checkoutBar, isRTL && styles.rowRtl]}>
-            <View style={{ flex: 1 }}>
-              <Text style={[styles.checkoutBarLbl, isRTL && styles.txtRtl]}>{t('shopCartFooterTotal')}</Text>
-              <Text style={[styles.checkoutBarTotal, isRTL && styles.txtRtl]}>{formatShopPrice(String(subtotal), currency)}</Text>
+          <SafeAreaView edges={['bottom']} style={[styles.footerSafe, { backgroundColor: bottomColor }]}>
+            <View style={[styles.checkoutBar, isRTL && styles.rowRtl]}>
+              <View style={{ flex: 1 }}>
+                <Text style={[styles.checkoutBarLbl, isRTL && styles.txtRtl]}>{t('shopCartFooterTotal')}</Text>
+                <Text style={[styles.checkoutBarTotal, isRTL && styles.txtRtl]}>{formatShopPrice(String(subtotal), currency)}</Text>
+              </View>
+              <Pressable
+                onPress={() => router.push('/boutique/checkout' as any)}
+                style={({ pressed }) => [styles.checkoutBtn, isRTL && styles.rowRtl, pressed && { opacity: 0.92 }]}
+              >
+                <Text style={styles.checkoutBtnTxt}>{t('shopCartGoCheckout')}</Text>
+                <FontAwesome name={isRTL ? 'arrow-left' : 'arrow-right'} size={13} color={brand.white} />
+              </Pressable>
             </View>
-            <Pressable
-              onPress={() => router.push('/boutique/checkout' as any)}
-              style={({ pressed }) => [styles.checkoutBtn, isRTL && styles.rowRtl, pressed && { opacity: 0.92 }]}
-            >
-              <Text style={styles.checkoutBtnTxt}>{t('shopCartGoCheckout')}</Text>
-              <FontAwesome name={isRTL ? 'arrow-left' : 'arrow-right'} size={13} color={brand.white} />
-            </Pressable>
-          </View>
+          </SafeAreaView>
         </>
       )}
-    </SafeAreaView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: brand.backgroundSoft },
+  screen: { flex: 1, backgroundColor: brand.backgroundSoft },
+  headerSafe: {},
+  footerSafe: {},
+  scrollFill: { flex: 1 },
+  screenSafe: { flex: 1 },
   rtlRoot: { direction: 'rtl' },
   rowRtl: { flexDirection: 'row-reverse' },
   txtRtl: { textAlign: 'right', writingDirection: 'rtl' },
@@ -397,16 +411,12 @@ const styles = StyleSheet.create({
   },
 
   checkoutBar: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
     backgroundColor: brand.white,
     borderTopWidth: 1,
     borderTopColor: brand.border,
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
-    paddingBottom: spacing.lg + 4,
+    paddingBottom: spacing.md,
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.md,

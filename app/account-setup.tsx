@@ -1,9 +1,8 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { router } from 'expo-router';
-import { type ComponentProps, type ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { type ComponentProps, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  FlatList,
   Modal,
   Platform,
   Pressable,
@@ -23,19 +22,32 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import {
+  SearchablePickSheet,
+  type SearchablePickItem,
+} from '@/components/schools/SearchablePickSheet';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
+import { SelectField } from '@/components/ui/SelectField';
 import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import {
   BAC_TYPES,
-  FILIERE_BAC_OPTIONS,
   type LabeledOption,
   NIVEAU_ETUDE_OPTIONS,
   SPECIALITES_MISSION,
 } from '@/constants/academicSetup';
+import { isValidOrientation1BacFiliereId } from '@/constants/orientation1bacFilieres';
+import {
+  filiereOptionsForNiveau,
+  isPremiereBacNiveau,
+  resolveFiliereDisplayLabel,
+  sanitizeFiliereForNiveau,
+} from '@/utils/academicFiliere';
 import { anneesBacOptionsForLocale } from '@/utils/bacSchoolYearLabels';
 import { listCities, type CityRow } from '@/services/referenceData';
 import { completeAccountSetup, type AccountSetupPayload } from '@/services/accountSetup';
+import { promptNotificationPermissionAfterAuth } from '@/services/pushNotifications';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { errorMessage } from '@/utils/errorMessage';
 import { isValidEmail } from '@/utils/isValidEmail';
@@ -45,6 +57,19 @@ const BLUE = brand.primary;
 type StepId = 1 | 2;
 const TOTAL_STEPS: StepId[] = [1, 2];
 const LAST_SETUP_STEP = TOTAL_STEPS[TOTAL_STEPS.length - 1];
+
+type SetupPickField =
+  | 'userType'
+  | 'niveau'
+  | 'bacType'
+  | 'filiere'
+  | 'bacAnnee'
+  | 'specialite1'
+  | 'specialite2'
+  | 'specialite3'
+  | 'typeLycee'
+  | 'genre'
+  | 'ville';
 
 function stepMeta(step: StepId, t: (k: any) => string) {
   switch (step) {
@@ -174,94 +199,8 @@ function SetupTextInput({
   );
 }
 
-function Chip({
-  label,
-  active,
-  onPress,
-  rtl,
-  wide = false,
-}: {
-  label: string;
-  active: boolean;
-  onPress: () => void;
-  rtl?: boolean;
-  wide?: boolean;
-}) {
-  return (
-    <Pressable
-      accessibilityRole="button"
-      onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        wide && styles.chipWide,
-        active && styles.chipActive,
-        pressed && { opacity: 0.9 },
-      ]}
-    >
-      <Text
-        style={[
-          styles.chipText,
-          wide && styles.chipTextWide,
-          wide && rtl && styles.chipTextWideRtl,
-          active && styles.chipTextActive,
-          rtl && styles.rtl,
-        ]}
-      >
-        {label}
-      </Text>
-    </Pressable>
-  );
-}
-
-function PickerRow({
-  label,
-  value,
-  onChange,
-  options,
-  rtl,
-  locale,
-  wideChips = false,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: LabeledOption[];
-  rtl: boolean;
-  locale: 'fr' | 'ar';
-  /** Libellés longs (ex. année du bac avec contexte pédagogique). */
-  wideChips?: boolean;
-}) {
-  return (
-    <View style={styles.block}>
-      <Text style={[styles.label, rtl && styles.rtl]}>{label}</Text>
-      <View style={[styles.select, rtl && styles.selectRtl]}>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          nestedScrollEnabled
-          {...(rtl ? { style: { direction: 'rtl' as const, width: '100%' as const } } : {})}
-          contentContainerStyle={[styles.selectPills, rtl && styles.selectPillsRtl]}
-        >
-          {options
-            .filter((o) => o.value !== '')
-            .map((o) => (
-              <Chip
-                key={o.value}
-                label={locale === 'ar' ? o.labelAr ?? o.label : o.label}
-                active={value === o.value}
-                onPress={() => onChange(o.value)}
-                rtl={rtl}
-                wide={wideChips}
-              />
-            ))}
-        </ScrollView>
-      </View>
-    </View>
-  );
-}
-
 export default function AccountSetupScreen() {
-  const { isRTL, locale, setLocale, t } = useLocale();
+  const { isRTL, locale, t } = useLocale();
   const rtl = isRTL;
   const bacLocale = locale === 'ar' ? 'ar' : 'fr';
   const anneesBacOptions = useMemo(() => anneesBacOptionsForLocale(bacLocale), [bacLocale]);
@@ -274,9 +213,7 @@ export default function AccountSetupScreen() {
   const [cities, setCities] = useState<CityRow[]>([]);
   const [serverError, setServerError] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
-  const [showCityModal, setShowCityModal] = useState(false);
-  const [cityQuery, setCityQuery] = useState('');
-  const [citySearchFocused, setCitySearchFocused] = useState(false);
+  const [pickField, setPickField] = useState<SetupPickField | null>(null);
 
   const [data, setData] = useState<AccountSetupPayload>({
     userType: '',
@@ -354,26 +291,173 @@ export default function AccountSetupScreen() {
     return cities.find((c) => String(c.id) === data.ville) ?? null;
   }, [cities, data.ville]);
 
-  const sortedCities = useMemo(() => {
-    return [...cities].sort((a, b) =>
-      (a.titre ?? '').localeCompare(b.titre ?? '', 'fr', { sensitivity: 'base' }),
-    );
-  }, [cities]);
+  const toPickItems = useCallback(
+    (options: readonly LabeledOption[] | LabeledOption[]): SearchablePickItem[] =>
+      options
+        .filter((o) => o.value !== '')
+        .map((o) => ({
+          id: o.value,
+          value: o.value,
+          label: locale === 'ar' && o.labelAr ? o.labelAr : o.label,
+        })),
+    [locale],
+  );
 
-  const filteredCities = useMemo(() => {
-    const q = cityQuery.trim().toLowerCase();
-    if (!q) return sortedCities;
-    return sortedCities.filter((c) => (c.titre ?? '').toLowerCase().includes(q));
-  }, [sortedCities, cityQuery]);
+  const anneesBacPickItems = useMemo(
+    () => toPickItems(anneesBacOptions),
+    [anneesBacOptions, toPickItems],
+  );
 
-  function openCityPicker() {
+  const userTypeOptions = useMemo<LabeledOption[]>(
+    () => [
+      { value: 'student', label: t('setupStudent'), labelAr: 'تلميذ/طالب' },
+      { value: 'tutor', label: t('setupTutor'), labelAr: 'ولي الأمر' },
+    ],
+    [t],
+  );
+
+  const typeLyceeOptions = useMemo<LabeledOption[]>(
+    () => [
+      { value: 'public', label: t('setupPublic'), labelAr: 'عمومي' },
+      { value: 'prive', label: t('setupPrivate'), labelAr: 'خصوصي' },
+    ],
+    [t],
+  );
+
+  const genreOptions = useMemo<LabeledOption[]>(
+    () => [
+      { value: 'Homme', label: t('setupMale'), labelAr: 'ذكر' },
+      { value: 'Femme', label: t('setupFemale'), labelAr: 'أنثى' },
+    ],
+    [t],
+  );
+
+  const specialiteOptions = useMemo<LabeledOption[]>(
+    () => SPECIALITES_MISSION.map((s) => ({ value: s, label: s, labelAr: s })),
+    [],
+  );
+
+  const cityPickerItems = useMemo<SearchablePickItem[]>(
+    () =>
+      [...cities]
+        .sort((a, b) => (a.titre ?? '').localeCompare(b.titre ?? '', 'fr', { sensitivity: 'base' }))
+        .map((c) => ({
+          id: String(c.id),
+          value: String(c.id),
+          label: c.titre ?? '',
+          subtitle: c.region?.titre,
+        })),
+    [cities],
+  );
+
+  const labelFor = useCallback((value: string, items: SearchablePickItem[]): string => {
+    if (!value) return '';
+    return items.find((i) => i.value === value)?.label ?? value;
+  }, []);
+
+  const setupPickConfig = useMemo(
+    () => ({
+      userType: {
+        title: t('setupYouAre'),
+        items: toPickItems(userTypeOptions),
+        value: data.userType,
+      },
+      niveau: {
+        title: t('setupStudyLevel'),
+        items: toPickItems(NIVEAU_ETUDE_OPTIONS),
+        value: data.niveau,
+      },
+      bacType: {
+        title: t('setupBacType'),
+        items: BAC_TYPES.map((b) => ({ id: b.value, value: b.value, label: b.label })),
+        value: data.bacType,
+      },
+      filiere: {
+        title: isPremiereBacNiveau(data.niveau) ? t('setupFiliere1Bac') : t('setupFiliere'),
+        items: toPickItems(filiereOptionsForNiveau(data.niveau)),
+        value: data.filiere,
+      },
+      bacAnnee: {
+        title: t('setupBacAnnee'),
+        items: anneesBacPickItems,
+        value: data.bacAnnee,
+      },
+      specialite1: {
+        title: t('setupSpecialite1'),
+        items: toPickItems(specialiteOptions),
+        value: data.specialite1,
+      },
+      specialite2: {
+        title: t('setupSpecialite2'),
+        items: toPickItems(specialiteOptions),
+        value: data.specialite2,
+      },
+      specialite3: {
+        title: t('setupSpecialite3Optional'),
+        items: toPickItems(specialiteOptions),
+        value: data.specialite3,
+      },
+      typeLycee: {
+        title: t('setupLyceeType'),
+        items: toPickItems(typeLyceeOptions),
+        value: data.typeLycee,
+      },
+      genre: {
+        title: t('setupGender'),
+        items: toPickItems(genreOptions),
+        value: data.genre,
+      },
+      ville: {
+        title: t('setupCityModalTitle'),
+        items: cityPickerItems,
+        value: data.ville,
+      },
+    }),
+    [
+      t,
+      toPickItems,
+      anneesBacPickItems,
+      data,
+      specialiteOptions,
+      typeLyceeOptions,
+      genreOptions,
+      userTypeOptions,
+      cityPickerItems,
+    ],
+  );
+
+  function openPickField(field: SetupPickField) {
     setServerError('');
-    setCityQuery('');
-    setShowCityModal(true);
+    setPickField(field);
   }
 
-  function closeCityPicker() {
-    setShowCityModal(false);
+  function handleSetupPick(field: SetupPickField, v: string) {
+    if (field === 'ville') {
+      setData((s) => ({ ...s, ville: v }));
+      return;
+    }
+    if (field === 'bacType') {
+      setData((s) => ({
+        ...s,
+        bacType: v as AccountSetupPayload['bacType'],
+        filiere: '',
+        specialite1: '',
+        specialite2: '',
+        specialite3: '',
+      }));
+      return;
+    }
+    if (field === 'niveau') {
+      const isHigher = ['BAC+1', 'BAC+2', 'BAC+3', 'BAC+4', 'BAC+5', 'BAC+6', 'Doctorant'].includes(v);
+      setData((s) => ({
+        ...s,
+        niveau: v,
+        filiere: sanitizeFiliereForNiveau(v, s.filiere),
+        ...(isHigher ? {} : { diplomeEnCours: '' }),
+      }));
+      return;
+    }
+    setData((s) => ({ ...s, [field]: v }));
   }
 
   function validateStep(step: StepId): string | null {
@@ -387,6 +471,13 @@ export default function AccountSetupScreen() {
       if (isBac) {
         if (!data.bacType) return t('setupErrPickBacType');
         if (data.bacType === 'normal' && !data.filiere) return t('setupErrPickFiliere');
+        if (
+          data.bacType === 'normal' &&
+          isPremiereBacNiveau(data.niveau) &&
+          !isValidOrientation1BacFiliereId(data.filiere)
+        ) {
+          return t('setupErrPickFiliere');
+        }
         if (data.bacType === 'mission') {
           if (!data.specialite1 || !data.specialite2) {
             return t('setupErrPickMissionSpecs');
@@ -450,9 +541,10 @@ export default function AccountSetupScreen() {
       const res = await completeAccountSetup({ ...data, email: data.email.trim() }, token);
       if (!res?.success) throw new Error(res?.message || 'Setup failed');
       await reloadMe();
+      void promptNotificationPermissionAfterAuth(getValidAccessToken);
       router.replace('/(tabs)');
     } catch (e: unknown) {
-      setServerError(errorMessage(e));
+      setServerError(errorMessage(e, t, 'auth'));
     } finally {
       setSubmitting(false);
     }
@@ -493,26 +585,7 @@ export default function AccountSetupScreen() {
                 <FontAwesome name="sign-out" size={18} color="white" />
               </Pressable>
 
-              <View style={styles.langSwitchWrap} accessibilityLabel={t('languageSwitcher')}>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setLocale('fr')}
-                style={[styles.langPill, locale === 'fr' && styles.langPillActive]}
-              >
-                <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>
-                  {t('langFr')}
-                </Text>
-              </Pressable>
-              <Pressable
-                accessibilityRole="button"
-                onPress={() => setLocale('ar')}
-                style={[styles.langPill, locale === 'ar' && styles.langPillActive]}
-              >
-                <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>
-                  {t('langAr')}
-                </Text>
-              </Pressable>
-            </View>
+              <HeroLangSwitch />
             </View>
           </View>
         </View>
@@ -581,82 +654,69 @@ export default function AccountSetupScreen() {
 
           {currentStep === 1 && (
             <>
-              <View style={styles.block}>
-                <Text style={[styles.label, rtl && styles.rtl]}>{t('setupYouAre')}</Text>
-                <View style={[styles.rowWrap, rtl && styles.rowWrapRtl]}>
-                  <Chip rtl={rtl} label={t('setupStudent')} active={data.userType === 'student'} onPress={() => setData((s) => ({ ...s, userType: 'student' }))} />
-                  <Chip rtl={rtl} label={t('setupTutor')} active={data.userType === 'tutor'} onPress={() => setData((s) => ({ ...s, userType: 'tutor' }))} />
-                </View>
-              </View>
-
-              <PickerRow
-                label={t('setupStudyLevel')}
-                value={data.niveau}
-                onChange={(v) => setData((s) => ({ ...s, niveau: v }))}
-                options={NIVEAU_ETUDE_OPTIONS}
+              <SelectField
+                label={t('setupYouAre')}
+                value={labelFor(data.userType, setupPickConfig.userType.items)}
                 rtl={rtl}
-                locale={locale}
+                onPress={() => openPickField('userType')}
+              />
+
+              <SelectField
+                label={t('setupStudyLevel')}
+                value={labelFor(data.niveau, setupPickConfig.niveau.items)}
+                rtl={rtl}
+                onPress={() => openPickField('niveau')}
               />
 
               {showBacFields && (
                 <>
-                  <PickerRow
+                  <SelectField
                     label={t('setupBacType')}
-                    value={data.bacType}
-                    onChange={(v) => setData((s) => ({ ...s, bacType: v as any, filiere: '', specialite1: '', specialite2: '', specialite3: '' }))}
-                    options={[{ value: '', label: '' }, ...BAC_TYPES.map((b) => ({ value: b.value, label: b.label, labelAr: b.label }))]}
+                    value={labelFor(data.bacType, setupPickConfig.bacType.items)}
                     rtl={rtl}
-                    locale={locale}
+                    onPress={() => openPickField('bacType')}
                   />
 
                   {data.bacType === 'normal' && (
-                    <PickerRow
-                      label={t('setupFiliere')}
-                      value={data.filiere}
-                      onChange={(v) => setData((s) => ({ ...s, filiere: v }))}
-                      options={FILIERE_BAC_OPTIONS}
+                    <SelectField
+                      label={isPremiereBacNiveau(data.niveau) ? t('setupFiliere1Bac') : t('setupFiliere')}
+                      value={
+                        resolveFiliereDisplayLabel(data.filiere, locale === 'ar' ? 'ar' : 'fr') ||
+                        labelFor(data.filiere, setupPickConfig.filiere.items)
+                      }
                       rtl={rtl}
-                      locale={locale}
+                      onPress={() => openPickField('filiere')}
                     />
                   )}
 
                   {data.bacType === 'mission' && (
                     <>
-                      <PickerRow
+                      <SelectField
                         label={t('setupSpecialite1')}
-                        value={data.specialite1}
-                        onChange={(v) => setData((s) => ({ ...s, specialite1: v }))}
-                        options={[{ value: '', label: '' }, ...SPECIALITES_MISSION.map((x) => ({ value: x, label: x, labelAr: x }))]}
+                        value={labelFor(data.specialite1, setupPickConfig.specialite1.items)}
                         rtl={rtl}
-                        locale={locale}
+                        onPress={() => openPickField('specialite1')}
                       />
-                      <PickerRow
+                      <SelectField
                         label={t('setupSpecialite2')}
-                        value={data.specialite2}
-                        onChange={(v) => setData((s) => ({ ...s, specialite2: v }))}
-                        options={[{ value: '', label: '' }, ...SPECIALITES_MISSION.map((x) => ({ value: x, label: x, labelAr: x }))]}
+                        value={labelFor(data.specialite2, setupPickConfig.specialite2.items)}
                         rtl={rtl}
-                        locale={locale}
+                        onPress={() => openPickField('specialite2')}
                       />
-                      <PickerRow
+                      <SelectField
                         label={t('setupSpecialite3Optional')}
-                        value={data.specialite3}
-                        onChange={(v) => setData((s) => ({ ...s, specialite3: v }))}
-                        options={[{ value: '', label: '' }, ...SPECIALITES_MISSION.map((x) => ({ value: x, label: x, labelAr: x }))]}
+                        value={labelFor(data.specialite3, setupPickConfig.specialite3.items)}
                         rtl={rtl}
-                        locale={locale}
+                        onPress={() => openPickField('specialite3')}
                       />
                     </>
                   )}
 
-                  <PickerRow
+                  <SelectField
                     label={t('setupBacAnnee')}
-                    value={data.bacAnnee}
-                    onChange={(v) => setData((s) => ({ ...s, bacAnnee: v }))}
-                    options={anneesBacOptions}
+                    value={labelFor(data.bacAnnee, setupPickConfig.bacAnnee.items)}
                     rtl={rtl}
-                    locale={locale}
-                    wideChips
+                    onPress={() => openPickField('bacAnnee')}
                   />
                 </>
               )}
@@ -683,13 +743,12 @@ export default function AccountSetupScreen() {
                 />
               </View>
 
-              <View style={styles.block}>
-                <Text style={[styles.label, rtl && styles.rtl]}>{t('setupLyceeType')}</Text>
-                <View style={[styles.rowWrap, rtl && styles.rowWrapRtl]}>
-                  <Chip rtl={rtl} label={t('setupPublic')} active={data.typeLycee === 'public'} onPress={() => setData((s) => ({ ...s, typeLycee: 'public' }))} />
-                  <Chip rtl={rtl} label={t('setupPrivate')} active={data.typeLycee === 'prive'} onPress={() => setData((s) => ({ ...s, typeLycee: 'prive' }))} />
-                </View>
-              </View>
+              <SelectField
+                label={t('setupLyceeType')}
+                value={labelFor(data.typeLycee, setupPickConfig.typeLycee.items)}
+                rtl={rtl}
+                onPress={() => openPickField('typeLycee')}
+              />
             </>
           )}
 
@@ -753,44 +812,22 @@ export default function AccountSetupScreen() {
                   </Pressable>
                 )}
               </View>
-              <View style={styles.block}>
-                <Text style={[styles.label, rtl && styles.rtl]}>{t('setupGender')}</Text>
-                <View style={[styles.rowWrap, rtl && styles.rowWrapRtl]}>
-                  <Chip rtl={rtl} label={t('setupMale')} active={data.genre === 'Homme'} onPress={() => setData((s) => ({ ...s, genre: 'Homme' }))} />
-                  <Chip rtl={rtl} label={t('setupFemale')} active={data.genre === 'Femme'} onPress={() => setData((s) => ({ ...s, genre: 'Femme' }))} />
-                </View>
-              </View>
-              <View style={styles.block}>
-                <Text style={[styles.label, rtl && styles.rtl]}>{t('setupCity')}</Text>
-                {loadingCities ? (
-                  <View style={styles.inlineLoading}>
-                    <ActivityIndicator />
-                    <Text style={styles.inlineLoadingText}>{t('setupLoading')}</Text>
-                  </View>
-                ) : (
-                  <>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={t('setupCity')}
-                      onPress={openCityPicker}
-                      style={[styles.cityField, rtl && styles.cityFieldRtl]}
-                    >
-                      <Text
-                        numberOfLines={1}
-                        style={[
-                          styles.cityFieldText,
-                          rtl && styles.rtl,
-                          !selectedCity && { color: brand.textMuted },
-                        ]}
-                      >
-                        {selectedCity ? selectedCity.titre : t('setupCityChoose')}
-                      </Text>
-                      <FontAwesome name="chevron-down" size={12} color={brand.textMuted} />
-                    </Pressable>
-                    <Text style={[styles.hint, rtl && styles.rtl]}>{t('setupCityHint')}</Text>
-                  </>
-                )}
-              </View>
+              <SelectField
+                label={t('setupGender')}
+                value={labelFor(data.genre, setupPickConfig.genre.items)}
+                rtl={rtl}
+                onPress={() => openPickField('genre')}
+              />
+              <SelectField
+                label={t('setupCity')}
+                hint={t('setupCityHint')}
+                value={selectedCity?.titre ?? ''}
+                rtl={rtl}
+                loading={loadingCities}
+                loadingLabel={t('setupLoading')}
+                disabled={!loadingCities && cities.length === 0}
+                onPress={() => openPickField('ville')}
+              />
             </>
           )}
 
@@ -826,119 +863,20 @@ export default function AccountSetupScreen() {
         </View>
       </View>
 
-      {/* City picker — bottom sheet searchable */}
-      <Modal
-        visible={showCityModal}
-        animationType="slide"
-        transparent
-        onRequestClose={closeCityPicker}
-      >
-        <View style={styles.sheetRoot}>
-          <Pressable style={styles.sheetBackdrop} onPress={closeCityPicker} />
-          <SafeAreaView edges={['bottom']} style={styles.sheetCard}>
-            <View style={styles.sheetHandle} />
-            <View style={[styles.sheetHeader, rtl && styles.sheetHeaderRtl]}>
-              <Text style={[styles.sheetTitle, rtl && styles.rtl]}>
-                {t('setupCityModalTitle')}
-              </Text>
-              <Pressable
-                accessibilityRole="button"
-                accessibilityLabel="Fermer"
-                onPress={closeCityPicker}
-                hitSlop={10}
-                style={styles.sheetClose}
-              >
-                <FontAwesome name="times" size={16} color={brand.text} />
-              </Pressable>
-            </View>
-
-            <View style={styles.sheetSearchWrap}>
-            <AnimatedFieldShell focused={citySearchFocused}>
-              <View style={[styles.sheetSearchInner, rtl && styles.sheetSearchInnerRtl]}>
-                <FontAwesome name="search" size={15} color={brand.textMuted} />
-                <TextInput
-                  value={cityQuery}
-                  onChangeText={setCityQuery}
-                  placeholder={t('setupCitySearchPlaceholder')}
-                  placeholderTextColor={INPUT_PLACEHOLDER_RGBA}
-                  style={[styles.sheetSearchInput, rtl && styles.rtl]}
-                  autoCorrect={false}
-                  autoCapitalize="none"
-                  returnKeyType="search"
-                  selectionColor={BLUE}
-                  onFocus={() => setCitySearchFocused(true)}
-                  onBlur={() => setCitySearchFocused(false)}
-                />
-                {cityQuery.length > 0 ? (
-                  <Pressable
-                    onPress={() => setCityQuery('')}
-                    hitSlop={8}
-                    accessibilityRole="button"
-                    accessibilityLabel="Effacer"
-                  >
-                    <FontAwesome name="times-circle" size={15} color={brand.textMuted} />
-                  </Pressable>
-                ) : null}
-              </View>
-            </AnimatedFieldShell>
-            </View>
-
-            <FlatList
-              style={[{ flex: 1 }, rtl ? { direction: 'rtl' as const } : undefined]}
-              data={filteredCities}
-              keyExtractor={(item) => String(item.id)}
-              keyboardShouldPersistTaps="handled"
-              initialNumToRender={20}
-              windowSize={10}
-              ListEmptyComponent={
-                <View style={styles.sheetEmpty}>
-                  <FontAwesome name="map-marker" size={20} color={brand.textMuted} />
-                  <Text style={styles.sheetEmptyText}>{t('setupCityNoResults')}</Text>
-                </View>
-              }
-              renderItem={({ item }) => {
-                const active = data.ville === String(item.id);
-                return (
-                  <Pressable
-                    accessibilityRole="button"
-                    onPress={() => {
-                      setData((s) => ({ ...s, ville: String(item.id) }));
-                      setShowCityModal(false);
-                    }}
-                    style={({ pressed }) => [
-                      styles.cityRow,
-                      rtl && styles.cityRowRtl,
-                      pressed && { backgroundColor: 'rgba(15,23,42,0.04)' },
-                    ]}
-                  >
-                    <View style={{ flex: 1 }}>
-                      <Text
-                        numberOfLines={1}
-                        style={[styles.cityRowText, rtl && styles.rtl, active && styles.cityRowTextActive]}
-                      >
-                        {item.titre}
-                      </Text>
-                      {item.region?.titre ? (
-                        <Text
-                          numberOfLines={1}
-                          style={[styles.cityRowMeta, rtl && styles.rtl]}
-                        >
-                          {item.region.titre}
-                        </Text>
-                      ) : null}
-                    </View>
-                    {active ? (
-                      <FontAwesome name="check" size={14} color={BLUE} />
-                    ) : null}
-                  </Pressable>
-                );
-              }}
-              contentContainerStyle={styles.cityListContent}
-              ItemSeparatorComponent={() => <View style={styles.cityRowSep} />}
-            />
-          </SafeAreaView>
-        </View>
-      </Modal>
+      {pickField ? (
+        <SearchablePickSheet
+          visible
+          title={setupPickConfig[pickField].title}
+          searchPlaceholder={t('setupCitySearchPlaceholder')}
+          emptyLabel={pickField === 'ville' ? t('setupCityNoResults') : t('accountSelectNoResults')}
+          allLabel={pickField === 'ville' ? t('setupCityChoose') : t('accountSelectPlaceholder')}
+          items={setupPickConfig[pickField].items}
+          selectedValue={setupPickConfig[pickField].value}
+          onPick={(v) => handleSetupPick(pickField, v)}
+          onClose={() => setPickField(null)}
+          rtl={rtl}
+        />
+      ) : null}
 
       {/* Birth date — native iOS/Android picker (web uses inline <input type="date">) */}
       {Platform.OS !== 'web' && (
@@ -1505,55 +1443,6 @@ const styles = StyleSheet.create({
   hint: { color: brand.textMuted, marginTop: 8, fontSize: 12 },
   sectionHint: { color: brand.textMuted, marginBottom: spacing.md },
 
-  rowWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
-  rowWrapRtl: { width: '100%', justifyContent: 'flex-start', alignContent: 'flex-start' },
-  chip: {
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: brand.border,
-    backgroundColor: 'white',
-  },
-  chipWide: {
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: radius.lg,
-    maxWidth: 320,
-  },
-  chipActive: {
-    backgroundColor: 'rgba(37,99,235,0.10)',
-    borderColor: 'rgba(37,99,235,0.35)',
-  },
-  chipText: { color: brand.text, fontWeight: '700' },
-  chipTextWide: { fontSize: fontSize.sm, lineHeight: Math.round(fontSize.sm * 1.35), textAlign: 'left' },
-  chipTextWideRtl: { textAlign: 'right' },
-  chipTextActive: { color: BLUE },
-
-  select: {
-    backgroundColor: 'white',
-    borderWidth: 1,
-    borderColor: brand.border,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-  },
-  selectRtl: { alignSelf: 'stretch' },
-  selectPills: { flexDirection: 'row', gap: 10, paddingHorizontal: 2 },
-  selectPillsRtl: { flexGrow: 1, justifyContent: 'flex-start', minWidth: '100%' },
-
-  inlineLoading: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: spacing.md },
-  inlineLoadingText: { color: brand.textMuted },
-
-  langSwitchWrap: {
-    flexDirection: 'row',
-    gap: 8,
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.16)',
-    borderRadius: 999,
-    padding: 4,
-  },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1569,17 +1458,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.16)',
   },
-  langPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 999,
-  },
-  langPillActive: {
-    backgroundColor: 'rgba(255,255,255,0.92)',
-  },
-  langPillTxt: { color: 'rgba(255,255,255,0.9)', fontWeight: '800' },
-  langPillTxtActive: { color: BLUE },
-
   footer: {
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.lg,
@@ -1603,33 +1481,6 @@ const styles = StyleSheet.create({
   modalBtnPrimaryText: { color: 'white', fontWeight: '900' },
   modalBtnGhost: { backgroundColor: 'white', borderWidth: 1, borderColor: brand.border },
   modalBtnGhostText: { color: brand.text, fontWeight: '900' },
-
-  cityField: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    backgroundColor: SHELL_BG_IDLE,
-    borderWidth: 2,
-    borderColor: SHELL_BORDER_IDLE,
-    borderRadius: radius.xl,
-    paddingHorizontal: spacing.lg + 2,
-    paddingVertical: Platform.OS === 'ios' ? 14 : 13,
-    minHeight: 54,
-    gap: 10,
-    ...Platform.select({
-      ios: { shadowColor: 'rgba(15,23,42,0.08)', shadowOpacity: 1, shadowRadius: 8, shadowOffset: { width: 0, height: 2 } },
-      android: { elevation: 0 },
-    }),
-  },
-  cityFieldRtl: { flexDirection: 'row-reverse' },
-  cityFieldText: {
-    color: brand.text,
-    fontWeight: '600',
-    fontSize: fontSize.lg,
-    lineHeight: Math.round(fontSize.lg * 1.35),
-    letterSpacing: -0.15,
-    flex: 1,
-  },
 
   sheetRoot: { flex: 1, justifyContent: 'flex-end' },
   sheetBackdrop: {

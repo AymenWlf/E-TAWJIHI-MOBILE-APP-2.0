@@ -15,7 +15,10 @@
     },
     "ios": {
       "supportsTablet": true,
-      "softwareKeyboardLayoutMode": "resize"
+      "softwareKeyboardLayoutMode": "resize",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": true
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -38,7 +41,12 @@
         "expo-notifications",
         {
           "color": "#333E8F",
-          "defaultChannel": "default"
+          "defaultChannel": "default",
+          "sounds": [
+            "./assets/sounds/notification.mp3",
+            "./assets/sounds/cash_commande.mp3",
+            "./assets/sounds/cash_transaction.mp3"
+          ]
         }
       ]
     ],

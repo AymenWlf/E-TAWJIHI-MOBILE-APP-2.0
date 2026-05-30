@@ -1,5 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { router } from 'expo-router';
+import { ETAWJIHI_TRANSFER_SUPPORT_PHONE } from '@/constants/etawjihiSupport';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,12 +25,15 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { DeviceTransferRequiredError } from '@/services/auth';
 import { CAIRO } from '@/theme/arabicTypography';
 import { brand, radius, spacing } from '@/theme/tokens';
 import { errorMessage } from '@/utils/errorMessage';
+import { isValidMoroccoMobile10, sanitizeMoroccoMobileInput } from '@/utils/moroccoMobilePhone';
 
 const BLUE = brand.primary;
 const MINT = brand.success;
@@ -38,7 +42,7 @@ const MINT = brand.success;
 const FIELD_SCROLL_INSET = 28;
 
 export default function LoginScreen() {
-  const { isRTL, locale, setLocale, t } = useLocale();
+  const { isRTL, t } = useLocale();
   const { login } = useAuth();
 
   const [phone, setPhone] = useState('');
@@ -113,7 +117,7 @@ export default function LoginScreen() {
   }));
 
   const v = useMemo(() => {
-    const phoneOk = phone.replace(/\s/g, '').length >= 9;
+    const phoneOk = isValidMoroccoMobile10(phone);
     const passwordOk = password.length >= 4;
     return {
       phoneOk,
@@ -134,7 +138,22 @@ export default function LoginScreen() {
       // (fires as soon as setUser is called inside login())
       await login(phone.trim(), password);
     } catch (e: unknown) {
-      setServerError(errorMessage(e));
+      if (e instanceof DeviceTransferRequiredError) {
+        router.push({
+          pathname: '/device-transfer',
+          params: {
+            transferToken: e.transferToken,
+            phone: e.phone ?? phone.trim(),
+            supportPhone: e.supportPhone ?? ETAWJIHI_TRANSFER_SUPPORT_PHONE,
+            maxDevices: String(e.maxDevices ?? 1),
+            activeSessions: e.activeSessions?.length
+              ? JSON.stringify(e.activeSessions)
+              : undefined,
+          },
+        });
+        return;
+      }
+      setServerError(errorMessage(e, t, 'auth'));
     } finally {
       setSubmitting(false);
     }
@@ -155,26 +174,7 @@ export default function LoginScreen() {
         </View>
 
         <View style={styles.topRow}>
-          <View style={styles.langSwitchWrap} accessibilityLabel={t('languageSwitcher')}>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setLocale('fr')}
-              style={[styles.langPill, locale === 'fr' && styles.langPillActive]}
-            >
-              <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>
-                {t('langFr')}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              onPress={() => setLocale('ar')}
-              style={[styles.langPill, locale === 'ar' && styles.langPillActive]}
-            >
-              <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>
-                {t('langAr')}
-              </Text>
-            </Pressable>
-          </View>
+          <HeroLangSwitch />
         </View>
 
         <View style={styles.topLogoCenter}>
@@ -223,7 +223,7 @@ export default function LoginScreen() {
               </View>
               <TextInput
                 value={phone}
-                onChangeText={setPhone}
+                onChangeText={(text) => setPhone(sanitizeMoroccoMobileInput(text))}
                 onFocus={() => scrollToFieldBlock('phone')}
                 onBlur={() => setTouched((t) => ({ ...t, phone: true }))}
                 onSubmitEditing={() => passwordRef.current?.focus()}
@@ -233,6 +233,7 @@ export default function LoginScreen() {
                 autoComplete="tel"
                 textContentType="telephoneNumber"
                 returnKeyType="next"
+                maxLength={10}
                 style={[styles.fieldInput, rtl && styles.rtl]}
               />
             </View>
@@ -286,6 +287,10 @@ export default function LoginScreen() {
               <Text style={[styles.fieldHint, rtl && styles.rtl]}>{v.passwordError}</Text>
             )}
           </View>
+
+          <Pressable accessibilityRole="button" onPress={() => router.push('/forgot-password')} style={styles.forgotRow}>
+            <Text style={[styles.forgotLink, rtl && styles.rtl]}>{t('loginForgotPassword')}</Text>
+          </Pressable>
 
           {/* CTA */}
           <Pressable
@@ -419,33 +424,6 @@ const styles = StyleSheet.create({
     backgroundColor: brand.border,
     alignSelf: 'center',
   },
-  langSwitchWrap: {
-    flexDirection: 'row',
-    backgroundColor: brand.backgroundSoft,
-    borderRadius: 999,
-    padding: 4,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: brand.border,
-    gap: 4,
-  },
-  langPill: {
-    height: 28,
-    paddingHorizontal: 10,
-    borderRadius: 999,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  langPillActive: {
-    backgroundColor: 'rgba(51,62,143,0.12)',
-  },
-  langPillTxt: {
-    fontSize: 12,
-    fontWeight: '900',
-    color: brand.textMuted,
-  },
-  langPillTxtActive: {
-    color: BLUE,
-  },
   sheetSub: {
     marginTop: spacing.sm,
     fontSize: 15,
@@ -558,6 +536,17 @@ const styles = StyleSheet.create({
     fontWeight: '900',
     letterSpacing: 0.2,
     fontFamily: CAIRO.black,
+  },
+
+  forgotRow: {
+    marginTop: spacing.md,
+    alignSelf: 'flex-end',
+  },
+  forgotLink: {
+    color: BLUE,
+    fontSize: 13,
+    fontWeight: '700',
+    textDecorationLine: 'underline',
   },
 
   signupRow: {

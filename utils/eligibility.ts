@@ -85,6 +85,8 @@ export type EligibilityProfile = {
   specialite2?: string | null;
   specialite3?: string | null;
   bacAnnee?: string | null;
+  /** Niveau d’études (ex. 2ème année Baccalauréat, BAC+1). */
+  niveau?: string | null;
 };
 
 /**
@@ -296,4 +298,47 @@ export function evaluateEligibilityByFiliere(
 
   // Type de bac non renseigné : on ne peut pas trancher.
   return 'unknown';
+}
+
+/** Critères annonce + repli établissement si l’annonce ne précise pas la filière / spécialités. */
+export function mergeEligibilityCriteria(
+  primary: EligibilityCriteria,
+  fallback?: EligibilityCriteria | null,
+): EligibilityCriteria {
+  const filieresP = nonEmpty(primary.filieresAcceptees);
+  const specsP = nonEmpty(primary.specialitesBacMissionAcceptees);
+  const filieresF = nonEmpty(fallback?.filieresAcceptees);
+  const specsF = nonEmpty(fallback?.specialitesBacMissionAcceptees);
+  return {
+    filieresAcceptees: filieresP.length > 0 ? filieresP : filieresF,
+    specialitesBacMissionAcceptees: specsP.length > 0 ? specsP : specsF,
+    anneesBacAcceptees: nonEmpty(primary.anneesBacAcceptees).length
+      ? nonEmpty(primary.anneesBacAcceptees)
+      : nonEmpty(fallback?.anneesBacAcceptees),
+  };
+}
+
+export type AcceptedStudyPathFilter = {
+  bacType: 'normal' | 'mission';
+  value: string;
+};
+
+/**
+ * Filtre listing : l’établissement / l’annonce accepte explicitement la filière
+ * (bac marocain) ou la spécialité (bac Mission) choisie.
+ */
+export function matchesAcceptedStudyPathFilter(
+  criteria: EligibilityCriteria,
+  filter: AcceptedStudyPathFilter,
+): boolean {
+  const v = filter.value.trim();
+  if (!v) return true;
+
+  if (filter.bacType === 'normal') {
+    const filieres = nonEmpty(criteria.filieresAcceptees);
+    return filieres.length > 0 && intersects([v], filieres);
+  }
+
+  const specs = nonEmpty(criteria.specialitesBacMissionAcceptees);
+  return specs.length > 0 && intersects([v], specs);
 }

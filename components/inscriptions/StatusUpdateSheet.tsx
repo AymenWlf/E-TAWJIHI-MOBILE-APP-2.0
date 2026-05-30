@@ -15,7 +15,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { loadCandidacyStatusesWithRefresh } from '@/services/candidacyStatusTypes';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { CandidacyStatusType } from '@/types/inscriptions';
-import { pickStatusLabel } from '@/utils/candidacyStatus';
+import { partitionCandidacyStatuses, pickStatusLabel } from '@/utils/candidacyStatus';
 
 type IconName = React.ComponentProps<typeof FontAwesome>['name'];
 
@@ -35,8 +35,7 @@ type Props = {
   availableStatuses: CandidacyStatusType[];
   onClose: () => void;
   /**
-   * Confirmation : `null` ⇒ l'utilisateur a choisi « Aucun statut »
-   * (option toujours proposée en plus des statuts autorisés).
+   * Confirmation du statut choisi.
    */
   onConfirm: (status: CandidacyStatusType | null) => void | Promise<void>;
   onRequestDelete?: () => void;
@@ -53,8 +52,6 @@ type Props = {
    */
   showUnavailable?: boolean;
 };
-
-const NONE_KEY = '__none__';
 
 /**
  * Tri stable des statuts : par `sortOrder` croissant puis par `id`
@@ -79,9 +76,8 @@ export function StatusUpdateSheet({
 }: Props) {
   const { t, locale, isRTL } = useLocale();
 
-  // Sélection courante : un id de statut, `null` pour « Aucun statut »,
-  // ou `undefined` quand rien n'a encore été touché.
-  const [selectedId, setSelectedId] = useState<number | null | undefined>(
+  // Sélection courante : id de statut, ou `undefined` tant qu'aucun choix.
+  const [selectedId, setSelectedId] = useState<number | undefined>(
     currentStatus?.id ?? undefined,
   );
   const [submitting, setSubmitting] = useState(false);
@@ -144,7 +140,7 @@ export function StatusUpdateSheet({
     if (!hasSelection || submitting) return;
     try {
       setSubmitting(true);
-      const next = selectedId === null ? null : findById(selectedId as number) ?? null;
+      const next = findById(selectedId as number) ?? null;
       await Promise.resolve(onConfirm(next));
     } finally {
       setSubmitting(false);
@@ -162,8 +158,14 @@ export function StatusUpdateSheet({
 
   return (
     <Modal visible={visible} transparent animationType="slide" onRequestClose={handleRequestClose}>
-      <Pressable style={styles.backdrop} onPress={handleBackdropPress}>
-        <Pressable style={styles.sheet} onPress={(e) => e.stopPropagation()}>
+      <View style={styles.backdrop}>
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={handleBackdropPress}
+          accessibilityRole="button"
+          accessibilityLabel={t('loginBack')}
+        />
+        <View style={styles.sheet}>
           <View style={styles.handle} />
           <Text style={[styles.title, isRTL && styles.rtl]}>{t('inscStatusActionTitle')}</Text>
           <Text style={[styles.subtitle, isRTL && styles.rtl]}>
@@ -180,6 +182,7 @@ export function StatusUpdateSheet({
             bounces
             keyboardShouldPersistTaps="handled"
             nestedScrollEnabled
+            scrollEventThrottle={16}
           >
             {available.map((s) => {
               const active = selectedId === s.id;
@@ -225,6 +228,7 @@ export function StatusUpdateSheet({
               return (
                 <View
                   key={`disabled-${s.id}`}
+                  pointerEvents="none"
                   accessibilityState={{ disabled: true }}
                   style={[styles.row, styles.rowDisabled, isRTL && styles.rowRtl]}
                 >
@@ -246,50 +250,6 @@ export function StatusUpdateSheet({
               );
             })}
 
-            {/* Option « Aucun statut » : toujours présentée en dernier. */}
-            <Pressable
-              key={NONE_KEY}
-              onPress={() => setSelectedId(null)}
-              disabled={submitting}
-              style={({ pressed }) => [
-                styles.row,
-                isRTL && styles.rowRtl,
-                selectedId === null && {
-                  borderColor: brand.textSecondary,
-                  backgroundColor: '#F3F4F6',
-                },
-                pressed && { opacity: 0.85 },
-                submitting && { opacity: 0.6 },
-              ]}
-            >
-              <View
-                style={[
-                  styles.iconWrap,
-                  {
-                    backgroundColor:
-                      selectedId === null ? brand.textSecondary : '#F3F4F6',
-                  },
-                ]}
-              >
-                <FontAwesome
-                  name="circle-o"
-                  size={14}
-                  color={selectedId === null ? '#FFFFFF' : brand.textSecondary}
-                />
-              </View>
-              <Text
-                style={[
-                  styles.rowLabel,
-                  isRTL && styles.rtl,
-                  selectedId === null && { color: brand.textSecondary, fontWeight: '800' },
-                ]}
-              >
-                {t('inscStatusActionClear')}
-              </Text>
-              {selectedId === null ? (
-                <FontAwesome name="check" size={14} color={brand.textSecondary} />
-              ) : null}
-            </Pressable>
           </ScrollView>
 
           <View style={[styles.footer, isRTL && styles.rowRtl]}>
@@ -324,8 +284,8 @@ export function StatusUpdateSheet({
               </Text>
             </Pressable>
           </View>
-        </Pressable>
-      </Pressable>
+        </View>
+      </View>
     </Modal>
   );
 }
@@ -352,6 +312,15 @@ const styles = StyleSheet.create({
   subtitle: { fontSize: fontSize.sm, color: brand.textSecondary, marginTop: -4 },
   list: { marginTop: spacing.sm },
   listContent: { gap: 8, paddingBottom: spacing.xs },
+  section: { gap: 8 },
+  sectionTitle: {
+    fontSize: fontSize.xs,
+    fontWeight: '800',
+    color: brand.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.6,
+    marginTop: spacing.xs,
+  },
   row: {
     flexDirection: 'row',
     alignItems: 'center',

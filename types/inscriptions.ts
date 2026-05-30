@@ -39,6 +39,11 @@ export type CandidacyStatusType = {
    * `RegistrationCandidacyController::applyStatusTimestamps`).
    */
   isEnrollmentMarker: boolean;
+  /**
+   * Quand `true`, la candidature est considérée comme terminée (refus ou
+   * issue finale) : plus de relance « mettre à jour le statut ».
+   */
+  isFinalizedMarker: boolean;
 };
 
 export type EstablishmentBrief = {
@@ -102,6 +107,8 @@ export type AnnouncementBrief = {
   establishment: EstablishmentBrief | null;
   /** Compteur public Q&R (liste suivi école), si exposé par l’API. */
   communityQnaMessageCount?: number;
+  /** Payload limité (TAWJIH PLUS / TASSJIL requis). */
+  previewOnly?: boolean;
 };
 
 export type CandidacyEventType =

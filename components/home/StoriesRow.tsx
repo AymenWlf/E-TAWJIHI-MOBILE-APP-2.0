@@ -1,4 +1,4 @@
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 
@@ -6,7 +6,7 @@ import type { StoryChannel } from '@/data/mock/homeFeed';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAppColors } from '@/hooks/useAppColors';
 import { homeShell } from '@/theme/homeShell';
-import { fontSize, spacing } from '@/theme/tokens';
+import { brand, fontSize, spacing } from '@/theme/tokens';
 
 const RING = 72;
 const AVATAR = RING - 12;
@@ -24,9 +24,19 @@ type Props = {
   onOpenChannel: (channelIndex: number) => void;
   /** Style type référence (fond sombre) */
   tone?: 'light' | 'dark';
+  /** Chargement des chaînes depuis l’API. */
+  loading?: boolean;
 };
 
-export function StoriesRow({ channels, readChannelIds, onOpenChannel, tone = 'light' }: Props) {
+const LOADING_PLACEHOLDER_COUNT = 5;
+
+export function StoriesRow({
+  channels,
+  readChannelIds,
+  onOpenChannel,
+  tone = 'light',
+  loading = false,
+}: Props) {
   const c = useAppColors();
   const { t, isRTL } = useLocale();
   const dark = tone === 'dark';
@@ -40,7 +50,32 @@ export function StoriesRow({ channels, readChannelIds, onOpenChannel, tone = 'li
         style={[styles.scrollTrack, isRTL && styles.scrollRtl]}
         contentContainerStyle={styles.scroll}
         accessibilityLabel={t('storiesA11y')}>
-        {channels.map((ch, index) => {
+        {loading
+          ? Array.from({ length: LOADING_PLACEHOLDER_COUNT }, (_, index) => (
+              <View key={`story-loading-${index}`} style={styles.item} accessibilityElementsHidden>
+                <View style={[styles.ring, styles.ringLoading]}>
+                  <View
+                    style={[
+                      styles.avatar,
+                      { backgroundColor: dark ? 'rgba(255,255,255,0.1)' : c.primaryMuted },
+                    ]}>
+                    <ActivityIndicator
+                      size="small"
+                      color={dark ? homeShell.green : brand.primary}
+                    />
+                  </View>
+                </View>
+                <View
+                  style={[
+                    styles.labelPlaceholder,
+                    { backgroundColor: dark ? 'rgba(255,255,255,0.18)' : 'rgba(51,62,143,0.12)' },
+                  ]}
+                />
+              </View>
+            ))
+          : null}
+        {!loading
+          ? channels.map((ch, index) => {
           const read = readChannelIds.has(ch.id);
           const cover = ch.coverUri ?? ch.slides[0]?.uri;
           const a11y =
@@ -86,7 +121,8 @@ export function StoriesRow({ channels, readChannelIds, onOpenChannel, tone = 'li
               </Text>
             </Pressable>
           );
-        })}
+        })
+          : null}
       </ScrollView>
     </View>
   );
@@ -119,6 +155,18 @@ const styles = StyleSheet.create({
     padding: 3,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  ringLoading: {
+    borderWidth: UNREAD_RING_W,
+    borderColor: UNREAD_RING,
+    opacity: 0.65,
+  },
+  labelPlaceholder: {
+    marginTop: spacing.sm,
+    width: RING,
+    height: 10,
+    borderRadius: 5,
+    alignSelf: 'center',
   },
   avatar: {
     width: AVATAR,

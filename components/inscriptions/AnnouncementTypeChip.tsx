@@ -2,7 +2,9 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
+import { useLocale } from '@/contexts/LocaleContext';
 import { fontSize, radius } from '@/theme/tokens';
+import { pickAnnouncementTypeLabel } from '@/utils/announcementTypeLabel';
 import { getAnnouncementTypeStyle } from '@/utils/announcementTypeStyle';
 
 type Variant =
@@ -37,8 +39,9 @@ export function AnnouncementTypeChip({
   isRTL = false,
   style,
 }: Props) {
+  const { t } = useLocale();
   const visual = getAnnouncementTypeStyle(type);
-  const label = (type ?? '').trim();
+  const label = pickAnnouncementTypeLabel(type, t);
   if (label === '') return null;
 
   const bannerStyle = variant === 'banner';

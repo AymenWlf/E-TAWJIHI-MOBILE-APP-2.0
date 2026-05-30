@@ -190,5 +190,6 @@ function toEligibility(p: UserProfile): EligibilityProfile {
     specialite2: p.specialite2 ?? null,
     specialite3: p.specialite3 ?? null,
     bacAnnee: p.bacAnnee ?? null,
+    niveau: p.niveau ?? null,
   };
 }

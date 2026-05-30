@@ -2,6 +2,7 @@
 
 import type { HeroEducationSlide } from '@/components/home/HeroEducationCarousel';
 import type { HomeStackCard } from '@/components/home/HomeStackedPackCards';
+import { BAC_RESULTS_STATIC_DEFAULT } from '@/constants/bacResultsCard';
 import type { AppLocale } from '@/constants/i18n';
 import { isStoryImageUri, resolvePublicMediaUrl } from '@/constants/storyMedia';
 
@@ -105,16 +106,13 @@ export const mockHomeStackCards: HomeStackCard[] = [
     packName: "Votre parcours d'orientation",
     dailyActions: { playedToday: false },
     orientationProgress: {
-      percent: 62,
+      percent: 0,
       label: 'Avancement',
     },
-    remainingOrientationTasks: [
-      { id: 'o1', title: 'Compléter le questionnaire filière / ville', icon: 'clipboard' },
-      { id: 'o2', title: 'Ajouter au moins 3 écoles à votre sélection', icon: 'university' },
-      { id: 'o3', title: 'Téléverser les pièces du dossier type (PDF)', icon: 'file-text-o' },
-      { id: 'o4', title: 'Valider votre calendrier de concours (dates limites)', icon: 'calendar' },
-      { id: 'o5', title: 'Réserver un créneau avec un conseiller orientation', icon: 'phone' },
-    ],
+  },
+  {
+    id: 'stack-bac-results',
+    bacResults: BAC_RESULTS_STATIC_DEFAULT,
   },
   {
     id: 'stack-2',
@@ -263,16 +261,13 @@ const mockHomeStackCardsAr: HomeStackCard[] = [
     packName: 'مسار التوجيه الخاص بك',
     dailyActions: { playedToday: false },
     orientationProgress: {
-      percent: 62,
+      percent: 0,
       label: 'التقدّم',
     },
-    remainingOrientationTasks: [
-      { id: 'o1', title: 'إكمال استبيان المسار / المدينة', icon: 'clipboard' },
-      { id: 'o2', title: 'إضافة 3 مدارس على الأقل إلى اختيارك', icon: 'university' },
-      { id: 'o3', title: 'رفع وثائق الملف النموذجي (PDF)', icon: 'file-text-o' },
-      { id: 'o4', title: 'تأكيد تقويم المسابقات (الآجال)', icon: 'calendar' },
-      { id: 'o5', title: 'حجز موعد مع مستشار التوجيه', icon: 'phone' },
-    ],
+  },
+  {
+    id: 'stack-bac-results',
+    bacResults: BAC_RESULTS_STATIC_DEFAULT,
   },
   {
     id: 'stack-2',

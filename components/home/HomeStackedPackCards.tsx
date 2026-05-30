@@ -1,15 +1,12 @@
-import type { ComponentProps } from 'react';
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
-  Modal,
-  Pressable,
   ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
 
+import { LoadingMiniIconSkeleton } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import { Gesture, GestureDetector, Pressable as GHPressable } from 'react-native-gesture-handler';
 import Animated, {
@@ -17,7 +14,6 @@ import Animated, {
   Extrapolation,
   interpolate,
   runOnJS,
-  runOnUI,
   type SharedValue,
   useAnimatedStyle,
   useSharedValue,
@@ -25,19 +21,54 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import {
+  OrientationPercentTextSkeleton,
+  OrientationProgressSkeleton,
+} from '@/components/home/OrientationParcoursSkeleton';
+import { HomeStackedPackPracticalCardSkeleton } from '@/components/home/HomeStackedPackPracticalCardSkeleton';
 import { PaginationDots } from '@/components/home/PaginationDots';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import type { HomeCopyKey } from '@/constants/i18n';
+import {
+  EMPTY_PLAN_PARCOURS_COMPLETION,
+  getNextPlanStep,
+  isPlanStepComplete,
+  PLAN_PARCOURS_STEP_COUNT,
+  PLAN_PARCOURS_STEPS,
+  resolvePlanParcoursState,
+  type OrientationParcoursTask,
+  type PlanParcoursCompletion,
+} from '@/constants/orientationParcours';
 import { getPracticalLinkDef } from '@/constants/practicalLinks';
 import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { navigatePlanParcoursStep, type PlanParcoursNavigationAuth } from '@/utils/planParcoursNavigation';
+import type { TawjihPlusParcoursGate } from '@/utils/tawjihPlusParcoursGate';
+import {
+  hasAnyBacResultPublished,
+  type BacResultsCardConfig,
+  type BacVerificationChannel,
+} from '@/constants/bacResultsCard';
+import { BacResultsStackCardContent } from '@/components/home/BacResultsStackCardContent';
+import { BacResultsStackCardSkeleton } from '@/components/home/BacResultsStackCardSkeleton';
+import {
+  BASE_CARD_H,
+  buildStackCardLayout,
+  getHomeStackCardHeight,
+  type StackCardLayout,
+} from '@/components/home/stackCardLayout';
 
-export type OrientationParcoursTask = {
-  id: string;
+export type { StackCardLayout } from '@/components/home/stackCardLayout';
+export { buildStackCardLayout } from '@/components/home/stackCardLayout';
+
+export type { OrientationParcoursTask };
+
+/** Données passées à la page d’accueil pour ouvrir le sheet parcours (plein écran). */
+export type OrientationOverviewOpenPayload = {
   title: string;
-  /** Icône FontAwesome (v4) pour la pastille d’étape sur la carte. */
-  icon?: ComponentProps<typeof FontAwesome>['name'];
+  completion: PlanParcoursCompletion;
+  tasks?: OrientationParcoursTask[];
 };
 
 export type HomeStackCard = {
@@ -56,7 +87,10 @@ export type HomeStackCard = {
   orientationProgress?: {
     percent: number;
     label?: string;
+    /** Progression parcours en cours de chargement (API). */
+    loading?: boolean;
   };
+  planParcoursCompletion?: PlanParcoursCompletion;
   remainingOrientationTasks?: OrientationParcoursTask[];
   /**
    * Défi quotidien (SNAKE) sur la carte accueil.
@@ -68,7 +102,18 @@ export type HomeStackCard = {
     streakDays?: number;
     includeDailyInfo?: boolean;
     infoReadToday?: boolean;
+    loading?: boolean;
+    /** Bouton test orientation 1ère bac (élèves 1ère bac). */
+    showOrientation1Bac?: boolean;
+    orientation1BacLocked?: boolean;
+    orientation1BacUnlockLabel?: string;
   };
+  /** Filière + niveau affichés sous le titre du pack (carte parcours). */
+  academicPackLine?: string;
+  /** Carte résultats du baccalauréat (canaux Outlook / SMS / MEN). */
+  bacResults?: BacResultsCardConfig;
+  /** Chargement config bac depuis l’API. */
+  bacResultsLoading?: boolean;
 };
 
 type Props = {
@@ -77,121 +122,41 @@ type Props = {
   width: number;
   onPressDailyGame?: () => void;
   onPressDailyInfo?: () => void;
+  onPressOrientation1Bac?: () => void;
+  /** Calcul des seuils (bac) : verrouillé pour 1ère bac. */
+  bacThresholdsLocked?: boolean;
+  /** Skeleton sur le bouton seuils (résultats bac + profil élève). */
+  bacThresholdsLoading?: boolean;
   /** Cartes « lien pratique » : même id que la rangée Liens pratiques. */
   onPressPracticalLink?: (id: string) => void;
+  /** Ouvre le sheet parcours au niveau de l’écran d’accueil (pas dans la carte). */
+  onOpenOrientationOverview?: (payload: OrientationOverviewOpenPayload) => void;
+  /** Chargement initial / refresh de la progression parcours. */
+  planParcoursLoading?: boolean;
+  /** Skeleton sur les cartes « lien pratique » pendant le refresh accueil. */
+  contentLoading?: boolean;
+  planParcoursNavAuth?: PlanParcoursNavigationAuth;
+  tawjihPlusGate?: TawjihPlusParcoursGate;
+  /** Ouvre le sheet d’instructions (Outlook / MEN / SMS) au niveau de l’écran d’accueil. */
+  onOpenBacVerification?: (channel: BacVerificationChannel) => void;
+  /** Ouvre le modal calcul des seuils (notes bulletin). */
+  onOpenBacThresholds?: () => void;
 };
 
-/** Hauteur de référence (iPhone classique) ; le rendu réel dépend de `buildStackCardLayout`. */
-const BASE_CARD_H = 336;
-const STACK_VERTICAL_EXTRA = 36;
+/** Traits entre pastilles « à faire » — plus foncé que la piste de la barre et le fond du bloc. */
+const ORIENTATION_STEP_LINE_TODO = '#CBD5E1';
+const ORIENTATION_PROGRESS_TRACK_BG = '#E2E8F0';
 
-export type StackCardLayout = {
-  cardH: number;
-  outerH: number;
-  pad: number;
-  padStripe: number;
-  iconSize: number;
-  eyebrow: number;
-  packLabel: number;
-  packName: number;
-  packLh: number;
-  validityLabel: number;
-  validityValue: number;
-  validityLh: number;
-  boxPad: number;
-  boxRadius: number;
-  hint: number;
-  hintLh: number;
-  hintMinH: number;
-  validityMT: number;
-  packLabelMT: number;
-  packNameMT: number;
-  hintMT: number;
-  calMR: number;
-  calMT: number;
-  validityValueMT: number;
-};
-
-/** Hauteur / typo / marges adaptées à la fenêtre pour que la carte tienne entièrement à l’écran. */
-export function buildStackCardLayout(cardWidth: number, windowHeight: number): StackCardLayout {
-  const wh = Math.max(420, windowHeight);
-  const capByScreen = Math.floor(wh * 0.43);
-  const capByWidth = Math.floor(cardWidth * 0.82);
-  let cardH = Math.min(BASE_CARD_H, capByScreen, capByWidth);
-  cardH = Math.max(210, cardH);
-  const s = cardH / BASE_CARD_H;
-  const r = (x: number) => Math.max(1, Math.round(x * s));
-
-  return {
-    cardH,
-    outerH: cardH + STACK_VERTICAL_EXTRA,
-    pad: r(spacing.lg),
-    padStripe: r(6),
-    iconSize: Math.max(12, r(16)),
-    eyebrow: Math.max(10, r(fontSize.xs)),
-    packLabel: Math.max(11, r(fontSize.sm)),
-    packName: Math.max(13, r(fontSize.lg)),
-    packLh: Math.max(18, r(22)),
-    validityLabel: Math.max(9, r(fontSize.xs)),
-    validityValue: Math.max(11, r(fontSize.sm)),
-    validityLh: Math.max(16, r(20)),
-    boxPad: r(spacing.md),
-    boxRadius: r(radius.md),
-    hint: Math.max(10, r(fontSize.xs)),
-    hintLh: Math.max(14, r(16)),
-    hintMinH: r(32),
-    validityMT: r(spacing.sm),
-    packLabelMT: r(spacing.sm),
-    packNameMT: r(4),
-    hintMT: r(spacing.sm),
-    calMR: r(spacing.md),
-    calMT: r(2),
-    validityValueMT: r(4),
-  };
-}
-
-const SWIPE_V = 820;
-const SPRING_BACK = { damping: 24, stiffness: 190, mass: 1.0 } as const;
-const EXIT_MS = 360;
-/** La carte suit le doigt à 70 % de sa vitesse — ressenti plus lourd / contrôlé. */
-const DRAG_DAMPING = 0.7;
-const EXIT_EASING = Easing.out(Easing.cubic);
-
-const ORIENTATION_STEP_COUNT = 5;
-const ORIENTATION_DEFAULT_LABELS = [
-  'Questionnaire',
-  'Écoles',
-  'Dossier',
-  'Concours',
-  'Conseiller',
-] as const;
-const ORIENTATION_DEFAULT_ICONS: readonly ComponentProps<typeof FontAwesome>['name'][] = [
-  'clipboard',
-  'university',
-  'file-text-o',
-  'calendar',
-  'phone',
-];
-
-function buildOrientationStepsForCard(
-  tasks?: OrientationParcoursTask[]
-): { id: string; title: string; icon: ComponentProps<typeof FontAwesome>['name'] }[] {
-  const out: { id: string; title: string; icon: ComponentProps<typeof FontAwesome>['name'] }[] = [];
-  for (let i = 0; i < ORIENTATION_STEP_COUNT; i++) {
-    const t = tasks?.[i];
-    out.push({
-      id: t?.id ?? `orientation-step-${i + 1}`,
-      title: t?.title ?? ORIENTATION_DEFAULT_LABELS[i],
-      icon: t?.icon ?? ORIENTATION_DEFAULT_ICONS[i]!,
-    });
-  }
-  return out;
-}
-
-function orientationCompletedSteps(percent: number): number {
-  const p = Math.min(100, Math.max(0, percent)) / 100;
-  return Math.min(ORIENTATION_STEP_COUNT, Math.floor(p * ORIENTATION_STEP_COUNT));
-}
+const SWIPE_V = 520;
+const SPRING_BACK = { damping: 22, stiffness: 260, mass: 0.9 } as const;
+/** Sortie de la carte du dessus — court pour que la suivante devienne principale vite. */
+const EXIT_MS = 200;
+/** Révélation du contenu de la nouvelle carte principale (après fin du swipe). */
+const REVEAL_MS = 220;
+/** La carte suit le doigt — léger amorti sans retarder la reconnaissance du swipe. */
+const DRAG_DAMPING = 0.88;
+const EXIT_EASING = Easing.out(Easing.quad);
+const REVEAL_EASING = Easing.out(Easing.cubic);
 
 function withAlpha(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
@@ -210,52 +175,55 @@ function formatHomeDailyStreakLine(streakDays: number | undefined, t: (key: Home
 }
 
 function OrientationStepsStrip({
-  percent,
+  completion,
   tasks,
   layout,
+  compact,
 }: {
-  percent: number;
+  completion: PlanParcoursCompletion;
   tasks?: OrientationParcoursTask[];
   layout: StackCardLayout;
+  compact?: boolean;
 }) {
   const { t, isRTL } = useLocale();
-  const steps = buildOrientationStepsForCard(tasks);
-  const completed = orientationCompletedSteps(percent);
-  const iconSz = Math.max(10, Math.round(layout.iconSize * 0.72));
-  const bubble = Math.max(22, Math.round(26 * (layout.cardH / BASE_CARD_H)));
+  const state = resolvePlanParcoursState(completion, tasks);
+  const scale = layout.cardH / BASE_CARD_H;
+  const iconSz = Math.max(8, Math.round(layout.iconSize * (compact ? 0.52 : 0.58)));
+  const bubble = Math.max(compact ? 16 : 18, Math.round((compact ? 18 : 22) * scale));
+
+  const nextStep = getNextPlanStep(completion);
 
   return (
     <View style={styles.orientationStepsWrap}>
       <View style={[styles.orientationStepsRow, isRTL && styles.orientationStepsRowRtl]}>
-        {steps.map((step, i) => {
-          const done = i < completed;
-          const current = i === completed && completed < ORIENTATION_STEP_COUNT;
-          const lineDone = i > 0 && i <= completed;
+        {PLAN_PARCOURS_STEPS.map((step, i) => {
+          const done = isPlanStepComplete(step.id, completion);
+          const current = !state.allDone && nextStep?.id === step.id;
+          const prevStep = i > 0 ? PLAN_PARCOURS_STEPS[i - 1]! : null;
+          const lineDone = prevStep != null && isPlanStepComplete(prevStep.id, completion);
           return (
             <Fragment key={step.id}>
               {i > 0 ? (
                 <View
                   style={[
                     styles.orientationStepLine,
-                    {
-                      backgroundColor: lineDone ? homeShell.green : brand.borderLight,
-                    },
+                    { backgroundColor: lineDone ? homeShell.green : ORIENTATION_STEP_LINE_TODO },
                   ]}
                 />
               ) : null}
               <View
                 style={[styles.orientationStepBubbleCol, { width: bubble }]}
-                accessibilityLabel={`${step.title}${
-                  done ? t('orientationStepA11yDone') : current ? t('orientationStepA11yCurrent') : t('orientationStepA11yTodo')
+                accessibilityLabel={`${t(step.labelKey)}${
+                  done
+                    ? t('orientationStepA11yDone')
+                    : current
+                      ? t('orientationStepA11yCurrent')
+                      : t('orientationStepA11yTodo')
                 }`}>
                 <View
                   style={[
                     styles.orientationStepBubble,
-                    {
-                      width: bubble,
-                      height: bubble,
-                      borderRadius: bubble / 2,
-                    },
+                    { width: bubble, height: bubble, borderRadius: bubble / 2 },
                     done && styles.orientationStepBubbleDone,
                     current && styles.orientationStepBubbleCurrent,
                     !done && !current && styles.orientationStepBubbleTodo,
@@ -263,9 +231,7 @@ function OrientationStepsStrip({
                   <FontAwesome
                     name={step.icon}
                     size={iconSz}
-                    color={
-                      done ? homeShell.text : current ? homeShell.green : brand.textMuted
-                    }
+                    color={done ? homeShell.text : current ? homeShell.green : brand.textMuted}
                   />
                 </View>
                 <View
@@ -285,16 +251,50 @@ function OrientationStepsStrip({
   );
 }
 
+function OrientationParcoursProgress({
+  completion,
+  tasks,
+  layout,
+  compact,
+  loading,
+}: {
+  completion: PlanParcoursCompletion;
+  tasks?: OrientationParcoursTask[];
+  layout: StackCardLayout;
+  compact?: boolean;
+  loading?: boolean;
+}) {
+  const { isRTL } = useLocale();
+  const state = resolvePlanParcoursState(completion, tasks);
+  if (loading) {
+    return (
+      <View style={styles.orientationProgressWrap}>
+        <OrientationProgressSkeleton layout={layout} compact={compact} isRTL={isRTL} />
+      </View>
+    );
+  }
+  return (
+    <View style={styles.orientationProgressWrap}>
+      <View style={[styles.orientationProgressTrack, isRTL && styles.orientationProgressTrackRtl]}>
+        <View style={[styles.orientationProgressFill, { width: `${state.percent}%` }]} />
+      </View>
+      <OrientationStepsStrip completion={completion} tasks={tasks} layout={layout} compact={compact} />
+    </View>
+  );
+}
+
 function DailyActionsBlock({
   daily,
   layout,
   onPressDailyGame,
   onPressDailyInfo,
+  onPressOrientation1Bac,
 }: {
   daily: NonNullable<HomeStackCard['dailyActions']>;
   layout: StackCardLayout;
   onPressDailyGame?: () => void;
   onPressDailyInfo?: () => void;
+  onPressOrientation1Bac?: () => void;
 }) {
   const { t, isRTL } = useLocale();
   const padV = Math.max(10, Math.round(layout.boxPad * 0.72));
@@ -307,13 +307,25 @@ function DailyActionsBlock({
   const gameLoading = daily.loading === true;
   const gamePending = !gameLoading && !daily.playedToday;
   const showInfo = Boolean(daily.includeDailyInfo && onPressDailyInfo);
+  const showOrientation1Bac = Boolean(daily.showOrientation1Bac && onPressOrientation1Bac);
+  const orientationLocked = showOrientation1Bac && daily.orientation1BacLocked === true;
   const infoPending = showInfo && !daily.infoReadToday;
+  const gameOnly = !showInfo && !showOrientation1Bac;
   const streakLine = formatHomeDailyStreakLine(daily.streakDays, t);
+  const unlockHint = daily.orientation1BacUnlockLabel
+    ? t('orientation1BacHomeLocked').replace('{date}', daily.orientation1BacUnlockLabel)
+    : '';
   const a11yStreak = streakLine ? `, ${streakLine}` : '';
   const playedCheckSize = Math.max(22, Math.round(iconSz + 5));
 
   return (
-    <View style={[styles.dailyActionsWrap, !showInfo && styles.dailyActionsWrapGameOnly]}>
+    <View
+      style={[
+        styles.dailyActionsWrap,
+        gameOnly && styles.dailyActionsWrapGameOnly,
+        isRTL && styles.dailyActionsWrapRtl,
+        gameOnly && isRTL && styles.dailyActionsWrapGameOnlyRtl,
+      ]}>
       <GHPressable
         onPress={onPressDailyGame}
         disabled={!onPressDailyGame || gameLoading}
@@ -328,7 +340,8 @@ function DailyActionsBlock({
         }
         style={({ pressed }) => [
           styles.dailyMini,
-          !showInfo && styles.dailyMiniFullWidth,
+          gameOnly && styles.dailyMiniFullWidth,
+          isRTL && styles.dailyMiniRtl,
           {
             paddingVertical: padV,
             paddingHorizontal: padH,
@@ -349,7 +362,7 @@ function DailyActionsBlock({
           </View>
         ) : null}
         {gameLoading ? (
-          <ActivityIndicator size="small" color={homeShell.blue} style={styles.dailyMiniIcon} />
+          <LoadingMiniIconSkeleton size={iconSz} style={styles.dailyMiniIcon} />
         ) : (
           <FontAwesome
             name="trophy"
@@ -363,7 +376,7 @@ function DailyActionsBlock({
             styles.dailyMiniTitle,
             { fontSize: titleFs, lineHeight: Math.round(titleFs * 1.22) },
             (gameLoading || !gamePending) && styles.dailyMiniTitleMuted,
-            isRTL && styles.orientationLblRtl,
+            isRTL && styles.dailyMiniTextRtl,
           ]}
           numberOfLines={2}>
           {gameLoading ? t('setupLoading') : t('gameDailyTitle')}
@@ -373,7 +386,7 @@ function DailyActionsBlock({
             style={[
               gamePending ? styles.dailyStreakLine : styles.dailyStreakLinePlayed,
               { fontSize: badgeFs },
-              isRTL && styles.orientationLblRtl,
+              isRTL && styles.dailyMiniTextRtl,
             ]}
             numberOfLines={1}>
             {streakLine}
@@ -381,7 +394,11 @@ function DailyActionsBlock({
         ) : null}
         {gamePending ? (
           <View style={styles.dailyMiniBadge}>
-            <Text style={[styles.dailyMiniBadgeTxt, { fontSize: badgeFs }]}>{t('dailyPlay')}</Text>
+            <Text
+              style={[styles.dailyMiniBadgeTxt, { fontSize: badgeFs }, isRTL && styles.dailyMiniTextRtl]}
+              numberOfLines={1}>
+              {t('dailyPlay')}
+            </Text>
           </View>
         ) : null}
       </GHPressable>
@@ -421,6 +438,60 @@ function DailyActionsBlock({
           )}
         </GHPressable>
       ) : null}
+      {showOrientation1Bac ? (
+        <GHPressable
+          onPress={onPressOrientation1Bac}
+          disabled={!onPressOrientation1Bac || orientationLocked}
+          accessibilityRole="button"
+          accessibilityState={{ disabled: orientationLocked }}
+          accessibilityLabel={
+            orientationLocked && daily.orientation1BacUnlockLabel
+              ? t('orientation1BacHomeLockedA11y').replace('{date}', daily.orientation1BacUnlockLabel)
+              : t('orientation1BacHomeButton')
+          }
+          style={({ pressed }) => [
+            styles.dailyMini,
+            isRTL && styles.dailyMiniRtl,
+            {
+              paddingVertical: padV,
+              paddingHorizontal: padH,
+              borderRadius: radius,
+            },
+            orientationLocked ? styles.dailyMiniLocked : styles.dailyMiniHighlight,
+            pressed && onPressOrientation1Bac && !orientationLocked ? { opacity: 0.88 } : null,
+          ]}>
+          {orientationLocked ? (
+            <View
+              style={[styles.dailyPlayedCheckBadgeBase, isRTL ? { left: 8 } : { right: 8 }]}
+              pointerEvents="none">
+              <FontAwesome name="lock" size={Math.max(16, iconSz - 1)} color={brand.textMuted} />
+            </View>
+          ) : null}
+          <FontAwesome
+            name="compass"
+            size={iconSz}
+            color={orientationLocked ? brand.textMuted : homeShell.blue}
+            style={styles.dailyMiniIcon}
+          />
+          <Text
+            style={[
+              styles.dailyMiniTitle,
+              { fontSize: titleFs, lineHeight: Math.round(titleFs * 1.22) },
+              orientationLocked && styles.dailyMiniTitleMuted,
+              isRTL && styles.dailyMiniTextRtl,
+            ]}
+            numberOfLines={2}>
+            {t('orientation1BacHomeButton')}
+          </Text>
+          {orientationLocked && unlockHint ? (
+            <Text
+              style={[styles.dailyMiniHint, { fontSize: badgeFs }, isRTL && styles.dailyMiniTextRtl]}
+              numberOfLines={2}>
+              {unlockHint}
+            </Text>
+          ) : null}
+        </GHPressable>
+      ) : null}
     </View>
   );
 }
@@ -429,33 +500,147 @@ function StackCardFace({
   card,
   accent,
   layout,
-  onOpenOrientationTasks,
+  shellLoading: _shellLoading = false,
+  onOpenOrientationOverview,
+  onPressOrientationContinue,
   onPressDailyGame,
   onPressDailyInfo,
+  onPressOrientation1Bac,
   onPressPracticalLink,
+  onOpenBacVerification,
+  onOpenBacThresholds,
+  bacThresholdsLocked = false,
+  bacThresholdsLoading = false,
+  cardH,
+  uniformStack = false,
+  bacStackPeek = false,
 }: {
   card: HomeStackCard;
   accent: 'blue' | 'green';
   layout: StackCardLayout;
-  onOpenOrientationTasks?: () => void;
+  shellLoading?: boolean;
+  cardH: number;
+  /** Carte bac sous la carte du dessus : hauteur au contenu, pas de flex vertical. */
+  bacStackPeek?: boolean;
+  onOpenOrientationOverview?: () => void;
+  onPressOrientationContinue?: () => void;
   onPressDailyGame?: () => void;
   onPressDailyInfo?: () => void;
+  onPressOrientation1Bac?: () => void;
   onPressPracticalLink?: (id: string) => void;
+  onOpenBacVerification?: (channel: BacVerificationChannel) => void;
+  onOpenBacThresholds?: () => void;
+  bacThresholdsLocked?: boolean;
+  bacThresholdsLoading?: boolean;
+  /** Pile à hauteur fixe (carte bac) : pas de rétrécissement des cartes du dessous. */
+  uniformStack?: boolean;
 }) {
   const { t, isRTL } = useLocale();
-  const stripe = accent === 'green' ? homeShell.greenDark : homeShell.blue;
+  const bacLoading = card.bacResults != null && card.bacResultsLoading === true;
+  const thresholdsBtnLoading = bacThresholdsLoading && !bacLoading;
+  const bacLive =
+    card.bacResults != null && !bacLoading && hasAnyBacResultPublished(card.bacResults);
+  const stripe = card.bacResults
+    ? bacLive
+      ? homeShell.green
+      : '#D97706'
+    : accent === 'green'
+      ? homeShell.greenDark
+      : homeShell.blue;
   const practicalDef = card.practicalLinkId ? getPracticalLinkDef(card.practicalLinkId) : undefined;
   const progress = card.orientationProgress;
-  const nameLines = progress ? 2 : practicalDef ? 2 : 3;
+  const planLoading = progress?.loading === true;
+  const planCompletion = card.planParcoursCompletion ?? EMPTY_PLAN_PARCOURS_COMPLETION;
+  const orientationState = progress && !planLoading
+    ? resolvePlanParcoursState(planCompletion, card.remainingOrientationTasks)
+    : null;
+  const nameLines = progress ? 2 : practicalDef ? 2 : card.bacResults ? 1 : 3;
   /** 1re carte : progression + actions quotidiennes — répartition verticale homogène. */
   const packedOrientationDaily = progress != null && card.dailyActions != null;
   const iconHeroSz = Math.max(28, Math.round(layout.iconSize * 2.35));
+
+  const cardInnerSize = { height: cardH, minHeight: cardH };
+
+  if (card.bacResults) {
+    const bacMain = !bacStackPeek;
+    const bacBody = bacLoading ? (
+      <BacResultsStackCardSkeleton
+        layout={layout}
+        isRTL={isRTL}
+        showThresholdsCta
+        hideThresholdsCta={!bacMain}
+      />
+    ) : (
+      <BacResultsStackCardContent
+        config={card.bacResults}
+        layout={layout}
+        isRTL={isRTL}
+        onOpenVerification={onOpenBacVerification}
+        onOpenThresholds={onOpenBacThresholds}
+        thresholdsLocked={bacThresholdsLocked}
+        thresholdsLoading={thresholdsBtnLoading}
+        hideThresholdsCta={!bacMain}
+      />
+    );
+
+    return (
+      <View
+        style={[
+          styles.cardInner,
+          styles.cardInnerBacFill,
+          cardInnerSize,
+          {
+            paddingTop: layout.pad,
+            paddingBottom: layout.pad,
+            paddingEnd: layout.pad,
+            paddingStart: layout.pad + layout.padStripe,
+          },
+        ]}>
+        <View style={[styles.stripe, { backgroundColor: stripe }]} />
+        <View
+          style={[
+            styles.cardColumn,
+            styles.cardColumnBac,
+            isRTL && styles.cardColumnRtl,
+          ]}>
+          <Text
+            style={[
+              styles.eyebrow,
+              styles.bacEyebrow,
+              { fontSize: layout.eyebrow },
+              isRTL && styles.orientationLblRtl,
+            ]}
+            numberOfLines={1}>
+            {t('bacCardEyebrow')}
+          </Text>
+          {bacMain ? (
+            <ScrollView
+              style={styles.bacScroll}
+              contentContainerStyle={[
+                styles.bacScrollContent,
+                isRTL && styles.bacScrollContentRtl,
+              ]}
+              showsVerticalScrollIndicator={false}
+              nestedScrollEnabled
+              bounces={false}
+              keyboardShouldPersistTaps="handled">
+              {bacBody}
+            </ScrollView>
+          ) : (
+            bacBody
+          )}
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View
       style={[
         styles.cardInner,
+        uniformStack && styles.cardInnerStack,
         {
-          height: layout.cardH,
+          ...cardInnerSize,
           paddingTop: layout.pad,
           paddingBottom: layout.pad,
           paddingEnd: layout.pad,
@@ -463,7 +648,7 @@ function StackCardFace({
         },
       ]}>
       <View style={[styles.stripe, { backgroundColor: stripe }]} />
-      <View style={styles.cardColumn}>
+      <View style={[styles.cardColumn, uniformStack && styles.cardColumnStackFill]}>
         <View style={styles.cardTop} collapsable={false}>
           {practicalDef ? (
             <>
@@ -520,6 +705,17 @@ function StackCardFace({
                 numberOfLines={nameLines}>
                 {card.packName ?? ''}
               </Text>
+              {card.academicPackLine ? (
+                <Text
+                  style={[
+                    styles.academicPackLine,
+                    isRTL && styles.orientationLblRtl,
+                    { marginTop: layout.packNameMT, fontSize: layout.validityValue, lineHeight: layout.validityLh },
+                  ]}
+                  numberOfLines={2}>
+                  {card.academicPackLine}
+                </Text>
+              ) : null}
             </>
           )}
         </View>
@@ -531,8 +727,8 @@ function StackCardFace({
             ]}>
             <View style={styles.firstCardStackHalf}>
               <GHPressable
-                onPress={onOpenOrientationTasks}
-                disabled={!onOpenOrientationTasks}
+                onPress={onOpenOrientationOverview}
+                disabled={!onOpenOrientationOverview}
                 accessibilityRole="button"
                 accessibilityLabel={t('orientationTasksA11y')}
                 style={({ pressed }) => [
@@ -542,7 +738,7 @@ function StackCardFace({
                     padding: layout.boxPad,
                     borderRadius: layout.boxRadius,
                   },
-                  pressed && onOpenOrientationTasks ? { opacity: 0.92 } : null,
+                  pressed && onOpenOrientationOverview ? { opacity: 0.92 } : null,
                 ]}>
                 <View style={[styles.orientationRow, isRTL && styles.orientationRowRtl]}>
                   <Text
@@ -550,16 +746,22 @@ function StackCardFace({
                     numberOfLines={1}>
                     {progress!.label ?? t('orientationProgressLabel')}
                   </Text>
-                  <Text style={[styles.orientationPercent, isRTL && styles.orientationPctRtl, { fontSize: layout.packLabel }]}>
-                    {Math.round(Math.min(100, Math.max(0, progress!.percent)))} %
-                  </Text>
+                  {planLoading ? (
+                    <OrientationPercentTextSkeleton />
+                  ) : (
+                    <Text style={[styles.orientationPercent, isRTL && styles.orientationPctRtl, { fontSize: layout.packLabel }]}>
+                      {`${orientationState?.completedCount ?? 0}/${PLAN_PARCOURS_STEP_COUNT} · ${orientationState?.percent ?? Math.round(progress!.percent)} %`}
+                    </Text>
+                  )}
                 </View>
-                <OrientationStepsStrip
-                  percent={progress!.percent}
+                <OrientationParcoursProgress
+                  completion={planCompletion}
                   tasks={card.remainingOrientationTasks}
                   layout={layout}
+                  compact
+                  loading={planLoading}
                 />
-                {onOpenOrientationTasks ? (
+                {onOpenOrientationOverview ? (
                   <Text
                     style={[
                       styles.orientationTapHint,
@@ -572,12 +774,13 @@ function StackCardFace({
               </GHPressable>
             </View>
             <View style={styles.firstCardStackHalf}>
-              <View style={styles.firstCardDailyStretch}>
+              <View style={[styles.firstCardDailyStretch, isRTL && styles.firstCardDailyStretchRtl]}>
                 <DailyActionsBlock
                   daily={card.dailyActions!}
                   layout={layout}
                   onPressDailyGame={onPressDailyGame}
                   onPressDailyInfo={onPressDailyInfo}
+                  onPressOrientation1Bac={onPressOrientation1Bac}
                 />
               </View>
             </View>
@@ -624,8 +827,8 @@ function StackCardFace({
           </GHPressable>
         ) : progress != null ? (
           <GHPressable
-            onPress={onOpenOrientationTasks}
-            disabled={!onOpenOrientationTasks}
+            onPress={onOpenOrientationOverview}
+            disabled={!onOpenOrientationOverview}
             accessibilityRole="button"
             accessibilityLabel={t('orientationTasksA11y')}
             style={({ pressed }) => [
@@ -635,7 +838,7 @@ function StackCardFace({
                 padding: layout.boxPad,
                 borderRadius: layout.boxRadius,
               },
-              pressed && onOpenOrientationTasks ? { opacity: 0.92 } : null,
+              pressed && onOpenOrientationOverview ? { opacity: 0.92 } : null,
             ]}>
             <View style={[styles.orientationRow, isRTL && styles.orientationRowRtl]}>
               <Text
@@ -643,16 +846,21 @@ function StackCardFace({
                 numberOfLines={1}>
                 {progress.label ?? t('orientationProgressLabel')}
               </Text>
-              <Text style={[styles.orientationPercent, isRTL && styles.orientationPctRtl, { fontSize: layout.packLabel }]}>
-                {Math.round(Math.min(100, Math.max(0, progress.percent)))} %
-              </Text>
+              {planLoading ? (
+                <OrientationPercentTextSkeleton />
+              ) : (
+                <Text style={[styles.orientationPercent, isRTL && styles.orientationPctRtl, { fontSize: layout.packLabel }]}>
+                  {`${orientationState?.completedCount ?? 0}/${PLAN_PARCOURS_STEP_COUNT} · ${orientationState?.percent ?? Math.round(progress.percent)} %`}
+                </Text>
+              )}
             </View>
-            <OrientationStepsStrip
-              percent={progress.percent}
+            <OrientationParcoursProgress
+              completion={planCompletion}
               tasks={card.remainingOrientationTasks}
               layout={layout}
+              loading={planLoading}
             />
-            {onOpenOrientationTasks ? (
+            {onOpenOrientationOverview ? (
               <Text
                 style={[
                   styles.orientationTapHint,
@@ -670,6 +878,7 @@ function StackCardFace({
               layout={layout}
               onPressDailyGame={onPressDailyGame}
               onPressDailyInfo={onPressDailyInfo}
+              onPressOrientation1Bac={onPressOrientation1Bac}
             />
           </View>
         ) : card.validityLabel != null || card.validityValue != null ? (
@@ -766,28 +975,52 @@ function DeckLayer({
   translateX,
   translateY,
   exitAnimating,
+  revealTop,
   isTop,
-  onOpenOrientationTasks,
+  shellLoading = false,
+  onOpenOrientationOverview,
+  onPressOrientationContinue,
   onPressDailyGame,
   onPressDailyInfo,
+  onPressOrientation1Bac,
   onPressPracticalLink,
+  onOpenBacVerification,
+  onOpenBacThresholds,
+  bacThresholdsLocked = false,
+  bacThresholdsLoading = false,
+  cardH,
+  uniformStack = false,
+  bacStackPeek = false,
 }: {
   stackPos: 0 | 1 | 2;
   card: HomeStackCard;
   accent: 'blue' | 'green';
   width: number;
   layout: StackCardLayout;
+  cardH: number;
+  bacStackPeek?: boolean;
   translateX: SharedValue<number>;
   translateY: SharedValue<number>;
   exitAnimating: SharedValue<number>;
+  /** 0 = carte du dessus masquée (blanc), 1 = contenu visible — après fin du swipe. */
+  revealTop: SharedValue<number>;
   isTop: boolean;
-  onOpenOrientationTasks?: () => void;
+  shellLoading?: boolean;
+  onOpenOrientationOverview?: () => void;
+  onPressOrientationContinue?: () => void;
   onPressDailyGame?: () => void;
   onPressDailyInfo?: () => void;
+  onPressOrientation1Bac?: () => void;
   onPressPracticalLink?: (id: string) => void;
+  onOpenBacVerification?: (channel: BacVerificationChannel) => void;
+  onOpenBacThresholds?: () => void;
+  bacThresholdsLocked?: boolean;
+  bacThresholdsLoading?: boolean;
+  uniformStack?: boolean;
 }) {
   const baseY = stackPos * 10;
-  const baseScale = 1 - stackPos * 0.045;
+  const clipSized = { height: cardH, minHeight: cardH, width: '100%' as const };
+  const baseScale = uniformStack ? 1 : 1 - stackPos * 0.045;
   /** Carte du dessus au-dessus des autres */
   const zIndex = stackPos === 0 ? 100 : stackPos === 1 ? 50 : 25;
 
@@ -809,29 +1042,40 @@ function DeckLayer({
     };
   }, [baseY, baseScale, zIndex, width, translateX, translateY]);
 
-  /** Pile fixe : pas d’interpolation sur translateX → évite le « snap » quand translateX repasse à 0 après la sortie */
+  /** Pile fixe ; la carte du milieu grossit pendant la sortie de celle du dessus. */
   const underStyle = useAnimatedStyle(() => {
     'worklet';
+    const promote =
+      stackPos === 1
+        ? interpolate(exitAnimating.value, [0, 1], [0, 1], Extrapolation.CLAMP)
+        : 0;
+    const scale = baseScale + (1 - baseScale) * promote;
+    const translateY = baseY - promote * 6;
     return {
       zIndex: zIndex,
-      transform: [{ translateY: baseY }, { scale: baseScale }],
+      transform: [{ translateY }, { scale }],
     };
-  }, [baseY, baseScale, zIndex]);
+  }, [baseY, baseScale, zIndex, stackPos, exitAnimating]);
 
-  /** Carte « suivante » (milieu) : voile blanc pendant le geste + sortie jusqu’au bump d’index */
-  const nextWhiteMaskStyle = useAnimatedStyle(() => {
+  /**
+   * Voile blanc iOS / Android :
+   * — carte suivante (milieu) : pendant drag non terminé + animation de sortie ;
+   * — carte principale : brièvement blanche puis fondu contenu quand le swipe est terminé.
+   */
+  const transitionWhiteMaskStyle = useAnimatedStyle(() => {
     'worklet';
-    if (stackPos !== 1) {
-      return { opacity: 0 };
+    let o = 0;
+    if (stackPos === 1) {
+      const dragCover = interpolate(
+        Math.abs(translateX.value),
+        [0, 6],
+        [0, 1],
+        Extrapolation.CLAMP,
+      );
+      o = Math.max(dragCover, exitAnimating.value);
+    } else if (stackPos === 0) {
+      o = interpolate(revealTop.value, [0, 1], [1, 0], Extrapolation.CLAMP);
     }
-    const tx = translateX.value;
-    const dragCover = interpolate(
-      Math.abs(tx),
-      [0, 10],
-      [0, 1],
-      Extrapolation.CLAMP
-    );
-    const o = Math.max(dragCover, exitAnimating.value);
     return {
       opacity: o,
       backgroundColor: brand.white,
@@ -841,28 +1085,43 @@ function DeckLayer({
       top: 0,
       bottom: 0,
       borderRadius: radius.xl,
+      zIndex: 20,
     };
-  }, [stackPos, translateX, exitAnimating]);
+  }, [stackPos, translateX, exitAnimating, revealTop]);
 
   const style = isTop ? topStyle : underStyle;
+  const bacLive =
+    card.bacResults != null &&
+    card.bacResultsLoading !== true &&
+    hasAnyBacResultPublished(card.bacResults);
 
   return (
     <Animated.View
       pointerEvents={isTop ? 'auto' : 'none'}
       style={[styles.stackLayer, { width }, style]}
       collapsable={false}>
-      <View style={[styles.cardElevate, { height: layout.cardH }]}>
-        <View style={[styles.cardClip, { height: layout.cardH }]}>
+        <View style={[styles.cardElevate, clipSized]}>
+        <View style={[styles.cardClip, clipSized]}>
           <StackCardFace
             card={card}
             accent={accent}
             layout={layout}
-            onOpenOrientationTasks={onOpenOrientationTasks}
+            cardH={cardH}
+            shellLoading={shellLoading}
+            onOpenOrientationOverview={onOpenOrientationOverview}
+            onPressOrientationContinue={onPressOrientationContinue}
             onPressDailyGame={onPressDailyGame}
             onPressDailyInfo={onPressDailyInfo}
+            onPressOrientation1Bac={onPressOrientation1Bac}
             onPressPracticalLink={onPressPracticalLink}
+            onOpenBacVerification={onOpenBacVerification}
+            onOpenBacThresholds={onOpenBacThresholds}
+            bacThresholdsLocked={bacThresholdsLocked}
+            bacThresholdsLoading={bacThresholdsLoading}
+            uniformStack={uniformStack}
+            bacStackPeek={bacStackPeek}
           />
-          <Animated.View pointerEvents="none" style={nextWhiteMaskStyle} />
+          <Animated.View pointerEvents="none" style={transitionWhiteMaskStyle} />
         </View>
       </View>
     </Animated.View>
@@ -874,36 +1133,61 @@ export function HomeStackedPackCards({
   width,
   onPressDailyGame,
   onPressDailyInfo,
+  onPressOrientation1Bac,
+  bacThresholdsLocked = false,
+  bacThresholdsLoading = false,
   onPressPracticalLink,
+  onOpenOrientationOverview: onOpenOrientationOverviewProp,
+  planParcoursLoading = false,
+  contentLoading = false,
+  planParcoursNavAuth,
+  tawjihPlusGate,
+  onOpenBacVerification,
+  onOpenBacThresholds,
 }: Props) {
   const { t, isRTL } = useLocale();
   const n = cards.length;
   const { width: screenW, height: windowH } = useWindowDimensions();
   const layout = useMemo(() => buildStackCardLayout(width, windowH), [width, windowH]);
+  const hasBacCard = useMemo(() => cards.some((c) => c.bacResults != null), [cards]);
+
   const screenWShared = useSharedValue(screenW);
   useEffect(() => {
     screenWShared.value = screenW;
   }, [screenW, screenWShared]);
   const [headIndex, setHeadIndex] = useState(0);
-  const [orientationModal, setOrientationModal] = useState<{
-    visible: boolean;
-    title: string;
-    tasks: OrientationParcoursTask[];
-  }>({ visible: false, title: '', tasks: [] });
 
-  const openOrientationTasks = useCallback((title: string, tasks: OrientationParcoursTask[]) => {
-    if (!tasks.length) return;
-    setOrientationModal({ visible: true, title, tasks });
-  }, []);
+  const stackCardH = useMemo(
+    () => getHomeStackCardHeight(layout, hasBacCard, isRTL),
+    [layout, hasBacCard, isRTL],
+  );
+  const topCardH = stackCardH;
+  /** Toutes les cartes de la pile à la même hauteur lorsque le bac est dans le deck. */
+  const uniformStack = hasBacCard;
+  const stackPeekPad = n > 1 ? (Math.min(3, n) - 1) * 10 : 0;
+  const stackArenaTail = 8;
+  const stackOuterH = topCardH + stackPeekPad + stackArenaTail;
+  const openOrientationOverview = useCallback(
+    (title: string, completion: PlanParcoursCompletion, tasks?: OrientationParcoursTask[]) => {
+      onOpenOrientationOverviewProp?.({ title, completion, tasks });
+    },
+    [onOpenOrientationOverviewProp],
+  );
 
-  const closeOrientationTasks = useCallback(() => {
-    setOrientationModal((m) => ({ ...m, visible: false }));
-  }, []);
+  const handlePressOrientationContinue = useCallback(
+    (completion: PlanParcoursCompletion, tasks?: OrientationParcoursTask[]) => {
+      const state = resolvePlanParcoursState(completion, tasks);
+      navigatePlanParcoursStep(state.currentStepKey, planParcoursNavAuth, tawjihPlusGate);
+    },
+    [planParcoursNavAuth, tawjihPlusGate],
+  );
 
   const translateX = useSharedValue(0);
   const translateY = useSharedValue(0);
   const exitAnimating = useSharedValue(0);
-  const threshold = width * 0.2;
+  /** 1 = contenu carte principale visible ; 0 = voile blanc jusqu’à fin du swipe. */
+  const revealTop = useSharedValue(1);
+  const threshold = width * 0.14;
 
   const bumpNextState = useCallback(() => {
     setHeadIndex((h) => (h + 1) % n);
@@ -914,45 +1198,38 @@ export function HomeStackedPackCards({
   }, [n]);
 
   /**
-   * Ne pas remettre translateX/Y à 0 dans le worklet avant le bump : sinon l’ancienne
-   * carte du dessus réapparaît au centre pendant un frame. On bump d’abord, puis après
-   * commit (double rAF) on remet les transforms à 0 en même temps que le voile blanc.
+   * Bump d’index puis reset des transforms après le commit React (un seul rAF).
+   * Ne pas reset translateX avant le bump : l’ancienne carte du dessus réapparaîtrait au centre.
    */
-  const bumpNextThenResetTransforms = useCallback(() => {
-    bumpNextState();
-    requestAnimationFrame(() => {
+  const finishSwipeTransition = useCallback(
+    (bump: () => void) => {
+      bump();
+      revealTop.value = 0;
       requestAnimationFrame(() => {
-        runOnUI(() => {
-          'worklet';
-          translateX.value = 0;
-          translateY.value = 0;
-          exitAnimating.value = 0;
-        })();
+        translateX.value = 0;
+        translateY.value = 0;
+        exitAnimating.value = 0;
+        revealTop.value = withTiming(1, { duration: REVEAL_MS, easing: REVEAL_EASING });
       });
-    });
-  }, [bumpNextState, translateX, translateY, exitAnimating]);
+    },
+    [revealTop, translateX, translateY, exitAnimating],
+  );
+
+  const bumpNextThenResetTransforms = useCallback(() => {
+    finishSwipeTransition(bumpNextState);
+  }, [finishSwipeTransition, bumpNextState]);
 
   const bumpPrevThenResetTransforms = useCallback(() => {
-    bumpPrevState();
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        runOnUI(() => {
-          'worklet';
-          translateX.value = 0;
-          translateY.value = 0;
-          exitAnimating.value = 0;
-        })();
-      });
-    });
-  }, [bumpPrevState, translateX, translateY, exitAnimating]);
+    finishSwipeTransition(bumpPrevState);
+  }, [finishSwipeTransition, bumpPrevState]);
 
   const panGesture = useMemo(() => {
     if (n <= 1) {
       return Gesture.Pan().enabled(false);
     }
     return Gesture.Pan()
-      .activeOffsetX([-16, 16])
-      .failOffsetY([-24, 24])
+      .activeOffsetX([-10, 10])
+      .failOffsetY([-28, 28])
       .onUpdate((e) => {
         'worklet';
         translateX.value = e.translationX * DRAG_DAMPING;
@@ -998,6 +1275,7 @@ export function HomeStackedPackCards({
           );
         } else {
           exitAnimating.value = 0;
+          revealTop.value = 1;
           translateX.value = withSpring(0, SPRING_BACK);
           translateY.value = withSpring(0, SPRING_BACK);
         }
@@ -1009,6 +1287,7 @@ export function HomeStackedPackCards({
     translateX,
     translateY,
     exitAnimating,
+    revealTop,
     bumpNextThenResetTransforms,
     bumpPrevThenResetTransforms,
     isRTL,
@@ -1027,16 +1306,26 @@ export function HomeStackedPackCards({
 
   return (
     <View style={styles.wrap}>
-      <View style={[styles.stackArena, { width, height: layout.outerH }]} collapsable={false}>
+      <View
+        style={[styles.stackArena, { width, height: stackOuterH }]}
+        collapsable={false}>
         {layers.map(({ stackPos, idx }) => {
           const card = cards[idx];
           const isTop = stackPos === 0;
           const accent: 'blue' | 'green' = idx % 2 === 0 ? 'blue' : 'green';
-          const orientationTasksHandler =
-            isTop &&
-            card.orientationProgress != null &&
-            (card.remainingOrientationTasks?.length ?? 0) > 0
-              ? () => openOrientationTasks(card.packName ?? '', card.remainingOrientationTasks!)
+          const cardCompletion = card.planParcoursCompletion ?? EMPTY_PLAN_PARCOURS_COMPLETION;
+          const orientationOverviewHandler =
+            isTop && card.orientationProgress != null
+              ? () =>
+                  openOrientationOverview(
+                    card.packName ?? '',
+                    cardCompletion,
+                    card.remainingOrientationTasks,
+                  )
+              : undefined;
+          const orientationContinueHandler =
+            isTop && card.orientationProgress != null
+              ? () => handlePressOrientationContinue(cardCompletion, card.remainingOrientationTasks)
               : undefined;
           const dailyGameHandler =
             isTop && card.dailyActions != null ? onPressDailyGame : undefined;
@@ -1044,6 +1333,19 @@ export function HomeStackedPackCards({
             isTop && card.dailyActions != null && card.dailyActions.includeDailyInfo === true
               ? onPressDailyInfo
               : undefined;
+          const dailyOrientation1BacHandler =
+            isTop && card.dailyActions?.showOrientation1Bac ? onPressOrientation1Bac : undefined;
+          const shellLoading = contentLoading && Boolean(card.practicalLinkId);
+          const bacVerificationHandler =
+            isTop && card.bacResults != null && !card.bacResultsLoading
+              ? onOpenBacVerification
+              : undefined;
+          const bacThresholdsHandler =
+            isTop && card.bacResults != null && !card.bacResultsLoading
+              ? onOpenBacThresholds
+              : undefined;
+          const bacStackPeek = card.bacResults != null && !isTop;
+          const layerCardH = stackCardH;
 
           return isTop ? (
             <GestureDetector key={`deck-top-${card.id}`} gesture={panGesture}>
@@ -1056,11 +1358,22 @@ export function HomeStackedPackCards({
                 translateX={translateX}
                 translateY={translateY}
                 exitAnimating={exitAnimating}
+                revealTop={revealTop}
                 isTop
-                onOpenOrientationTasks={orientationTasksHandler}
+                shellLoading={shellLoading}
+                onOpenOrientationOverview={orientationOverviewHandler}
+                onPressOrientationContinue={orientationContinueHandler}
                 onPressDailyGame={dailyGameHandler}
                 onPressDailyInfo={dailyInfoHandler}
+                onPressOrientation1Bac={dailyOrientation1BacHandler}
                 onPressPracticalLink={onPressPracticalLink}
+                onOpenBacVerification={bacVerificationHandler}
+                onOpenBacThresholds={bacThresholdsHandler}
+                bacThresholdsLocked={bacThresholdsLocked}
+                bacThresholdsLoading={bacThresholdsLoading}
+                cardH={layerCardH}
+                uniformStack={uniformStack}
+                bacStackPeek={bacStackPeek}
               />
             </GestureDetector>
           ) : (
@@ -1071,55 +1384,26 @@ export function HomeStackedPackCards({
               accent={accent}
               width={width}
               layout={layout}
+              cardH={layerCardH}
+              uniformStack={uniformStack}
+              bacStackPeek={bacStackPeek}
               translateX={translateX}
               translateY={translateY}
               exitAnimating={exitAnimating}
+              revealTop={revealTop}
               isTop={false}
+              shellLoading={shellLoading}
               onPressPracticalLink={onPressPracticalLink}
+              onOpenBacVerification={bacVerificationHandler}
+              onOpenBacThresholds={bacThresholdsHandler}
+              bacThresholdsLocked={bacThresholdsLocked}
+              bacThresholdsLoading={bacThresholdsLoading}
             />
           );
         })}
       </View>
       <Text style={[styles.swipeHint, isRTL && styles.swipeHintRtl]}>{t('swipeCardsHint')}</Text>
       <PaginationDots total={n} activeIndex={headIndex} onDark={false} compact rtl={isRTL} />
-
-      <Modal
-        visible={orientationModal.visible}
-        transparent
-        animationType="fade"
-        onRequestClose={closeOrientationTasks}>
-        <View style={styles.modalRoot}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={closeOrientationTasks}
-            accessibilityLabel={t('closeOverlayA11y')}
-          />
-          <View style={styles.modalCard} accessibilityViewIsModal>
-            <Text style={[styles.modalTitle, isRTL && styles.modalTxtRtl]} numberOfLines={2}>
-              {orientationModal.title}
-            </Text>
-            <Text style={[styles.modalSubtitle, isRTL && styles.modalTxtRtl]}>{t('orientationModalSubtitle')}</Text>
-            <ScrollView
-              style={styles.modalScroll}
-              showsVerticalScrollIndicator={false}
-              bounces={false}>
-              {orientationModal.tasks.map((task, i) => (
-                <View
-                  key={task.id}
-                  style={[styles.modalTaskRow, isRTL && styles.modalTaskRowRtl]}>
-                  <Text style={styles.modalTaskIndex}>{i + 1}.</Text>
-                  <Text style={[styles.modalTaskTitle, isRTL && styles.modalTxtRtl]}>{task.title}</Text>
-                </View>
-              ))}
-            </ScrollView>
-            <Pressable
-              onPress={closeOrientationTasks}
-              style={({ pressed }) => [styles.modalCloseBtn, pressed && { opacity: 0.85 }]}>
-              <Text style={styles.modalCloseLabel}>{t('modalClose')}</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
     </View>
   );
 }
@@ -1168,6 +1452,40 @@ const styles = StyleSheet.create({
     minHeight: 0,
     zIndex: 1,
   },
+  cardColumnStackFill: {
+    flex: 1,
+    minHeight: 0,
+  },
+  cardInnerBacFill: {
+    flexDirection: 'column',
+  },
+  cardColumnBac: {
+    flex: 1,
+    flexGrow: 1,
+    minHeight: 0,
+    width: '100%',
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+  },
+  bacEyebrow: {
+    flexShrink: 0,
+  },
+  bacScroll: {
+    flex: 1,
+    minHeight: 0,
+    width: '100%',
+  },
+  bacScrollContent: {
+    flexGrow: 0,
+    paddingBottom: 6,
+  },
+  bacScrollContentRtl: {
+    paddingBottom: 10,
+  },
+  cardColumnRtl: {
+    width: '100%',
+    alignItems: 'stretch',
+  },
   /** Ne pas rétrécir : sinon sur web le bloc titre peut passer à hauteur 0 (texte « invisible »). */
   cardTop: {
     flexGrow: 0,
@@ -1204,6 +1522,10 @@ const styles = StyleSheet.create({
     minHeight: 0,
     width: '100%',
   },
+  firstCardDailyStretchRtl: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   orientationBlockPacked: {
     alignSelf: 'stretch',
     width: '100%',
@@ -1235,6 +1557,10 @@ const styles = StyleSheet.create({
   packLabel: {
     color: brand.textSecondary,
     fontWeight: '600',
+  },
+  academicPackLine: {
+    color: brand.textSecondary,
+    fontWeight: '700',
   },
   packName: {
     color: brand.text,
@@ -1299,6 +1625,14 @@ const styles = StyleSheet.create({
   /** Une seule tuile (défi) : pleine largeur, même hauteur que la rangée à deux tuiles. */
   dailyActionsWrapGameOnly: {
     justifyContent: 'center',
+    alignItems: 'center',
+  },
+  dailyActionsWrapRtl: {
+    direction: 'rtl',
+  },
+  dailyActionsWrapGameOnlyRtl: {
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   dailyMini: {
     flex: 1,
@@ -1306,6 +1640,15 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  dailyMiniRtl: {
+    alignItems: 'center',
+    alignSelf: 'stretch',
+  },
+  dailyMiniTextRtl: {
+    textAlign: 'center',
+    writingDirection: 'rtl',
+    width: '100%',
   },
   dailyMiniFullWidth: {
     flexGrow: 1,
@@ -1348,6 +1691,13 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(148, 163, 184, 0.65)',
     backgroundColor: 'rgba(241, 245, 249, 0.95)',
+  },
+  dailyMiniLocked: {
+    position: 'relative',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(148, 163, 184, 0.55)',
+    backgroundColor: 'rgba(241, 245, 249, 0.92)',
+    opacity: 0.92,
   },
   dailyPlayedCheckBadgeBase: {
     position: 'absolute',
@@ -1396,8 +1746,8 @@ const styles = StyleSheet.create({
   },
   hintSpacer: {},
   swipeHint: {
-    marginTop: spacing.xs,
-    marginBottom: 0,
+    marginTop: spacing.lg,
+    marginBottom: spacing.xs,
     textAlign: 'center',
     color: brand.textMuted,
     fontSize: fontSize.xs,
@@ -1439,9 +1789,35 @@ const styles = StyleSheet.create({
   orientationPctRtl: {
     writingDirection: 'ltr',
   },
+  orientationProgressWrap: {
+    marginTop: 6,
+    width: '100%',
+  },
+  orientationProgressTrack: {
+    height: 5,
+    borderRadius: 3,
+    backgroundColor: ORIENTATION_PROGRESS_TRACK_BG,
+    overflow: 'hidden',
+    flexDirection: 'row',
+  },
+  /** RTL : remplissage depuis la droite vers la gauche. */
+  orientationProgressTrackRtl: {
+    flexDirection: 'row-reverse',
+  },
+  orientationProgressFill: {
+    height: '100%',
+    borderRadius: 3,
+    backgroundColor: homeShell.green,
+  },
   orientationStepsWrap: {
     marginTop: 6,
     width: '100%',
+  },
+  orientationStepsEmpty: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    width: '100%',
+    minHeight: 22,
   },
   orientationStepsRow: {
     flexDirection: 'row',
@@ -1453,8 +1829,8 @@ const styles = StyleSheet.create({
   },
   orientationStepLine: {
     flex: 1,
-    height: 3,
-    minWidth: 2,
+    height: 2,
+    minWidth: 1,
     borderRadius: 2,
     alignSelf: 'center',
   },
@@ -1476,30 +1852,36 @@ const styles = StyleSheet.create({
     borderColor: homeShell.green,
   },
   orientationStepBubbleTodo: {
-    backgroundColor: brand.backgroundSoft,
-    borderColor: brand.border,
+    backgroundColor: brand.white,
+    borderWidth: 1,
+    borderColor: ORIENTATION_STEP_LINE_TODO,
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.06,
+    shadowRadius: 2,
+    elevation: 1,
   },
   orientationStepDot: {
-    marginTop: 5,
-    width: 6,
-    height: 6,
+    marginTop: 4,
+    width: 5,
+    height: 5,
     borderRadius: 3,
   },
   orientationStepDotDone: {
     backgroundColor: homeShell.green,
   },
   orientationStepDotCurrent: {
-    width: 7,
-    height: 7,
-    borderRadius: 4,
+    width: 6,
+    height: 6,
+    borderRadius: 3,
     borderWidth: 2,
     borderColor: homeShell.green,
     backgroundColor: brand.white,
   },
   orientationStepDotTodo: {
-    backgroundColor: brand.borderLight,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: brand.border,
+    backgroundColor: brand.white,
+    borderWidth: 1.5,
+    borderColor: ORIENTATION_STEP_LINE_TODO,
   },
   orientationTapHint: {
     color: brand.textSecondary,
@@ -1507,83 +1889,6 @@ const styles = StyleSheet.create({
     lineHeight: 16,
   },
   orientationTapHintRtl: {
-    textAlign: 'right',
-    writingDirection: 'rtl',
-  },
-  modalRoot: {
-    flex: 1,
-    backgroundColor: 'rgba(15, 23, 42, 0.48)',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  modalCard: {
-    backgroundColor: brand.white,
-    borderRadius: radius.lg,
-    padding: spacing.lg,
-    maxHeight: '72%',
-    zIndex: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 12 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 16,
-  },
-  modalTitle: {
-    color: brand.text,
-    fontSize: fontSize.lg,
-    fontWeight: '800',
-    letterSpacing: -0.4,
-  },
-  modalSubtitle: {
-    marginTop: spacing.xs,
-    color: brand.textMuted,
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
-  },
-  modalScroll: {
-    marginTop: spacing.md,
-    maxHeight: 320,
-  },
-  modalTaskRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: brand.borderLight,
-    gap: spacing.sm,
-  },
-  modalTaskRowRtl: {
-    flexDirection: 'row-reverse',
-  },
-  modalTaskIndex: {
-    color: brand.primary,
-    fontSize: fontSize.sm,
-    fontWeight: '800',
-    minWidth: 22,
-  },
-  modalTaskTitle: {
-    flex: 1,
-    color: brand.text,
-    fontSize: fontSize.sm,
-    fontWeight: '600',
-    lineHeight: 20,
-  },
-  modalCloseBtn: {
-    marginTop: spacing.md,
-    alignSelf: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xl,
-    backgroundColor: brand.backgroundSoft,
-    borderRadius: radius.md,
-  },
-  modalCloseLabel: {
-    color: brand.primary,
-    fontSize: fontSize.sm,
-    fontWeight: '800',
-  },
-  modalTxtRtl: {
     textAlign: 'right',
     writingDirection: 'rtl',
   },

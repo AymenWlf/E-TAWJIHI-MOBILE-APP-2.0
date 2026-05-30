@@ -25,6 +25,9 @@ import { CommunityQnaSection } from '@/components/community/CommunityQnaSection'
 import { LiveNowPill } from '@/components/events/LiveNowPill';
 import { SidebarMenuIconButton } from '@/components/SidebarMenuIconButton';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
+import { EventsDetailScreenSkeleton } from '@/components/events/EventsDetailScreenSkeleton';
+import { LoadErrorState, loadErrorRetryLabel } from '@/components/ui/LoadErrorState';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -41,8 +44,9 @@ import { resolvePlatformEventCoverUri } from '@/utils/platformEventCover';
 import { platformEventDisplayTitle, platformEventKindBadgeText } from '@/utils/platformEventLocale';
 import { contactStatusLabelMobile } from '@/utils/platformEventRegistrationLabels';
 import { formatPlatformEventDurationMobile } from '@/utils/eventDuration';
-import { errorMessage } from '@/utils/errorMessage';
+import { classifyApiError, getUserFacingApiError, getUserFacingLoadError } from '@/utils/apiError';
 import { formatPlatformEventDetailDateTime } from '@/utils/platformEventFormat';
+import { sanitizeRichHtml } from '@/utils/sanitizeRichHtml';
 function InfoRow({
   icon,
   label,
@@ -124,7 +128,7 @@ export default function EvenementDetailScreen() {
   const { id: rawId, qnaQ: rawQnaQ } = useLocalSearchParams<{ id: string; qnaQ?: string | string[] }>();
   const router = useRouter();
   const { width } = useWindowDimensions();
-  const { t, isRTL, locale, setLocale } = useLocale();
+  const { t, isRTL, locale } = useLocale();
   const { getValidAccessToken, user, reloadMe } = useAuth();
   const id = Number(rawId);
   const highlightQuestionId = useMemo(() => {
@@ -136,6 +140,7 @@ export default function EvenementDetailScreen() {
 
   const [ev, setEv] = useState<PlatformEventBrief | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   const [busy, setBusy] = useState(false);
   const [regModalOpen, setRegModalOpen] = useState(false);
@@ -149,7 +154,7 @@ export default function EvenementDetailScreen() {
     const ar = locale === 'ar' && ev?.descriptionHtmlAr?.trim();
     const h = (ar ? ev?.descriptionHtmlAr : ev?.descriptionHtml)?.trim();
     if (!h) return undefined;
-    return { html: h };
+    return { html: sanitizeRichHtml(h) };
   }, [ev?.descriptionHtml, ev?.descriptionHtmlAr, locale]);
 
   const registrationExplain = useMemo(() => {
@@ -177,12 +182,28 @@ export default function EvenementDetailScreen() {
   const load = useCallback(async () => {
     if (!Number.isFinite(id) || id <= 0) {
       setEv(null);
+      setLoadError(t('eventsLoadError'));
       return;
     }
+    setLoadError(null);
     const token = await getValidAccessToken();
-    const data = await fetchPlatformEventDetail(token ?? undefined, id);
-    setEv(data);
-  }, [getValidAccessToken, id]);
+    try {
+      const data = await fetchPlatformEventDetail(token ?? undefined, id, { throwOnError: true });
+      if (!data) {
+        setEv(null);
+        setLoadError(t('eventsLoadError'));
+      } else {
+        setEv(data);
+      }
+    } catch (e) {
+      setEv(null);
+      if (classifyApiError(e) === 'notFound') {
+        setLoadError(t('eventsLoadError'));
+      } else {
+        setLoadError(getUserFacingLoadError(e, t, { context: 'events' }));
+      }
+    }
+  }, [getValidAccessToken, id, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -275,15 +296,7 @@ export default function EvenementDetailScreen() {
         Alert.alert('', t('eventsRegError'));
       }
     } catch (e: unknown) {
-      let msg = t('eventsRegError');
-      const raw = errorMessage(e);
-      try {
-        const j = JSON.parse(raw) as { message?: string };
-        if (typeof j.message === 'string' && j.message.trim()) msg = j.message.trim();
-      } catch {
-        if (raw && raw.length > 0 && raw.length < 240) msg = raw;
-      }
-      Alert.alert('', msg);
+      Alert.alert('', getUserFacingApiError(e, t, { context: 'events', fallbackKey: 'eventsRegError' }));
     } finally {
       setRegSubmitting(false);
     }
@@ -319,8 +332,9 @@ export default function EvenementDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={[styles.root, styles.center]} edges={['top']}>
-        <ActivityIndicator color={brand.primary} />
+      <SafeAreaView style={styles.root} edges={['top']}>
+        <StatusBar style="light" backgroundColor={brand.primary} />
+        <EventsDetailScreenSkeleton isRTL={isRTL} />
       </SafeAreaView>
     );
   }
@@ -329,7 +343,12 @@ export default function EvenementDetailScreen() {
     return (
       <SafeAreaView style={styles.root} edges={['top']}>
         <View style={styles.center}>
-          <Text style={styles.emptyTxt}>{t('eventsLoadError')}</Text>
+          <LoadErrorState
+            message={loadError ?? t('eventsLoadError')}
+            onRetry={() => void load()}
+            retryLabel={loadErrorRetryLabel(t)}
+            isRTL={isRTL}
+          />
           <Pressable onPress={() => router.back()} style={styles.backBtn}>
             <Text style={styles.backBtnTxt}>OK</Text>
           </Pressable>
@@ -371,36 +390,7 @@ export default function EvenementDetailScreen() {
       <View style={styles.heroBar}>
         <SidebarMenuIconButton color={brand.white} />
         <View style={styles.heroBarSpacer} />
-        <View
-          style={[styles.langSwitch, isRTL && styles.rowRtl]}
-          accessibilityRole="tablist"
-          accessibilityLabel={t('languageSwitcher')}
-        >
-          <Pressable
-            onPress={() => setLocale('fr')}
-            style={({ pressed }) => [
-              styles.langPill,
-              locale === 'fr' && styles.langPillActive,
-              pressed && { opacity: 0.85 },
-            ]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: locale === 'fr' }}
-          >
-            <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>{t('langFr')}</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setLocale('ar')}
-            style={({ pressed }) => [
-              styles.langPill,
-              locale === 'ar' && styles.langPillActive,
-              pressed && { opacity: 0.85 },
-            ]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: locale === 'ar' }}
-          >
-            <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>{t('langAr')}</Text>
-          </Pressable>
-        </View>
+        <HeroLangSwitch />
         <Pressable onPress={() => router.back()} hitSlop={14} style={styles.heroBackBtn} accessibilityRole="button">
           <FontAwesome name={isRTL ? 'chevron-right' : 'chevron-left'} size={20} color={brand.white} />
         </Pressable>
@@ -822,22 +812,6 @@ const styles = StyleSheet.create({
   },
   heroBackBtn: { padding: 8, marginStart: -4 },
   heroBarSpacer: { flex: 1 },
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    borderRadius: radius.full,
-    padding: 3,
-    flexShrink: 0,
-  },
-  langPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-    borderRadius: radius.full,
-  },
-  langPillActive: { backgroundColor: brand.white },
-  langPillTxt: { color: brand.white, fontSize: fontSize.xs, fontWeight: '700' },
-  langPillTxtActive: { color: brand.primary },
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.section * 2,

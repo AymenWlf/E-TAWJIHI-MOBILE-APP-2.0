@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef } from 'react';
 import { Image, StyleSheet, View } from 'react-native';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import Animated, {
@@ -48,11 +48,17 @@ const ICON_BUBBLE = 46;
 export function AnimatedSplash({
   onReadyForHideNativeSplash,
   onDone,
-  durationMs = 3200,
+  durationMs = 1400,
 }: AnimatedSplashProps) {
   const enter = useSharedValue(0);
   const orbit = useSharedValue(0);
   const exit = useSharedValue(0);
+  const onDoneRef = useRef(onDone);
+  onDoneRef.current = onDone;
+
+  const completeSplash = useCallback(() => {
+    onDoneRef.current();
+  }, []);
 
   useEffect(() => {
     enter.value = withTiming(1, { duration: 700, easing: Easing.out(Easing.cubic) });
@@ -68,14 +74,14 @@ export function AnimatedSplash({
         { duration: 320, easing: Easing.inOut(Easing.quad) },
         (finished) => {
           if (finished) {
-            runOnJS(onDone)();
+            runOnJS(completeSplash)();
           }
         },
       );
-    }, Math.max(1200, durationMs));
+    }, Math.max(800, durationMs));
 
     return () => clearTimeout(t);
-  }, [durationMs, enter, exit, onDone, orbit]);
+  }, [completeSplash, durationMs, enter, exit, orbit]);
 
   const rootStyle = useAnimatedStyle(() => ({
     opacity: 1 - exit.value,

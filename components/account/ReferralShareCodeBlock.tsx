@@ -19,6 +19,8 @@ type Props = {
   /** Carte Mon compte (fond bleu) ou carte blanche fidélité */
   variant: 'teaser' | 'card';
   showLink?: boolean;
+  /** Boutons copier lien / WhatsApp sous le code */
+  showShareActions?: boolean;
 };
 
 export function ReferralShareCodeBlock({
@@ -29,6 +31,7 @@ export function ReferralShareCodeBlock({
   t,
   variant,
   showLink = false,
+  showShareActions = true,
 }: Props) {
   const { getValidAccessToken } = useAuth();
   const isTeaser = variant === 'teaser';
@@ -72,13 +75,15 @@ export function ReferralShareCodeBlock({
           numberOfLines={1}>
           {referralCode}
         </Text>
-        <Pressable
-          onPress={() => flashCopy(referralCode, true)}
-          style={[isTeaser ? styles.iconBtnTeaser : styles.iconBtnCard]}
-          accessibilityRole="button"
-          accessibilityLabel={t('referralCopyCode')}>
-          <FontAwesome name="copy" size={16} color={isTeaser ? brand.primary : brand.primary} />
-        </Pressable>
+        {showShareActions ? (
+          <Pressable
+            onPress={() => flashCopy(referralCode, true)}
+            style={[isTeaser ? styles.iconBtnTeaser : styles.iconBtnCard]}
+            accessibilityRole="button"
+            accessibilityLabel={t('referralCopyCode')}>
+            <FontAwesome name="copy" size={16} color={brand.primary} />
+          </Pressable>
+        ) : null}
       </View>
 
       {showLink && referralLink ? (
@@ -92,38 +97,40 @@ export function ReferralShareCodeBlock({
         </>
       ) : null}
 
-      <View style={[styles.actionsRow, rtl && styles.rowRtl]}>
-        <Pressable
-          onPress={() => flashCopy(referralCode, true)}
-          style={[styles.actionBtn, isTeaser ? styles.actionBtnTeaser : styles.actionBtnCard]}
-          accessibilityRole="button"
-          accessibilityLabel={t('referralCopyCode')}>
-          <FontAwesome name="copy" size={14} color={isTeaser ? brand.white : brand.primary} />
-          <Text style={[isTeaser ? styles.actionTxtTeaser : styles.actionTxtCard, rtl && styles.txtRtl]}>
-            {t('referralCopyCode')}
-          </Text>
-        </Pressable>
-        {showLink && referralLink ? (
+      {showShareActions ? (
+        <View style={[styles.actionsRow, rtl && styles.rowRtl]}>
           <Pressable
-            onPress={() => flashCopy(referralLink)}
+            onPress={() => flashCopy(referralCode, true)}
             style={[styles.actionBtn, isTeaser ? styles.actionBtnTeaser : styles.actionBtnCard]}
             accessibilityRole="button"
-            accessibilityLabel={t('referralCopyLink')}>
-            <FontAwesome name="link" size={14} color={isTeaser ? brand.white : brand.primary} />
+            accessibilityLabel={t('referralCopyCode')}>
+            <FontAwesome name="copy" size={14} color={isTeaser ? brand.white : brand.primary} />
             <Text style={[isTeaser ? styles.actionTxtTeaser : styles.actionTxtCard, rtl && styles.txtRtl]}>
-              {t('referralCopyLink')}
+              {t('referralCopyCode')}
             </Text>
           </Pressable>
-        ) : null}
-        <Pressable
-          onPress={shareWhatsApp}
-          style={[styles.actionBtn, styles.whatsappBtn]}
-          accessibilityRole="button"
-          accessibilityLabel={t('referralShareWhatsApp')}>
-          <FontAwesome name="whatsapp" size={16} color={brand.white} />
-          <Text style={styles.whatsappTxt}>{t('referralShareWhatsApp')}</Text>
-        </Pressable>
-      </View>
+          {showLink && referralLink ? (
+            <Pressable
+              onPress={() => flashCopy(referralLink)}
+              style={[styles.actionBtn, isTeaser ? styles.actionBtnTeaser : styles.actionBtnCard]}
+              accessibilityRole="button"
+              accessibilityLabel={t('referralCopyLink')}>
+              <FontAwesome name="link" size={14} color={isTeaser ? brand.white : brand.primary} />
+              <Text style={[isTeaser ? styles.actionTxtTeaser : styles.actionTxtCard, rtl && styles.txtRtl]}>
+                {t('referralCopyLink')}
+              </Text>
+            </Pressable>
+          ) : null}
+          <Pressable
+            onPress={shareWhatsApp}
+            style={[styles.actionBtn, styles.whatsappBtn]}
+            accessibilityRole="button"
+            accessibilityLabel={t('referralShareWhatsApp')}>
+            <FontAwesome name="whatsapp" size={16} color={brand.white} />
+            <Text style={styles.whatsappTxt}>{t('referralShareWhatsApp')}</Text>
+          </Pressable>
+        </View>
+      ) : null}
     </View>
   );
 }

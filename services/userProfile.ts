@@ -27,6 +27,7 @@ export type UserProfile = {
   /** Bac mission — code étudiant */
   studentCode?: string | null;
   typeEcolePrefere?: string[] | null;
+  langueEtudes?: string[] | null;
   servicesPrefere?: string[] | null;
   tuteur?: string | null;
   nomTuteur?: string | null;

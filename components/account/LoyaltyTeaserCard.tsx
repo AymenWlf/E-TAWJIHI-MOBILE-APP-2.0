@@ -3,6 +3,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 
 import { ReferralLockedBanner } from '@/components/account/ReferralLockedBanner';
 import { ReferralShareCodeBlock } from '@/components/account/ReferralShareCodeBlock';
+import { ReferralTeaserBodySkeleton } from '@/components/account/ReferralProgramSkeleton';
 import { Text } from '@/components/ui/Text';
 import type { HomeCopyKey } from '@/constants/i18n';
 import type { ReferralTierProgress } from '@/services/userReferral';
@@ -17,10 +18,12 @@ type Props = {
   referredDiscountPercent?: number;
   tierProgress?: ReferralTierProgress | null;
   locked?: boolean;
+  loading?: boolean;
   requiredServiceName?: string;
   t: (k: HomeCopyKey) => string;
   onPress: () => void;
-  onLockedCtaPress?: () => void;
+  /** Affiche copier / WhatsApp sous le code (désactivé sur l’aperçu Mon compte). */
+  showShareActions?: boolean;
 };
 
 function tierRewardLabel(
@@ -39,10 +42,11 @@ export function LoyaltyTeaserCard({
   referredDiscountPercent,
   tierProgress,
   locked = false,
+  loading = false,
   requiredServiceName = 'TAWJIH PLUS',
   t,
   onPress,
-  onLockedCtaPress,
+  showShareActions = true,
 }: Props) {
   const qualifiedCount = tierProgress?.qualifiedAffiliateCount ?? 0;
   const tiers = tierProgress?.tiers ?? [];
@@ -82,34 +86,40 @@ export function LoyaltyTeaserCard({
           </View>
 
           <View style={[styles.bodyLockedWrap, locked && styles.bodyLockedDim]} pointerEvents={locked ? 'none' : 'auto'}>
-            <View style={[styles.statBlock, rtl && styles.txtRtl]}>
-              <Text style={[styles.statValue, rtl && styles.txtRtl]}>{qualifiedCount}</Text>
-              <Text style={[styles.statLabel, rtl && styles.txtRtl]}>{t('referralTeaserQualifiedLabel')}</Text>
-            </View>
+            {loading ? (
+              <ReferralTeaserBodySkeleton isRTL={rtl} />
+            ) : (
+              <>
+                <View style={styles.statBlock}>
+                  <Text style={[styles.statValue, rtl && styles.txtRtl]}>{qualifiedCount}</Text>
+                  <Text style={[styles.statLabel, rtl && styles.txtRtl]}>{t('referralTeaserQualifiedLabel')}</Text>
+                </View>
 
-            {nextTier ? (
-              <View style={[styles.nextRewardBox, rtl && styles.txtRtl]}>
-                <Text style={[styles.statLabel, rtl && styles.txtRtl]}>{t('loyaltyTeaserNextReward')}</Text>
-                <Text style={[styles.statValueSm, rtl && styles.txtRtl]} numberOfLines={2}>
-                  {tierRewardLabel(nextTier, locale)}
-                </Text>
-                <Text style={[styles.statHint, rtl && styles.txtRtl]}>
-                  {t('referralTierRemaining').replace('{{count}}', String(nextTier.remaining))}
-                </Text>
-              </View>
-            ) : allUnlocked ? (
-              <View style={[styles.nextRewardBox, rtl && styles.rowRtl]}>
-                <FontAwesome name="check-circle" size={18} color={homeShell.green} />
-                <Text style={[styles.statValueSm, rtl && styles.txtRtl]}>{t('referralTeaserAllUnlocked')}</Text>
-              </View>
-            ) : null}
+                {nextTier ? (
+                  <View style={styles.nextRewardBox}>
+                    <Text style={[styles.statLabel, rtl && styles.txtRtl]}>{t('loyaltyTeaserNextReward')}</Text>
+                    <Text style={[styles.statValueSm, rtl && styles.txtRtl]} numberOfLines={2}>
+                      {tierRewardLabel(nextTier, locale)}
+                    </Text>
+                    <Text style={[styles.statHint, rtl && styles.txtRtl]}>
+                      {t('referralTierRemaining').replace('{{count}}', String(nextTier.remaining))}
+                    </Text>
+                  </View>
+                ) : allUnlocked ? (
+                  <View style={[styles.nextRewardBox, rtl && styles.rowRtl]}>
+                    <FontAwesome name="check-circle" size={18} color={homeShell.green} />
+                    <Text style={[styles.statValueSm, rtl && styles.txtRtl]}>{t('referralTeaserAllUnlocked')}</Text>
+                  </View>
+                ) : null}
 
-            <View style={[styles.servicePill, rtl && styles.rowRtl]}>
-              <FontAwesome name="briefcase" size={11} color={homeShell.green} />
-              <Text style={[styles.servicePillTxt, rtl && styles.txtRtl]} numberOfLines={1}>
-                {serviceName}
-              </Text>
-            </View>
+                <View style={[styles.servicePill, rtl && styles.rowRtl]}>
+                  <FontAwesome name="briefcase" size={11} color={homeShell.green} />
+                  <Text style={[styles.servicePillTxt, rtl && styles.txtRtl]} numberOfLines={1}>
+                    {serviceName}
+                  </Text>
+                </View>
+              </>
+            )}
           </View>
 
           {locked ? (
@@ -119,7 +129,6 @@ export function LoyaltyTeaserCard({
                 rtl={rtl}
                 t={t}
                 variant="hero"
-                onCtaPress={onLockedCtaPress}
               />
             </View>
           ) : referralCode ? (
@@ -131,18 +140,10 @@ export function LoyaltyTeaserCard({
                 rtl={rtl}
                 t={t}
                 variant="teaser"
+                showShareActions={showShareActions}
               />
             </View>
           ) : null}
-
-          <View style={[styles.ctaRow, locked && styles.ctaRowLocked]}>
-            <Text style={[styles.ctaTxt, locked && styles.ctaTxtLocked]}>
-              {locked ? t('referralLockedCta') : t('loyaltyTeaserCta')}
-            </Text>
-            {!locked ? (
-              <FontAwesome name={rtl ? 'angle-left' : 'angle-right'} size={16} color={homeShell.bg} />
-            ) : null}
-          </View>
         </View>
       </Pressable>
     </View>
@@ -150,10 +151,7 @@ export function LoyaltyTeaserCard({
 }
 
 const styles = StyleSheet.create({
-  wrap: {
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.md,
-  },
+  wrap: {},
   wrapRtl: { direction: 'rtl' },
   cardPress: {
     borderRadius: radius.xl,
@@ -278,29 +276,6 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '700',
     color: homeShell.green,
-  },
-  ctaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    borderRadius: radius.lg,
-    backgroundColor: brand.white,
-    marginTop: spacing.xs,
-  },
-  ctaRowLocked: {
-    backgroundColor: 'rgba(255,255,255,0.14)',
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-  },
-  ctaTxt: {
-    fontSize: fontSize.sm,
-    fontWeight: '800',
-    color: homeShell.bg,
-  },
-  ctaTxtLocked: {
-    color: brand.white,
   },
   shareBlock: {
     marginTop: spacing.sm,

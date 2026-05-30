@@ -15,16 +15,24 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { ShopThankYouScreenSkeleton } from '@/components/shop/ShopThankYouScreenSkeleton';
 import { Text } from '@/components/ui/Text';
 import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVisualThumb';
 import { getApiBaseUrl } from '@/constants/api';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useShopFlowSystemBars } from '@/hooks/useShopFlowSystemBars';
 import { fetchShopOrder, uploadShopOrderBankTransferReceipt } from '@/services/shop';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { AppLocale, HomeCopyKey } from '@/constants/i18n';
 import type { ShopOrderPayload, ShopOrderServicePaymentFollowUp } from '@/types/shop';
+import {
+  isFiliere1BacId,
+  isPremiereBacNiveau,
+  resolveFiliereDisplayLabel,
+} from '@/utils/academicFiliere';
 import { formatShopPrice } from '@/utils/shopFormatPrice';
 import { getShopOrderAccessToken } from '@/utils/shopOrderTokenStorage';
+import { getUserFacingApiError } from '@/utils/apiError';
 
 function fillThankTpl(template: string, vars: Record<string, string>): string {
   let s = template;
@@ -106,6 +114,16 @@ export default function BoutiqueThankYouScreen() {
     };
   }, [publicId]);
 
+  const filiereThankYouDisplay = useMemo(() => {
+    const raw = (order?.filiere ?? '').trim();
+    if (!raw) return '';
+    const loc = locale === 'ar' ? 'ar' : 'fr';
+    if (isPremiereBacNiveau(order?.studyLevel ?? '')) {
+      if (!isFiliere1BacId(raw)) return '';
+    }
+    return resolveFiliereDisplayLabel(raw, loc);
+  }, [order?.filiere, order?.studyLevel, locale]);
+
   const followUp = order?.servicePaymentFollowUp ?? null;
   const payModalityLabel =
     followUp != null
@@ -178,7 +196,7 @@ export default function BoutiqueThankYouScreen() {
       setOrder(next);
       Alert.alert('', t('shopThankBankUploadOk'));
     } catch (e) {
-      Alert.alert(t('commonErrorTitle'), e instanceof Error ? e.message : t('shopThankBankUploadErr'));
+      Alert.alert(t('commonErrorTitle'), getUserFacingApiError(e, t, { context: 'upload' }));
     } finally {
       setUploadBusy(false);
     }
@@ -194,33 +212,41 @@ export default function BoutiqueThankYouScreen() {
     [t],
   );
 
+  const { headerColor, bottomColor } = useShopFlowSystemBars({
+    headerColor: brand.backgroundSoft,
+    bottomColor: brand.backgroundSoft,
+  });
+
   if (loading) {
     return (
-      <SafeAreaView style={[styles.root, isRTL && styles.rtlRoot]} edges={['top']}>
-        <StatusBar style="dark" />
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={brand.primary} />
-          <Text style={[styles.loadingTxt, isRTL && styles.txtRtl]}>{t('shopLoading')}</Text>
-        </View>
-      </SafeAreaView>
+      <View style={[styles.screen, isRTL && styles.rtlRoot]}>
+        <StatusBar style="dark" backgroundColor={headerColor} />
+        <SafeAreaView edges={['top', 'bottom']} style={[styles.screenSafe, { backgroundColor: bottomColor }]}>
+          <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+            <ShopThankYouScreenSkeleton isRTL={isRTL} />
+          </ScrollView>
+        </SafeAreaView>
+      </View>
     );
   }
 
   if (forbidden || !order || !publicId) {
     return (
-      <SafeAreaView style={[styles.root, isRTL && styles.rtlRoot]} edges={['top']}>
-        <StatusBar style="dark" />
-        <View style={styles.center}>
-          <FontAwesome name="exclamation-circle" size={36} color={brand.error} />
-          <Text style={[styles.loadingTxt, isRTL && styles.txtRtl]}>{t('shopThankOrderNotFound')}</Text>
-          <Pressable
-            onPress={() => router.replace('/(tabs)/boutique')}
-            style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.9 }]}
-          >
-            <Text style={styles.btnPrimaryTxt}>{t('shopThankBackShop')}</Text>
-          </Pressable>
-        </View>
-      </SafeAreaView>
+      <View style={[styles.screen, isRTL && styles.rtlRoot]}>
+        <StatusBar style="dark" backgroundColor={headerColor} />
+        <SafeAreaView edges={['top', 'bottom']} style={[styles.screenSafe, { backgroundColor: bottomColor }]}>
+          <View style={styles.center}>
+            <FontAwesome name="exclamation-circle" size={36} color={brand.error} />
+            <Text style={[styles.loadingTxt, isRTL && styles.txtRtl]}>{t('shopThankOrderNotFound')}</Text>
+            <Pressable
+              onPress={() => router.replace('/(tabs)/boutique')}
+              style={({ pressed }) => [styles.btnPrimary, pressed && { opacity: 0.9 }]}
+            >
+              <Text style={styles.btnPrimaryTxt}>{t('shopThankBackShop')}</Text>
+            </Pressable>
+          </View>
+        </SafeAreaView>
+      </View>
     );
   }
 
@@ -251,9 +277,10 @@ export default function BoutiqueThankYouScreen() {
       : '';
 
   return (
-    <SafeAreaView style={[styles.root, isRTL && styles.rtlRoot]} edges={['top']}>
-      <StatusBar style="dark" />
+    <View style={[styles.screen, isRTL && styles.rtlRoot]}>
+      <StatusBar style="dark" backgroundColor={headerColor} />
 
+      <SafeAreaView edges={['top', 'bottom']} style={[styles.screenSafe, { backgroundColor: bottomColor }]}>
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
         <View style={styles.heroCard}>
           <View style={styles.heroIcon}>
@@ -293,11 +320,13 @@ export default function BoutiqueThankYouScreen() {
               value={fillThankTpl(t('shopThankBacLine'), { v: order.bacType })}
             />
           ) : null}
-          {order.filiere ? (
+          {order.studyLevel ? (
             <Row
               icon="list-alt"
               isRtl={isRTL}
-              value={fillThankTpl(t('shopThankFiliereLine'), { v: order.filiere })}
+              value={fillThankTpl(t('shopThankFiliereLine'), {
+                v: filiereThankYouDisplay || '—',
+              })}
             />
           ) : null}
           {order.specialiteMission1 ? (
@@ -698,7 +727,8 @@ export default function BoutiqueThankYouScreen() {
         </Pressable>
         <View style={{ height: spacing.xxl }} />
       </ScrollView>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
   );
 }
 
@@ -939,6 +969,8 @@ function BankWireDetailCard({
 }
 
 const styles = StyleSheet.create({
+  screen: { flex: 1, backgroundColor: brand.backgroundSoft },
+  screenSafe: { flex: 1 },
   root: { flex: 1, backgroundColor: brand.backgroundSoft },
   rtlRoot: { direction: 'rtl' },
   rowRtl: { flexDirection: 'row-reverse' },

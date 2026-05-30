@@ -22,7 +22,7 @@ import type { CandidacyStatusType } from '@/types/inscriptions';
 
 type ListResponse = { success: boolean; data: CandidacyStatusType[] };
 
-const STORAGE_KEY = '@etawjihi/candidacy-status-catalog/v1';
+const STORAGE_KEY = '@etawjihi/candidacy-status-catalog/v2';
 
 type CacheEnvelope = {
   version: 1;
@@ -90,7 +90,13 @@ export async function loadCandidacyStatusesWithRefresh(
         const sameLength = fresh.length === cached.length;
         const sameIds =
           sameLength &&
-          fresh.every((s, idx) => s.id === cached[idx]?.id && s.code === cached[idx]?.code);
+          fresh.every(
+            (s, idx) =>
+              s.id === cached[idx]?.id &&
+              s.code === cached[idx]?.code &&
+              s.isFinalizedMarker === cached[idx]?.isFinalizedMarker &&
+              s.isEnrollmentMarker === cached[idx]?.isEnrollmentMarker,
+          );
         if (!sameIds) onRefresh(fresh);
       }
     } catch {

@@ -22,6 +22,10 @@ export const homeShell = {
   greenAlpha11: 'rgba(47, 206, 148, 0.11)',
   greenAlpha18: 'rgba(47, 206, 148, 0.18)',
   greenAlpha28: 'rgba(47, 206, 148, 0.28)',
+  /** Fonds verts opaques (carte bac — au moins un canal publié) */
+  greenSurface: '#E6FAF2',
+  greenSurfaceStrong: '#D2F5E8',
+  greenBorder: '#7AD9B0',
   /** Surfaces carte */
   card: '#FFFFFF',
   cardText: '#0F172A',

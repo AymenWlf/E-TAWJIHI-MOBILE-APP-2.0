@@ -1,3 +1,5 @@
+import { sanitizeRichHtml } from '@/utils/sanitizeRichHtml';
+
 export function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -13,7 +15,7 @@ export function normalizeEstablishmentDescriptionHtml(description: string | null
   if (!t) return '';
 
   const looksHtml = /<[a-z][\s\S]*>/i.test(t);
-  if (looksHtml) return t;
+  if (looksHtml) return sanitizeRichHtml(t);
 
   const escaped = escapeHtml(t).replace(/\r\n|\r|\n/g, '<br />');
   return `<p>${escaped}</p>`;

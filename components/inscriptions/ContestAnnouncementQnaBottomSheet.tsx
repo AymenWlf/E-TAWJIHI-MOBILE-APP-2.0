@@ -13,6 +13,10 @@ type Props = {
   announcementId: number;
   /** Titre affiché dans l’en-tête (FR ou AR selon l’écran appelant). */
   announcementTitle: string;
+  /** École de l’annonce (filtrage onglet Inscriptions). */
+  establishmentId?: number;
+  /** Navigation vers les annonces (ex. fermer la sheet puis scroller). */
+  onPressContestAnnouncements?: () => void;
   onClose: () => void;
 };
 
@@ -24,6 +28,8 @@ export function ContestAnnouncementQnaBottomSheet({
   visible,
   announcementId,
   announcementTitle,
+  establishmentId,
+  onPressContestAnnouncements,
   onClose,
 }: Props) {
   const { t, isRTL } = useLocale();
@@ -66,6 +72,8 @@ export function ContestAnnouncementQnaBottomSheet({
               <CommunityQnaSection
                 contextType="contest_announcement"
                 contextId={announcementId}
+                establishmentId={establishmentId}
+                onPressContestAnnouncements={onPressContestAnnouncements}
                 variant="embedded"
                 marginHorizontal={0}
                 composerLayout="instagram"

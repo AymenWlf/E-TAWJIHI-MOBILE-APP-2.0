@@ -1,7 +1,8 @@
 import { router } from 'expo-router';
 import { useEffect } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
+import { LoadingContentCardSkeleton } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { brand } from '@/theme/tokens';
@@ -25,7 +26,7 @@ export default function LogoutScreen() {
 
   return (
     <View style={styles.root} accessibilityLabel="Logout">
-      <ActivityIndicator color={brand.primary} />
+      <LoadingContentCardSkeleton style={styles.cardSk} />
       <Text style={styles.txt}>Déconnexion…</Text>
     </View>
   );
@@ -40,5 +41,6 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   txt: { color: brand.textMuted, fontWeight: '800' },
+  cardSk: { width: '88%', maxWidth: 320 },
 });
 

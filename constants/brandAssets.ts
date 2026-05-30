@@ -11,6 +11,9 @@ export const ETAWJIHI_LOGO_LIGHT_URL = 'https://cdn.e-tawjihi.ma/logo-blanc-nobg
 /** Intrinsèque du PNG CDN (1000×500) — pour dimensionner le `<Image>` sans marge latérale due à `contain`. */
 export const ETAWJIHI_LOGO_LIGHT_ASPECT = 1000 / 500;
 
+/** Hauteur du logo en-tête accueil et bandeau diagnostic (largeur = aspect × hauteur). */
+export const ETAWJIHI_HEADER_LOGO_HEIGHT = 68;
+
 /** Logo marque transparent (même ressource que login / splash) — boutique, pastilles service, etc. */
 export const ETAWJIHI_LOGO_TRANSPARENT: ImageSourcePropType = require('../assets/images/logo-transparent.png');
 

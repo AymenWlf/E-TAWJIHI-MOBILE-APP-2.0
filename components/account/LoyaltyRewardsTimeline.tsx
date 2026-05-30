@@ -1,6 +1,7 @@
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { LoyaltyRewardMiniCard } from '@/components/account/LoyaltyRewardMiniCard';
+import { LoadingCardStack } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import type { HomeCopyKey } from '@/constants/i18n';
 import { homeShell } from '@/theme/homeShell';
@@ -44,18 +45,13 @@ export function LoyaltyRewardsTimeline({
   const hasMore = limit != null && tiers.length > limit;
 
   if (loading) {
-    return (
-      <View style={styles.loadWrap}>
-        <ActivityIndicator color={brand.primary} />
-        <Text style={[styles.loadTxt, rtl && styles.txtRtl]}>{t('loyaltyCatalogLoading')}</Text>
-      </View>
-    );
+    return <LoadingCardStack count={2} isRTL={rtl} style={styles.loadWrap} />;
   }
 
   if (error) {
     return (
       <View style={styles.loadWrap}>
-        <Text style={[styles.errTxt, rtl && styles.txtRtl]}>{t('loyaltyCatalogError')}</Text>
+        <Text style={[styles.errTxt, rtl && styles.txtRtl]}>{t('commonLoadError')}</Text>
         <Pressable onPress={onReload} style={styles.retryBtn}>
           <Text style={styles.retryBtnTxt}>{t('loyaltyCatalogRetry')}</Text>
         </Pressable>

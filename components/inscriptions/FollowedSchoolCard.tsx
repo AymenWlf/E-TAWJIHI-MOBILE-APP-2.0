@@ -2,6 +2,8 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useEffect, useRef } from 'react';
 import { Animated, Easing, Image, Pressable, StyleSheet, View } from 'react-native';
 
+import { StatusBadge } from '@/components/inscriptions/StatusBadge';
+import { TourFocusWrap } from '@/components/inscriptions/TourFocusWrap';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
 import {
@@ -9,35 +11,27 @@ import {
   getEstablishmentLogoUrl,
 } from '@/constants/establishmentMedia';
 import { useLocale } from '@/contexts/LocaleContext';
+import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { EstablishmentFollow } from '@/types/inscriptions';
-import {
-  formatDaysUntilClose,
-  formatTimeAgo,
-  pickAnnouncementTitle,
-  pickEstablishmentNamesPair,
-} from '@/utils/candidacyStatus';
-
-import { StatusBadge } from './StatusBadge';
+import type { ApplyToSchoolsTourGate } from '@/utils/applyToSchoolsTourProgress';
+import { pickEstablishmentName } from '@/utils/candidacyStatus';
 
 type Props = {
   follow: EstablishmentFollow;
-  /** Dernière annonce de l’école non encore « vue » (nouvelle annonce). */
   actionRequired?: boolean;
   onPress?: () => void;
   onUnfollow?: () => void;
   onOpenLatest?: () => void;
-  /**
-   * Ouvre la fiche école. Affiché en CTA secondaire dans l'état « aucune annonce »
-   * pour proposer une action utile à l'utilisateur.
-   */
   onOpenSchool?: () => void;
-  /**
-   * Ouvre le sheet de mise à jour de statut. Le bouton n'est rendu que si
-   * `follow.availableStatuses` est non vide (au moins une annonce de l'école
-   * autorise un statut).
-   */
   onUpdateStatus?: () => void;
+  tourFocusStatus?: boolean;
+  tourFocusLabel?: string;
+  tourFocusPulse?: boolean;
+  tourGate?: ApplyToSchoolsTourGate;
+  tourSuppressUpdatePulse?: boolean;
+  /** Changement de statut réservé TAWJIH PLUS. */
+  statusUpdateLocked?: boolean;
 };
 
 export function FollowedSchoolCard({
@@ -45,293 +39,202 @@ export function FollowedSchoolCard({
   actionRequired = false,
   onPress,
   onUnfollow,
-  onOpenLatest,
-  onOpenSchool,
   onUpdateStatus,
+  tourFocusStatus = false,
+  tourFocusLabel,
+  tourFocusPulse = true,
+  tourGate,
+  tourSuppressUpdatePulse = false,
+  statusUpdateLocked = false,
 }: Props) {
   const { t, locale, isRTL } = useLocale();
   const est = follow.establishment;
-  const stats = follow.stats;
-  const latest = follow.latestAnnouncement;
-  // Coloration de la carte selon le statut courant (cohérent avec CandidacyCard).
   const status = follow.status;
   const cardBg = actionRequired ? '#FFF1F2' : status?.colorBg ?? brand.white;
   const cardBorder = actionRequired ? '#FECACA' : status?.colorBorder ?? brand.border;
   const accentColor = actionRequired ? '#DC2626' : status?.colorFg ?? brand.primary;
   const hasUpdateAction = (follow.availableStatuses?.length ?? 0) > 0;
+  const statusInteractionEnabled = !tourGate || tourGate === 'status';
+  const secondaryActionsEnabled = !tourGate;
 
-  const { primary: estNamePrimary, secondary: estNameSecondary } = pickEstablishmentNamesPair(
-    est,
-    locale,
-  );
-  const villes = (est?.villes ?? []).filter(Boolean);
-  const villeMain = est?.ville?.trim() || '';
-  const villesShort = villes.length > 0 ? villes.slice(0, 3).join(' · ') : villeMain;
+  const schoolName = pickEstablishmentName(est, locale);
+  const sigle = (est?.sigle ?? '').trim();
+  const showSigle = Boolean(sigle) && sigle.toLowerCase() !== schoolName.trim().toLowerCase();
 
   const logoUri =
     getEstablishmentLogoUrl(est?.logo) ?? fallbackEstablishmentAvatarName(est?.nom, est?.sigle);
 
-  const deadline = latest ? formatDaysUntilClose(latest.daysUntilClose, locale) : { label: '', kind: 'normal' as const };
-
   const pulseScale = useRef(new Animated.Value(1)).current;
-  const pulseUpdate = Boolean(actionRequired && hasUpdateAction && onUpdateStatus);
+  const pulseOpacity = useRef(new Animated.Value(1)).current;
+  const pulseUpdate = Boolean(
+    actionRequired &&
+      hasUpdateAction &&
+      onUpdateStatus &&
+      !tourSuppressUpdatePulse &&
+      !statusUpdateLocked,
+  );
 
   useEffect(() => {
     if (!pulseUpdate) {
       pulseScale.setValue(1);
+      pulseOpacity.setValue(1);
       return;
     }
     const anim = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseScale, {
-          toValue: 1.08,
-          duration: 700,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseScale, {
-          toValue: 1,
-          duration: 700,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
+      Animated.parallel([
+        Animated.sequence([
+          Animated.timing(pulseScale, {
+            toValue: 1.04,
+            duration: 650,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseScale, {
+            toValue: 1,
+            duration: 650,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
+        Animated.sequence([
+          Animated.timing(pulseOpacity, {
+            toValue: 0.72,
+            duration: 650,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseOpacity, {
+            toValue: 1,
+            duration: 650,
+            easing: Easing.inOut(Easing.quad),
+            useNativeDriver: true,
+          }),
+        ]),
       ]),
     );
     anim.start();
     return () => {
       anim.stop();
       pulseScale.setValue(1);
+      pulseOpacity.setValue(1);
     };
-  }, [pulseUpdate, pulseScale]);
+  }, [pulseUpdate, pulseScale, pulseOpacity]);
 
   return (
     <Pressable
-      onPress={onPress}
+      onPress={tourGate ? undefined : onPress}
+      disabled={Boolean(tourGate)}
+      accessibilityRole="button"
       style={({ pressed }) => [
         styles.card,
-        { backgroundColor: cardBg, borderColor: cardBorder },
+        {
+          backgroundColor: cardBg,
+          borderColor: cardBorder,
+          borderStartColor: accentColor,
+        },
         actionRequired && styles.cardActionRequired,
-        pressed && { opacity: 0.92 },
-      ]}
-    >
-      <View
-        style={[
-          styles.accentBar,
-          { backgroundColor: accentColor },
-          isRTL && styles.accentBarRtl,
-        ]}
-      />
-
+        pressed && !tourGate && { opacity: 0.92 },
+      ]}>
       {actionRequired ? (
-        <View style={[styles.actionRequiredBanner, isRTL && styles.rowRtl]}>
-          <FontAwesome name="exclamation-circle" size={12} color="#B91C1C" />
-          <Text style={[styles.actionRequiredBannerTxt, isRTL && styles.rtl]} numberOfLines={4}>
-            {t('inscCandidaciesActionRequiredBanner')}
+        <Animated.View
+          style={[
+            styles.actionRequiredChip,
+            isRTL && styles.rowRtl,
+            pulseUpdate ? { opacity: pulseOpacity } : null,
+          ]}>
+          <FontAwesome name="exclamation-circle" size={11} color="#B91C1C" />
+          <Text style={[styles.actionRequiredChipTxt, isRTL && styles.rtlText]}>
+            {t('inscCandidaciesAttentionFilterRequired')}
           </Text>
-        </View>
+        </Animated.View>
       ) : null}
 
-      {/* Bandeau statut : posé tout en haut de la carte pour ne pas
-          écraser le bloc nom de l'école (qui peut être long en AR/FR). */}
-      <View style={[styles.statusRow, isRTL && styles.rowRtl]}>
-        <StatusBadge status={follow.status} size="sm" />
-      </View>
-
-      {/* Header : logo + nom (le statut est désormais au-dessus). */}
-      <View style={[styles.headerRow, isRTL && styles.rowRtl]}>
-        <Image
-          source={{ uri: logoUri }}
-          style={styles.logo}
-          resizeMode="contain"
-          accessibilityIgnoresInvertColors
-        />
-        <View style={styles.headerTexts}>
-          <Text style={[styles.estName, isRTL && styles.rtl]}>
-            {estNamePrimary}
-          </Text>
-          {estNameSecondary ? (
-            <Text style={[styles.estNameAlt, isRTL && styles.rtl]}>
-              {estNameSecondary}
+      <View style={[styles.body, isRTL && styles.bodyRtl]}>
+        <View style={[styles.topRow, isRTL && styles.rowRtl]}>
+          <Image
+            source={{ uri: logoUri }}
+            style={styles.logo}
+            resizeMode="contain"
+            accessibilityIgnoresInvertColors
+          />
+          <View style={styles.schoolCol}>
+            <Text style={[styles.schoolName, isRTL && styles.rtlText]} numberOfLines={2}>
+              {schoolName}
             </Text>
-          ) : null}
-          <View style={[styles.estMetaRow, isRTL && styles.rowRtl]}>
-            {est?.sigle ? (
-              <View style={styles.siglePill}>
-                <Text style={styles.siglePillTxt}>{est.sigle}</Text>
+            {(showSigle || est?.type) ? (
+              <View style={[styles.metaRow, isRTL && styles.rowRtl]}>
+                {showSigle ? (
+                  <View style={styles.siglePill}>
+                    <Text style={styles.siglePillTxt} numberOfLines={1}>
+                      {sigle}
+                    </Text>
+                  </View>
+                ) : null}
+                {est?.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
               </View>
             ) : null}
-            {est?.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
-          </View>
-        </View>
-      </View>
-
-      {villesShort ? (
-        <View style={[styles.villeRow, isRTL && styles.rowRtl]}>
-          <FontAwesome name="map-marker" size={11} color={brand.textMuted} />
-          <Text style={[styles.villeTxt, isRTL && styles.rtl]} numberOfLines={1}>
-            {villesShort}
-            {villes.length > 3 ? ` +${villes.length - 3}` : ''}
-          </Text>
-        </View>
-      ) : null}
-
-      {/* Stats */}
-      <View style={[styles.statsRow, isRTL && styles.rowRtl]}>
-        <View style={styles.statPill}>
-          <FontAwesome name="bullhorn" size={11} color={brand.primary} />
-          <Text style={styles.statPillTxt}>
-            {stats.totalAnnouncements} {t('followedSchoolStatTotalAnnouncements')}
-          </Text>
-        </View>
-        {stats.openAnnouncements > 0 ? (
-          <View style={[styles.statPill, styles.statPillOpen]}>
-            <FontAwesome name="play-circle" size={11} color="#15803D" />
-            <Text style={[styles.statPillTxt, { color: '#15803D' }]}>
-              {stats.openAnnouncements} {t('followedSchoolStatOpenAnnouncements')}
-            </Text>
-          </View>
-        ) : null}
-        {stats.candidaciesCount > 0 ? (
-          <View style={styles.statPill}>
-            <FontAwesome name="flag-checkered" size={11} color={brand.primary} />
-            <Text style={styles.statPillTxt}>
-              {stats.candidaciesCount} {t('followedSchoolStatCandidacies')}
-            </Text>
-          </View>
-        ) : null}
-      </View>
-
-      {/* Latest announcement */}
-      {latest ? (
-        <Pressable
-          onPress={onOpenLatest}
-          style={({ pressed }) => [
-            styles.latestBox,
-            actionRequired && styles.latestBoxActionRequired,
-            pressed && onOpenLatest ? { opacity: 0.85 } : null,
-          ]}
-        >
-          <View style={[styles.latestHeader, isRTL && styles.rowRtl]}>
-            <FontAwesome name="bookmark" size={10} color={brand.primary} />
-            <Text style={[styles.latestEyebrow, isRTL && styles.rtl]} numberOfLines={1}>
-              {t('followedSchoolLatestAnnouncement')}
-            </Text>
-            {actionRequired ? (
-              <View style={[styles.latestActionTag, isRTL && styles.latestActionTagRtl]}>
-                <Text style={styles.latestActionTagTxt}>{t('inscCandidaciesLatestAnnouncementActionTag')}</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={[styles.latestTitle, isRTL && styles.rtl]} numberOfLines={2}>
-            {pickAnnouncementTitle(latest, locale) || latest.title}
-          </Text>
-          {deadline.label ? (
-            <View style={[styles.latestMeta, isRTL && styles.rowRtl]}>
-              <View
-                style={[
-                  styles.countdown,
-                  deadline.kind === 'closed' && styles.countdownClosed,
-                  deadline.kind === 'today' && styles.countdownToday,
-                  deadline.kind === 'soon' && styles.countdownSoon,
-                  deadline.kind === 'normal' && styles.countdownOpen,
-                ]}
-              >
-                <FontAwesome
-                  name={deadline.kind === 'closed' ? 'lock' : 'hourglass-half'}
-                  size={10}
-                  color={
-                    deadline.kind === 'closed'
-                      ? '#B91C1C'
-                      : deadline.kind === 'today'
-                        ? '#B45309'
-                        : deadline.kind === 'soon'
-                          ? '#9A3412'
-                          : '#15803D'
-                  }
-                />
-                <Text
-                  style={[
-                    styles.countdownTxt,
-                    deadline.kind === 'closed' && { color: '#B91C1C' },
-                    deadline.kind === 'today' && { color: '#B45309' },
-                    deadline.kind === 'soon' && { color: '#9A3412' },
-                    deadline.kind === 'normal' && { color: '#15803D' },
-                  ]}
-                >
-                  {deadline.label}
-                </Text>
-              </View>
-            </View>
-          ) : null}
-        </Pressable>
-      ) : (
-        <View style={styles.emptyBox}>
-          <View style={[styles.emptyHeader, isRTL && styles.rowRtl]}>
-            <View style={styles.emptyIcon}>
-              <FontAwesome name="bell-o" size={14} color={brand.primary} />
-            </View>
-            <View style={styles.emptyTextBlock}>
-              <Text style={[styles.emptyTitle, isRTL && styles.rtl]} numberOfLines={2}>
-                {t('followedSchoolNoAnnouncementsTitle')}
-              </Text>
-              <Text style={[styles.emptyHint, isRTL && styles.rtl]} numberOfLines={3}>
-                {t('followedSchoolNoAnnouncementsHint')}
-              </Text>
+            <View style={[styles.statusRow, isRTL && styles.rowRtl]}>
+              <StatusBadge status={follow.status} size="sm" />
             </View>
           </View>
-          {onOpenSchool ? (
+
+          {onUnfollow && secondaryActionsEnabled ? (
             <Pressable
               onPress={(e) => {
                 e.stopPropagation?.();
-                onOpenSchool();
+                onUnfollow();
               }}
-              style={({ pressed }) => [
-                styles.emptyCta,
-                isRTL && styles.rowRtl,
-                pressed && { opacity: 0.85 },
-              ]}
-            >
-              <FontAwesome name="external-link" size={11} color={brand.primary} />
-              <Text style={styles.emptyCtaTxt}>{t('followedSchoolViewSchoolBtn')}</Text>
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('followSchoolUnfollowBtn')}
+              style={({ pressed }) => [styles.unfollowBtn, pressed && { opacity: 0.75 }]}>
+              <FontAwesome name="trash-o" size={14} color="#B91C1C" />
             </Pressable>
           ) : null}
         </View>
-      )}
 
-      {/* Latest event hint */}
-      {follow.latestEvent ? (
-        <Text style={[styles.eventHint, isRTL && styles.rtl]} numberOfLines={1}>
-          <FontAwesome name="history" size={10} color={brand.textMuted} />{' '}
-          {follow.latestEvent.message ?? '—'} · {formatTimeAgo(follow.latestEvent.createdAt, locale)}
-        </Text>
-      ) : null}
-
-      {/* Actions — Mettre à jour le statut + Ne plus suivre */}
-      <View style={[styles.actionsRow, isRTL && styles.rowRtl]}>
         {hasUpdateAction && onUpdateStatus ? (
-          <Animated.View style={pulseUpdate ? { flex: 1, transform: [{ scale: pulseScale }] } : styles.btnFlex}>
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation?.();
-                onUpdateStatus();
-              }}
-              style={({ pressed }) => [styles.btn, styles.btnPrimary, pressed && { opacity: 0.85 }]}
-            >
-              <FontAwesome name="pencil" size={11} color={brand.white} />
-              <Text style={styles.btnPrimaryTxt}>{t('inscStatusActionUpdate')}</Text>
-            </Pressable>
-          </Animated.View>
+          <TourFocusWrap
+            active={tourFocusStatus}
+            pulse={tourFocusPulse}
+            label={tourFocusStatus ? tourFocusLabel : undefined}
+            style={styles.updateWrap}>
+            <Animated.View
+              style={[
+                styles.updateWrap,
+                pulseUpdate && !tourFocusStatus ? { transform: [{ scale: pulseScale }] } : null,
+              ]}>
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  if (!statusInteractionEnabled) return;
+                  onUpdateStatus();
+                }}
+                disabled={!statusInteractionEnabled}
+                accessibilityRole="button"
+                accessibilityLabel={
+                  statusUpdateLocked ? t('inscTawjihPlusUpgradeCta') : t('inscStatusActionUpdate')
+                }
+                style={({ pressed }) => [
+                  styles.updateBtn,
+                  statusUpdateLocked && styles.updateBtnLocked,
+                  actionRequired && !statusUpdateLocked && styles.updateBtnUrgent,
+                  pressed && statusInteractionEnabled && { opacity: 0.88 },
+                  tourFocusStatus && styles.updateBtnTourFocus,
+                  !statusInteractionEnabled && styles.tourActionDisabled,
+                ]}>
+                <FontAwesome
+                  name={statusUpdateLocked ? 'lock' : 'pencil'}
+                  size={12}
+                  color={brand.white}
+                />
+                <Text style={styles.updateBtnTxt} numberOfLines={2}>
+                  {statusUpdateLocked ? t('inscTawjihPlusUpgradeCta') : t('inscStatusActionUpdate')}
+                </Text>
+              </Pressable>
+            </Animated.View>
+          </TourFocusWrap>
         ) : null}
-        <Pressable
-          onPress={(e) => {
-            e.stopPropagation?.();
-            onUnfollow?.();
-          }}
-          style={({ pressed }) => [styles.btn, styles.btnDanger, pressed && { opacity: 0.85 }]}
-        >
-          <FontAwesome name="trash-o" size={11} color="#B91C1C" />
-          <Text style={styles.btnDangerTxt}>{t('followSchoolUnfollowBtn')}</Text>
-        </Pressable>
       </View>
     </Pressable>
   );
@@ -339,229 +242,139 @@ export function FollowedSchoolCard({
 
 const styles = StyleSheet.create({
   card: {
-    backgroundColor: brand.white,
     borderRadius: radius.lg,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingStart: spacing.md + 6,
-    gap: spacing.sm,
-    borderWidth: 1,
-    borderColor: brand.border,
-    shadowColor: '#0F172A',
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    shadowOffset: { width: 0, height: 2 },
-    elevation: 1,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderStartWidth: 4,
+    marginBottom: spacing.sm,
     overflow: 'hidden',
-    position: 'relative',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 6,
+    elevation: 2,
   },
   cardActionRequired: {
-    borderWidth: 2,
+    borderWidth: 1.5,
   },
-  actionRequiredBanner: {
+  actionRequiredChip: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
-    alignSelf: 'stretch',
-    marginHorizontal: -spacing.md,
-    marginTop: -spacing.md,
-    paddingVertical: 8,
+    paddingVertical: 6,
     paddingHorizontal: spacing.md,
     backgroundColor: '#FEE2E2',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#FECACA',
   },
-  actionRequiredBannerTxt: {
-    flex: 1,
+  actionRequiredChipTxt: {
     color: '#991B1B',
-    fontWeight: '900',
-    fontSize: fontSize.xs,
-    letterSpacing: 0.15,
-  },
-  accentBar: {
-    position: 'absolute',
-    top: 0,
-    bottom: 0,
-    left: 0,
-    width: 4,
-    borderTopLeftRadius: radius.lg,
-    borderBottomLeftRadius: radius.lg,
-  },
-  accentBarRtl: {
-    left: undefined,
-    right: 0,
-    borderTopLeftRadius: 0,
-    borderBottomLeftRadius: 0,
-    borderTopRightRadius: radius.lg,
-    borderBottomRightRadius: radius.lg,
-  },
-  /* Le badge de statut est posé sur sa propre ligne en haut de carte
-     pour éviter qu'il ne pousse le bloc nom de l'école (parfois long). */
-  statusRow: { flexDirection: 'row', alignItems: 'center' },
-  headerRow: { flexDirection: 'row', alignItems: 'center', gap: spacing.sm },
-  rowRtl: { flexDirection: 'row-reverse' },
-  logo: { width: 44, height: 44, borderRadius: radius.sm, backgroundColor: brand.borderLight },
-  headerTexts: { flex: 1, gap: 3 },
-  estName: { fontWeight: '800', color: brand.text, fontSize: fontSize.md, lineHeight: 19 },
-  /** Nom dans l'autre langue (FR pour locale AR, AR pour locale FR). */
-  estNameAlt: {
-    fontWeight: '600',
-    color: brand.textMuted,
-    fontSize: fontSize.sm,
-    lineHeight: 17,
-    marginTop: 1,
-  },
-  estMetaRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: 6 },
-  siglePill: {
-    paddingHorizontal: 7,
-    paddingVertical: 2,
-    backgroundColor: 'rgba(51,62,143,0.10)',
-    borderRadius: radius.sm,
-  },
-  siglePillTxt: { color: brand.primary, fontWeight: '800', fontSize: fontSize.xs, letterSpacing: 0.4 },
-  villeRow: { flexDirection: 'row', alignItems: 'center', gap: 5 },
-  villeTxt: { color: brand.textSecondary, fontSize: fontSize.xs, fontWeight: '600', flex: 1 },
-
-  statsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
-  statPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.full,
-    backgroundColor: brand.borderLight,
-  },
-  statPillOpen: { backgroundColor: '#DCFCE7' },
-  statPillTxt: { fontSize: fontSize.xs, color: brand.text, fontWeight: '700' },
-
-  latestBox: {
-    backgroundColor: brand.white,
-    borderRadius: radius.md,
-    padding: spacing.sm,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: brand.border,
-    gap: 4,
-  },
-  latestBoxActionRequired: {
-    borderColor: '#F87171',
-    backgroundColor: '#FFF7F7',
-  },
-  latestHeader: { flexDirection: 'row', alignItems: 'center', gap: 5, flexWrap: 'wrap' },
-  latestActionTag: {
-    marginStart: 'auto',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.full,
-    backgroundColor: '#FEE2E2',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#FECACA',
-  },
-  latestActionTagTxt: {
-    color: '#991B1B',
-    fontWeight: '900',
-    fontSize: 9,
-    letterSpacing: 0.2,
-  },
-  latestEyebrow: {
-    flex: 1,
-    minWidth: 0,
-    color: brand.primary,
     fontWeight: '800',
     fontSize: fontSize.xs,
-    textTransform: 'uppercase',
-    letterSpacing: 0.4,
+    letterSpacing: 0.2,
   },
-  latestActionTagRtl: {
-    marginStart: 0,
-    marginEnd: 'auto',
-  },
-  latestTitle: { color: brand.text, fontWeight: '700', fontSize: fontSize.sm, lineHeight: 18 },
-  latestMeta: { marginTop: 2, flexDirection: 'row', alignItems: 'center' },
-
-  /* Countdown */
-  countdown: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'transparent',
-  },
-  countdownTxt: { fontWeight: '800', fontSize: fontSize.xs },
-  countdownOpen: { backgroundColor: '#DCFCE7', borderColor: '#BBF7D0' },
-  countdownSoon: { backgroundColor: '#FFEDD5', borderColor: '#FED7AA' },
-  countdownToday: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },
-  countdownClosed: { backgroundColor: '#FEE2E2', borderColor: '#FECACA' },
-
-  muted: { color: brand.textMuted, fontSize: fontSize.xs, fontStyle: 'italic' },
-  eventHint: { color: brand.textMuted, fontSize: fontSize.xs, fontWeight: '600' },
-
-  /* État « pas encore d'annonce » : panneau dédié, plus visuel qu'un texte muted */
-  emptyBox: {
-    backgroundColor: '#F8FAFF',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderStyle: 'dashed',
-    borderColor: 'rgba(51,62,143,0.30)',
-    borderRadius: radius.md,
-    padding: spacing.sm + 2,
+  body: {
+    padding: spacing.md,
     gap: spacing.sm,
   },
-  emptyHeader: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm },
-  emptyIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: 'rgba(51,62,143,0.10)',
-    alignItems: 'center',
-    justifyContent: 'center',
+  bodyRtl: {
+    direction: 'rtl',
   },
-  emptyTextBlock: { flex: 1, gap: 2 },
-  emptyTitle: { color: brand.text, fontWeight: '800', fontSize: fontSize.sm, lineHeight: 18 },
-  emptyHint: { color: brand.textMuted, fontWeight: '600', fontSize: 11.5, lineHeight: 16 },
-  emptyCta: {
+  rowRtl: {
+    flexDirection: 'row-reverse',
+  },
+  rtlText: {
+    writingDirection: 'rtl',
+    textAlign: 'right',
+  },
+  topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  logo: {
+    width: 48,
+    height: 48,
     borderRadius: radius.md,
-    backgroundColor: brand.white,
+    backgroundColor: 'rgba(51, 62, 143, 0.06)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: brand.primary,
-    alignSelf: 'flex-start',
+    borderColor: 'rgba(51, 62, 143, 0.12)',
   },
-  emptyCtaTxt: { color: brand.primary, fontWeight: '800', fontSize: fontSize.xs },
-
-  actionsRow: { flexDirection: 'row', gap: spacing.sm, marginTop: 2 },
-  btnFlex: { flex: 1 },
-  btn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 6,
-    paddingVertical: 9,
-    paddingHorizontal: 12,
-    borderRadius: radius.md,
+  schoolCol: {
     flex: 1,
+    minWidth: 0,
+    gap: 4,
   },
-  btnPrimary: { backgroundColor: brand.primary },
-  btnPrimaryTxt: { color: brand.white, fontSize: fontSize.sm, fontWeight: '700' },
-  btnSecondary: {
+  schoolName: {
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    color: brand.text,
+    lineHeight: 20,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
+  siglePill: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(51, 62, 143, 0.08)',
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: brand.primary,
-    backgroundColor: brand.white,
+    borderColor: 'rgba(51, 62, 143, 0.14)',
+    maxWidth: '100%',
   },
-  btnSecondaryTxt: { color: brand.primary, fontSize: fontSize.sm, fontWeight: '700' },
-  btnDanger: {
+  siglePillTxt: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: brand.primary,
+    letterSpacing: 0.3,
+  },
+  statusRow: {
+    flexDirection: 'row',
+    marginTop: 2,
+  },
+  unfollowBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FEF2F2',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#FECACA',
-    backgroundColor: '#FEF2F2',
   },
-  btnDangerTxt: { color: '#B91C1C', fontSize: fontSize.sm, fontWeight: '700' },
-
-  rtl: { textAlign: 'right', writingDirection: 'rtl' },
+  updateWrap: {
+    width: '100%',
+  },
+  updateBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 10,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    backgroundColor: brand.primary,
+  },
+  updateBtnUrgent: {
+    backgroundColor: '#DC2626',
+  },
+  updateBtnLocked: {
+    backgroundColor: '#475569',
+  },
+  updateBtnTxt: {
+    color: brand.white,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+  },
+  updateBtnTourFocus: {
+    borderWidth: 2,
+    borderColor: homeShell.green,
+  },
+  tourActionDisabled: {
+    opacity: 0.38,
+  },
 });

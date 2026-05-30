@@ -120,6 +120,7 @@ type ItemResponse = { success: boolean; data: PlatformEventBrief };
 export async function fetchPlatformEvents(
   accessToken: string | undefined,
   scope: 'upcoming' | 'past' | 'all' | 'live' = 'upcoming',
+  options?: { throwOnError?: boolean },
 ): Promise<PlatformEventBrief[]> {
   const url = buildApiUrl(`/api/platform-events?scope=${encodeURIComponent(scope)}&limit=80`);
   const headers: HeadersInit = {};
@@ -127,7 +128,8 @@ export async function fetchPlatformEvents(
   try {
     const res = await httpGetJson<ListResponse>(url, { headers });
     return res.success && Array.isArray(res.data) ? res.data.map(coercePlatformEventBrief) : [];
-  } catch {
+  } catch (e) {
+    if (options?.throwOnError) throw e;
     return [];
   }
 }
@@ -135,6 +137,7 @@ export async function fetchPlatformEvents(
 export async function fetchPlatformEventDetail(
   accessToken: string | undefined,
   id: number,
+  options?: { throwOnError?: boolean },
 ): Promise<PlatformEventBrief | null> {
   const url = buildApiUrl(`/api/platform-events/${id}`);
   const headers: HeadersInit = {};
@@ -142,7 +145,8 @@ export async function fetchPlatformEventDetail(
   try {
     const res = await httpGetJson<ItemResponse>(url, { headers });
     return res.success && res.data ? coercePlatformEventBrief(res.data) : null;
-  } catch {
+  } catch (e) {
+    if (options?.throwOnError) throw e;
     return null;
   }
 }

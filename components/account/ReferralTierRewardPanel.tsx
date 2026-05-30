@@ -15,9 +15,16 @@ import { CelebrationConfetti } from '@/components/ui/CelebrationConfetti';
 import { Text } from '@/components/ui/Text';
 import type { HomeCopyKey } from '@/constants/i18n';
 import { useAuth } from '@/contexts/AuthContext';
-import { claimReferralTierPromo, type ReferralTierInfo, type ReferralTierPromoClaim } from '@/services/userReferral';
+import {
+  claimReferralTierPromo,
+  type ReferralTierInfo,
+  type ReferralTierProduct,
+  type ReferralTierPromoClaim,
+} from '@/services/userReferral';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { resolveShopImageUrl, shopProductPrimaryImage } from '@/utils/shopImageUrl';
+import { getUserFacingApiError } from '@/utils/apiError';
 
 type Props = {
   tier: ReferralTierInfo;
@@ -30,6 +37,45 @@ type Props = {
 function tierLabel(tier: ReferralTierInfo, locale: 'fr' | 'ar'): string {
   if (locale === 'ar' && tier.rewardLabelAr) return tier.rewardLabelAr;
   return tier.rewardLabelFr ?? '';
+}
+
+function rewardProductImageUri(product: ReferralTierProduct): string {
+  const fromUrl = resolveShopImageUrl(product.imageUrl);
+  if (fromUrl) return fromUrl;
+  if (product.images?.length) return shopProductPrimaryImage(product.images);
+  return '';
+}
+
+function RewardProductThumb({ product, icon }: { product: ReferralTierProduct; icon: 'gift' | 'book' }) {
+  const uri = rewardProductImageUri(product);
+  if (uri) {
+    return <Image source={{ uri }} style={styles.productRowThumb} resizeMode="cover" />;
+  }
+  return (
+    <View style={[styles.productRowThumb, styles.productThumbFallback]}>
+      <FontAwesome name={icon} size={20} color={homeShell.cardMuted} />
+    </View>
+  );
+}
+
+function RewardProductPrice({
+  product,
+  rtl,
+  t,
+}: {
+  product: ReferralTierProduct;
+  rtl: boolean;
+  t: (k: HomeCopyKey) => string;
+}) {
+  const priceLabel = product.price?.trim();
+  return (
+    <View style={[styles.priceRow, rtl && styles.rowRtl]}>
+      {priceLabel ? (
+        <Text style={[styles.priceStruck, rtl && styles.txtRtl]}>{priceLabel} MAD</Text>
+      ) : null}
+      <Text style={[styles.priceFree, rtl && styles.txtRtl]}>{t('referralTierRewardFree')}</Text>
+    </View>
+  );
 }
 
 export function ReferralTierRewardPanel({ tier, rtl, locale, t, onClaimSuccess }: Props) {
@@ -64,7 +110,7 @@ export function ReferralTierRewardPanel({ tier, rtl, locale, t, onClaimSuccess }
   }, [promo?.code, t]);
 
   const generatePromo = useCallback(async () => {
-    if (!tier.unlocked || claiming || tier.rewardTakenOnOtherTier || tier.canClaim === false) return;
+    if (!tier.unlocked || claiming || tier.canClaim === false) return;
     const productId = isChoice ? selectedId : selected?.id;
     if (!productId) {
       Alert.alert(t('referralTierPickProduct'));
@@ -80,8 +126,7 @@ export function ReferralTierRewardPanel({ tier, rtl, locale, t, onClaimSuccess }
       setTimeout(() => setShowConfetti(false), 4000);
       onClaimSuccess?.();
     } catch (e) {
-      const msg = e instanceof Error && e.message !== 'claim_failed' ? e.message : t('referralTierPromoError');
-      Alert.alert(msg);
+      Alert.alert(t('referralTierPromoError'), getUserFacingApiError(e, t, { context: 'account', fallbackKey: 'referralTierPromoError' }));
     } finally {
       setClaiming(false);
     }
@@ -100,22 +145,6 @@ export function ReferralTierRewardPanel({ tier, rtl, locale, t, onClaimSuccess }
   if (!tier.unlocked) return null;
   if (products.length === 0) return null;
 
-  if (tier.rewardTakenOnOtherTier && !claim) {
-    return (
-      <View style={[styles.wrap, rtl && styles.wrapRtl]}>
-        <View style={[styles.blockedBox, rtl && styles.rowRtl]}>
-          <FontAwesome name="lock" size={16} color={homeShell.cardMuted} />
-          <Text style={[styles.blockedTxt, rtl && styles.txtRtl]}>
-            {t('referralRewardTakenOnOtherTier').replace(
-              '{{tier}}',
-              String(tier.claimedTierIndex ?? 1),
-            )}
-          </Text>
-        </View>
-      </View>
-    );
-  }
-
   return (
     <View style={[styles.wrap, rtl && styles.wrapRtl]}>
       {showConfetti ? (
@@ -131,12 +160,8 @@ export function ReferralTierRewardPanel({ tier, rtl, locale, t, onClaimSuccess }
         <Text style={[styles.tierLabel, rtl && styles.txtRtl]}>{tierLabel(tier, locale)}</Text>
       ) : null}
 
-      {!claim && tier.canClaim !== false ? (
-        <Text style={[styles.singleRewardHint, rtl && styles.txtRtl]}>{t('referralSingleRewardHint')}</Text>
-      ) : null}
-
       {isChoice && !claim ? (
-        <View style={styles.productGrid}>
+        <View style={styles.productList}>
           {products.map((p) => {
             const active = p.id === selectedId;
             return (
@@ -144,28 +169,22 @@ export function ReferralTierRewardPanel({ tier, rtl, locale, t, onClaimSuccess }
                 key={p.id}
                 onPress={() => setSelectedId(p.id)}
                 style={[
-                  styles.productCard,
-                  active && styles.productCardActive,
-                  rtl && styles.productCardRtl,
+                  styles.productRow,
+                  active && styles.productRowActive,
+                  rtl && styles.rowRtl,
                 ]}>
-                {p.imageUrl ? (
-                  <Image source={{ uri: p.imageUrl }} style={styles.productThumb} />
-                ) : (
-                  <View style={[styles.productThumb, styles.productThumbFallback]}>
-                    <FontAwesome name="gift" size={20} color={homeShell.cardMuted} />
-                  </View>
-                )}
-                <Text style={[styles.productTitle, rtl && styles.txtRtl]} numberOfLines={2}>
-                  {p.title}
-                </Text>
-                {p.price ? (
-                  <Text style={[styles.productPrice, rtl && styles.txtRtl]}>{p.price} MAD</Text>
-                ) : null}
-                {active ? (
-                  <View style={[styles.checkBadge, rtl && styles.checkBadgeRtl]}>
-                    <FontAwesome name="check" size={10} color={brand.white} />
-                  </View>
-                ) : null}
+                <RewardProductThumb product={p} icon="gift" />
+                <View style={styles.productRowBody}>
+                  <Text style={[styles.productRowTitle, rtl && styles.txtRtl]}>{p.title}</Text>
+                  <RewardProductPrice product={p} rtl={rtl} t={t} />
+                </View>
+                <View
+                  style={[
+                    styles.selectIndicator,
+                    active && styles.selectIndicatorActive,
+                  ]}>
+                  {active ? <FontAwesome name="check" size={12} color={brand.white} /> : null}
+                </View>
               </Pressable>
             );
           })}
@@ -174,25 +193,15 @@ export function ReferralTierRewardPanel({ tier, rtl, locale, t, onClaimSuccess }
         <Pressable
           onPress={() => router.push(`/boutique/${selected.slug}`)}
           style={[styles.singleProductRow, rtl && styles.rowRtl]}>
-          {selected.imageUrl ? (
-            <Image source={{ uri: selected.imageUrl }} style={styles.singleThumb} />
-          ) : (
-            <View style={[styles.singleThumb, styles.productThumbFallback]}>
-              <FontAwesome name="book" size={18} color={homeShell.cardMuted} />
-            </View>
-          )}
+          <RewardProductThumb product={selected} icon="book" />
           <View style={styles.singleBody}>
-            <Text style={[styles.productTitle, rtl && styles.txtRtl]} numberOfLines={2}>
-              {selected.title}
-            </Text>
+            <Text style={[styles.productRowTitle, rtl && styles.txtRtl]}>{selected.title}</Text>
             {selected.description ? (
               <Text style={[styles.productDesc, rtl && styles.txtRtl]} numberOfLines={3}>
                 {selected.description}
               </Text>
             ) : null}
-            {selected.price ? (
-              <Text style={[styles.productPrice, rtl && styles.txtRtl]}>{selected.price} MAD</Text>
-            ) : null}
+            <RewardProductPrice product={selected} rtl={rtl} t={t} />
           </View>
           <FontAwesome name={rtl ? 'chevron-left' : 'chevron-right'} size={12} color={brand.primary} />
         </Pressable>
@@ -332,67 +341,82 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: homeShell.greenDark,
   },
-  productGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+  productList: {
     gap: spacing.sm,
   },
-  productCard: {
-    width: '47%',
-    flexGrow: 1,
+  productRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
     padding: spacing.sm,
     borderRadius: radius.lg,
     borderWidth: 1.5,
     borderColor: homeShell.borderOnWhite,
     backgroundColor: '#F8FAFC',
-    gap: 6,
-    position: 'relative',
   },
-  productCardRtl: { direction: 'rtl' },
-  productCardActive: {
+  productRowActive: {
     borderColor: brand.primary,
     backgroundColor: `${brand.primary}08`,
   },
-  productThumb: {
-    width: '100%',
-    height: 72,
+  productRowThumb: {
+    width: 96,
+    height: 64,
     borderRadius: radius.md,
     backgroundColor: '#E2E8F0',
+    flexShrink: 0,
   },
   productThumbFallback: {
     alignItems: 'center',
     justifyContent: 'center',
   },
-  productTitle: {
-    fontSize: fontSize.xs,
+  productRowBody: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  productRowTitle: {
+    fontSize: fontSize.sm,
     fontWeight: '800',
     color: homeShell.cardText,
-    lineHeight: 16,
+    lineHeight: 20,
   },
-  productPrice: {
-    fontSize: 10,
-    fontWeight: '700',
-    color: brand.primary,
+  priceRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 8,
+    marginTop: 2,
+  },
+  priceStruck: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: homeShell.cardMuted,
+    textDecorationLine: 'line-through',
+  },
+  priceFree: {
+    fontSize: fontSize.sm,
+    fontWeight: '900',
+    color: homeShell.greenDark,
   },
   productDesc: {
     fontSize: 10,
     color: homeShell.cardMuted,
     lineHeight: 14,
   },
-  checkBadge: {
-    position: 'absolute',
-    top: 8,
-    right: 8,
-    width: 20,
-    height: 20,
-    borderRadius: 10,
-    backgroundColor: brand.primary,
+  selectIndicator: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: '#CBD5E1',
+    backgroundColor: brand.white,
     alignItems: 'center',
     justifyContent: 'center',
+    flexShrink: 0,
   },
-  checkBadgeRtl: {
-    right: undefined,
-    left: 8,
+  selectIndicatorActive: {
+    borderColor: brand.primary,
+    backgroundColor: brand.primary,
   },
   singleProductRow: {
     flexDirection: 'row',
@@ -405,13 +429,7 @@ const styles = StyleSheet.create({
     borderColor: homeShell.borderOnWhite,
   },
   rowRtl: { flexDirection: 'row-reverse' },
-  singleThumb: {
-    width: 56,
-    height: 56,
-    borderRadius: radius.md,
-    backgroundColor: '#E2E8F0',
-  },
-  singleBody: { flex: 1, gap: 4 },
+  singleBody: { flex: 1, gap: 4, minWidth: 0 },
   generateBtn: {
     flexDirection: 'row',
     alignItems: 'center',

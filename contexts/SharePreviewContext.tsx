@@ -9,7 +9,6 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   Clipboard,
   Image,
@@ -22,6 +21,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LoadingContentCardSkeleton } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import { buildPublicPageUrl } from '@/constants/publicWeb';
 import type { HomeCopyKey } from '@/constants/i18n';
@@ -217,7 +217,7 @@ export function SharePreviewProvider({ children }: { children: ReactNode }) {
                       style={styles.waHeroPlaceholder}
                       accessibilityLabel={t('shareLinkPreviewLoading')}
                     >
-                      <ActivityIndicator color={brand.primary} />
+                      <LoadingContentCardSkeleton style={styles.waHeroSkeletonCard} />
                     </View>
                   ) : (
                     <View style={styles.waHeroPlaceholder}>
@@ -355,6 +355,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: brand.backgroundSoft,
+    paddingHorizontal: spacing.md,
+  },
+  waHeroSkeletonCard: {
+    width: '100%',
+    maxWidth: 320,
   },
   waBody: {
     padding: spacing.md,

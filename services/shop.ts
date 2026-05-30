@@ -1,6 +1,10 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
 import { fetchPlatformServices, type PlatformServiceItem } from '@/services/platformServices';
+import {
+  fetchPlatformServiceCatalogEntitlements,
+  type PlatformServiceCatalogEntitlement,
+} from '@/services/platformServices';
 import { platformServiceEffectiveUnitPriceString } from '@/utils/platformServicePrice';
 import type {
   CreateShopOrderInput,
@@ -151,7 +155,14 @@ export async function uploadShopOrderBankTransferReceipt(
 /**
  * Recharge prix catalogue et livraison gratuite (évite sous-total à 0 si panier persisté obsolète).
  */
-export async function hydrateCartLinesPricesViaApi(lines: ShopCartLine[]): Promise<ShopCartLine[]> {
+export async function hydrateCartLinesPricesViaApi(
+  lines: ShopCartLine[],
+  options?: {
+    entitlementsBySlug?: Record<string, PlatformServiceCatalogEntitlement>;
+    phone?: string;
+    accessToken?: string | null;
+  },
+): Promise<ShopCartLine[]> {
   if (lines.length === 0) return lines;
 
   const productSlugs = lines
@@ -176,13 +187,21 @@ export async function hydrateCartLinesPricesViaApi(lines: ShopCartLine[]): Promi
     serviceBySlug = new Map(list.map((s) => [s.slug, s]));
   }
 
+  let entitlementsBySlug = options?.entitlementsBySlug;
+  if (!entitlementsBySlug && serviceSlugs.length > 0) {
+    entitlementsBySlug = await fetchPlatformServiceCatalogEntitlements(
+      { phone: options?.phone, cartSlugs: [...new Set(serviceSlugs)] },
+      options?.accessToken ?? null,
+    );
+  }
+
   let changed = false;
   const next = lines.map((l) => {
     if (isPlatformServiceCartLine(l)) {
       const slug = (l.platformServiceSlug ?? l.slug).trim();
       const svc = serviceBySlug.get(slug);
       if (!svc) return l;
-      const price = platformServiceEffectiveUnitPriceString(svc);
+      const price = platformServiceEffectiveUnitPriceString(svc, entitlementsBySlug?.[slug]);
       const currency = svc.currency || l.currency;
       if (price === l.price && currency === l.currency && l.isFreeShipping === svc.isFreeShipping) return l;
       changed = true;

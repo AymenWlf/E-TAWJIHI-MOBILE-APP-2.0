@@ -64,6 +64,15 @@ export type StoryAnalyticsEvent =
   | 'complete'
   | 'cta_click';
 
+/** IDs API (entiers). Les mocks locaux (`story-cdn-1`, etc.) sont ignorés. */
+function parseStoryApiId(raw?: string): number | undefined {
+  if (raw == null || raw === '') return undefined;
+  const t = String(raw).trim();
+  if (!/^\d+$/.test(t)) return undefined;
+  const n = parseInt(t, 10);
+  return n > 0 ? n : undefined;
+}
+
 /**
  * Envoie un événement analytics (best-effort, pas de throw vers l’UI).
  */
@@ -76,14 +85,24 @@ export async function recordStoryEvent(
     viewport?: 'mobile' | 'desktop';
   },
 ): Promise<void> {
+  const channelId = parseStoryApiId(opts.channelId);
+  const slideId = parseStoryApiId(opts.slideId);
+
+  if (event === 'feed_impression' || event === 'open' || event === 'complete') {
+    if (!channelId) return;
+  }
+  if (event === 'slide_view' || event === 'cta_click') {
+    if (!slideId) return;
+  }
+
   try {
     const body: Record<string, unknown> = {
       event,
       viewport: opts.viewport ?? 'mobile',
     };
     if (opts.visitorId) body.visitorId = opts.visitorId;
-    if (opts.channelId) body.channelId = Number(opts.channelId);
-    if (opts.slideId) body.slideId = Number(opts.slideId);
+    if (channelId) body.channelId = channelId;
+    if (slideId) body.slideId = slideId;
     const url = buildApiUrl('/api/stories/record-event');
     await httpPostJson<{ success: boolean }, Record<string, unknown>>(url, body);
   } catch {

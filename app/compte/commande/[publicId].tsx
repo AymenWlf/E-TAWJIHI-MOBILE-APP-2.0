@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AccountOrderDetailScreenSkeleton } from '@/components/account/AccountOrderDetailScreenSkeleton';
 import { OrderPromoApplyBlock } from '@/components/shop/OrderPromoApplyBlock';
 import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVisualThumb';
 import { Text } from '@/components/ui/Text';
@@ -28,6 +29,7 @@ import { homeShell } from '@/theme/homeShell';
 import type { ShopOrderPayload } from '@/types/shop';
 import { formatOrderCreatedAtShort } from '@/utils/dateParis';
 import { formatShopPrice } from '@/utils/shopFormatPrice';
+import { getUserFacingApiError } from '@/utils/apiError';
 import {
   isShopOrderCompleted,
   orderHasActivePhysicalLines,
@@ -119,7 +121,7 @@ export default function AccountOrderDetailScreen() {
       setOrder(next);
       Alert.alert('', t('shopThankBankUploadOk'));
     } catch (e) {
-      Alert.alert(t('commonErrorTitle'), e instanceof Error ? e.message : t('shopThankBankUploadErr'));
+      Alert.alert(t('commonErrorTitle'), getUserFacingApiError(e, t, { context: 'upload' }));
     } finally {
       setUploadBusy(false);
     }
@@ -139,9 +141,7 @@ export default function AccountOrderDetailScreen() {
     return (
       <View style={styles.root}>
         <StatusBar style="light" />
-        <View style={[styles.center, { paddingTop: insets.top }]}>
-          <ActivityIndicator color={homeShell.text} size="large" />
-        </View>
+        <AccountOrderDetailScreenSkeleton isRTL={isRTL} />
       </View>
     );
   }

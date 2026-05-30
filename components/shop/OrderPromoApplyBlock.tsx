@@ -14,6 +14,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { applyUserOrderPromo } from '@/services/userOrders';
 import { rejectMultipleShopPromoCodesInInput } from '@/services/shopPromo';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { getUserFacingApiError } from '@/utils/apiError';
 import { homeShell } from '@/theme/homeShell';
 import type { ShopOrderPayload } from '@/types/shop';
 import { canApplyPromoToOrder, isOrderStatusAllowingPromoApply } from '@/utils/shopOrderStatusUi';
@@ -30,12 +31,9 @@ export function OrderPromoApplyBlock({ publicId, order, onOrderUpdated, isRTL }:
   const { getValidAccessToken } = useAuth();
   const [draftCode, setDraftCode] = useState('');
   const [applying, setApplying] = useState(false);
+  const [promoError, setPromoError] = useState<string | null>(null);
 
   const hasPromo = (order.promoCodeLabel ?? '').trim() !== '';
-  if (hasPromo) {
-    return null;
-  }
-
   const statusAllowsPromo = isOrderStatusAllowingPromoApply(order.status);
   const canApply = canApplyPromoToOrder(order);
   const locked = !statusAllowsPromo;
@@ -44,28 +42,34 @@ export function OrderPromoApplyBlock({ publicId, order, onOrderUpdated, isRTL }:
     if (!canApply) return;
     const code = draftCode.trim();
     if (!code) {
-      Alert.alert(t('commonErrorTitle'), t('shopCheckoutPromoErrEnter'));
+      setPromoError(t('shopCheckoutPromoErrEnter'));
       return;
     }
     const multiErr = rejectMultipleShopPromoCodesInInput(code);
     if (multiErr) {
-      Alert.alert(t('commonErrorTitle'), multiErr);
+      setPromoError(multiErr);
       return;
     }
     const token = await getValidAccessToken();
     if (!token) return;
     setApplying(true);
+    setPromoError(null);
     try {
       const next = await applyUserOrderPromo(token, publicId, code);
       onOrderUpdated(next);
       setDraftCode('');
+      setPromoError(null);
       Alert.alert('', t('accountOrderPromoApplied'));
     } catch (e) {
-      Alert.alert(t('commonErrorTitle'), e instanceof Error ? e.message : t('shopCheckoutPromoErrValidate'));
+      setPromoError(getUserFacingApiError(e, t, { context: 'checkout', fallbackKey: 'shopCheckoutPromoErrValidate' }));
     } finally {
       setApplying(false);
     }
   }, [canApply, draftCode, getValidAccessToken, onOrderUpdated, publicId, t]);
+
+  if (hasPromo) {
+    return null;
+  }
 
   return (
     <View style={styles.promoBlock}>
@@ -73,7 +77,10 @@ export function OrderPromoApplyBlock({ publicId, order, onOrderUpdated, isRTL }:
       <View style={[styles.promoRow, isRTL && styles.rowRtl]}>
         <TextInput
           value={locked ? '' : draftCode}
-          onChangeText={(v) => setDraftCode(v.toUpperCase())}
+          onChangeText={(v) => {
+            setDraftCode(v.toUpperCase());
+            if (promoError) setPromoError(null);
+          }}
           placeholder={locked ? '—' : t('accountOrderPromoPlaceholder')}
           autoCapitalize="characters"
           autoCorrect={false}
@@ -96,6 +103,9 @@ export function OrderPromoApplyBlock({ publicId, order, onOrderUpdated, isRTL }:
           )}
         </Pressable>
       </View>
+      {promoError ? (
+        <Text style={[styles.promoError, isRTL && styles.txtRtl]}>{promoError}</Text>
+      ) : null}
       <Text style={[styles.promoHint, locked && styles.promoHintLocked, isRTL && styles.txtRtl]}>
         {locked ? t('accountOrderPromoLockedHint') : t('accountOrderPromoHint')}
       </Text>
@@ -142,4 +152,5 @@ const styles = StyleSheet.create({
   promoBtnTxt: { color: brand.white, fontSize: fontSize.sm, fontWeight: '700' },
   promoHint: { fontSize: 11, color: homeShell.cardMuted, lineHeight: 16 },
   promoHintLocked: { color: '#B45309', fontWeight: '600' },
+  promoError: { fontSize: 12, fontWeight: '600', color: '#991B1B', lineHeight: 17 },
 });

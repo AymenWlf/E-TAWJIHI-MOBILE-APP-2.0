@@ -1,3 +1,5 @@
+import { isSafeHref } from '@/utils/safeOpenUrl';
+
 function escapeHtml(s: string): string {
   return s
     .replace(/&/g, '&amp;')
@@ -42,6 +44,7 @@ function restoreMarkdownLinksFromPlaceholders(s: string, rawLinks: string[]): st
     if (!inner) return '';
     const label = inner[1];
     const hrefRaw = inner[2].trim();
+    if (!isSafeHref(hrefRaw)) return '';
     const hrefEsc = escapeHtml(hrefRaw);
     const labelEsc = escapeHtml(label);
     return `<a href="${hrefEsc}">${labelEsc}</a>`;

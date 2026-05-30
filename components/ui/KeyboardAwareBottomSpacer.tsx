@@ -21,9 +21,12 @@ export function KeyboardAwareBottomSpacer({ minPaddingWhenKeyboardClosed }: Prop
   const keyboard = useAnimatedKeyboard();
   const base = minPaddingWhenKeyboardClosed ?? safeBottom + spacing.xl;
 
-  const style = useAnimatedStyle(() => ({
-    height: keyboard.height.value + base,
-  }));
+  const style = useAnimatedStyle(() => {
+    const kb = keyboard.height.value;
+    // Clavier ouvert : uniquement la hauteur clavier + petite marge (évite base + clavier en double).
+    const height = kb > 0 ? kb + spacing.md : base;
+    return { height };
+  });
 
   return <Animated.View style={style} />;
 }

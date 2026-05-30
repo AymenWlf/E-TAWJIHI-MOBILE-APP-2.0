@@ -3,7 +3,6 @@ import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Alert,
   FlatList,
   Image,
@@ -14,13 +13,14 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { CommunityQnaSection } from '@/components/community/CommunityQnaSection';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
-import { ContestAnnouncementQnaBottomSheet } from '@/components/inscriptions/ContestAnnouncementQnaBottomSheet';
+import { FollowedSchoolDetailLoadingSkeleton } from '@/components/inscriptions/FollowedSchoolDetailLoadingSkeleton';
+import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { StatusBadge } from '@/components/inscriptions/StatusBadge';
 import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import {
   fallbackEstablishmentAvatarName,
@@ -41,19 +41,21 @@ import { updateLatestSeenOnDisk } from '@/utils/followLatestAnnouncementSeen';
 
 export default function FollowedSchoolDetailScreen() {
   const router = useRouter();
-  const { t, locale, isRTL, setLocale } = useLocale();
+  const { t, locale, isRTL } = useLocale();
+  const {
+    isInscriptionsLocked,
+    isInscriptionsAccessPending,
+    openTawjihPlusProduct,
+    applyServerInscriptionsAccess,
+    resolveInscriptionsAccessWithoutServer,
+  } = useTawjihPlusAccessContext();
+  const showInscriptionsPaywall = !isInscriptionsAccessPending && isInscriptionsLocked;
+  const pageLoading = loading || isInscriptionsAccessPending;
   const insets = useSafeAreaInsets();
   const { getValidAccessToken } = useAuth();
-  const params = useLocalSearchParams<{ id?: string; qnaQ?: string | string[] }>();
+  const params = useLocalSearchParams<{ id?: string }>();
   const followId = useMemo(() => Number(params.id ?? 0), [params.id]);
-  const highlightQuestionId = useMemo(() => {
-    const raw = params.qnaQ;
-    const s = Array.isArray(raw) ? raw[0] : raw;
-    const n = Number(s ?? 0);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  }, [params.qnaQ]);
   const listRef = useRef<FlatList<any>>(null);
-  const [listScrollY, setListScrollY] = useState(0);
 
   const [data, setData] = useState<EstablishmentFollowTimeline | null>(null);
   const [loading, setLoading] = useState(true);
@@ -61,8 +63,6 @@ export default function FollowedSchoolDetailScreen() {
   const [busy, setBusy] = useState(false);
   const [statusSheetOpen, setStatusSheetOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
-  const [announcementQnaSheet, setAnnouncementQnaSheet] = useState<{ id: number; title: string } | null>(null);
-  const closeAnnouncementQnaSheet = useCallback(() => setAnnouncementQnaSheet(null), []);
 
   const load = useCallback(async () => {
     if (!Number.isFinite(followId) || followId <= 0) {
@@ -75,10 +75,27 @@ export default function FollowedSchoolDetailScreen() {
       setLoading(false);
       return;
     }
-    const payload = await fetchEstablishmentFollowTimeline(token, followId);
-    setData(payload);
-    setLoading(false);
-  }, [followId, getValidAccessToken]);
+    try {
+      const result = await fetchEstablishmentFollowTimeline(token, followId);
+      if (!result?.timeline?.follow) {
+        setData(null);
+        resolveInscriptionsAccessWithoutServer();
+      } else {
+        applyServerInscriptionsAccess(result.inscriptionsFullAccess);
+        setData(result.timeline);
+      }
+    } catch {
+      setData(null);
+      resolveInscriptionsAccessWithoutServer();
+    } finally {
+      setLoading(false);
+    }
+  }, [
+    applyServerInscriptionsAccess,
+    followId,
+    getValidAccessToken,
+    resolveInscriptionsAccessWithoutServer,
+  ]);
 
   useEffect(() => {
     void load();
@@ -92,6 +109,10 @@ export default function FollowedSchoolDetailScreen() {
 
   const onConfirmStatus = useCallback(
     async (next: CandidacyStatusType | null) => {
+      if (showInscriptionsPaywall) {
+        openTawjihPlusProduct();
+        return;
+      }
       if (!data?.follow) return;
       setStatusBusy(true);
       try {
@@ -106,7 +127,7 @@ export default function FollowedSchoolDetailScreen() {
         setStatusSheetOpen(false);
       }
     },
-    [data?.follow, getValidAccessToken],
+    [data?.follow, getValidAccessToken, openTawjihPlusProduct, showInscriptionsPaywall],
   );
 
   const onUnfollow = useCallback(() => {
@@ -152,16 +173,19 @@ export default function FollowedSchoolDetailScreen() {
 
   if (loading) {
     return (
-      <SafeAreaView style={styles.root}>
+      <View style={styles.root}>
         <Stack.Screen options={{ headerShown: false }} />
-        <View style={styles.center}>
-          <ActivityIndicator size="large" color={brand.primary} />
-        </View>
-      </SafeAreaView>
+        <StatusBar style="light" />
+        <FollowedSchoolDetailLoadingSkeleton
+          isRTL={isRTL}
+          topInset={insets.top}
+          bottomInset={insets.bottom}
+        />
+      </View>
     );
   }
 
-  if (!data) {
+  if (!data?.follow) {
     return (
       <SafeAreaView style={styles.root}>
         <Stack.Screen options={{ headerShown: false }} />
@@ -202,40 +226,7 @@ export default function FollowedSchoolDetailScreen() {
         <Text style={[styles.heroTitle, isRTL && styles.rtl]} numberOfLines={1}>
           {t('followedSchoolTimelineTitle')}
         </Text>
-        <View
-          style={[styles.langSwitch, isRTL && styles.rowRtl]}
-          accessibilityRole="tablist"
-          accessibilityLabel={t('languageSwitcher')}
-        >
-          <Pressable
-            onPress={() => setLocale('fr')}
-            style={({ pressed }) => [
-              styles.langPill,
-              locale === 'fr' && styles.langPillActive,
-              pressed && { opacity: 0.85 },
-            ]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: locale === 'fr' }}
-          >
-            <Text style={[styles.langPillTxt, locale === 'fr' && styles.langPillTxtActive]}>
-              {t('langFr')}
-            </Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setLocale('ar')}
-            style={({ pressed }) => [
-              styles.langPill,
-              locale === 'ar' && styles.langPillActive,
-              pressed && { opacity: 0.85 },
-            ]}
-            accessibilityRole="tab"
-            accessibilityState={{ selected: locale === 'ar' }}
-          >
-            <Text style={[styles.langPillTxt, locale === 'ar' && styles.langPillTxtActive]}>
-              {t('langAr')}
-            </Text>
-          </Pressable>
-        </View>
+        <HeroLangSwitch />
       </View>
 
       <Pressable
@@ -309,16 +300,29 @@ export default function FollowedSchoolDetailScreen() {
         </View>
         {(follow.availableStatuses?.length ?? 0) > 0 ? (
           <Pressable
-            onPress={() => setStatusSheetOpen(true)}
+            onPress={() => {
+              if (isInscriptionsLocked) {
+                openTawjihPlusProduct();
+                return;
+              }
+              setStatusSheetOpen(true);
+            }}
             disabled={statusBusy}
             style={({ pressed }) => [
               styles.statusUpdateBtn,
+              showInscriptionsPaywall && styles.statusUpdateBtnLocked,
               pressed && { opacity: 0.85 },
               statusBusy && { opacity: 0.6 },
             ]}
           >
-            <FontAwesome name="pencil" size={11} color={brand.primary} />
-            <Text style={styles.statusUpdateBtnTxt}>{t('inscStatusActionUpdate')}</Text>
+            <FontAwesome
+              name={isInscriptionsLocked ? 'lock' : 'pencil'}
+              size={11}
+              color={isInscriptionsLocked ? '#475569' : brand.primary}
+            />
+            <Text style={styles.statusUpdateBtnTxt}>
+              {showInscriptionsPaywall ? t('inscTawjihPlusUpgradeCta') : t('inscStatusActionUpdate')}
+            </Text>
           </Pressable>
         ) : null}
       </View>
@@ -440,24 +444,10 @@ export default function FollowedSchoolDetailScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
         keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
-        onScroll={(e) => setListScrollY(e.nativeEvent.contentOffset.y)}
-        scrollEventThrottle={32}
         ListHeaderComponent={
           <>
             {renderHeader()}
             {renderTimeline()}
-            {followId > 0 ? (
-              <View style={{ marginHorizontal: spacing.lg, marginBottom: spacing.md }}>
-                <CommunityQnaSection
-                  contextType="establishment_follow"
-                  contextId={followId}
-                  marginHorizontal={0}
-                  highlightQuestionId={highlightQuestionId}
-                  flatListRef={listRef}
-                  listScrollOffsetY={listScrollY}
-                />
-              </View>
-            ) : null}
             <View style={[styles.announcementsTitleRow, isRTL && styles.rowRtl]}>
               <View style={styles.sectionIconCircle}>
                 <FontAwesome name="bullhorn" size={13} color={brand.primary} />
@@ -491,22 +481,20 @@ export default function FollowedSchoolDetailScreen() {
                 anneesBacAcceptees: item.anneesBacAcceptees ?? [],
                 availableStatuses: item.availableStatuses ?? [],
                 establishment: item.establishment ?? null,
-                communityQnaMessageCount: item.communityQnaMessageCount,
               }}
               isFollowed
               onToggleFollow={() => undefined}
-              onOpenLink={() => undefined}
-              onOpenComments={() => {
-                void updateLatestSeenOnDisk(followId, item.id);
-                setAnnouncementQnaSheet({
-                  id: item.id,
-                  title: (isRTL && item.titleAr ? item.titleAr : item.title) || '',
-                });
+              onOpenLink={() => {
+                if (showInscriptionsPaywall) openTawjihPlusProduct();
+              }}
+              onUpdateStatus={() => {
+                if (showInscriptionsPaywall) openTawjihPlusProduct();
               }}
               onPress={() => {
                 void updateLatestSeenOnDisk(followId, item.id);
                 router.push(`/inscriptions/${item.id}` as never);
               }}
+              previewOnly={showInscriptionsPaywall || Boolean(item.previewOnly)}
             />
           </View>
         )}
@@ -528,12 +516,6 @@ export default function FollowedSchoolDetailScreen() {
         onConfirm={onConfirmStatus}
       />
 
-      <ContestAnnouncementQnaBottomSheet
-        visible={announcementQnaSheet !== null}
-        announcementId={announcementQnaSheet?.id ?? 0}
-        announcementTitle={announcementQnaSheet?.title ?? ''}
-        onClose={closeAnnouncementQnaSheet}
-      />
     </View>
   );
 }
@@ -581,23 +563,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginHorizontal: spacing.sm,
   },
-
-  /* Lang switcher (FR / AR) */
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.16)',
-    borderRadius: radius.full,
-    padding: 3,
-  },
-  langPill: {
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-  },
-  langPillActive: { backgroundColor: brand.white },
-  langPillTxt: { color: brand.white, fontSize: fontSize.xs, fontWeight: '700' },
-  langPillTxtActive: { color: brand.primary },
 
   estCard: {
     flexDirection: 'row',
@@ -671,6 +636,10 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.4,
     textTransform: 'uppercase',
+  },
+  statusUpdateBtnLocked: {
+    backgroundColor: 'rgba(255,255,255,0.85)',
+    borderColor: '#CBD5E1',
   },
   statusUpdateBtn: {
     flexDirection: 'row',

@@ -1,12 +1,10 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ActivityIndicator,
   Animated,
   DeviceEventEmitter,
   Dimensions,
   FlatList,
-  Modal,
   Pressable,
   StyleSheet,
   View,
@@ -14,7 +12,10 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { NotificationCard } from '@/components/inscriptions/NotificationCard';
+import { NotificationCardSkeletonStack } from '@/components/inscriptions/NotificationCardSkeleton';
 import { Text } from '@/components/ui/Text';
+import { PlatformSheetOverlay } from '@/components/ui/PlatformSheetOverlay';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
@@ -24,16 +25,19 @@ import {
   markNotificationRead,
   NOTIFICATIONS_IN_APP_REFRESH_EVENT,
 } from '@/services/notifications';
-import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { brand, fontSize, spacing } from '@/theme/tokens';
 import type { AppNotification } from '@/types/inscriptions';
-import { notificationMessage, notificationTimeAgo, notificationTitle } from '@/utils/notificationDisplay';
-import { navigateFromAppNotification } from '@/utils/notificationNavigation';
+import { notificationCtaLabelKey } from '@/utils/notificationCtaLabel';
+import {
+  canNavigateFromAppNotification,
+  navigateFromAppNotification,
+} from '@/utils/notificationNavigation';
 
 const PANEL_W = Math.min(400, Math.round(Dimensions.get('window').width * 0.88));
 
 export function NotificationsOffcanvas() {
   const insets = useSafeAreaInsets();
-  const { t, isRTL, locale } = useLocale();
+  const { t, isRTL } = useLocale();
   const { user, getValidAccessToken } = useAuth();
   const { drawerOpen, closeDrawer, refreshUnread, unreadCount: serverUnreadCount } = useNotificationsDrawer();
   const slide = useRef(new Animated.Value(PANEL_W)).current;
@@ -172,8 +176,8 @@ export function NotificationsOffcanvas() {
   const unreadInList = useMemo(() => items.filter((x) => !x.isRead).length, [items]);
 
   return (
-    <Modal transparent visible={drawerOpen} animationType="none" onRequestClose={closeWithAnim}>
-      <View style={styles.root} accessibilityViewIsModal>
+    <PlatformSheetOverlay visible={drawerOpen} zIndex={8500} onRequestClose={closeWithAnim}>
+      <View style={styles.root}>
         <Pressable style={styles.backdrop} onPress={onBackdrop} accessibilityRole="button" accessibilityLabel={t('notifDrawerClose')} />
         <Animated.View
           style={[
@@ -213,9 +217,12 @@ export function NotificationsOffcanvas() {
           ) : null}
 
           {loading ? (
-            <View style={styles.center}>
-              <ActivityIndicator color={brand.primary} />
-            </View>
+            <NotificationCardSkeletonStack
+              count={4}
+              isRTL={isRTL}
+              withCtaPattern={[true, false, true, false]}
+              style={styles.list}
+            />
           ) : (
             <FlatList
               data={items}
@@ -230,32 +237,23 @@ export function NotificationsOffcanvas() {
                   <Text style={[styles.emptyTxt, isRTL && styles.rtl]}>{t('notifDrawerEmpty')}</Text>
                 </View>
               }
-              renderItem={({ item: n }) => (
-                <View style={[styles.card, !n.isRead && styles.cardUnread, isRTL && styles.cardRtl]}>
-                  <View style={[styles.cardTop, isRTL && styles.rowRtl]}>
-                    <FontAwesome name="bell" size={14} color={brand.primary} />
-                    <Text style={[styles.cardTitle, !n.isRead && styles.cardTitleUnread, isRTL && styles.rtl]} numberOfLines={2}>
-                      {notificationTitle(n, locale)}
-                    </Text>
-                  </View>
-                  <Text style={[styles.cardMsg, isRTL && styles.rtl]} numberOfLines={4}>
-                    {notificationMessage(n, locale)}
-                  </Text>
-                  <Text style={[styles.time, isRTL && styles.rtl]}>{notificationTimeAgo(n, locale)}</Text>
-                  <Pressable
-                    onPress={() => void onOpenLink(n)}
-                    style={({ pressed }) => [styles.cta, isRTL && styles.rowRtl, pressed && { opacity: 0.9 }]}
-                  >
-                    <Text style={styles.ctaTxt}>{t('notifDrawerOpenLink')}</Text>
-                    <FontAwesome name={isRTL ? 'chevron-left' : 'chevron-right'} size={12} color={brand.white} />
-                  </Pressable>
-                </View>
-              )}
+              renderItem={({ item: n }) => {
+                const ctaKey = notificationCtaLabelKey(n);
+                const canNavigate = canNavigateFromAppNotification(n);
+                return (
+                  <NotificationCard
+                    notif={n}
+                    interactive={false}
+                    actionLabel={canNavigate ? t(ctaKey) : undefined}
+                    onActionPress={canNavigate ? () => void onOpenLink(n) : undefined}
+                  />
+                );
+              }}
             />
           )}
         </Animated.View>
       </View>
-    </Modal>
+    </PlatformSheetOverlay>
   );
 }
 
@@ -319,38 +317,9 @@ const styles = StyleSheet.create({
   },
   markAllTxt: { fontSize: fontSize.xs, fontWeight: '800', color: brand.primary },
   closeBtn: { padding: spacing.xs },
-  list: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl, gap: spacing.sm },
-  center: { paddingVertical: spacing.xxl, alignItems: 'center' },
+  list: { paddingHorizontal: spacing.md, paddingBottom: spacing.xl, gap: spacing.sm, flexGrow: 1 },
   empty: { paddingVertical: spacing.xxl, alignItems: 'center', gap: spacing.sm },
   emptyTxt: { textAlign: 'center', color: brand.textMuted, fontWeight: '600' },
-  card: {
-    borderRadius: radius.lg,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: brand.border,
-    padding: spacing.md,
-    backgroundColor: brand.white,
-    marginBottom: spacing.sm,
-  },
-  cardRtl: {},
-  cardUnread: {
-    backgroundColor: 'rgba(51,62,143,0.05)',
-    borderColor: 'rgba(51,62,143,0.25)',
-  },
-  cardTop: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.sm, marginBottom: spacing.xs },
-  cardTitle: { flex: 1, fontSize: fontSize.sm, fontWeight: '700', color: brand.text },
-  cardTitleUnread: { fontWeight: '900' },
-  cardMsg: { fontSize: fontSize.xs, color: brand.textSecondary, lineHeight: 18, marginBottom: spacing.xs },
-  time: { fontSize: 10, fontWeight: '600', color: brand.textMuted, marginBottom: spacing.sm },
-  cta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: 8,
-    backgroundColor: brand.primary,
-    paddingVertical: 10,
-    borderRadius: radius.md,
-  },
-  ctaTxt: { color: brand.white, fontWeight: '800', fontSize: fontSize.xs },
   rowRtl: { flexDirection: 'row-reverse' },
   rtl: { textAlign: 'right', writingDirection: 'rtl' },
 });

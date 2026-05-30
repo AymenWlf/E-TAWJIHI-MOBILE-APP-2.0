@@ -1,9 +1,13 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import type { ComponentProps } from 'react';
 import { useMemo } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { HomeFeedHorizontalScroll } from '@/components/home/HomeFeedHorizontalScroll';
+import { practicalLinkCardShadow } from '@/components/home/HomeFeedSection';
+import { HomePracticalInfoSectionSkeleton } from '@/components/home/HomePracticalInfoSectionSkeleton';
 import { Text } from '@/components/ui/Text';
+import { homeSectionHeaderStyles as header } from '@/components/home/homeSectionHeaderStyles';
 import { PRACTICAL_LINK_DEFS } from '@/constants/practicalLinks';
 import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
@@ -12,88 +16,25 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 export type PracticalInfoItem = {
   id: string;
   label: string;
+  description: string;
   icon: ComponentProps<typeof FontAwesome>['name'];
   accent: string;
 };
 
-/** Tuile carrée compacte (scroll horizontal type stories / notifs). */
-const CARD = 112;
-const ICON_BOX = 38;
-const ICON_GLYPH = 18;
+const CARD_W = 144;
+const CARD_H = 112;
+const ICON_BOX = 48;
+const ICON_GLYPH = 21;
 
-const shadowCard =
-  Platform.OS === 'android'
-    ? { elevation: 6 }
-    : {
-        shadowColor: '#0F172A',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.1,
-        shadowRadius: 12,
-      };
+const androidTextFix =
+  Platform.OS === 'android' ? ({ includeFontPadding: false } as const) : ({} as const);
 
 type Props = {
   width: number;
   items?: PracticalInfoItem[];
   onPressItem?: (id: string) => void;
+  loading?: boolean;
 };
-
-export function HomePracticalInfoSection({ width, items: itemsOverride, onPressItem }: Props) {
-  const { t, isRTL } = useLocale();
-
-  const items = useMemo((): PracticalInfoItem[] => {
-    if (itemsOverride?.length) return itemsOverride;
-    return PRACTICAL_LINK_DEFS.map((d) => ({
-      id: d.id,
-      label: t(d.labelKey),
-      icon: d.icon,
-      accent: d.accent,
-    }));
-  }, [itemsOverride, t]);
-
-  return (
-    <View style={[styles.wrap, { width }]}>
-      <View style={[styles.titleRow, isRTL && styles.titleRowRtl]}>
-        <View style={styles.titleAccent} />
-        <Text style={[styles.title, isRTL && styles.titleTxtRtl]}>{t('practicalTitle')}</Text>
-      </View>
-      <Text style={[styles.subtitle, isRTL && styles.subtitleRtl]}>{t('practicalSubtitle')}</Text>
-
-      <ScrollView
-        horizontal
-        nestedScrollEnabled
-        showsHorizontalScrollIndicator={false}
-        style={[styles.scrollTrack, isRTL && styles.scrollRtl]}
-        contentContainerStyle={styles.hScroll}
-        accessibilityLabel={t('practicalSectionA11y')}>
-        {items.map((item, index) => (
-          <Pressable
-            key={item.id}
-            onPress={() => onPressItem?.(item.id)}
-            style={({ pressed }) => [
-              styles.card,
-              shadowCard,
-              {
-                width: CARD,
-                height: CARD,
-                borderTopColor: item.accent,
-                marginEnd: index < items.length - 1 ? spacing.md : 0,
-              },
-              pressed && styles.cardPressed,
-            ]}
-            accessibilityRole="button"
-            accessibilityLabel={item.label}>
-            <View style={[styles.iconWrap, { backgroundColor: withAlpha(item.accent, 0.13) }]}>
-              <FontAwesome name={item.icon} size={ICON_GLYPH} color={item.accent} />
-            </View>
-            <Text style={[styles.label, isRTL && styles.labelRtl]} numberOfLines={3}>
-              {item.label}
-            </Text>
-          </Pressable>
-        ))}
-      </ScrollView>
-    </View>
-  );
-}
 
 function withAlpha(hex: string, alpha: number): string {
   const h = hex.replace('#', '');
@@ -105,110 +46,190 @@ function withAlpha(hex: string, alpha: number): string {
   return `rgba(${r},${g},${b},${alpha})`;
 }
 
+function PracticalLinkCard({
+  item,
+  isRTL,
+  onPress,
+}: {
+  item: PracticalInfoItem;
+  isRTL: boolean;
+  onPress: () => void;
+}) {
+  const iconBg = withAlpha(item.accent, 0.14);
+  const iconRing = withAlpha(item.accent, 0.28);
+  const glow = withAlpha(item.accent, 0.11);
+  const footerBg = withAlpha(item.accent, 0.06);
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [
+        styles.card,
+        { borderTopColor: item.accent },
+        pressed && styles.cardPressed,
+      ]}
+      accessibilityRole="button"
+      accessibilityLabel={item.label}>
+      <View style={[styles.glowOrb, { backgroundColor: glow }]} pointerEvents="none" />
+      <View style={[styles.cardBody, isRTL && styles.cardBodyRtl]}>
+        <View style={styles.heroRow}>
+          <View style={[styles.iconWrap, { backgroundColor: iconBg, borderColor: iconRing }]}>
+            <FontAwesome name={item.icon} size={ICON_GLYPH} color={item.accent} />
+          </View>
+          <View style={[styles.arrowChip, { backgroundColor: footerBg, borderColor: iconRing }]}>
+            <FontAwesome
+              name={isRTL ? 'chevron-left' : 'chevron-right'}
+              size={10}
+              color={item.accent}
+            />
+          </View>
+        </View>
+
+        <View style={styles.textBlock}>
+          <Text style={[styles.label, isRTL && styles.labelRtl]} numberOfLines={3}>
+            {item.label}
+          </Text>
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
+export function HomePracticalInfoSection({
+  width,
+  items: itemsOverride,
+  onPressItem,
+  loading = false,
+}: Props) {
+  const { t, isRTL } = useLocale();
+
+  const items = useMemo((): PracticalInfoItem[] => {
+    if (itemsOverride?.length) return itemsOverride;
+    return PRACTICAL_LINK_DEFS.map((d) => ({
+      id: d.id,
+      label: t(d.labelKey),
+      description: '',
+      icon: d.icon,
+      accent: d.accent,
+    }));
+  }, [itemsOverride, t]);
+
+  if (loading) {
+    return <HomePracticalInfoSectionSkeleton width={width} isRTL={isRTL} />;
+  }
+
+  return (
+    <View style={[header.sectionWrap, { width }, isRTL && header.sectionWrapRtl]}>
+      <View style={[header.titleRow, isRTL && header.titleRowRtl]}>
+        <View style={[header.titleLeft, isRTL && header.titleLeftRtl]}>
+          <View style={header.titleAccent} />
+          <View style={[header.titleTextCol, isRTL && header.titleTextColRtl]}>
+            <Text style={[header.title, isRTL && header.titleRtl]}>{t('practicalTitle')}</Text>
+          </View>
+        </View>
+      </View>
+      <Text style={[header.subtitle, isRTL && header.subtitleRtl]}>{t('practicalSubtitle')}</Text>
+
+      <View accessibilityLabel={t('practicalSectionA11y')} accessible>
+        <HomeFeedHorizontalScroll isRTL={isRTL}>
+          {items.map((item) => (
+            <View key={item.id} style={[styles.cardSlot, styles.cardShadowHost, practicalLinkCardShadow]}>
+              <PracticalLinkCard
+                item={item}
+                isRTL={isRTL}
+                onPress={() => onPressItem?.(item.id)}
+              />
+            </View>
+          ))}
+        </HomeFeedHorizontalScroll>
+      </View>
+    </View>
+  );
+}
+
 const styles = StyleSheet.create({
-  wrap: {
-    marginTop: spacing.md,
-    marginBottom: spacing.sm,
+  cardSlot: {
+    width: CARD_W,
+    height: CARD_H,
+    marginVertical: 2,
   },
-  /** Pleine largeur : obligatoire pour le scroll horizontal (évite le rétrécissement avec alignItems sur un parent RTL). */
-  scrollTrack: {
-    width: '100%',
-    /**
-     * Full-bleed : annule le padding horizontal de la page,
-     * puis on ré-applique le padding uniquement côté start dans `hScroll`.
-     */
-    marginHorizontal: -spacing.xl,
-    /** Les ombres des cards ne doivent pas être coupées par le scroll. */
-    overflow: 'visible',
-  },
-  scrollRtl: {
-    direction: 'rtl',
-  },
-  titleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: spacing.sm,
-    marginBottom: 4,
-  },
-  titleRowRtl: {
-    flexDirection: 'row-reverse',
-  },
-  titleAccent: {
-    width: 4,
-    height: 22,
-    borderRadius: 2,
-    backgroundColor: homeShell.blue,
-  },
-  title: {
-    color: brand.text,
-    fontSize: fontSize.lg,
-    fontWeight: '900',
-    letterSpacing: -0.35,
-  },
-  titleTxtRtl: {
-    textAlign: 'right',
-    writingDirection: 'rtl',
-  },
-  subtitle: {
-    color: brand.textMuted,
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    letterSpacing: 0.12,
-    marginBottom: spacing.md,
-    paddingStart: 4 + spacing.sm,
-    lineHeight: 16,
-  },
-  subtitleRtl: {
-    textAlign: 'right',
-    paddingStart: 0,
-    paddingEnd: 4 + spacing.sm,
-    alignSelf: 'stretch',
-  },
-  hScroll: {
-    flexDirection: 'row',
-    alignItems: 'stretch',
-    /** Donne de la place aux ombres (sinon clip en haut/bas). */
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
-    /** Aligne au début (start) mais pas de marge côté fin (end). */
-    paddingStart: spacing.xl,
-    paddingEnd: 0,
+  cardShadowHost: {
+    borderRadius: radius.lg,
+    backgroundColor: brand.white,
   },
   card: {
+    width: '100%',
+    height: '100%',
     borderRadius: radius.lg,
     backgroundColor: brand.white,
     borderWidth: 1,
-    borderColor: 'rgba(15, 23, 42, 0.07)',
+    borderColor: homeShell.borderOnWhite,
     borderTopWidth: 3,
-    paddingHorizontal: 6,
-    paddingTop: 8,
-    paddingBottom: 6,
-    alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginEnd: 0,
+    overflow: 'hidden',
   },
   cardPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.97 }],
+    opacity: 0.94,
+    transform: [{ scale: 0.985 }],
+  },
+  glowOrb: {
+    position: 'absolute',
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    top: -18,
+    end: -14,
+    opacity: 0.95,
+  },
+  cardBody: {
+    flex: 1,
+    paddingHorizontal: spacing.sm + 2,
+    paddingTop: spacing.sm + 4,
+    paddingBottom: spacing.sm,
+    gap: spacing.sm,
+    justifyContent: 'space-between',
+  },
+  cardBodyRtl: {
+    direction: 'rtl',
+  },
+  heroRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
   },
   iconWrap: {
     width: ICON_BOX,
     height: ICON_BOX,
-    borderRadius: 12,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    borderWidth: 1,
+  },
+  arrowChip: {
+    width: 26,
+    height: 26,
+    borderRadius: radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
+    marginTop: 2,
+    flexShrink: 0,
+  },
+  textBlock: {
+    gap: 4,
+    minHeight: 0,
   },
   label: {
-    width: '100%',
-    textAlign: 'center',
     color: brand.text,
-    fontSize: fontSize.xs,
+    fontSize: fontSize.sm,
     fontWeight: '800',
-    lineHeight: 13.5,
-    letterSpacing: -0.1,
+    lineHeight: 17,
+    letterSpacing: -0.25,
+    ...androidTextFix,
   },
   labelRtl: {
+    textAlign: 'right',
     writingDirection: 'rtl',
+    lineHeight: 18,
   },
 });

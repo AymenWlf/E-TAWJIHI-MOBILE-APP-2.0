@@ -1,8 +1,9 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Linking, Modal, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Dimensions, Image, Linking, StyleSheet, View } from 'react-native';
 
+import { PlatformSheetOverlay } from '@/components/ui/PlatformSheetOverlay';
 import { Text } from '@/components/ui/Text';
 import {
   Gesture,
@@ -383,7 +384,7 @@ export function StoryViewerModal({
   }
 
   return (
-    <Modal visible={visible} animationType="fade" presentationStyle="fullScreen" onRequestClose={onClose}>
+    <PlatformSheetOverlay visible={visible} onRequestClose={onClose} animationType="fade">
       <StatusBar style="light" />
       <GestureHandlerRootView style={styles.gestureRoot}>
         <GestureDetector gesture={pan}>
@@ -482,7 +483,7 @@ export function StoryViewerModal({
           </Animated.View>
         </GestureDetector>
       </GestureHandlerRootView>
-    </Modal>
+    </PlatformSheetOverlay>
   );
 }
 
@@ -519,6 +520,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.35)',
   },
   topChrome: {
     position: 'absolute',
