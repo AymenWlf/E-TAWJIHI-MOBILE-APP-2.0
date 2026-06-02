@@ -9,8 +9,66 @@ import {
 export const NIVEAU_PREMIERE_BAC = '1ère année Baccalauréat';
 export const NIVEAU_DEUXIEME_BAC = '2ème année Baccalauréat';
 
-export function isPremiereBacNiveau(niveau: string): boolean {
-  return niveau.trim() === NIVEAU_PREMIERE_BAC;
+const FILIERE_LEGACY_ALIASES: Record<string, string> = {
+  'sciences math a': 'Sciences Math A',
+  'sciences math b': 'Sciences Math B',
+  'sciences mathématiques a': 'Sciences Math A',
+  'sciences mathématiques b': 'Sciences Math B',
+  'sciences mathematiques a': 'Sciences Math A',
+  'sciences mathematiques b': 'Sciences Math B',
+  'sciences mathématiques': 'Sciences Math A',
+  'sciences mathematiques': 'Sciences Math A',
+  'sciences physiques': 'Sciences Physique',
+  'sciences physique': 'Sciences Physique',
+  'sciences de la vie et de la terre': 'SVT',
+  'sciences économiques': 'Sciences économique',
+  'sciences economiques': 'Sciences économique',
+};
+
+function normalizeFiliereKey(raw: string): string {
+  return raw.normalize('NFC').replace(/\s+/g, ' ').trim();
+}
+
+export function normalizeFiliereForSetupForm(
+  stored: string | null | undefined,
+  niveau?: string | null,
+): string {
+  const v = normalizeFiliereKey(stored ?? '');
+  if (!v) return '';
+
+  const exact = FILIERE_BAC_OPTIONS.find((o) => o.value === v);
+  if (exact?.value) return exact.value;
+  if (isFiliere1BacId(v)) return v;
+
+  const lower = v.toLowerCase();
+  const alias = FILIERE_LEGACY_ALIASES[lower];
+  if (alias) return sanitizeFiliereForNiveau(niveau ?? '', alias);
+
+  const fuzzy = FILIERE_BAC_OPTIONS.find(
+    (o) =>
+      o.value !== '' &&
+      (o.value.toLowerCase() === lower ||
+        o.label.toLowerCase() === lower ||
+        o.label.toLowerCase().includes(lower) ||
+        lower.includes(o.value.toLowerCase())),
+  );
+  if (fuzzy?.value) return sanitizeFiliereForNiveau(niveau ?? '', fuzzy.value);
+
+  if (/math/i.test(v)) {
+    if (/\bb\b/i.test(v) || v.toLowerCase().includes('math b')) {
+      return sanitizeFiliereForNiveau(niveau ?? '', 'Sciences Math B');
+    }
+    return sanitizeFiliereForNiveau(niveau ?? '', 'Sciences Math A');
+  }
+  if (/physique/i.test(v)) return sanitizeFiliereForNiveau(niveau ?? '', 'Sciences Physique');
+  if (/svt|vie et de la terre/i.test(v)) return sanitizeFiliereForNiveau(niveau ?? '', 'SVT');
+  if (/économ|econom/i.test(v)) return sanitizeFiliereForNiveau(niveau ?? '', 'Sciences économique');
+
+  return sanitizeFiliereForNiveau(niveau ?? '', v);
+}
+
+export function isPremiereBacNiveau(niveau: string | null | undefined): boolean {
+  return (niveau ?? '').trim() === NIVEAU_PREMIERE_BAC;
 }
 
 export function isDeuxiemeBacNiveau(niveau: string): boolean {

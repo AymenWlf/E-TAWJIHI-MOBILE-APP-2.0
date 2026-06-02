@@ -1,6 +1,5 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
@@ -107,10 +106,12 @@ export type HomeStackCard = {
     showOrientation1Bac?: boolean;
     orientation1BacLocked?: boolean;
     orientation1BacUnlockLabel?: string;
+    /** Client TASSJIL sur l’ancien backend — bouton à côté du jeu quotidien. */
+    showTassjilTrack?: boolean;
   };
   /** Filière + niveau affichés sous le titre du pack (carte parcours). */
   academicPackLine?: string;
-  /** Carte résultats du baccalauréat (canaux Outlook / SMS / MEN). */
+  /** Carte résultats du baccalauréat (canaux Outlook / bac.men.gov.ma). */
   bacResults?: BacResultsCardConfig;
   /** Chargement config bac depuis l’API. */
   bacResultsLoading?: boolean;
@@ -123,8 +124,7 @@ type Props = {
   onPressDailyGame?: () => void;
   onPressDailyInfo?: () => void;
   onPressOrientation1Bac?: () => void;
-  /** Calcul des seuils (bac) : verrouillé pour 1ère bac. */
-  bacThresholdsLocked?: boolean;
+  onPressTassjilTrack?: () => void;
   /** Skeleton sur le bouton seuils (résultats bac + profil élève). */
   bacThresholdsLoading?: boolean;
   /** Cartes « lien pratique » : même id que la rangée Liens pratiques. */
@@ -137,7 +137,7 @@ type Props = {
   contentLoading?: boolean;
   planParcoursNavAuth?: PlanParcoursNavigationAuth;
   tawjihPlusGate?: TawjihPlusParcoursGate;
-  /** Ouvre le sheet d’instructions (Outlook / MEN / SMS) au niveau de l’écran d’accueil. */
+  /** Ouvre le sheet d’instructions (Outlook / MEN) au niveau de l’écran d’accueil. */
   onOpenBacVerification?: (channel: BacVerificationChannel) => void;
   /** Ouvre le modal calcul des seuils (notes bulletin). */
   onOpenBacThresholds?: () => void;
@@ -289,12 +289,14 @@ function DailyActionsBlock({
   onPressDailyGame,
   onPressDailyInfo,
   onPressOrientation1Bac,
+  onPressTassjilTrack,
 }: {
   daily: NonNullable<HomeStackCard['dailyActions']>;
   layout: StackCardLayout;
   onPressDailyGame?: () => void;
   onPressDailyInfo?: () => void;
   onPressOrientation1Bac?: () => void;
+  onPressTassjilTrack?: () => void;
 }) {
   const { t, isRTL } = useLocale();
   const padV = Math.max(10, Math.round(layout.boxPad * 0.72));
@@ -308,9 +310,10 @@ function DailyActionsBlock({
   const gamePending = !gameLoading && !daily.playedToday;
   const showInfo = Boolean(daily.includeDailyInfo && onPressDailyInfo);
   const showOrientation1Bac = Boolean(daily.showOrientation1Bac && onPressOrientation1Bac);
+  const showTassjil = Boolean(daily.showTassjilTrack && onPressTassjilTrack);
   const orientationLocked = showOrientation1Bac && daily.orientation1BacLocked === true;
   const infoPending = showInfo && !daily.infoReadToday;
-  const gameOnly = !showInfo && !showOrientation1Bac;
+  const gameOnly = !showInfo && !showOrientation1Bac && !showTassjil;
   const streakLine = formatHomeDailyStreakLine(daily.streakDays, t);
   const unlockHint = daily.orientation1BacUnlockLabel
     ? t('orientation1BacHomeLocked').replace('{date}', daily.orientation1BacUnlockLabel)
@@ -341,6 +344,7 @@ function DailyActionsBlock({
         style={({ pressed }) => [
           styles.dailyMini,
           gameOnly && styles.dailyMiniFullWidth,
+          gameOnly && styles.dailyMiniFillCard,
           isRTL && styles.dailyMiniRtl,
           {
             paddingVertical: padV,
@@ -402,6 +406,36 @@ function DailyActionsBlock({
           </View>
         ) : null}
       </GHPressable>
+      {showTassjil ? (
+        <GHPressable
+          onPress={onPressTassjilTrack}
+          disabled={!onPressTassjilTrack}
+          accessibilityRole="button"
+          accessibilityLabel={t('homeTassjilTrackCta')}
+          style={({ pressed }) => [
+            styles.dailyMini,
+            styles.dailyMiniTassjil,
+            isRTL && styles.dailyMiniRtl,
+            {
+              paddingVertical: padV,
+              paddingHorizontal: padH,
+              borderRadius: radius,
+            },
+            pressed && onPressTassjilTrack ? { opacity: 0.88 } : null,
+          ]}>
+          <FontAwesome name="list-alt" size={iconSz} color={brand.primary} style={styles.dailyMiniIcon} />
+          <Text
+            style={[
+              styles.dailyMiniTitle,
+              styles.dailyMiniTitleTassjil,
+              { fontSize: titleFs, lineHeight: Math.round(titleFs * 1.22) },
+              isRTL && styles.dailyMiniTextRtl,
+            ]}
+            numberOfLines={2}>
+            {t('homeTassjilTrackCta')}
+          </Text>
+        </GHPressable>
+      ) : null}
       {showInfo ? (
         <GHPressable
           onPress={onPressDailyInfo}
@@ -506,10 +540,10 @@ function StackCardFace({
   onPressDailyGame,
   onPressDailyInfo,
   onPressOrientation1Bac,
+  onPressTassjilTrack,
   onPressPracticalLink,
   onOpenBacVerification,
   onOpenBacThresholds,
-  bacThresholdsLocked = false,
   bacThresholdsLoading = false,
   cardH,
   uniformStack = false,
@@ -527,10 +561,10 @@ function StackCardFace({
   onPressDailyGame?: () => void;
   onPressDailyInfo?: () => void;
   onPressOrientation1Bac?: () => void;
+  onPressTassjilTrack?: () => void;
   onPressPracticalLink?: (id: string) => void;
   onOpenBacVerification?: (channel: BacVerificationChannel) => void;
   onOpenBacThresholds?: () => void;
-  bacThresholdsLocked?: boolean;
   bacThresholdsLoading?: boolean;
   /** Pile à hauteur fixe (carte bac) : pas de rétrécissement des cartes du dessous. */
   uniformStack?: boolean;
@@ -577,7 +611,6 @@ function StackCardFace({
         isRTL={isRTL}
         onOpenVerification={onOpenBacVerification}
         onOpenThresholds={onOpenBacThresholds}
-        thresholdsLocked={bacThresholdsLocked}
         thresholdsLoading={thresholdsBtnLoading}
         hideThresholdsCta={!bacMain}
       />
@@ -613,22 +646,7 @@ function StackCardFace({
             numberOfLines={1}>
             {t('bacCardEyebrow')}
           </Text>
-          {bacMain ? (
-            <ScrollView
-              style={styles.bacScroll}
-              contentContainerStyle={[
-                styles.bacScrollContent,
-                isRTL && styles.bacScrollContentRtl,
-              ]}
-              showsVerticalScrollIndicator={false}
-              nestedScrollEnabled
-              bounces={false}
-              keyboardShouldPersistTaps="handled">
-              {bacBody}
-            </ScrollView>
-          ) : (
-            bacBody
-          )}
+          {bacBody}
         </View>
       </View>
     );
@@ -773,7 +791,7 @@ function StackCardFace({
                 ) : null}
               </GHPressable>
             </View>
-            <View style={styles.firstCardStackHalf}>
+            <View style={[styles.firstCardStackHalf, styles.firstCardStackHalfDaily]}>
               <View style={[styles.firstCardDailyStretch, isRTL && styles.firstCardDailyStretchRtl]}>
                 <DailyActionsBlock
                   daily={card.dailyActions!}
@@ -781,6 +799,7 @@ function StackCardFace({
                   onPressDailyGame={onPressDailyGame}
                   onPressDailyInfo={onPressDailyInfo}
                   onPressOrientation1Bac={onPressOrientation1Bac}
+                  onPressTassjilTrack={onPressTassjilTrack}
                 />
               </View>
             </View>
@@ -879,6 +898,7 @@ function StackCardFace({
               onPressDailyGame={onPressDailyGame}
               onPressDailyInfo={onPressDailyInfo}
               onPressOrientation1Bac={onPressOrientation1Bac}
+              onPressTassjilTrack={onPressTassjilTrack}
             />
           </View>
         ) : card.validityLabel != null || card.validityValue != null ? (
@@ -983,10 +1003,10 @@ function DeckLayer({
   onPressDailyGame,
   onPressDailyInfo,
   onPressOrientation1Bac,
+  onPressTassjilTrack,
   onPressPracticalLink,
   onOpenBacVerification,
   onOpenBacThresholds,
-  bacThresholdsLocked = false,
   bacThresholdsLoading = false,
   cardH,
   uniformStack = false,
@@ -1011,10 +1031,10 @@ function DeckLayer({
   onPressDailyGame?: () => void;
   onPressDailyInfo?: () => void;
   onPressOrientation1Bac?: () => void;
+  onPressTassjilTrack?: () => void;
   onPressPracticalLink?: (id: string) => void;
   onOpenBacVerification?: (channel: BacVerificationChannel) => void;
   onOpenBacThresholds?: () => void;
-  bacThresholdsLocked?: boolean;
   bacThresholdsLoading?: boolean;
   uniformStack?: boolean;
 }) {
@@ -1113,10 +1133,10 @@ function DeckLayer({
             onPressDailyGame={onPressDailyGame}
             onPressDailyInfo={onPressDailyInfo}
             onPressOrientation1Bac={onPressOrientation1Bac}
+            onPressTassjilTrack={onPressTassjilTrack}
             onPressPracticalLink={onPressPracticalLink}
             onOpenBacVerification={onOpenBacVerification}
             onOpenBacThresholds={onOpenBacThresholds}
-            bacThresholdsLocked={bacThresholdsLocked}
             bacThresholdsLoading={bacThresholdsLoading}
             uniformStack={uniformStack}
             bacStackPeek={bacStackPeek}
@@ -1134,7 +1154,7 @@ export function HomeStackedPackCards({
   onPressDailyGame,
   onPressDailyInfo,
   onPressOrientation1Bac,
-  bacThresholdsLocked = false,
+  onPressTassjilTrack,
   bacThresholdsLoading = false,
   onPressPracticalLink,
   onOpenOrientationOverview: onOpenOrientationOverviewProp,
@@ -1335,6 +1355,8 @@ export function HomeStackedPackCards({
               : undefined;
           const dailyOrientation1BacHandler =
             isTop && card.dailyActions?.showOrientation1Bac ? onPressOrientation1Bac : undefined;
+          const tassjilTrackHandler =
+            isTop && card.dailyActions?.showTassjilTrack ? onPressTassjilTrack : undefined;
           const shellLoading = contentLoading && Boolean(card.practicalLinkId);
           const bacVerificationHandler =
             isTop && card.bacResults != null && !card.bacResultsLoading
@@ -1366,10 +1388,10 @@ export function HomeStackedPackCards({
                 onPressDailyGame={dailyGameHandler}
                 onPressDailyInfo={dailyInfoHandler}
                 onPressOrientation1Bac={dailyOrientation1BacHandler}
+                onPressTassjilTrack={tassjilTrackHandler}
                 onPressPracticalLink={onPressPracticalLink}
                 onOpenBacVerification={bacVerificationHandler}
                 onOpenBacThresholds={bacThresholdsHandler}
-                bacThresholdsLocked={bacThresholdsLocked}
                 bacThresholdsLoading={bacThresholdsLoading}
                 cardH={layerCardH}
                 uniformStack={uniformStack}
@@ -1396,7 +1418,6 @@ export function HomeStackedPackCards({
               onPressPracticalLink={onPressPracticalLink}
               onOpenBacVerification={bacVerificationHandler}
               onOpenBacThresholds={bacThresholdsHandler}
-              bacThresholdsLocked={bacThresholdsLocked}
               bacThresholdsLoading={bacThresholdsLoading}
             />
           );
@@ -1470,18 +1491,6 @@ const styles = StyleSheet.create({
   bacEyebrow: {
     flexShrink: 0,
   },
-  bacScroll: {
-    flex: 1,
-    minHeight: 0,
-    width: '100%',
-  },
-  bacScrollContent: {
-    flexGrow: 0,
-    paddingBottom: 6,
-  },
-  bacScrollContentRtl: {
-    paddingBottom: 10,
-  },
   cardColumnRtl: {
     width: '100%',
     alignItems: 'stretch',
@@ -1517,14 +1526,18 @@ const styles = StyleSheet.create({
     width: '100%',
     justifyContent: 'center',
   },
+  /** Moitié basse : le bloc défi quotidien remplit toute la hauteur disponible. */
+  firstCardStackHalfDaily: {
+    justifyContent: 'flex-start',
+  },
   firstCardDailyStretch: {
     flex: 1,
     minHeight: 0,
     width: '100%',
+    alignSelf: 'stretch',
   },
   firstCardDailyStretchRtl: {
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignSelf: 'stretch',
   },
   orientationBlockPacked: {
     alignSelf: 'stretch',
@@ -1622,17 +1635,17 @@ const styles = StyleSheet.create({
     width: '100%',
     minHeight: 0,
   },
-  /** Une seule tuile (défi) : pleine largeur, même hauteur que la rangée à deux tuiles. */
+  /** Une seule tuile (défi) : pleine largeur et hauteur de la zone basse de la carte. */
   dailyActionsWrapGameOnly: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'stretch',
+    alignSelf: 'stretch',
   },
   dailyActionsWrapRtl: {
     direction: 'rtl',
   },
   dailyActionsWrapGameOnlyRtl: {
-    justifyContent: 'center',
-    alignItems: 'center',
+    alignItems: 'stretch',
+    alignSelf: 'stretch',
   },
   dailyMini: {
     flex: 1,
@@ -1652,7 +1665,15 @@ const styles = StyleSheet.create({
   },
   dailyMiniFullWidth: {
     flexGrow: 1,
+    flexShrink: 1,
     maxWidth: '100%',
+    width: '100%',
+  },
+  /** Défi seul (FR typique) : occupe tout le reste de la carte sous la progression. */
+  dailyMiniFillCard: {
+    alignSelf: 'stretch',
+    flex: 1,
+    minHeight: 0,
   },
   dailyMiniIcon: {
     marginBottom: 6,
@@ -1679,6 +1700,15 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.22,
     shadowRadius: 4,
     elevation: 2,
+  },
+  dailyMiniTassjil: {
+    borderWidth: 1.5,
+    borderColor: 'rgba(51, 62, 143, 0.35)',
+    backgroundColor: 'rgba(51, 62, 143, 0.08)',
+  },
+  dailyMiniTitleTassjil: {
+    color: brand.primary,
+    fontWeight: '800',
   },
   dailyMiniDone: {
     borderWidth: StyleSheet.hairlineWidth,

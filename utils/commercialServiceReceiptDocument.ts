@@ -57,8 +57,10 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .status-badge { display: inline-flex; align-items: center; gap: 6px; background: #059669; color: #fff; padding: 10px 20px; border-radius: 50px; font-weight: 600; font-size: 12px; margin: 8px 28px 0; }
 .status-badge.warn { background: #dc2626; }
 .tx-detail-row td { padding: 0 !important; border-bottom: 1px solid #e2e8f0; background: #fafbfc; }
-.tx-detail-cell { padding: 10px 12px 12px !important; vertical-align: top; }
-.tx-detail-title { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 8px; }
+.tx-detail-cell { padding: 0 !important; vertical-align: top; }
+.tx-detail-wrap { margin: 16px 0 18px; padding: 14px 12px; }
+.tx-detail-title { font-size: 10px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.05em; margin: 0 0 12px; }
+.tx-detail-wrap .tx-inner-table { margin-top: 4px; margin-bottom: 4px; }
 .tx-inner-table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 6px; overflow: hidden; background: #fff; }
 .tx-inner-table th { background: #f1f5f9; color: #475569; font-weight: 600; text-align: left; padding: 7px 10px; font-size: 10px; border-bottom: 1px solid #e2e8f0; }
 .tx-inner-table th:last-child { text-align: right; }
@@ -69,8 +71,11 @@ body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Robo
 .tx-inner-table tfoot td:last-child { color: #059669; font-size: 12px; }
 .tx-pill { font-size: 9px; padding: 3px 6px; border-radius: 4px; font-weight: 600; background: #d1fae5; color: #059669; display: inline-block; }
 .tx-pill.pending { background: #fef3c7; color: #d97706; }
-.tx-historique-block { margin-bottom: 16px; page-break-inside: avoid; }
-.tx-historique-service { font-size: 12px; font-weight: 700; color: #1e293b; margin: 12px 0 8px; }
+.section-transactions .transactions-section-body { margin-top: 16px; margin-bottom: 20px; }
+.tx-historique-block { margin-top: 12px; margin-bottom: 18px; page-break-inside: avoid; }
+.tx-historique-block:first-child { margin-top: 0; }
+.tx-historique-block:last-child { margin-bottom: 8px; }
+.tx-historique-service { font-size: 12px; font-weight: 700; color: #1e293b; margin: 14px 0 10px; }
 .tx-historique-grand-total { margin-top: 14px; padding: 12px 14px; background: #ecfdf5; border: 2px solid #bbf7d0; border-radius: 8px; display: flex; justify-content: space-between; align-items: center; font-size: 13px; font-weight: 700; color: #065f46; }
 .badge-ok { background: #d1fae5; color: #059669; padding: 3px 6px; border-radius: 4px; font-size: 9px; font-weight: 600; }
 .badge-warn { background: #fee2e2; color: #dc2626; padding: 3px 6px; border-radius: 4px; font-size: 9px; font-weight: 600; }
@@ -230,6 +235,7 @@ function buildServiceTransactionsDetailRow(
   return `
     <tr class="tx-detail-row">
       <td colspan="5" class="tx-detail-cell">
+        <div class="tx-detail-wrap">
         <div class="tx-detail-title">${escapeHtml(title)}</div>
         <table class="tx-inner-table">
           <thead>
@@ -248,6 +254,7 @@ function buildServiceTransactionsDetailRow(
             ${buildTransactionTableFooter(txs, servicePaid)}
           </tfoot>
         </table>
+        </div>
       </td>
     </tr>`;
 }
@@ -455,9 +462,11 @@ export function buildCommercialServiceReceiptHtml(
       </div>
     </div>
 
-    <div class="section">
+    <div class="section section-transactions">
       <div class="section-title">Historique des transactions par service</div>
-      ${buildTransactionsHistorySection(services)}
+      <div class="transactions-section-body">
+        ${buildTransactionsHistorySection(services)}
+      </div>
     </div>
 
     <div style="text-align:center;margin:20px 28px">

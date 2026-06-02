@@ -22,7 +22,6 @@ export const PRACTICAL_LINK_IDS_REQUIRING_TAWJIH_PLUS = [
   'diagnostic-recommandations',
   'inscriptions',
   'candidatures',
-  'ecoles-inscription',
 ] as const;
 
 export type TawjihPlusPracticalLinkId = (typeof PRACTICAL_LINK_IDS_REQUIRING_TAWJIH_PLUS)[number];

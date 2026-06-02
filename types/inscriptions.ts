@@ -56,6 +56,8 @@ export type EstablishmentBrief = {
   ville?: string | null;
   villes?: string[];
   type?: string | null;
+  /** École incluse dans le service d’inscription TASSJIL (champ Dev2 `eTawjihiInscription`). */
+  isServiceTassjil?: boolean;
 };
 
 export type CustomLink = {

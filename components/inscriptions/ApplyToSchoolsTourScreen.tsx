@@ -110,6 +110,14 @@ export function ApplyToSchoolsTourScreen() {
   const step = APPLY_TO_SCHOOLS_TOUR_STEPS[stepIndex];
   const isLast = stepIndex >= APPLY_TO_SCHOOLS_TOUR_STEPS.length - 1;
 
+  const tourAnnouncementForCard = useMemo(
+    () => ({
+      ...tourAnnouncement,
+      availableStatuses: tourAvailableStatuses,
+    }),
+    [tourAnnouncement, tourAvailableStatuses],
+  );
+
   const tourProgress = useMemo<ApplyToSchoolsTourProgressState>(
     () => ({
       stepIndex,
@@ -503,7 +511,7 @@ export function ApplyToSchoolsTourScreen() {
             <View style={styles.previewBlock}>
               <View style={styles.cardHighlight}>
                 <AnnouncementCard
-                  item={tourAnnouncement}
+                  item={tourAnnouncementForCard}
                   isFollowed={demoFollowed}
                   onToggleFollow={handleDemoFollow}
                   onOpenLink={handleDemoOpenRegistrationLink}

@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DiagnosticRecommendationsTawjihPlusGate } from '@/components/diagnostic/DiagnosticRecommendationsTawjihPlusGate';
@@ -503,6 +503,17 @@ export default function DiagnosticResultatsScreen() {
         ) : null}
       </SafeAreaView>
 
+      {isLoggedIn ? (
+        <View style={[styles.followStickyBar, isRTL && styles.followStickyBarRtl]}>
+          <RecommendationFollowProgress
+            followCount={followProgress.current}
+            locale={appLocale === 'ar' ? 'ar' : 'fr'}
+            isRTL={isRTL}
+            style={styles.followStickyCard}
+          />
+        </View>
+      ) : null}
+
       <ScrollView
           style={[styles.scroll, isRTL && styles.scrollRtl]}
           contentContainerStyle={[styles.scrollContent, isRTL && styles.scrollContentRtl]}
@@ -535,14 +546,6 @@ export default function DiagnosticResultatsScreen() {
                 <Text style={[styles.insightTxt, isRTL && styles.rtlText]}>{globalComment}</Text>
               </View>
             </View>
-          ) : null}
-
-          {isLoggedIn ? (
-            <RecommendationFollowProgress
-              followCount={followProgress.current}
-              locale={appLocale === 'ar' ? 'ar' : 'fr'}
-              isRTL={isRTL}
-            />
           ) : null}
 
           {TIER_ORDER.map((tier) => {
@@ -727,6 +730,26 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     color: brand.white,
   },
+  followStickyBar: {
+    backgroundColor: '#F8FAFC',
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.sm,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: homeShell.borderOnWhite,
+    zIndex: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 4,
+      },
+      android: { elevation: 2 },
+    }),
+  },
+  followStickyBarRtl: { direction: 'rtl' },
+  followStickyCard: { marginBottom: 0 },
   rtlText: { writingDirection: 'rtl', textAlign: 'right' },
   scroll: { flex: 1, backgroundColor: '#F8FAFC' },
   scrollRtl: { direction: 'rtl' },

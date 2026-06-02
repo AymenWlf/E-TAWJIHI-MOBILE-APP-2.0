@@ -86,6 +86,8 @@ type RawCard = {
     ville?: string | null;
     villes?: string[];
     type?: string | null;
+    isServiceTassjil?: boolean;
+    is_service_tassjil?: boolean;
   } | null;
 };
 
@@ -204,6 +206,7 @@ function normalize(c: RawCard): ContestAnnouncementCard {
           ville: c.etablissement.ville ?? null,
           villes: Array.isArray(c.etablissement.villes) ? c.etablissement.villes : [],
           type: c.etablissement.type ?? null,
+          isServiceTassjil: establishmentIsServiceTassjil(c.etablissement),
         }
       : null,
     communityQnaMessageCount:
@@ -212,6 +215,12 @@ function normalize(c: RawCard): ContestAnnouncementCard {
         : undefined,
     previewOnly: c.previewOnly === true,
   };
+}
+
+function establishmentIsServiceTassjil(
+  e: { isServiceTassjil?: boolean; is_service_tassjil?: boolean } | null | undefined,
+): boolean {
+  return Boolean(e?.isServiceTassjil ?? e?.is_service_tassjil);
 }
 
 function authHeaders(accessToken?: string | null): Record<string, string> | undefined {
@@ -310,6 +319,7 @@ export function contestDetailToListCard(d: ContestAnnouncementDetail): ContestAn
           ville: d.establishment.ville,
           villes: d.establishment.villes,
           type: d.establishment.type,
+          isServiceTassjil: establishmentIsServiceTassjil(d.establishment),
         }
       : null,
     communityQnaMessageCount: undefined,
@@ -394,6 +404,7 @@ export type ContestAnnouncementDetail = {
     email: string | null;
     siteWeb: string | null;
     campuses: { nom: string; ville: string }[];
+    isServiceTassjil?: boolean;
   };
   previewOnly?: boolean;
 };
@@ -444,6 +455,8 @@ type RawDetail = {
     email?: string | null;
     siteWeb?: string | null;
     campuses?: { nom?: string; ville?: string }[];
+    isServiceTassjil?: boolean;
+    is_service_tassjil?: boolean;
   } | null;
   previewOnly?: boolean;
 };
@@ -515,6 +528,7 @@ function normalizeDetailEstablishment(
           .campuses!.filter((c) => c && (c.nom || c.ville))
           .map((c) => ({ nom: (c.nom ?? '').trim(), ville: (c.ville ?? '').trim() }))
       : [],
+    isServiceTassjil: establishmentIsServiceTassjil(e),
   };
 }
 

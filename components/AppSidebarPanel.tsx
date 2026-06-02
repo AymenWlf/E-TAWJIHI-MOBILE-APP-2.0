@@ -28,9 +28,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
+import { hasLegacyTassjilAccess } from '@/utils/tassjilPracticalLinkLock';
 import { CAIRO } from '@/theme/arabicTypography';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { heroShellHeaderUi, useHeroShellHeaderWide } from '@/utils/heroShellHeaderUi';
 
 type IconKind = 'fa' | 'mci';
 
@@ -135,9 +137,13 @@ export function AppSidebarPanel() {
   const [sheetMounted, setSheetMounted] = useState(false);
 
   const panelWidth = useMemo(() => {
-    const pct = windowWidth >= 600 ? 0.38 : windowWidth >= 420 ? 0.84 : 0.9;
-    return Math.min(320, Math.round(windowWidth * pct));
+    if (windowWidth >= 1024) return Math.min(380, Math.round(windowWidth * 0.32));
+    if (windowWidth >= 600) return Math.min(360, Math.round(windowWidth * 0.38));
+    if (windowWidth >= 420) return Math.round(windowWidth * 0.84);
+    return Math.round(windowWidth * 0.9);
   }, [windowWidth]);
+
+  const isWideHeader = useHeroShellHeaderWide(windowWidth);
 
   const closedTranslate = isRTL ? panelWidth : -panelWidth;
 
@@ -215,6 +221,19 @@ export function AppSidebarPanel() {
     ];
 
     const account: SidebarLink[] = [
+      ...(hasLegacyTassjilAccess(user?.legacyLink)
+        ? ([
+            {
+              id: 'tassjil-schools',
+              href: '/tassjil-school-choices',
+              icon: 'list-alt',
+              iconKind: 'fa' as const,
+              labelKey: 'sidebarTassjilSchools' as const,
+              iconBg: 'rgba(51, 62, 143, 0.12)',
+              iconColor: brand.primary,
+            },
+          ] satisfies SidebarLink[])
+        : []),
       {
         id: 'loyalty',
         href: '/compte/fidelite',
@@ -335,13 +354,19 @@ export function AppSidebarPanel() {
                   onPress={close}
                   hitSlop={16}
                   style={({ pressed }): ViewStyle[] => [
-                    styles.closeBtn,
-                    ...(pressed ? [styles.closeBtnPressed] : []),
+                    isWideHeader ? heroShellHeaderUi.iconBtn : styles.closeBtn,
+                    ...(pressed
+                      ? [isWideHeader ? heroShellHeaderUi.iconBtnPressed : styles.closeBtnPressed]
+                      : []),
                   ]}
                   accessibilityRole="button"
                   accessibilityLabel={t('sidebarClose')}
                 >
-                  <FontAwesome name="times" size={18} color={homeShell.textMuted} />
+                  <FontAwesome
+                    name="times"
+                    size={isWideHeader ? 20 : 18}
+                    color={isWideHeader ? homeShell.text : homeShell.textMuted}
+                  />
                 </Pressable>
               </View>
               <View style={[styles.heroAccentBar, isRTL && styles.heroAccentBarRtl]} />
@@ -470,6 +495,8 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderRadius: radius.md,
     backgroundColor: 'rgba(255,255,255,0.1)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.18)',
   },
   closeBtnPressed: {
     backgroundColor: 'rgba(255,255,255,0.18)',

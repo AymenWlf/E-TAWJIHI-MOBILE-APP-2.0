@@ -165,6 +165,7 @@ function RootLayoutNav() {
               <Stack.Screen name="verify-reset-otp" options={{ headerShown: false }} />
               <Stack.Screen name="reset-password" options={{ headerShown: false }} />
               <Stack.Screen name="account-setup" options={{ headerShown: false }} />
+              <Stack.Screen name="link-tassjil-account" options={{ headerShown: false }} />
               <Stack.Screen name="logout" options={{ headerShown: false }} />
               <Stack.Screen name="boutique/[slug]" options={{ headerShown: false }} />
               <Stack.Screen name="boutique/service/[slug]" options={{ headerShown: false }} />

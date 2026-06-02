@@ -91,19 +91,37 @@ export async function resolveTourFgsesAnnouncement(): Promise<ContestAnnouncemen
 /** Complète logo / nom arabe si l’API les omet encore. */
 function enrichTourAnnouncement(announcement: ContestAnnouncementCard): ContestAnnouncementCard {
   const fallbackEst = TOUR_DEMO_FGSES_ANNOUNCEMENT.establishment;
+  const fallback = TOUR_DEMO_FGSES_ANNOUNCEMENT;
   const est = announcement.establishment;
-  if (!est || !fallbackEst) return announcement;
+  const registrationUrl =
+    announcement.registrationUrl?.trim() || fallback.registrationUrl?.trim() || '';
+  const registrationUrlLabel =
+    announcement.registrationUrlLabel?.trim() ||
+    fallback.registrationUrlLabel?.trim() ||
+    null;
+  const registrationUrlLabelAr =
+    announcement.registrationUrlLabelAr?.trim() ||
+    fallback.registrationUrlLabelAr?.trim() ||
+    null;
+
+  if (!est || !fallbackEst) {
+    return {
+      ...announcement,
+      registrationUrl,
+      registrationUrlLabel,
+      registrationUrlLabelAr,
+    };
+  }
   return {
     ...announcement,
+    registrationUrl,
+    registrationUrlLabel,
+    registrationUrlLabelAr,
     establishment: {
       ...est,
       logo: est.logo?.trim() || fallbackEst.logo || null,
       nomArabe: est.nomArabe?.trim() || fallbackEst.nomArabe || null,
     },
-    registrationUrlLabelAr:
-      announcement.registrationUrlLabelAr?.trim() ||
-      TOUR_DEMO_FGSES_ANNOUNCEMENT.registrationUrlLabelAr ||
-      null,
   };
 }
 
@@ -273,6 +291,23 @@ const CANDIDACY_CARD_API_CODE_ALIASES: Record<
   not_admitted_contest: ['not_admitted_contest', 'failed_exam', 'not_selected', 'rejected'],
 };
 
+function mergeTourStatusWithFallback(
+  match: CandidacyStatusType,
+  fallback: CandidacyStatusType,
+): CandidacyStatusType {
+  return {
+    ...match,
+    labelFr: fallback.labelFr,
+    labelAr: match.labelAr?.trim() ? match.labelAr : fallback.labelAr,
+    icon: fallback.icon || match.icon,
+    colorFg: fallback.colorFg,
+    colorBg: fallback.colorBg,
+    colorBorder: fallback.colorBorder,
+    isFinalizedMarker: fallback.isFinalizedMarker,
+    isEnrollmentMarker: fallback.isEnrollmentMarker,
+  };
+}
+
 function pickTourSheetStatusesForStep(
   catalog: CandidacyStatusType[],
   stepCodes: readonly string[],
@@ -301,15 +336,7 @@ function pickTourSheetStatusesForStep(
       match = fallback;
     }
     if (match) {
-      resolved.push(
-        fallback
-          ? {
-              ...match,
-              labelFr: fallback.labelFr,
-              labelAr: match.labelAr?.trim() ? match.labelAr : fallback.labelAr,
-            }
-          : match,
-      );
+      resolved.push(fallback ? mergeTourStatusWithFallback(match, fallback) : match);
     }
   }
   return resolved;

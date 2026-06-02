@@ -28,7 +28,11 @@ type Props = {
 
 const SEUIL_SHORT = {
   fr: { compatible: 'Seuil compat.', almost: 'Seuil presque', not: 'Seuil non compat.' },
-  ar: { compatible: 'عتبة متوافقة', almost: 'عتبة شبه', not: 'عتبة غير متوافقة' },
+  ar: {
+    compatible: 'عتبة متوافقة',
+    almost: 'قريبة من عتبة النقط',
+    not: 'عتبة غير متوافقة',
+  },
 } as const;
 
 const SEUIL_SOURCE_HINT = {
@@ -142,7 +146,7 @@ const styles = StyleSheet.create({
   },
   seuilTxt: {
     fontWeight: '800',
-    maxWidth: 120,
+    maxWidth: 148,
   },
   rtlText: { writingDirection: 'rtl' },
 });

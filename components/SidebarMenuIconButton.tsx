@@ -1,9 +1,10 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
 import { radius, spacing as space } from '@/theme/tokens';
+import { heroShellHeaderUi, useHeroShellHeaderWide } from '@/utils/heroShellHeaderUi';
 
 type Props = {
   /** Couleur de l’icône (heroes bleus → blanc ou homeShell.text). */
@@ -20,6 +21,8 @@ export function SidebarMenuIconButton({
 }: Props) {
   const { open } = useAppSidebar();
   const { t } = useLocale();
+  const { width: screenW } = useWindowDimensions();
+  const isWideHeader = useHeroShellHeaderWide(screenW);
 
   return (
     <View style={[styles.wrap, { marginEnd: trailingSpacing }]}>
@@ -27,13 +30,13 @@ export function SidebarMenuIconButton({
         onPress={open}
         hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
         style={({ pressed }) => [
-          styles.hit,
-          pressed && styles.hitPressed,
+          isWideHeader ? heroShellHeaderUi.iconBtn : styles.hit,
+          pressed && (isWideHeader ? heroShellHeaderUi.iconBtnPressed : styles.hitPressed),
         ]}
         accessibilityRole="button"
         accessibilityLabel={t('sidebarOpen')}
       >
-        <FontAwesome name="bars" size={21} color={color} />
+        <FontAwesome name="bars" size={isWideHeader ? 20 : 21} color={color} />
       </Pressable>
     </View>
   );

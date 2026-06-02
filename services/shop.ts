@@ -1,5 +1,5 @@
 import { buildApiUrl } from '@/constants/api';
-import { httpGetJson, httpPostJson } from '@/services/http';
+import { apiFetchInit, httpGetJson, httpPostJson } from '@/services/http';
 import { fetchPlatformServices, type PlatformServiceItem } from '@/services/platformServices';
 import {
   fetchPlatformServiceCatalogEntitlements,
@@ -136,11 +136,13 @@ export async function uploadShopOrderBankTransferReceipt(
     name: file.name || 'justificatif.pdf',
     type: file.type || 'application/octet-stream',
   } as unknown as Blob);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: { Accept: 'application/json' },
-    body: form,
-  });
+  const res = await fetch(
+    url,
+    await apiFetchInit({
+      method: 'POST',
+      body: form,
+    }),
+  );
   const json = (await res.json().catch(() => null)) as ApiDataResponse<ShopOrderPayload> & { message?: string };
   if (!res.ok || !json?.success || !json.data) {
     throw new Error(typeof json?.message === 'string' ? json.message : `HTTP ${res.status}`);

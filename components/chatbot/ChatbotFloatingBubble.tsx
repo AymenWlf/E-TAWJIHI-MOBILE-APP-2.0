@@ -53,6 +53,7 @@ import {
 import { fetchShopProductBySlug } from '@/services/shop';
 import { getEstablishmentLogoUrl } from '@/constants/establishmentMedia';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { heroShellHeaderUi, useHeroShellHeaderWide } from '@/utils/heroShellHeaderUi';
 import {
   extractBoutiqueProductSlugsFromText,
   extractChatbotLinksFromText,
@@ -261,6 +262,7 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
   const { t, isRTL } = useLocale();
   const { user, getValidAccessToken } = useAuth();
   const { width: screenW } = useWindowDimensions();
+  const isWideHeader = useHeroShellHeaderWide(screenW);
 
   const [open, setOpen] = useState(false);
   /** `true` = masquer le hint ; lecture AsyncStorage au montage pour éviter un flash pour les anciens utilisateurs. */
@@ -740,13 +742,21 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
           behavior={Platform.OS === 'ios' ? 'padding' : undefined}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         >
-          <View style={[styles.header, { paddingTop: Math.max(insets.top, spacing.md) }]}>
-            <View style={styles.headerRow}>
+          <View
+            style={[
+              styles.header,
+              isWideHeader && styles.headerWide,
+              { paddingTop: Math.max(insets.top, spacing.md) },
+            ]}>
+            <View style={[styles.headerRow, isWideHeader && heroShellHeaderUi.headerRowWide]}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Accueil"
                 onPress={() => pushNav('/(tabs)' as Href)}
-                style={styles.headerBackBtn}
+                style={({ pressed }) => [
+                  isWideHeader ? heroShellHeaderUi.iconBtnCompact : styles.headerBackBtn,
+                  pressed && (isWideHeader ? heroShellHeaderUi.iconBtnPressed : { opacity: 0.85 }),
+                ]}
                 hitSlop={8}
               >
                 <FontAwesome name={isRTL ? 'chevron-right' : 'chevron-left'} size={18} color={brand.white} />
@@ -754,12 +764,15 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
               <MaterialCommunityIcons name="robot" size={22} color={brand.white} />
               <Text style={styles.headerTitle}>{t('chatbotTitle')}</Text>
             </View>
-            <View style={styles.headerActions}>
+            <View style={[styles.headerActions, isWideHeader && styles.headerActionsWide]}>
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel="Historique"
                 onPress={() => setSessionsOpen(true)}
-                style={styles.headerIconBtn}
+                style={({ pressed }) => [
+                  isWideHeader ? heroShellHeaderUi.iconBtnCompact : styles.headerIconBtn,
+                  pressed && (isWideHeader ? heroShellHeaderUi.iconBtnPressed : { opacity: 0.85 }),
+                ]}
               >
                 <FontAwesome name="history" size={18} color={brand.white} />
               </Pressable>
@@ -767,7 +780,10 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
                 accessibilityRole="button"
                 accessibilityLabel={t('chatbotNewChat')}
                 onPress={newChat}
-                style={styles.headerIconBtn}
+                style={({ pressed }) => [
+                  isWideHeader ? heroShellHeaderUi.iconBtnCompact : styles.headerIconBtn,
+                  pressed && (isWideHeader ? heroShellHeaderUi.iconBtnPressed : { opacity: 0.85 }),
+                ]}
               >
                 <FontAwesome name="plus" size={18} color={brand.white} />
               </Pressable>
@@ -775,9 +791,12 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
                 accessibilityRole="button"
                 accessibilityLabel={t('chatbotCloseA11y')}
                 onPress={() => setOpen(false)}
-                style={styles.headerIconBtn}
+                style={({ pressed }) => [
+                  isWideHeader ? heroShellHeaderUi.iconBtn : styles.headerIconBtn,
+                  pressed && (isWideHeader ? heroShellHeaderUi.iconBtnPressed : { opacity: 0.85 }),
+                ]}
               >
-                <FontAwesome name="times" size={22} color={brand.white} />
+                <FontAwesome name="times" size={isWideHeader ? 20 : 22} color={brand.white} />
               </Pressable>
             </View>
           </View>
@@ -1309,6 +1328,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm,
     backgroundColor: brand.primary,
+    gap: spacing.sm,
+  },
+  headerWide: {
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   headerRow: {
     flexDirection: 'row',
@@ -1400,6 +1424,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
+  },
+  headerActionsWide: {
+    gap: spacing.xs,
   },
   headerIconBtn: {
     padding: spacing.sm,

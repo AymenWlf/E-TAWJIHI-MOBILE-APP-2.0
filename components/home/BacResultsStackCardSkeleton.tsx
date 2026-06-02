@@ -12,6 +12,16 @@ type Props = {
   hideThresholdsCta?: boolean;
 };
 
+function OutletTileSkeleton({ pulseStyle }: { pulseStyle: ReturnType<typeof useSkeletonPulse> }) {
+  return (
+    <View style={styles.outletTileSk}>
+      <SkeletonBlock style={styles.outletTileIconSk} pulseStyle={pulseStyle} />
+      <SkeletonBlock style={styles.outletTileLabelSk} pulseStyle={pulseStyle} />
+      <SkeletonBlock style={styles.outletTileTagSk} pulseStyle={pulseStyle} />
+    </View>
+  );
+}
+
 function OutletRowSkeleton({
   pulseStyle,
   layout,
@@ -77,9 +87,10 @@ export function BacResultsStackCardSkeleton({
           { padding: layout.boxPad, borderRadius: layout.boxRadius },
         ]}>
         <SkeletonBlock style={styles.outletsTitleSk} pulseStyle={pulseStyle} />
-        <OutletRowSkeleton pulseStyle={pulseStyle} layout={layout} isRTL={isRTL} />
-        <OutletRowSkeleton pulseStyle={pulseStyle} layout={layout} isRTL={isRTL} />
-        <OutletRowSkeleton pulseStyle={pulseStyle} layout={layout} isRTL={isRTL} />
+        <View style={styles.outletsGrid}>
+          <OutletTileSkeleton pulseStyle={pulseStyle} />
+          <OutletTileSkeleton pulseStyle={pulseStyle} />
+        </View>
       </View>
 
       {showThresholdsCta && !hideThresholdsCta ? (
@@ -175,6 +186,40 @@ const styles = StyleSheet.create({
     height: 11,
     borderRadius: 4,
     backgroundColor: 'rgba(51, 62, 143, 0.12)',
+  },
+  outletsGrid: {
+    flexDirection: 'row',
+    gap: 8,
+    width: '100%',
+  },
+  outletTileSk: {
+    flex: 1,
+    minWidth: 0,
+    padding: 10,
+    borderRadius: 8,
+    backgroundColor: 'rgba(255, 255, 255, 0.85)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(51, 62, 143, 0.1)',
+    gap: 8,
+    minHeight: 88,
+  },
+  outletTileIconSk: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(51, 62, 143, 0.12)',
+  },
+  outletTileLabelSk: {
+    width: '88%',
+    height: 12,
+    borderRadius: 4,
+    backgroundColor: 'rgba(51, 62, 143, 0.14)',
+  },
+  outletTileTagSk: {
+    width: 64,
+    height: 22,
+    borderRadius: 999,
+    backgroundColor: 'rgba(51, 62, 143, 0.1)',
   },
   outletRow: {
     flexDirection: 'row',

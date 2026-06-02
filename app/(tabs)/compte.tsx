@@ -27,6 +27,11 @@ import {
   AccountOrdersLoadingSkeleton,
   AccountProfileLoadingSkeleton,
 } from '@/components/account/AccountScreenSkeleton';
+import { ActiveServicesPanel } from '@/components/account/ActiveServicesPanel';
+import { AppFeedbackAccountCard } from '@/components/account/AppFeedbackAccountCard';
+import { ChangePasswordSection } from '@/components/account/ChangePasswordSection';
+import { LoyaltyTeaserCard } from '@/components/account/LoyaltyTeaserCard';
+import { ProfileOrdersPreviewPanel } from '@/components/account/ProfileOrdersPreviewPanel';
 import { BirthDateField } from '@/components/ui/BirthDateField';
 import { SelectField } from '@/components/ui/SelectField';
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
@@ -57,9 +62,6 @@ import {
   fetchUserActiveServices,
   type UserActiveCommercialService,
 } from '@/services/userActiveServices';
-import { ActiveServicesPanel } from '@/components/account/ActiveServicesPanel';
-import { LoyaltyTeaserCard } from '@/components/account/LoyaltyTeaserCard';
-import { ProfileOrdersPreviewPanel } from '@/components/account/ProfileOrdersPreviewPanel';
 import { useUserReferral } from '@/hooks/useUserReferral';
 import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
@@ -770,29 +772,17 @@ export default function CompteTabScreen() {
               onOrderPress={(publicId) => router.push(`/compte/commande/${publicId}`)}
             />
 
-            <Pressable
-              onPress={() => openAppFeedback()}
-              style={({ pressed }) => [styles.feedbackCard, styles.profileStackItem, pressed && { opacity: 0.92 }]}
-              accessibilityRole="button">
-              <View style={[styles.feedbackCardHead, isRTL && styles.feedbackCardHeadRtl]}>
-                <View style={styles.feedbackCardIcon}>
-                  <FontAwesome name="comment-o" size={18} color={brand.primary} />
-                </View>
-                <View style={{ flex: 1, minWidth: 0 }}>
-                  <Text style={[styles.feedbackCardTitle, isRTL && styles.txtRtl]}>
-                    {t('appFeedbackTitle')}
-                  </Text>
-                  <Text style={[styles.feedbackCardSub, isRTL && styles.txtRtl]} numberOfLines={2}>
-                    {t('appFeedbackIntro')}
-                  </Text>
-                </View>
-                <FontAwesome
-                  name={isRTL ? 'chevron-left' : 'chevron-right'}
-                  size={14}
-                  color={homeShell.cardMuted}
-                />
-              </View>
-            </Pressable>
+            <View style={styles.profileStackItem}>
+              <AppFeedbackAccountCard
+                rtl={isRTL}
+                t={t}
+                services={activeServices}
+                servicesLoaded={activeServicesLoaded}
+                servicesLoading={activeServicesLoading}
+                onOpenFeedback={() => openAppFeedback()}
+                onLockedPress={() => router.push(TAWJIH_PLUS_PRODUCT_PATH as never)}
+              />
+            </View>
 
             <View style={[styles.card, styles.profileStackItem]}>
               <View style={styles.sectionHead}>
@@ -1125,6 +1115,10 @@ export default function CompteTabScreen() {
                   style={[styles.input, isRTL && styles.inputRtl]}
                 />
               </Field>
+            </View>
+
+            <View style={styles.profileStackItem}>
+              <ChangePasswordSection rtl={isRTL} t={t} getAccessToken={getValidAccessToken} />
             </View>
 
             <View style={[styles.card, styles.profileStackItem]}>

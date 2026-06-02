@@ -37,8 +37,8 @@ import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
 const SHEET_MS = 300;
-/** Hauteur du sheet : 70 % de l’écran (iOS + Android). */
-const SHEET_HEIGHT_RATIO = 0.7;
+/** Hauteur du sheet : ~78 % de l’écran pour laisser place au CTA bas. */
+const SHEET_HEIGHT_RATIO = 0.78;
 
 type Props = {
   visible: boolean;
@@ -50,11 +50,14 @@ type Props = {
   onClose: () => void;
 };
 
-function StepRow({ n, text, rtl }: { n: number; text: string; rtl: boolean }) {
+function StepRow({ n, text, rtl, last }: { n: number; text: string; rtl: boolean; last?: boolean }) {
   return (
     <View style={[styles.stepRow, rtl && styles.stepRowRtl]}>
-      <View style={styles.stepNum}>
-        <Text style={styles.stepNumTxt}>{n}</Text>
+      <View style={styles.stepRail}>
+        <View style={styles.stepNum}>
+          <Text style={styles.stepNumTxt}>{n}</Text>
+        </View>
+        {!last ? <View style={styles.stepLine} /> : null}
       </View>
       <Text style={[styles.stepTxt, rtl && styles.rtlText]}>{text}</Text>
     </View>
@@ -108,11 +111,10 @@ export function BacResultsVerificationModal({
   const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: sheetY.value }] }));
 
   const titleKey: HomeCopyKey =
-    channel === 'outlook'
-      ? 'bacVerifyModalTitleOutlook'
-      : channel === 'men'
-        ? 'bacVerifyModalTitleMen'
-        : 'bacVerifyModalTitleSms';
+    channel === 'outlook' ? 'bacVerifyModalTitleOutlook' : 'bacVerifyModalTitleMen';
+
+  const channelAccent = channel === 'men' ? homeShell.greenDark : homeShell.blue;
+  const channelIcon = channel === 'outlook' ? 'envelope-o' : 'graduation-cap';
 
   const stepKeys: HomeCopyKey[] = useMemo(() => {
     if (channel === 'outlook') {
@@ -124,26 +126,22 @@ export function BacResultsVerificationModal({
         'bacOutlookStep5',
       ];
     }
-    if (channel === 'men') {
-      return [
-        'bacMenStep1',
-        'bacMenStep2',
-        'bacMenStep3',
-        'bacMenStep4',
-        'bacMenStep5',
-        'bacMenStep6',
-      ];
-    }
-    return ['bacSmsStep1', 'bacSmsStep2', 'bacSmsStep3'];
+    return [
+      'bacMenStep1',
+      'bacMenStep2',
+      'bacMenStep3',
+      'bacMenStep4',
+      'bacMenStep5',
+      'bacMenStep6',
+    ];
   }, [channel]);
 
   const outlookEmailPreview = buildMassarOutlookEmail(
     editing ? draftMassar : massarCode || draftMassar,
   );
 
-  const showMassarBlock = channel === 'outlook' || channel === 'men';
-  const canOpenExternal = channel === 'outlook' || channel === 'men';
   const massarReady = (massarCode || draftMassar).replace(/\s/g, '').length >= 5;
+  const openDisabled = !massarReady;
 
   const handleConfirm = async () => {
     const ok = await onConfirmMassar(draftMassar);
@@ -173,24 +171,29 @@ export function BacResultsVerificationModal({
         <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]} pointerEvents="none" />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel={t('bacModalClose')} />
 
-        <Animated.View
-          style={[
-            styles.sheet,
-            sheetStyle,
-            {
-              height: sheetHeight,
-              paddingBottom: Math.max(insets.bottom, spacing.sm),
-            },
-          ]}>
+        <Animated.View style={[styles.sheet, sheetStyle, { height: sheetHeight }]}>
           <View style={styles.sheetChrome}>
             <View style={styles.handle} />
             <View style={[styles.header, isRTL && styles.headerRtl]}>
-              <Pressable onPress={onClose} hitSlop={12} accessibilityRole="button" accessibilityLabel={t('bacModalClose')}>
-                <FontAwesome name="times" size={18} color={brand.textMuted} />
+              <View style={[styles.channelBadge, { backgroundColor: `${channelAccent}18` }]}>
+                <FontAwesome name={channelIcon} size={18} color={channelAccent} />
+              </View>
+              <View style={styles.headerText}>
+                <Text style={[styles.title, isRTL && styles.rtlText]} numberOfLines={2}>
+                  {t(titleKey)}
+                </Text>
+                <Text style={[styles.subtitle, isRTL && styles.rtlText]} numberOfLines={2}>
+                  {channel === 'outlook' ? t('bacOutletOutlook') : t('bacOutletMenResults')}
+                </Text>
+              </View>
+              <Pressable
+                onPress={onClose}
+                hitSlop={12}
+                accessibilityRole="button"
+                accessibilityLabel={t('bacModalClose')}
+                style={({ pressed }) => [styles.closeBtn, pressed && styles.pressed]}>
+                <FontAwesome name="times" size={16} color={brand.textMuted} />
               </Pressable>
-              <Text style={[styles.title, isRTL && styles.rtlText]} numberOfLines={2}>
-                {t(titleKey)}
-              </Text>
             </View>
           </View>
 
@@ -205,10 +208,12 @@ export function BacResultsVerificationModal({
               showsVerticalScrollIndicator
               nestedScrollEnabled
               bounces>
-              {showMassarBlock ? (
-                <View style={styles.massarCard}>
+              <View style={styles.massarCard}>
+                <View style={[styles.sectionHead, isRTL && styles.rowRtl]}>
+                  <FontAwesome name="id-card-o" size={14} color={brand.primary} />
                   <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{t('bacMassarSectionTitle')}</Text>
-                  <Text style={[styles.sectionHint, isRTL && styles.rtlText]}>{t('bacMassarSectionHint')}</Text>
+                </View>
+                <Text style={[styles.sectionHint, isRTL && styles.rtlText]}>{t('bacMassarSectionHint')}</Text>
 
                   {massarLoading ? (
                     <ActivityIndicator color={brand.primary} style={{ marginVertical: spacing.sm }} />
@@ -288,48 +293,52 @@ export function BacResultsVerificationModal({
                     </View>
                   ) : null}
                 </View>
-              ) : null}
 
               <View style={styles.stepsCard}>
-                <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{t('bacVerifyStepsTitle')}</Text>
+                <View style={[styles.sectionHead, isRTL && styles.rowRtl]}>
+                  <FontAwesome name="list-ol" size={14} color={brand.primary} />
+                  <Text style={[styles.sectionTitle, isRTL && styles.rtlText]}>{t('bacVerifyStepsTitle')}</Text>
+                </View>
                 {stepKeys.map((key, i) => {
                   let text = t(key);
                   if (key === 'bacOutlookStep2' && outlookEmailPreview) {
                     text = text.replace('{email}', outlookEmailPreview);
                   }
-                  return <StepRow key={key} n={i + 1} text={text} rtl={isRTL} />;
+                  return (
+                    <StepRow
+                      key={key}
+                      n={i + 1}
+                      text={text}
+                      rtl={isRTL}
+                      last={i === stepKeys.length - 1}
+                    />
+                  );
                 })}
               </View>
             </ScrollView>
           </KeyboardAvoidingView>
 
-          <View style={[styles.footer, isRTL && styles.footerRtl]}>
-            {canOpenExternal ? (
-              <Pressable
-                onPress={openExternal}
-                disabled={showMassarBlock && !massarReady}
-                style={({ pressed }) => [
-                  styles.btnOpen,
-                  channel === 'men' && styles.btnOpenMen,
-                  showMassarBlock && !massarReady && styles.btnDisabled,
-                  pressed && styles.pressed,
-                ]}>
-                <FontAwesome
-                  name="external-link"
-                  size={14}
-                  color={channel === 'men' ? homeShell.greenDark : homeShell.blue}
-                />
-                <Text
-                  style={[
-                    styles.btnOpenTxt,
-                    channel === 'men' && styles.btnOpenMenTxt,
-                  ]}>
-                  {channel === 'outlook' ? t('bacOpenOutlook') : t('bacOpenMenSite')}
-                </Text>
-              </Pressable>
-            ) : null}
-            <Pressable onPress={onClose} style={({ pressed }) => [styles.btnClose, pressed && styles.pressed]}>
-              <Text style={styles.btnCloseTxt}>{t('bacModalClose')}</Text>
+          <View
+            style={[
+              styles.footer,
+              isRTL && styles.footerRtl,
+              { paddingBottom: Math.max(insets.bottom, 10) + 4 },
+            ]}>
+            <Pressable
+              onPress={openExternal}
+              disabled={openDisabled}
+              accessibilityRole="button"
+              accessibilityLabel={channel === 'outlook' ? t('bacOpenOutlook') : t('bacOpenMenSite')}
+              style={({ pressed }) => [
+                styles.btnOpen,
+                channel === 'men' ? styles.btnOpenMen : styles.btnOpenOutlook,
+                openDisabled && styles.btnDisabled,
+                pressed && !openDisabled && styles.btnOpenPressed,
+              ]}>
+              <FontAwesome name="external-link" size={16} color={brand.white} />
+              <Text style={styles.btnOpenTxt}>
+                {channel === 'outlook' ? t('bacOpenOutlook') : t('bacOpenMenSite')}
+              </Text>
             </Pressable>
           </View>
         </Animated.View>
@@ -363,7 +372,7 @@ const styles = StyleSheet.create({
   },
   sheetChrome: {
     flexShrink: 0,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.sm,
   },
   scrollHost: {
     flex: 1,
@@ -382,18 +391,46 @@ const styles = StyleSheet.create({
   },
   header: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.md,
+    alignItems: 'center',
+    gap: spacing.sm,
     marginBottom: spacing.xs,
   },
   headerRtl: {
     flexDirection: 'row-reverse',
   },
-  title: {
+  headerText: {
     flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
+  channelBadge: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexShrink: 0,
+  },
+  closeBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(15, 23, 42, 0.06)',
+    flexShrink: 0,
+  },
+  title: {
     fontSize: fontSize.lg,
     fontWeight: '800',
     color: brand.text,
+    letterSpacing: -0.2,
+  },
+  subtitle: {
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    color: brand.textMuted,
+    lineHeight: 16,
   },
   rtlText: {
     textAlign: 'right',
@@ -401,24 +438,29 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     flexGrow: 1,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.md,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.lg,
     gap: spacing.md,
+  },
+  sectionHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   massarCard: {
     padding: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: brand.backgroundSoft,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(15, 23, 42, 0.08)',
+    backgroundColor: 'rgba(51, 62, 143, 0.04)',
+    borderWidth: 1,
+    borderColor: 'rgba(51, 62, 143, 0.1)',
     gap: spacing.sm,
   },
   stepsCard: {
     padding: spacing.md,
     borderRadius: radius.lg,
-    backgroundColor: brand.white,
-    borderWidth: 1,
-    borderColor: 'rgba(51, 62, 143, 0.12)',
+    backgroundColor: brand.backgroundSoft,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
     gap: spacing.sm,
   },
   sectionTitle: {
@@ -557,37 +599,62 @@ const styles = StyleSheet.create({
   },
   stepRow: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'stretch',
     gap: spacing.sm,
   },
   stepRowRtl: {
     flexDirection: 'row-reverse',
   },
+  stepRail: {
+    alignItems: 'center',
+    width: 22,
+    flexShrink: 0,
+  },
   stepNum: {
     width: 22,
     height: 22,
     borderRadius: 11,
-    backgroundColor: 'rgba(51, 62, 143, 0.12)',
+    backgroundColor: brand.primary,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  stepLine: {
+    width: 2,
+    flex: 1,
+    minHeight: 10,
+    marginTop: 4,
+    borderRadius: 1,
+    backgroundColor: 'rgba(51, 62, 143, 0.16)',
   },
   stepNumTxt: {
     fontSize: 11,
     fontWeight: '800',
-    color: brand.primary,
+    color: brand.white,
   },
   stepTxt: {
     flex: 1,
     fontSize: fontSize.sm,
     color: brand.text,
     lineHeight: 20,
+    paddingBottom: spacing.sm,
   },
   footer: {
     flexShrink: 0,
-    gap: spacing.sm,
     paddingTop: spacing.sm,
+    paddingHorizontal: 0,
+    backgroundColor: brand.white,
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: 'rgba(15, 23, 42, 0.08)',
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: -4 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: { elevation: 8 },
+      default: {},
+    }),
   },
   footerRtl: {
     direction: 'rtl',
@@ -596,32 +663,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
+    gap: 10,
+    width: '100%',
+    minHeight: 52,
     paddingVertical: 14,
-    borderRadius: radius.md,
-    backgroundColor: 'rgba(51, 62, 143, 0.1)',
-    borderWidth: 1,
-    borderColor: 'rgba(51, 62, 143, 0.22)',
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.lg,
+  },
+  btnOpenOutlook: {
+    backgroundColor: brand.primary,
   },
   btnOpenMen: {
-    backgroundColor: 'rgba(47, 206, 148, 0.1)',
-    borderColor: 'rgba(22, 163, 74, 0.25)',
+    backgroundColor: homeShell.greenDark,
+  },
+  btnOpenPressed: {
+    opacity: 0.92,
+    transform: [{ scale: 0.99 }],
   },
   btnOpenTxt: {
     fontWeight: '800',
-    fontSize: fontSize.sm,
-    color: homeShell.blue,
-  },
-  btnOpenMenTxt: {
-    color: homeShell.greenDark,
-  },
-  btnClose: {
-    paddingVertical: 12,
-    alignItems: 'center',
-  },
-  btnCloseTxt: {
-    fontWeight: '600',
-    color: brand.textMuted,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.md,
+    color: brand.white,
   },
 });

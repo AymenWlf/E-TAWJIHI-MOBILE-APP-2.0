@@ -47,7 +47,18 @@ import {
 import { anneesBacOptionsForLocale } from '@/utils/bacSchoolYearLabels';
 import { listCities, type CityRow } from '@/services/referenceData';
 import { completeAccountSetup, type AccountSetupPayload } from '@/services/accountSetup';
+import { getOldClient, getUserProfile } from '@/services/userProfile';
 import { promptNotificationPermissionAfterAuth } from '@/services/pushNotifications';
+import {
+  buildAccountSetupPatchFromAuthUser,
+  buildAccountSetupPatchFromOldClient,
+  buildAccountSetupPatchFromProfile,
+  buildVillePatchFromOldClient,
+  buildVillePatchFromProfile,
+  mergeAccountSetupFillEmpty,
+  type OldClientSetupSource,
+} from '@/utils/accountSetupAutofill';
+import type { UserProfile } from '@/services/userProfile';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { errorMessage } from '@/utils/errorMessage';
 import { isValidEmail } from '@/utils/isValidEmail';
@@ -204,7 +215,7 @@ export default function AccountSetupScreen() {
   const rtl = isRTL;
   const bacLocale = locale === 'ar' ? 'ar' : 'fr';
   const anneesBacOptions = useMemo(() => anneesBacOptionsForLocale(bacLocale), [bacLocale]);
-  const { user, getValidAccessToken, reloadMe } = useAuth();
+  const { user, getValidAccessToken, reloadMe, sessionReady } = useAuth();
 
   const scrollRef = useRef<ScrollView>(null);
   const [currentStep, setCurrentStep] = useState<StepId>(1);
@@ -214,6 +225,10 @@ export default function AccountSetupScreen() {
   const [serverError, setServerError] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [pickField, setPickField] = useState<SetupPickField | null>(null);
+  const [profileAutofillLoading, setProfileAutofillLoading] = useState(true);
+  const profileAutofillRunRef = useRef(0);
+  const cachedProfileRef = useRef<UserProfile | null>(null);
+  const cachedOldClientRef = useRef<OldClientSetupSource | null>(null);
 
   const [data, setData] = useState<AccountSetupPayload>({
     userType: '',
@@ -264,6 +279,79 @@ export default function AccountSetupScreen() {
       cancelled = true;
     };
   }, []);
+
+  const isLoadingUserData = !sessionReady || profileAutofillLoading;
+
+  /** Préremplit depuis /api/me + GET /api/user/profile dès que la session est prête. */
+  useEffect(() => {
+    if (!sessionReady) return;
+
+    const runId = ++profileAutofillRunRef.current;
+    let alive = true;
+
+    void (async () => {
+      setProfileAutofillLoading(true);
+      try {
+        const meUser = await reloadMe();
+        const token = await getValidAccessToken();
+        if (!token) return;
+
+        const patches: Partial<AccountSetupPayload>[] = [
+          buildAccountSetupPatchFromAuthUser({
+            firstName: meUser?.firstName,
+            lastName: meUser?.lastName,
+            prenom: (meUser as { prenom?: string | null } | null)?.prenom,
+            nom: (meUser as { nom?: string | null } | null)?.nom,
+            email: meUser?.email,
+          }),
+        ];
+
+        const profile = await getUserProfile(token);
+        cachedProfileRef.current = profile;
+        if (profile) {
+          patches.push(buildAccountSetupPatchFromProfile(profile, cities));
+        }
+
+        const oldClient = await getOldClient(token).catch(() => null);
+        cachedOldClientRef.current = oldClient;
+        if (oldClient) {
+          patches.push(buildAccountSetupPatchFromOldClient(oldClient, cities));
+        }
+
+        if (!alive || runId !== profileAutofillRunRef.current) return;
+        setData((prev) => mergeAccountSetupFillEmpty(prev, ...patches));
+      } catch {
+        /* préremplissage optionnel */
+      } finally {
+        if (alive && runId === profileAutofillRunRef.current) {
+          setProfileAutofillLoading(false);
+        }
+      }
+    })();
+
+    return () => {
+      alive = false;
+    };
+  }, [sessionReady, getValidAccessToken, reloadMe, user?.id]);
+
+  /** Complète la ville une fois la liste des villes chargée. */
+  useEffect(() => {
+    if (loadingCities || cities.length === 0) return;
+    const patches: Partial<AccountSetupPayload>[] = [];
+    const profile = cachedProfileRef.current;
+    if (profile) {
+      const villePatch = buildVillePatchFromProfile(profile, cities);
+      if (villePatch.ville) patches.push(villePatch);
+    }
+    const oldClient = cachedOldClientRef.current;
+    if (oldClient) {
+      const crmVillePatch = buildVillePatchFromOldClient(oldClient, cities);
+      if (crmVillePatch.ville) patches.push(crmVillePatch);
+    }
+    if (patches.length > 0) {
+      setData((prev) => mergeAccountSetupFillEmpty(prev, ...patches));
+    }
+  }, [loadingCities, cities]);
 
   useEffect(() => {
     if (user?.is_setup) {
@@ -624,7 +712,14 @@ export default function AccountSetupScreen() {
 
       <View style={styles.flex}>
         <View style={styles.flex}>
+          {isLoadingUserData ? (
+            <View style={styles.dataLoadingOverlay} accessibilityLiveRegion="polite">
+              <ActivityIndicator size="large" color={BLUE} />
+              <Text style={[styles.dataLoadingText, rtl && styles.rtl]}>{t('setupLoadingProfile')}</Text>
+            </View>
+          ) : null}
           <ScrollView
+            pointerEvents={isLoadingUserData ? 'none' : 'auto'}
             ref={scrollRef}
             {...(rtl ? { style: { direction: 'rtl' as const } } : {})}
             contentContainerStyle={styles.content}
@@ -834,11 +929,11 @@ export default function AccountSetupScreen() {
 
           </ScrollView>
 
-          <View style={[styles.footer, rtl && styles.footerRtl]}>
+          <View style={[styles.footer, rtl && styles.footerRtl]} pointerEvents={isLoadingUserData ? 'none' : 'auto'}>
             <Pressable
               accessibilityRole="button"
               onPress={goPrev}
-              disabled={currentStep === 1 || submitting}
+              disabled={currentStep === 1 || submitting || isLoadingUserData}
               style={[styles.btn, styles.btnGhost, (currentStep === 1 || submitting) && styles.btnDisabled]}
             >
               <Text style={styles.btnGhostText}>{t('setupBack')}</Text>
@@ -847,8 +942,8 @@ export default function AccountSetupScreen() {
             <Pressable
               accessibilityRole="button"
               onPress={goNext}
-              disabled={submitting}
-              style={[styles.btn, styles.btnPrimary, submitting && styles.btnDisabled]}
+              disabled={submitting || isLoadingUserData}
+              style={[styles.btn, styles.btnPrimary, (submitting || isLoadingUserData) && styles.btnDisabled]}
             >
               {submitting ? (
                 <View style={styles.btnRow}>
@@ -1302,6 +1397,21 @@ const styles = StyleSheet.create({
   headerTitles: { flex: 1 },
   headerTitle: { color: 'white', fontSize: 20, fontWeight: '800' },
   headerSub: { color: 'rgba(255,255,255,0.85)', marginTop: 6 },
+  dataLoadingOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 20,
+    backgroundColor: 'rgba(241,245,249,0.92)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.md,
+    paddingHorizontal: spacing.xl,
+  },
+  dataLoadingText: {
+    color: brand.textSecondary,
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
   progressWrap: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, marginTop: -4 },
   progressWrapRtl: { direction: 'rtl' },
   progressTrack: {

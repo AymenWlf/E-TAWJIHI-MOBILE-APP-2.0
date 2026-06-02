@@ -11,7 +11,7 @@ const CMS_ALLOWED_TAGS = [
 const CMS_ALLOWED_ATTR: Record<string, string[]> = {
   a: ['href', 'target', 'rel', 'title'],
   img: ['src', 'alt', 'title', 'width', 'height', 'loading'],
-  '*': ['class', 'style'],
+  '*': ['class', 'style', 'dir'],
 };
 
 /** Sanitise le HTML CMS avant RenderHTML. */

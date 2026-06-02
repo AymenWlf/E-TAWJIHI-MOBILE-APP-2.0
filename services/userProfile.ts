@@ -48,6 +48,18 @@ export async function getUserProfile(accessToken: string): Promise<UserProfile |
   return res.data ?? null;
 }
 
+export type OldClientSetupSource = Record<string, unknown>;
+
+export type GetOldClientResponse = { success: boolean; data: OldClientSetupSource | null };
+
+export async function getOldClient(accessToken: string): Promise<OldClientSetupSource | null> {
+  const url = buildApiUrl('/api/user/old-client');
+  const res = await httpGetJson<GetOldClientResponse>(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  return res.data ?? null;
+}
+
 export type UpdateUserProfilePayload = {
   nom?: string;
   prenom?: string;

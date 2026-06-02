@@ -192,7 +192,7 @@ export function BacResultsThresholdsModal({ visible, onClose }: Props) {
               <View style={styles.heroIconWrap}>
                 <FontAwesome name="graduation-cap" size={20} color={homeShell.text} />
               </View>
-              <View style={styles.heroText}>
+              <View style={[styles.heroText, isRTL && styles.heroTextRtl]}>
                 <Text style={[styles.heroEyebrow, bodyFont && { fontFamily: bodyFont }, isRTL && styles.rtlText]}>
                   {t('bacThresholdsEyebrow')}
                 </Text>
@@ -208,7 +208,11 @@ export function BacResultsThresholdsModal({ visible, onClose }: Props) {
                 hitSlop={12}
                 accessibilityRole="button"
                 accessibilityLabel={t('bacModalClose')}
-                style={({ pressed }) => [styles.heroCloseBtn, pressed && styles.pressed]}>
+                style={({ pressed }) => [
+                  styles.heroCloseBtn,
+                  isRTL && styles.heroCloseBtnRtl,
+                  pressed && styles.pressed,
+                ]}>
                 <FontAwesome name="times" size={16} color={homeShell.textMuted} />
               </Pressable>
             </View>
@@ -491,6 +495,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
     paddingEnd: 40,
   },
+  heroTextRtl: {
+    paddingEnd: 0,
+    paddingStart: 40,
+  },
   heroEyebrow: {
     fontSize: fontSize.xs,
     fontWeight: '700',
@@ -524,6 +532,11 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255,255,255,0.12)',
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
+  },
+  /** Arabe : croix à gauche (l’app ne force pas toujours le miroir RTL natif sur `end`). */
+  heroCloseBtnRtl: {
+    end: undefined,
+    start: spacing.md,
   },
   heroAccentBar: {
     marginTop: spacing.md,

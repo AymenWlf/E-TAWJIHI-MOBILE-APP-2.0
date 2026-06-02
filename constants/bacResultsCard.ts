@@ -15,8 +15,6 @@ export type BacResultsCardConfig = {
   resultDateIso: string;
   /** Résultats disponibles sur Outlook */
   outlook: BacOutletStatus;
-  /** Résultats envoyés par SMS */
-  sms: BacOutletStatus;
   /** Résultats visibles sur bac.men.gov.ma */
   menResults: BacOutletStatus;
   /** Le site bac.men.gov.ma répond (hors contenu des notes) */
@@ -30,7 +28,6 @@ export const BAC_RESULTS_STATIC_DEFAULT: BacResultsCardConfig = {
   globalStatus: 'not_yet',
   resultDateIso: '2026-07-08T12:00:00+01:00',
   outlook: 'not_yet',
-  sms: 'not_yet',
   menResults: 'not_yet',
   menSiteOnline: true,
   bacCardFirst: false,
@@ -61,7 +58,6 @@ export function parseBacResultsConfigFromApi(
     globalStatus: normalizeGlobalStatus(o.globalStatus ?? fallback.globalStatus),
     resultDateIso,
     outlook: normalizeOutletStatus(o.outlook ?? fallback.outlook),
-    sms: normalizeOutletStatus(o.sms ?? fallback.sms),
     menResults: normalizeOutletStatus(o.menResults ?? fallback.menResults),
     menSiteOnline: o.menSiteOnline !== false,
     bacCardFirst: o.bacCardFirst === true,
@@ -88,7 +84,7 @@ export function orderHomeStackCards<T extends { id: string; bacResults?: unknown
 export const BAC_MEN_GOV_URL = 'https://bac.men.gov.ma';
 export const BAC_OUTLOOK_CHECK_URL = 'https://outlook.live.com/mail/';
 
-export type BacVerificationChannel = 'outlook' | 'men' | 'sms';
+export type BacVerificationChannel = 'outlook' | 'men';
 
 /** Identifiant Outlook officiel : code Massar + @taalim.ma */
 export function buildMassarOutlookEmail(massarCode: string): string {
@@ -135,11 +131,12 @@ export function pad2(n: number): string {
   return String(Math.max(0, n)).padStart(2, '0');
 }
 
-/** Au moins un canal de résultat (Outlook, SMS ou bac.men.gov.ma) est publié. */
+/** Au moins un canal de résultat (Outlook ou bac.men.gov.ma) est publié. */
 export function hasAnyBacResultPublished(config: BacResultsCardConfig): boolean {
-  return (
-    config.outlook === 'published' ||
-    config.sms === 'published' ||
-    config.menResults === 'published'
-  );
+  return config.outlook === 'published' || config.menResults === 'published';
+}
+
+/** Seuils débloqués : statut global publié ou notes visibles sur bac.men.gov.ma. */
+export function areBacNotesPublished(config: BacResultsCardConfig): boolean {
+  return config.globalStatus === 'published' || config.menResults === 'published';
 }

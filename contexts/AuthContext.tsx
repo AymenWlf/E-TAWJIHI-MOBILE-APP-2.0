@@ -32,6 +32,14 @@ type AuthUser = {
   lastName?: string | null;
   is_setup?: boolean;
   roles?: string[];
+  tassjilAccess?: boolean;
+  legacyLink?: {
+    linked?: boolean;
+    requiresLink?: boolean;
+    hasTassjilCandidate?: boolean;
+    linkedAt?: string | null;
+    maskedOtpPhone?: string | null;
+  };
 };
 
 type AuthContextValue = {
@@ -51,7 +59,7 @@ type AuthContextValue = {
   register: (phone: string, password: string, referralCode?: string | null, rememberMe?: boolean) => Promise<AuthUser>;
   logout: () => Promise<void>;
   getValidAccessToken: () => Promise<string | null>;
-  reloadMe: () => Promise<void>;
+  reloadMe: () => Promise<AuthUser | null>;
 };
 
 const Ctx = createContext<AuthContextValue | null>(null);
@@ -158,11 +166,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }, [expireSessionLocal]);
 
-  const reloadMe = useCallback(async () => {
+  const reloadMe = useCallback(async (): Promise<AuthUser | null> => {
     try {
       const token = await getValidAccessToken();
       if (!token) {
-        return;
+        return null;
       }
       const url = buildApiUrl('/api/me');
       const res = await httpGetJson<{ success: boolean; data?: { user?: AuthUser } }>(url, {
@@ -177,6 +185,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           prev.id === next.id &&
           prev.is_setup === next.is_setup &&
           prev.firstName === next.firstName &&
+          prev.lastName === next.lastName &&
           prev.phone === next.phone
         ) {
           return prev;
@@ -186,11 +195,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       if (next) {
         await setStoredUser(next);
       }
+      return next;
     } catch (e) {
       const status = (e as ApiError)?.status;
       if (status === 401 || status === 403) {
         await expireSessionLocal();
       }
+      return null;
     }
   }, [expireSessionLocal, getValidAccessToken]);
 

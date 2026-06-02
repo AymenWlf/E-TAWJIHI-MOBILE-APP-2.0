@@ -1,9 +1,10 @@
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Pressable, StyleSheet, useWindowDimensions, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { radius } from '@/theme/tokens';
+import { heroShellHeaderUi, useHeroShellHeaderWide } from '@/utils/heroShellHeaderUi';
 
 type Props = {
   style?: StyleProp<ViewStyle>;
@@ -12,10 +13,16 @@ type Props = {
 /** FR / عربي — switch langue unifié (accueil + en-têtes hero). Ordre visuel fixe : FR à gauche, عربي à droite. */
 export function HeroLangSwitch({ style }: Props = {}) {
   const { locale, setLocale, t, isRTL } = useLocale();
+  const { width: screenW } = useWindowDimensions();
+  const isWideHeader = useHeroShellHeaderWide(screenW);
 
   return (
     <View
-      style={[styles.langSwitch, style]}
+      style={[
+        styles.langSwitch,
+        isWideHeader && heroShellHeaderUi.langSwitchWide,
+        style,
+      ]}
       accessibilityRole="tablist"
       accessibilityLabel={t('languageSwitcher')}>
       <Pressable
@@ -72,6 +79,8 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: radius.full,
+    minWidth: 40,
+    alignItems: 'center',
   },
   langPillActive: {
     backgroundColor: 'rgba(255,255,255,0.22)',

@@ -146,13 +146,13 @@ export const TOUR_STATUS_ACTION_STEP_STATUSES: CandidacyStatusType[] = [
     labelFr: 'Non intéressé',
     labelAr: 'غير مهتم',
     icon: 'ban',
-    colorFg: '#6B7280',
-    colorBg: '#F3F4F6',
-    colorBorder: '#D1D5DB',
+    colorFg: '#B91C1C',
+    colorBg: '#FEE2E2',
+    colorBorder: '#FECACA',
     sortOrder: 25,
     isActive: true,
     isEnrollmentMarker: false,
-    isFinalizedMarker: false,
+    isFinalizedMarker: true,
   },
 ];
 

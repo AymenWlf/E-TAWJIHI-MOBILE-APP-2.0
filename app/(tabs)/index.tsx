@@ -17,7 +17,7 @@ import { LoadErrorState, loadErrorRetryLabel } from '@/components/ui/LoadErrorSt
 import { HomeLatestAnnouncementsSection } from '@/components/home/HomeLatestAnnouncementsSection';
 import { HomeMostVisitedSchoolsSection } from '@/components/home/HomeMostVisitedSchoolsSection';
 import { HomeOrientationAccessSection } from '@/components/home/HomeOrientationAccessSection';
-import { HomePracticalInfoSection } from '@/components/home/HomePracticalInfoSection';
+import { HomePracticalInfoSection, type PracticalInfoItem } from '@/components/home/HomePracticalInfoSection';
 import {
   HomeStackedPackCards,
   type OrientationOverviewOpenPayload,
@@ -35,11 +35,16 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
 import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
 import { useAuth } from '@/contexts/AuthContext';
-import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
+import { invalidateEligibilityProfileCache, useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import { useStoryReadChannels } from '@/hooks/useStoryReadChannels';
 import { getMobileVisitorId } from '@/utils/visitorId';
 import { navigatePracticalLink } from '@/utils/navigatePracticalLink';
+import {
+  getTassjilPracticalLinkLock,
+  isTassjilPracticalLinkId,
+} from '@/utils/tassjilPracticalLinkLock';
 import { buildApiUrl, isDevApiBaseUrl } from '@/constants/api';
+import { PRACTICAL_LINK_DEFS } from '@/constants/practicalLinks';
 import {
   BAC_RESULTS_STATIC_DEFAULT,
   orderHomeStackCards,
@@ -101,7 +106,11 @@ export default function IndexScreen() {
   const { unreadCount: notifUnreadCount, openDrawer, refreshUnread } = useNotificationsDrawer();
   const { user, isLoading, getValidAccessToken, reloadMe } = useAuth();
   const { openAppFeedback } = useAppFeedback();
-  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading } = useTawjihPlusAccess();
+  const {
+    hasAccess: hasTawjihPlusAccess,
+    loading: tawjihPlusLoading,
+    refresh: refreshTawjihPlusAccess,
+  } = useTawjihPlusAccess();
   const {
     profile: eligibilityProfile,
     loading: eligibilityLoading,
@@ -120,6 +129,7 @@ export default function IndexScreen() {
   );
   const [bacResultsLoading, setBacResultsLoading] = useState(true);
   const homeRefreshInFlightRef = useRef(false);
+  const planParcoursLoadGenRef = useRef(0);
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
   const heroWide = isHomeHeroWideLayout(screenW);
@@ -274,9 +284,12 @@ export default function IndexScreen() {
         inviteFriendComplete: false,
         inviteFriendQualifiedCount: 0,
       }),
-      accountSetupComplete: Boolean(user?.is_setup),
+      accountSetupComplete:
+        planParcoursCompletion?.accountSetupComplete ?? Boolean(user?.is_setup),
     };
   }, [planParcoursCompletion, user?.is_setup]);
+
+  const planParcoursInitialLoading = planParcoursLoading && planParcoursCompletion === null;
 
   const parcoursUiState = useMemo(
     () => resolvePlanParcoursState(planCompletionForUi),
@@ -314,7 +327,7 @@ export default function IndexScreen() {
   );
 
   const orientationSheetLoading =
-    orientationSheet.visible && (planParcoursLoading || planParcoursCompletion === null);
+    orientationSheet.visible && (planParcoursInitialLoading || planParcoursLoading);
 
   const orientationSheetTasks = useMemo(() => {
     if (!orientationSheet.visible || orientationSheetLoading) return undefined;
@@ -359,6 +372,7 @@ export default function IndexScreen() {
   }, []);
 
   const refreshPlanParcours = useCallback(async (): Promise<PlanParcoursCompletion> => {
+    const gen = ++planParcoursLoadGenRef.current;
     setPlanParcoursLoading(true);
     try {
       const token = await getValidAccessToken();
@@ -375,10 +389,14 @@ export default function IndexScreen() {
         }
       }
       const completion = await fetchPlanParcoursCompletion(token, accountSetupComplete);
-      setPlanParcoursCompletion(completion);
+      if (gen === planParcoursLoadGenRef.current) {
+        setPlanParcoursCompletion(completion);
+      }
       return completion;
     } finally {
-      setPlanParcoursLoading(false);
+      if (gen === planParcoursLoadGenRef.current) {
+        setPlanParcoursLoading(false);
+      }
     }
   }, [getValidAccessToken, user?.is_setup]);
 
@@ -459,23 +477,19 @@ export default function IndexScreen() {
       let alive = true;
       const task = InteractionManager.runAfterInteractions(() => {
         void (async () => {
-          setPlanParcoursLoading(true);
+          if (!alive) return;
           try {
-            const token = await getValidAccessToken();
-            const completion = await fetchPlanParcoursCompletion(token, Boolean(user?.is_setup));
-            if (alive) setPlanParcoursCompletion(completion);
-        } catch {
+            await refreshPlanParcours();
+          } catch {
             if (alive) setPlanParcoursCompletion(null);
-        } finally {
-            if (alive) setPlanParcoursLoading(false);
-        }
-      })();
+          }
+        })();
       });
       return () => {
         alive = false;
         task.cancel();
       };
-    }, [getValidAccessToken, user?.is_setup]),
+    }, [refreshPlanParcours]),
   );
 
   const handleDevResetPlanStep = useCallback(
@@ -500,8 +514,11 @@ export default function IndexScreen() {
       bacResultsConfig.bacCardFirst,
     );
     const completion = planCompletionForUi;
-    const packLoading = planParcoursLoading || homeRefreshing;
+    const packLoading = planParcoursInitialLoading;
     const dailyCardLoading = dailyLoading || homeRefreshing;
+    const showLegacyTassjil = Boolean(
+      user?.legacyLink?.hasTassjilCandidate || user?.legacyLink?.linked,
+    );
     return base.map((card) => {
       const isParcoursCard =
         card.id === 'stack-1' || card.orientationProgress != null;
@@ -551,7 +568,7 @@ export default function IndexScreen() {
         planParcoursCompletion: parcours.completion,
         orientationProgress: {
           ...card.orientationProgress,
-          percent: packLoading ? 0 : parcours.totalPercent,
+          percent: parcours.totalPercent,
           loading: packLoading,
         },
         remainingOrientationTasks: parcours.remainingTasks,
@@ -562,6 +579,7 @@ export default function IndexScreen() {
               showOrientation1Bac: showOrientation1BacBtn,
               orientation1BacLocked: !isOrientation1BacUnlocked(),
               orientation1BacUnlockLabel: unlockLabel,
+              showTassjilTrack: showLegacyTassjil,
             }
           : card.dailyActions,
       };
@@ -572,11 +590,13 @@ export default function IndexScreen() {
     dailyLoading,
     homeRefreshing,
     planCompletionForUi,
-    planParcoursLoading,
+    planParcoursInitialLoading,
     bacResultsConfig,
     bacResultsLoading,
     eligibilityProfile,
     t,
+    user?.legacyLink?.hasTassjilCandidate,
+    user?.legacyLink?.linked,
   ]);
 
   const onPressOrientation1Bac = useCallback(() => {
@@ -591,8 +611,32 @@ export default function IndexScreen() {
     router.push('/orientation-1bac' as never);
   }, [locale, t]);
 
+  const practicalItems = useMemo((): PracticalInfoItem[] => {
+    const tassjilLock = getTassjilPracticalLinkLock(user?.legacyLink);
+    return PRACTICAL_LINK_DEFS.map((d) => {
+      const lock = isTassjilPracticalLinkId(d.id) ? tassjilLock : null;
+      return {
+        id: d.id,
+        label: t(d.labelKey),
+        description: '',
+        icon: d.icon,
+        accent: d.accent,
+        ...(lock?.locked ? { locked: true, lockReasonKey: lock.reasonKey } : {}),
+      };
+    });
+  }, [t, user?.legacyLink]);
+
   const onPressPracticalItem = useCallback(
     (id: string) => {
+      if (isTassjilPracticalLinkId(id)) {
+        const lock = getTassjilPracticalLinkLock(user?.legacyLink);
+        if (lock.locked && lock.reasonKey) {
+          Alert.alert(t('practical_ecolesInscription_locked_title'), t(lock.reasonKey), [
+            { text: t('closeOverlayA11y'), style: 'cancel' },
+          ]);
+          return;
+        }
+      }
       navigatePracticalLink(
         (href) => router.push(href as never),
         id,
@@ -600,7 +644,7 @@ export default function IndexScreen() {
         tawjihPlusGate,
       );
     },
-    [planParcoursNavAuth, tawjihPlusGate],
+    [planParcoursNavAuth, tawjihPlusGate, t, user?.legacyLink],
   );
 
   const onPressLatestAnnouncement = useCallback(
@@ -683,6 +727,7 @@ export default function IndexScreen() {
     setHomeRefreshing(true);
     setHomeLoadError(null);
     try {
+      invalidateEligibilityProfileCache();
       await Promise.all([
         loadActiveServices(),
         refreshUnread({ force: true }),
@@ -690,9 +735,12 @@ export default function IndexScreen() {
         loadStories(),
         loadDailyChallenge(),
         loadBacResultsConfig({ force: true }),
-        refreshPlanParcours(),
+        refreshTawjihPlusAccess(),
         user ? reloadMe() : Promise.resolve(),
+      ]);
+      await Promise.all([
         user ? refetchEligibilityProfile() : Promise.resolve(),
+        refreshPlanParcours(),
       ]);
     } finally {
       homeRefreshInFlightRef.current = false;
@@ -706,6 +754,7 @@ export default function IndexScreen() {
     loadDailyChallenge,
     loadBacResultsConfig,
     refreshPlanParcours,
+    refreshTawjihPlusAccess,
     reloadMe,
     refetchEligibilityProfile,
     user,
@@ -821,23 +870,14 @@ export default function IndexScreen() {
           cards={stackCards}
           width={stackCardW}
           onPressDailyGame={() => router.push('/daily-challenge')}
+          onPressTassjilTrack={() => router.push('/tassjil-school-choices')}
           onPressOrientation1Bac={onPressOrientation1Bac}
           onPressPracticalLink={onPressPracticalItem}
           onOpenOrientationOverview={openOrientationOverview}
           onOpenBacVerification={openBacVerification}
           onOpenBacThresholds={openBacThresholds}
           bacThresholdsLoading={bacResultsLoading || eligibilityLoading || homeRefreshing}
-          bacThresholdsLocked={
-            !bacResultsLoading &&
-            !eligibilityLoading &&
-            !homeRefreshing &&
-            Boolean(
-              eligibilityProfile?.bacType === 'normal' &&
-                eligibilityProfile?.niveau &&
-                isPremiereBacNiveau(eligibilityProfile.niveau),
-            )
-          }
-          planParcoursLoading={planParcoursLoading || homeRefreshing}
+          planParcoursLoading={planParcoursInitialLoading}
           contentLoading={homeRefreshing}
           planParcoursNavAuth={planParcoursNavAuth}
           tawjihPlusGate={tawjihPlusGate}
@@ -845,6 +885,7 @@ export default function IndexScreen() {
 
         <HomePracticalInfoSection
           width={stackCardW}
+          items={practicalItems}
           onPressItem={onPressPracticalItem}
           loading={homeRefreshing}
         />
@@ -853,12 +894,12 @@ export default function IndexScreen() {
           width={stackCardW}
           onPressItem={onPressPracticalItem}
           onOpenOrientationParcours={openOrientationParcoursSheet}
-          planParcoursLoading={planParcoursLoading || homeRefreshing}
+          planParcoursLoading={planParcoursInitialLoading}
           planParcoursCompletion={planCompletionForUi}
           hasTawjihPlusAccess={hasTawjihPlusAccess}
-          tawjihPlusLoading={tawjihPlusLoading}
+          tawjihPlusLoading={tawjihPlusLoading || homeRefreshing}
           onOpenTawjihPlusProduct={openTawjihPlusProduct}
-          loading={homeRefreshing}
+          loading={false}
         />
 
         <HomeMostVisitedSchoolsSection

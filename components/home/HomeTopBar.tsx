@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
@@ -11,6 +11,7 @@ import {
 import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { spacing } from '@/theme/tokens';
+import { heroShellHeaderUi, useHeroShellHeaderWide } from '@/utils/heroShellHeaderUi';
 
 /** Hauteur visuelle du logo (largeur = ratio × hauteur). */
 const LOGO_HEIGHT = 68;
@@ -30,22 +31,27 @@ export function HomeTopBar({
   onPressMenu,
 }: Props) {
   const { t, isRTL } = useLocale();
+  const { width: screenW } = useWindowDimensions();
+  const isWideHeader = useHeroShellHeaderWide(screenW);
   const notificationsA11y =
     unreadCount > 0
       ? `${t('notifications')}, ${unreadCount} ${t('unreadSuffix')}`
       : t('notifications');
 
   return (
-    <View style={[styles.row, isRTL && styles.rowRtl]}>
+    <View style={[styles.row, isWideHeader && heroShellHeaderUi.headerRowWide, isRTL && styles.rowRtl]}>
       {onPressMenu ? (
         <Pressable
           onPress={onPressMenu}
           hitSlop={10}
-          style={({ pressed }) => [styles.menuBtn, pressed && { opacity: 0.88 }]}
+          style={({ pressed }) => [
+            isWideHeader ? heroShellHeaderUi.iconBtn : styles.menuBtn,
+            pressed && (isWideHeader ? heroShellHeaderUi.iconBtnPressed : { opacity: 0.88 }),
+          ]}
           accessibilityRole="button"
           accessibilityLabel={t('sidebarOpen')}
         >
-          <FontAwesome name="bars" size={22} color={homeShell.text} />
+          <FontAwesome name="bars" size={isWideHeader ? 20 : 22} color={homeShell.text} />
         </Pressable>
       ) : null}
       <View style={[styles.logoBlock, isRTL && styles.logoBlockRtl]} accessibilityLabel="E-Tawjihi">
@@ -62,10 +68,13 @@ export function HomeTopBar({
         <Pressable
           onPress={onPressNotifications}
           hitSlop={8}
-          style={styles.iconBtn}
+          style={({ pressed }) => [
+            isWideHeader ? heroShellHeaderUi.iconBtn : styles.iconBtn,
+            pressed && (isWideHeader ? heroShellHeaderUi.iconBtnPressed : { opacity: 0.88 }),
+          ]}
           accessibilityRole="button"
           accessibilityLabel={notificationsA11y}>
-          <FontAwesome name="bell-o" size={22} color={homeShell.text} />
+          <FontAwesome name="bell-o" size={isWideHeader ? 20 : 22} color={homeShell.text} />
           {unreadCount > 0 ? (
             <View style={styles.badge}>
               <Text style={styles.badgeTxt}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
@@ -75,9 +84,13 @@ export function HomeTopBar({
         <Pressable
           onPress={onPressProfile}
           hitSlop={8}
-          style={[styles.iconBtn, styles.iconBtnSp]}
+          style={({ pressed }) => [
+            isWideHeader ? heroShellHeaderUi.iconBtn : styles.iconBtn,
+            styles.iconBtnSp,
+            pressed && (isWideHeader ? heroShellHeaderUi.iconBtnPressed : { opacity: 0.88 }),
+          ]}
           accessibilityLabel={t('profile')}>
-          <FontAwesome name="user-circle-o" size={26} color={homeShell.text} />
+          <FontAwesome name="user-circle-o" size={isWideHeader ? 22 : 26} color={homeShell.text} />
         </Pressable>
       </View>
     </View>
@@ -132,6 +145,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flexShrink: 0,
+    gap: spacing.sm,
   },
   iconBtn: {
     position: 'relative',

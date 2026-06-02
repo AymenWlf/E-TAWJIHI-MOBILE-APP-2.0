@@ -78,6 +78,7 @@ import {
   type SecteurRow,
 } from '@/services/referenceData';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { homeShell } from '@/theme/homeShell';
 import type { CandidacyStatusType, EstablishmentFollow } from '@/types/inscriptions';
 import {
   evaluateEligibilityByFiliere,
@@ -143,6 +144,11 @@ function InscriptionsTabScreenInner() {
   } = useNotificationsDrawer();
   const { presentShare } = useSharePreview();
   const isLoggedIn = Boolean(user);
+
+  /** Client TASSJIL sur l’ancien backend (pas seulement pack Dev2). */
+  const showLegacyTassjilCta = Boolean(
+    user?.legacyLink?.hasTassjilCandidate || user?.legacyLink?.linked,
+  );
 
   const [tab, setTab] = useState<TabId>('announcements');
 
@@ -1208,6 +1214,35 @@ function InscriptionsTabScreenInner() {
 
       <Text style={[styles.heroSub, isRTL && styles.rtl]}>{t('inscSubtitle')}</Text>
 
+      {showLegacyTassjilCta ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push('/tassjil-school-choices')}
+          style={({ pressed }) => [
+            styles.tassjilCta,
+            isRTL && styles.rowRtl,
+            pressed && { opacity: 0.9 },
+          ]}
+        >
+          <View style={[styles.tassjilCtaIconWrap, isRTL && styles.rowRtl]}>
+            <FontAwesome name="list-alt" size={16} color={homeShell.greenDark} />
+          </View>
+          <View style={styles.tassjilCtaTextCol}>
+            <Text style={[styles.tassjilCtaTitle, isRTL && styles.rtl]} numberOfLines={2}>
+              {t('inscTassjilTrackCta')}
+            </Text>
+            <Text style={[styles.tassjilCtaHint, isRTL && styles.rtl]} numberOfLines={2}>
+              {t('inscTassjilTrackHint')}
+            </Text>
+          </View>
+          <FontAwesome
+            name={isRTL ? 'chevron-left' : 'chevron-right'}
+            size={14}
+            color={homeShell.greenDark}
+          />
+        </Pressable>
+      ) : null}
+
       {/* Tabs */}
       <View style={styles.tabsRow}>
         {(['announcements', 'candidacies'] as const).map((id) => {
@@ -1958,8 +1993,36 @@ const styles = StyleSheet.create({
   },
   heroTitle: { color: brand.white, fontSize: fontSize.xxl, fontWeight: '900' },
   heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: fontSize.sm, lineHeight: 19 },
-
-  /* Tabs */
+  tassjilCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+    backgroundColor: homeShell.greenSurface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: homeShell.greenBorder,
+  },
+  tassjilCtaIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: radius.md,
+    backgroundColor: brand.white,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tassjilCtaTextCol: { flex: 1, minWidth: 0, gap: 2 },
+  tassjilCtaTitle: {
+    color: homeShell.greenDark,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+  },
+  tassjilCtaHint: {
+    color: brand.textSecondary,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+  },
   tabsRow: {
     flexDirection: 'row',
     alignItems: 'stretch',

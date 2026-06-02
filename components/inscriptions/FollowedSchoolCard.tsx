@@ -53,7 +53,9 @@ export function FollowedSchoolCard({
   const cardBg = actionRequired ? '#FFF1F2' : status?.colorBg ?? brand.white;
   const cardBorder = actionRequired ? '#FECACA' : status?.colorBorder ?? brand.border;
   const accentColor = actionRequired ? '#DC2626' : status?.colorFg ?? brand.primary;
-  const hasUpdateAction = (follow.availableStatuses?.length ?? 0) > 0;
+  const hasUpdateAction =
+    (follow.availableStatuses?.length ?? 0) > 0 ||
+    (tourGate === 'status' && typeof onUpdateStatus === 'function');
   const statusInteractionEnabled = !tourGate || tourGate === 'status';
   const secondaryActionsEnabled = !tourGate;
 

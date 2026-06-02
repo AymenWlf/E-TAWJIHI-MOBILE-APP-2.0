@@ -173,6 +173,14 @@ export default function TabLayout() {
           ),
         }}
       />
+      {/** Suivi TASSJIL : accessible via sidebar, barre d’onglets visible (href: null). */}
+      <Tabs.Screen
+        name="tassjil-school-choices"
+        options={{
+          href: null,
+          headerShown: false,
+        }}
+      />
       {/**
        * Événements : même barre d’onglets que le reste de l’app, sans entrée visible
        * (navigation via sidebar / liens). Voir expo-router : `href: null`.

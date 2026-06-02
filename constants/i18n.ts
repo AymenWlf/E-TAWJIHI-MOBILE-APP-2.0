@@ -22,6 +22,7 @@ export type HomeCopyKey =
   | 'langFr'
   | 'langAr'
   | 'gameDailyTitle'
+  | 'homeTassjilTrackCta'
   | 'orientation1BacHomeButton'
   | 'orientation1BacHomeLocked'
   | 'orientation1BacHomeLockedA11y'
@@ -166,6 +167,8 @@ export type HomeCopyKey =
   | 'practical_candidatures_desc'
   | 'practical_evenements_desc'
   | 'practical_ecolesInscription_desc'
+  | 'practical_ecolesInscription_locked'
+  | 'practical_ecolesInscription_locked_title'
   | 'practical_boutique_desc'
   | 'practicalCardEyebrow'
   | 'practicalCardTap'
@@ -412,6 +415,10 @@ export type HomeCopyKey =
   | 'appFeedbackRequiredRatings'
   | 'appFeedbackRequiredComment'
   | 'appFeedbackOpenCta'
+  | 'appFeedbackLockedTitle'
+  | 'appFeedbackLockedBody'
+  | 'appFeedbackLockedCta'
+  | 'appFeedbackClientRequired'
   | 'appUpdateEyebrow'
   | 'appUpdateTitleRequired'
   | 'appUpdateTitleRecommended'
@@ -652,6 +659,7 @@ export type HomeCopyKey =
   | 'setupFemale'
   | 'setupCity'
   | 'setupLoading'
+  | 'setupLoadingProfile'
   | 'setupCityHint'
   | 'setupCityChoose'
   | 'setupCityModalTitle'
@@ -889,6 +897,18 @@ export type HomeCopyKey =
   | 'accountSelectPlaceholder'
   | 'accountSelectNoResults'
   | 'accountSectionAccount'
+  | 'accountChangePasswordTitle'
+  | 'accountCurrentPasswordLabel'
+  | 'accountCurrentPasswordPlaceholder'
+  | 'accountCurrentPasswordRequired'
+  | 'accountNewPasswordLabel'
+  | 'accountNewPasswordPlaceholder'
+  | 'accountNewPasswordMustDiffer'
+  | 'accountChangePasswordSubmit'
+  | 'accountChangePasswordSuccessTitle'
+  | 'accountChangePasswordSuccessBody'
+  | 'accountChangePasswordFailed'
+  | 'accountPasswordsMatch'
   | 'accountPhone'
   | 'accountSetupStatus'
   | 'accountSetupComplete'
@@ -1303,6 +1323,41 @@ export type HomeCopyKey =
   | 'sidebarOpen'
   | 'sidebarClose'
   | 'sidebarCart'
+  | 'sidebarTassjilSchools'
+  | 'tassjilLinkTitle'
+  | 'tassjilLinkSubtitle'
+  | 'tassjilLinkIntro'
+  | 'tassjilLinkCta'
+  | 'tassjilLinkSupport'
+  | 'tassjilLinkSupportMessage'
+  | 'tassjilLinkOtpTitle'
+  | 'tassjilLinkOtpSubtitle'
+  | 'tassjilLinkVerifyCta'
+  | 'tassjilLinkErrGeneric'
+  | 'tassjilLinkInitiateNeutral'
+  | 'tassjilNoDossierTitle'
+  | 'tassjilNoDossierBody'
+  | 'tassjilSchoolsTitle'
+  | 'tassjilSchoolsHeroEyebrow'
+  | 'tassjilSchoolsCount'
+  | 'tassjilSupportWhatsapp'
+  | 'tassjilStatInscription'
+  | 'tassjilStatSuivi'
+  | 'tassjilAcceptanceTitle'
+  | 'tassjilLearnMore'
+  | 'tassjilRegistrationWindow'
+  | 'tassjilSchoolsSubtitle'
+  | 'tassjilSchoolsLoading'
+  | 'tassjilSchoolsErrGeneric'
+  | 'tassjilSchoolsSupportMessage'
+  | 'tassjilSchoolsEmptyTitle'
+  | 'tassjilSchoolsEmptyBody'
+  | 'tassjilFilterTitle'
+  | 'tassjilFilterAll'
+  | 'tassjilFilterReset'
+  | 'tassjilFilterResults'
+  | 'tassjilFilterEmptyTitle'
+  | 'tassjilFilterEmptyBody'
   | 'sidebarEvents'
   | 'sidebarSectionDiscover'
   | 'sidebarSectionTools'
@@ -1375,6 +1430,9 @@ export type HomeCopyKey =
   | 'inscEyebrow'
   | 'inscTitle'
   | 'inscSubtitle'
+  | 'inscTassjilTrackCta'
+  | 'inscTassjilTrackHint'
+  | 'inscTassjilServiceIncluded'
   | 'inscTabNotifications'
   | 'inscTabCandidacies'
   | 'inscTabAnnouncements'
@@ -1628,6 +1686,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     langFr: 'FR',
     langAr: 'عربي',
     gameDailyTitle: 'Jeu quotidien',
+    homeTassjilTrackCta: 'Suivre mes TASSJIL',
     orientation1BacHomeButton: 'Test d’orientation 1ère bac',
     orientation1BacHomeLocked: 'Ouverture le {date}',
     orientation1BacHomeLockedA11y: 'Test d’orientation 1ère bac — disponible à partir du {date}',
@@ -1793,7 +1852,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     practical_evenements_desc:
       'Salons, ateliers et webinaires pour avancer dans votre orientation.',
     practical_ecolesInscription_desc:
-      'La liste des établissements pour lesquels vous déposez ou suivrez une candidature.',
+      'Suivi de vos inscriptions TASSJIL et de l’état de vos dossiers par école.',
+    practical_ecolesInscription_locked_title: 'Suivi TASSJIL',
+    practical_ecolesInscription_locked:
+      'Ce suivi est réservé aux clients du service TASSJIL E-Tawjihi. Contactez le support si vous pensez y avoir droit.',
     practical_boutique_desc:
       'Formules d’accompagnement et services pour sécuriser votre parcours.',
     practicalCardEyebrow: 'Liens utiles',
@@ -1938,7 +2000,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     bacThresholdsOutOf20: '/20',
     bacThresholdsCtaTitle: 'Calculer les seuils des écoles',
     bacThresholdsCtaSub: 'Saisis tes notes du bulletin · formules 75/25 et 50/50',
-    bacThresholdsLockedSub: 'Disponible en 2ème bac',
+    bacThresholdsLockedSub: 'Disponible lorsque les résultats sont publiés',
     orientationTapHint: 'Toucher pour voir les étapes',
     orientationProgressLabel: "Progression d'orientation",
     orientationTasksA11y: "Parcours d'orientation — 6 étapes",
@@ -2054,6 +2116,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     appFeedbackRequiredRatings: 'Merci de répondre à toutes les questions (Très bien, Bien ou Moyen).',
     appFeedbackRequiredComment: 'Merci de décrire comment améliorer l’app (10 caractères min.).',
     appFeedbackOpenCta: 'Donner mon avis sur l’app',
+    appFeedbackLockedTitle: 'Avis réservé aux clients',
+    appFeedbackLockedBody:
+      'Pour partager votre retour sur l’application, vous devez disposer d’un service E-Tawjihi actif (Tawjih Plus, Tassjil…).',
+    appFeedbackLockedCta: 'Découvrir nos services',
+    appFeedbackClientRequired: 'Cette fonctionnalité est réservée aux clients avec un service actif.',
     appUpdateEyebrow: 'Mise à jour',
     appUpdateTitleRequired: 'Mise à jour obligatoire',
     appUpdateTitleRecommended: 'Nouvelle version disponible',
@@ -2331,6 +2398,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     setupFemale: 'Femme',
     setupCity: 'Ville',
     setupLoading: 'Chargement…',
+    setupLoadingProfile: 'Chargement de vos informations…',
     setupCityHint: 'Astuce : appuyez sur le champ pour ouvrir la liste et rechercher votre ville.',
     setupCityChoose: 'Choisir une ville…',
     setupCityModalTitle: 'Sélectionnez votre ville',
@@ -2583,6 +2651,18 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountSelectPlaceholder: 'Sélectionner…',
     accountSelectNoResults: 'Aucun résultat',
     accountSectionAccount: 'Compte et accès',
+    accountChangePasswordTitle: 'Modifier mon mot de passe',
+    accountCurrentPasswordLabel: 'Mot de passe actuel',
+    accountCurrentPasswordPlaceholder: 'Votre mot de passe actuel',
+    accountCurrentPasswordRequired: 'Veuillez entrer votre mot de passe actuel.',
+    accountNewPasswordLabel: 'Nouveau mot de passe',
+    accountNewPasswordPlaceholder: 'Nouveau mot de passe',
+    accountNewPasswordMustDiffer: 'Le nouveau mot de passe doit être différent de l\'ancien.',
+    accountChangePasswordSubmit: 'Modifier le mot de passe',
+    accountChangePasswordSuccessTitle: 'Mot de passe modifié',
+    accountChangePasswordSuccessBody: 'Votre mot de passe a été mis à jour avec succès.',
+    accountChangePasswordFailed: 'Échec de la modification du mot de passe.',
+    accountPasswordsMatch: 'Les mots de passe correspondent.',
     accountPhone: 'Téléphone',
     accountSetupStatus: 'État du profil',
     accountSetupComplete: 'Complet',
@@ -3033,6 +3113,47 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     sidebarOpen: 'Ouvrir le menu',
     sidebarClose: 'Fermer',
     sidebarCart: 'Panier',
+    sidebarTassjilSchools: 'Suivi TASSJIL',
+    tassjilLinkTitle: 'Lier mon compte TASSJIL',
+    tassjilLinkSubtitle: 'Nous recherchons votre dossier TASSJIL à partir de votre numéro de téléphone.',
+    tassjilLinkIntro:
+      'La liaison se fait automatiquement si un dossier TASSJIL actif existe pour le même numéro sur E-Tawjihi.',
+    tassjilLinkCta: 'Réessayer la liaison',
+    tassjilLinkSupport: 'Contacter le support',
+    tassjilLinkSupportMessage:
+      'Bonjour, j’ai besoin d’aide pour lier mon compte TASSJIL à la nouvelle application E-Tawjihi.',
+    tassjilLinkOtpTitle: 'Code de vérification',
+    tassjilLinkOtpSubtitle: 'Entrez le code envoyé au {phone}',
+    tassjilLinkVerifyCta: 'Confirmer la liaison',
+    tassjilLinkErrGeneric: 'Une erreur est survenue. Réessayez ou contactez le support.',
+    tassjilLinkInitiateNeutral:
+      'Aucun dossier TASSJIL actif trouvé pour ce numéro. Contactez le support si vous pensez qu’il s’agit d’une erreur.',
+    tassjilNoDossierTitle: 'Aucun dossier TASSJIL',
+    tassjilNoDossierBody:
+      'Nous n’avons pas trouvé de dossier TASSJIL actif pour votre numéro. Contactez le support si vous êtes déjà inscrit.',
+    tassjilSchoolsTitle: 'Mes écoles TASSJIL',
+    tassjilSchoolsHeroEyebrow: 'Service TASSJIL',
+    tassjilSchoolsCount: '{count} école(s) suivie(s)',
+    tassjilSupportWhatsapp: 'Support WhatsApp',
+    tassjilStatInscription: "Statut d'inscription",
+    tassjilStatSuivi: 'Statut de suivi',
+    tassjilAcceptanceTitle: "Détails d'acceptation",
+    tassjilLearnMore: 'Voir la fiche école',
+    tassjilRegistrationWindow: 'Inscriptions : {start} → {end}',
+    tassjilSchoolsSubtitle: 'Suivi de vos inscriptions synchronisé avec l’équipe E-Tawjihi',
+    tassjilSchoolsLoading: 'Chargement de vos écoles…',
+    tassjilSchoolsErrGeneric: 'Impossible de charger vos écoles. Réessayez.',
+    tassjilSchoolsSupportMessage:
+      'Bonjour, j’ai une question sur le suivi de mes inscriptions TASSJIL dans l’application.',
+    tassjilSchoolsEmptyTitle: 'Aucune école sélectionnée',
+    tassjilSchoolsEmptyBody:
+      'Vos écoles d’inscription apparaîtront ici dès qu’elles seront configurées dans votre dossier TASSJIL.',
+    tassjilFilterTitle: 'Filtres rapides',
+    tassjilFilterAll: 'Tous',
+    tassjilFilterReset: 'Réinitialiser',
+    tassjilFilterResults: '{shown} / {total} affiché(s)',
+    tassjilFilterEmptyTitle: 'Aucun résultat',
+    tassjilFilterEmptyBody: 'Aucune école ne correspond aux filtres sélectionnés.',
     sidebarEvents: 'Événements',
     sidebarSectionDiscover: 'Découvrir',
     sidebarSectionTools: 'Outils & orientation',
@@ -3107,6 +3228,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscEyebrow: 'Inscriptions & candidatures',
     inscTitle: 'Mes inscriptions',
     inscSubtitle: 'Suivez vos candidatures et restez informé des ouvertures.',
+    inscTassjilTrackCta: 'Suivi des inscriptions — service TASSJIL',
+    inscTassjilTrackHint: 'Vos écoles TASSJIL synchronisées avec E-Tawjihi',
+    inscTassjilServiceIncluded:
+      "Inclus dans le service d'inscription (Voir avec votre chargée d'inscription)",
     inscTabNotifications: 'Notifications',
     inscTabCandidacies: 'Candidatures',
     inscTabAnnouncements: 'Annonces',
@@ -3371,6 +3496,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     langFr: 'FR',
     langAr: 'عربي',
     gameDailyTitle: 'لعبة اليوم',
+    homeTassjilTrackCta: 'متابعة TASSJIL',
     orientation1BacHomeButton: 'توجيه 1ère باك',
     orientation1BacHomeLocked: 'يفتح في {date}',
     orientation1BacHomeLockedA11y: 'اختبار التوجيه 1ère باك — متاح من {date}',
@@ -3536,7 +3662,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     practical_evenements_desc:
       'معارض وورش عمل وندوات عبر الويب لتطوير توجهك.',
     practical_ecolesInscription_desc:
-      'المؤسسات التي تقدّم لها طلبًا أو تتابع معها التسجيل.',
+      'متابعة تسجيلات TASSJIL وحالة ملفاتك في كل مدرسة.',
+    practical_ecolesInscription_locked_title: 'متابعة TASSJIL',
+    practical_ecolesInscription_locked:
+      'هذه المتابعة مخصّصة لعملاء خدمة TASSJIL في E-Tawjihi. اتصل بالدعم إذا كنت مسجّلًا بالفعل.',
     practical_boutique_desc:
       'باقات المرافقة والخدمات لتأمين مسارك.',
     practicalCardEyebrow: 'روابط مفيدة',
@@ -3678,7 +3807,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     bacThresholdsOutOf20: '/20',
     bacThresholdsCtaTitle: 'حساب عتبات المدارس',
     bacThresholdsCtaSub: 'أدخل نقاطك · صيغ 75/25 و 50/50',
-    bacThresholdsLockedSub: 'متاح في 2ème باك',
+    bacThresholdsLockedSub: 'متاح عند نشر النتائج',
     orientationTapHint: 'المس لعرض الخطوات',
     orientationProgressLabel: 'تقدّم التوجيه',
     orientationTasksA11y: 'مسار التوجيه — 6 خطوات',
@@ -3792,6 +3921,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     appFeedbackRequiredRatings: 'يُرجى الإجابة على جميع الأسئلة (ممتاز، جيد أو متوسط).',
     appFeedbackRequiredComment: 'يُرجى وصف كيفية تحسين التطبيق (10 أحرف على الأقل).',
     appFeedbackOpenCta: 'إبداء رأيي في التطبيق',
+    appFeedbackLockedTitle: 'الرأي مخصّص للعملاء',
+    appFeedbackLockedBody:
+      'لمشاركة ملاحظاتك على التطبيق، يلزم امتلاك خدمة E-Tawjihi نشطة (Tawjih Plus، Tassjil…).',
+    appFeedbackLockedCta: 'اكتشف خدماتنا',
+    appFeedbackClientRequired: 'هذه الميزة مخصّصة للعملاء الذين لديهم خدمة نشطة.',
     appUpdateEyebrow: 'تحديث',
     appUpdateTitleRequired: 'تحديث إلزامي',
     appUpdateTitleRecommended: 'إصدار جديد متوفر',
@@ -4061,6 +4195,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     setupFemale: 'أنثى',
     setupCity: 'المدينة',
     setupLoading: 'جارٍ التحميل…',
+    setupLoadingProfile: 'جارٍ تحميل معلوماتك…',
     setupCityHint: 'نصيحة: اضغط على الحقل لفتح القائمة والبحث عن مدينتك.',
     setupCityChoose: 'اختر مدينة…',
     setupCityModalTitle: 'اختر مدينتك',
@@ -4303,6 +4438,18 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountSelectPlaceholder: 'اختر…',
     accountSelectNoResults: 'لا توجد نتائج',
     accountSectionAccount: 'الحساب والوصول',
+    accountChangePasswordTitle: 'تغيير كلمة المرور',
+    accountCurrentPasswordLabel: 'كلمة المرور الحالية',
+    accountCurrentPasswordPlaceholder: 'كلمة المرور الحالية',
+    accountCurrentPasswordRequired: 'يرجى إدخال كلمة المرور الحالية.',
+    accountNewPasswordLabel: 'كلمة المرور الجديدة',
+    accountNewPasswordPlaceholder: 'كلمة المرور الجديدة',
+    accountNewPasswordMustDiffer: 'يجب أن تختلف كلمة المرور الجديدة عن الحالية.',
+    accountChangePasswordSubmit: 'تغيير كلمة المرور',
+    accountChangePasswordSuccessTitle: 'تم تغيير كلمة المرور',
+    accountChangePasswordSuccessBody: 'تم تحديث كلمة المرور بنجاح.',
+    accountChangePasswordFailed: 'فشل تغيير كلمة المرور.',
+    accountPasswordsMatch: 'كلمتا المرور متطابقتان.',
     accountPhone: 'رقم الهاتف',
     accountSetupStatus: 'حالة الملف',
     accountSetupComplete: 'مكتمل',
@@ -4744,6 +4891,43 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     sidebarOpen: 'فتح القائمة',
     sidebarClose: 'إغلاق',
     sidebarCart: 'السلة',
+    sidebarTassjilSchools: 'متابعة TASSJIL',
+    tassjilLinkTitle: 'ربط حساب TASSJIL',
+    tassjilLinkSubtitle: 'نبحث عن ملف TASSJIL باستخدام رقم هاتفك.',
+    tassjilLinkIntro: 'يتم الربط تلقائيًا إذا وُجد ملف TASSJIL نشط لنفس الرقم على E-Tawjihi.',
+    tassjilLinkCta: 'إعادة محاولة الربط',
+    tassjilLinkSupport: 'الاتصال بالدعم',
+    tassjilLinkSupportMessage: 'مرحبًا، أحتاج مساعدة لربط حساب TASSJIL بالتطبيق الجديد E-Tawjihi.',
+    tassjilLinkOtpTitle: 'رمز التحقق',
+    tassjilLinkOtpSubtitle: 'أدخل الرمز المرسل إلى {phone}',
+    tassjilLinkVerifyCta: 'تأكيد الربط',
+    tassjilLinkErrGeneric: 'حدث خطأ. أعد المحاولة أو اتصل بالدعم.',
+    tassjilLinkInitiateNeutral:
+      'لم يُعثر على ملف TASSJIL نشط لهذا الرقم. اتصل بالدعم إذا كنت مسجّلًا بالفعل.',
+    tassjilNoDossierTitle: 'لا يوجد ملف TASSJIL',
+    tassjilNoDossierBody:
+      'لم نجد ملف TASSJIL نشطًا لرقمك. اتصل بالدعم إذا كنت مسجّلًا بالفعل.',
+    tassjilSchoolsTitle: 'مدارسي TASSJIL',
+    tassjilSchoolsHeroEyebrow: 'خدمة TASSJIL',
+    tassjilSchoolsCount: '{count} مدرسة متابَعة',
+    tassjilSupportWhatsapp: 'دعم WhatsApp',
+    tassjilStatInscription: 'حالة التسجيل',
+    tassjilStatSuivi: 'حالة المتابعة',
+    tassjilAcceptanceTitle: 'تفاصيل القبول',
+    tassjilLearnMore: 'عرض بطاقة المدرسة',
+    tassjilRegistrationWindow: 'التسجيل: {start} → {end}',
+    tassjilSchoolsSubtitle: 'متابعة تسجيلاتك المتزامنة مع فريق E-Tawjihi',
+    tassjilSchoolsLoading: 'جاري تحميل مدارسك…',
+    tassjilSchoolsErrGeneric: 'تعذر تحميل المدارس. أعد المحاولة.',
+    tassjilSchoolsSupportMessage: 'مرحبًا، لدي سؤال حول متابعة تسجيلات TASSJIL في التطبيق.',
+    tassjilSchoolsEmptyTitle: 'لا توجد مدارس مختارة',
+    tassjilSchoolsEmptyBody: 'ستظهر مدارس التسجيل هنا عند إعدادها في ملف TASSJIL.',
+    tassjilFilterTitle: 'فلاتر سريعة',
+    tassjilFilterAll: 'الكل',
+    tassjilFilterReset: 'إعادة التعيين',
+    tassjilFilterResults: '{shown} / {total} معروض',
+    tassjilFilterEmptyTitle: 'لا توجد نتائج',
+    tassjilFilterEmptyBody: 'لا توجد مدرسة تطابق الفلاتر المحددة.',
     sidebarEvents: 'الفعاليات',
     sidebarSectionDiscover: 'اكتشف',
     sidebarSectionTools: 'أدوات وإرشاد',
@@ -4818,6 +5002,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscEyebrow: 'التسجيلات والترشيحات',
     inscTitle: 'تسجيلاتي',
     inscSubtitle: 'تابع ترشيحاتك وابقَ على اطلاع بفترات التسجيل.',
+    inscTassjilTrackCta: 'متابعة التسجيلات — خدمة TASSJIL',
+    inscTassjilTrackHint: 'مدارس TASSJIL المتزامنة مع E-Tawjihi',
+    inscTassjilServiceIncluded:
+      'مشمول في خدمة التسجيل (راجع مسؤولة التسجيل لديك)',
     inscTabNotifications: 'الإشعارات',
     inscTabCandidacies: 'الترشيحات',
     inscTabAnnouncements: 'الإعلانات',

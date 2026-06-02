@@ -161,6 +161,9 @@ export function getUserFacingApiError(
   if (context === 'auth' && (kind === 'unauthorized' || kind === 'forbidden' || kind === 'validation')) {
     return t('apiErrAuth');
   }
+  if (context === 'feedback' && kind === 'forbidden') {
+    return t('appFeedbackClientRequired');
+  }
 
   if (kind !== 'unknown') {
     return t(KIND_I18N[kind]);

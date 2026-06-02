@@ -38,7 +38,7 @@ function navigatePracticalLinkUnlocked(
       push('/inscriptions?tab=candidacies');
       return;
     case 'ecoles-inscription':
-      push('/ecoles');
+      push('/tassjil-school-choices');
       return;
     case 'boutique':
       push('/boutique');

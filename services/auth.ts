@@ -209,6 +209,25 @@ export async function resetPasswordWithToken(token: string, password: string): P
   });
 }
 
+export type ChangePasswordResponse = { success: boolean; message?: string };
+
+export async function changePasswordWithToken(
+  accessToken: string,
+  currentPassword: string,
+  newPassword: string,
+  confirmPassword: string,
+): Promise<ChangePasswordResponse> {
+  const url = buildApiUrl('/api/auth/change-password');
+  return await httpPostJson<
+    ChangePasswordResponse,
+    { currentPassword: string; newPassword: string; confirmPassword: string }
+  >(
+    url,
+    { currentPassword, newPassword, confirmPassword },
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+}
+
 export async function setAuthToken(token: string): Promise<void> {
   await AsyncStorage.setItem(TOKEN_KEY, token);
 }

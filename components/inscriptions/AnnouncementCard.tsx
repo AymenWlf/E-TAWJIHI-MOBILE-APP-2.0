@@ -12,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { TassjilServiceIncludedNotice } from '@/components/inscriptions/TassjilServiceIncludedNotice';
 import { TawjihPlusPreviewLockPanel } from '@/components/inscriptions/TawjihPlusPaywall';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
@@ -25,6 +26,7 @@ import {
   getEstablishmentLogoUrl,
 } from '@/constants/establishmentMedia';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
+import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useTawjihPlusAccessContextOptional } from '@/contexts/TawjihPlusAccessContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
@@ -43,6 +45,7 @@ import {
 } from '@/utils/candidacyStatus';
 import { isPremiereBacNiveau } from '@/utils/academicFiliere';
 import { evaluateEligibility } from '@/utils/eligibility';
+import { shouldShowTassjilServiceIncludedNotice } from '@/utils/tassjilServiceIncludedNotice';
 
 type Props = {
   item: ContestAnnouncementCard;
@@ -153,6 +156,7 @@ export function AnnouncementCard({
     return null;
   }
   const { t, locale, isRTL } = useLocale();
+  const { user } = useAuth();
   const router = useRouter();
   const tawjihPlusAccess = useTawjihPlusAccessContextOptional();
   const openTawjihPlusProduct = useCallback(() => {
@@ -196,7 +200,8 @@ export function AnnouncementCard({
   const deadline = formatDaysUntilClose(item.daysUntilClose, locale);
   const contentLocked = previewOnly;
   const canUpdateStatus =
-    typeof onUpdateStatus === 'function' && (item.availableStatuses?.length ?? 0) > 0;
+    typeof onUpdateStatus === 'function' &&
+    ((item.availableStatuses?.length ?? 0) > 0 || tourGate === 'status');
   /** En aperçu TAWJIH PLUS : toujours afficher les CTA verrouillés (statut + lien). */
   const showStatusAction = contentLocked ? true : canUpdateStatus;
 
@@ -212,10 +217,19 @@ export function AnnouncementCard({
     locale,
     item.registrationUrlLabelAr,
   );
+  const showTassjilServiceNotice = shouldShowTassjilServiceIncludedNotice(
+    est,
+    item.announcementType,
+    user?.legacyLink,
+  );
 
   const followInteractionEnabled = !tourGate || tourGate === 'follow';
   const statusInteractionEnabled = !tourGate || tourGate === 'status';
   const linkInteractionEnabled = !tourGate || tourGate === 'link';
+  const hasRegistrationUrl = Boolean(item.registrationUrl?.trim());
+  /** Tutoriel « lien d'inscription » : le tap doit rester actif même sans URL API. */
+  const canPressRegistrationLink =
+    linkInteractionEnabled && (hasRegistrationUrl || tourGate === 'link');
 
   const hasMetaPanel =
     Boolean(villesShort) ||
@@ -243,7 +257,7 @@ export function AnnouncementCard({
           if (!linkInteractionEnabled) return;
           onOpenLink();
         }}
-        disabled={!locked && (!item.registrationUrl || !linkInteractionEnabled)}
+        disabled={!locked && !canPressRegistrationLink}
         accessibilityRole="button"
         accessibilityLabel={locked ? t('inscTawjihPlusUpgradeCta') : registrationLinkLabel}
         style={({ pressed }) => [
@@ -251,8 +265,8 @@ export function AnnouncementCard({
           fullWidth ? styles.btnLinkFull : styles.btnFlex,
           styles.btnLink,
           locked && styles.btnLockedPaywall,
-          !locked && (!item.registrationUrl || !linkInteractionEnabled) && styles.btnDisabled,
-          pressed && (locked || linkInteractionEnabled) && { opacity: 0.85 },
+          !locked && !canPressRegistrationLink && styles.btnDisabled,
+          pressed && (locked || canPressRegistrationLink) && { opacity: 0.85 },
           !locked && !linkInteractionEnabled && styles.tourActionDisabled,
           tourFocusActive('link') && styles.btnLinkFocus,
         ]}>
@@ -426,6 +440,8 @@ export function AnnouncementCard({
           numberOfLines={3}>
           {pickAnnouncementTitle(item, locale) || item.title}
         </Text>
+
+        {showTassjilServiceNotice ? <TassjilServiceIncludedNotice isRTL={isRTL} /> : null}
 
         {/* Dates, lieu — panneau structuré */}
         {hasMetaPanel ? (

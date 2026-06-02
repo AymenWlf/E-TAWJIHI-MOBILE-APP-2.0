@@ -1,7 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import type { ComponentProps } from 'react';
 import { useMemo } from 'react';
-import { Platform, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { HomeFeedHorizontalScroll } from '@/components/home/HomeFeedHorizontalScroll';
 import { practicalLinkCardShadow } from '@/components/home/HomeFeedSection';
@@ -9,6 +9,7 @@ import { HomePracticalInfoSectionSkeleton } from '@/components/home/HomePractica
 import { Text } from '@/components/ui/Text';
 import { homeSectionHeaderStyles as header } from '@/components/home/homeSectionHeaderStyles';
 import { PRACTICAL_LINK_DEFS } from '@/constants/practicalLinks';
+import type { HomeCopyKey } from '@/constants/i18n';
 import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -19,6 +20,8 @@ export type PracticalInfoItem = {
   description: string;
   icon: ComponentProps<typeof FontAwesome>['name'];
   accent: string;
+  locked?: boolean;
+  lockReasonKey?: HomeCopyKey;
 };
 
 const CARD_W = 144;
@@ -55,38 +58,44 @@ function PracticalLinkCard({
   isRTL: boolean;
   onPress: () => void;
 }) {
-  const iconBg = withAlpha(item.accent, 0.14);
-  const iconRing = withAlpha(item.accent, 0.28);
-  const glow = withAlpha(item.accent, 0.11);
-  const footerBg = withAlpha(item.accent, 0.06);
+  const locked = Boolean(item.locked);
+  const iconBg = withAlpha(item.accent, locked ? 0.08 : 0.14);
+  const iconRing = withAlpha(item.accent, locked ? 0.16 : 0.28);
+  const glow = withAlpha(item.accent, locked ? 0.04 : 0.11);
+  const footerBg = withAlpha(item.accent, locked ? 0.04 : 0.06);
+  const displayAccent = locked ? brand.textMuted : item.accent;
 
   return (
     <Pressable
       onPress={onPress}
       style={({ pressed }) => [
         styles.card,
-        { borderTopColor: item.accent },
-        pressed && styles.cardPressed,
+        { borderTopColor: displayAccent },
+        locked && styles.cardLocked,
+        pressed && !locked && styles.cardPressed,
       ]}
       accessibilityRole="button"
-      accessibilityLabel={item.label}>
+      accessibilityLabel={item.label}
+      accessibilityState={{ disabled: locked }}>
       <View style={[styles.glowOrb, { backgroundColor: glow }]} pointerEvents="none" />
       <View style={[styles.cardBody, isRTL && styles.cardBodyRtl]}>
         <View style={styles.heroRow}>
           <View style={[styles.iconWrap, { backgroundColor: iconBg, borderColor: iconRing }]}>
-            <FontAwesome name={item.icon} size={ICON_GLYPH} color={item.accent} />
+            <FontAwesome name={locked ? 'lock' : item.icon} size={ICON_GLYPH} color={displayAccent} />
           </View>
           <View style={[styles.arrowChip, { backgroundColor: footerBg, borderColor: iconRing }]}>
             <FontAwesome
-              name={isRTL ? 'chevron-left' : 'chevron-right'}
+              name={locked ? 'lock' : isRTL ? 'chevron-left' : 'chevron-right'}
               size={10}
-              color={item.accent}
+              color={displayAccent}
             />
           </View>
         </View>
 
         <View style={styles.textBlock}>
-          <Text style={[styles.label, isRTL && styles.labelRtl]} numberOfLines={3}>
+          <Text
+            style={[styles.label, locked && styles.labelLocked, isRTL && styles.labelRtl]}
+            numberOfLines={3}>
             {item.label}
           </Text>
         </View>
@@ -114,6 +123,17 @@ export function HomePracticalInfoSection({
     }));
   }, [itemsOverride, t]);
 
+  const handlePress = (id: string) => {
+    const item = items.find((x) => x.id === id);
+    if (item?.locked && item.lockReasonKey) {
+      Alert.alert(t('practical_ecolesInscription_locked_title'), t(item.lockReasonKey), [
+        { text: t('closeOverlayA11y'), style: 'cancel' },
+      ]);
+      return;
+    }
+    onPressItem?.(id);
+  };
+
   if (loading) {
     return <HomePracticalInfoSectionSkeleton width={width} isRTL={isRTL} />;
   }
@@ -137,7 +157,7 @@ export function HomePracticalInfoSection({
               <PracticalLinkCard
                 item={item}
                 isRTL={isRTL}
-                onPress={() => onPressItem?.(item.id)}
+                onPress={() => handlePress(item.id)}
               />
             </View>
           ))}
@@ -170,6 +190,10 @@ const styles = StyleSheet.create({
   cardPressed: {
     opacity: 0.94,
     transform: [{ scale: 0.985 }],
+  },
+  cardLocked: {
+    opacity: 0.88,
+    backgroundColor: brand.backgroundSoft,
   },
   glowOrb: {
     position: 'absolute',
@@ -231,5 +255,8 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     writingDirection: 'rtl',
     lineHeight: 18,
+  },
+  labelLocked: {
+    color: brand.textMuted,
   },
 });

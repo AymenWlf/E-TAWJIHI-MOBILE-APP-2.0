@@ -19,6 +19,7 @@ import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
+import { TassjilServiceIncludedNotice } from '@/components/inscriptions/TassjilServiceIncludedNotice';
 import { ContestYoutubeTutorial } from '@/components/inscriptions/ContestYoutubeTutorial';
 import {
   EligibilityBadge,
@@ -81,6 +82,7 @@ import {
 import { splitSiblingsAroundCurrent } from '@/utils/contestAnnouncementSiblings';
 import { downloadDocument, pickDocumentIcon, viewDocument } from '@/utils/documents';
 import { evaluateEligibility } from '@/utils/eligibility';
+import { shouldShowTassjilServiceIncludedNotice } from '@/utils/tassjilServiceIncludedNotice';
 import { fireAndForget } from '@/utils/fireAndForget';
 import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
 
@@ -419,6 +421,11 @@ export default function InscriptionDetailScreen() {
     fallbackEstablishmentAvatarName(est?.nom, est?.sigle);
 
   const deadline = formatDaysUntilClose(data.daysUntilClose, locale);
+  const showTassjilServiceNotice = shouldShowTassjilServiceIncludedNotice(
+    est,
+    data.announcementType,
+    user?.legacyLink,
+  );
   const noEligibility =
     data.filieresAcceptees.length === 0 &&
     data.specialitesBacMissionAcceptees.length === 0 &&
@@ -461,8 +468,11 @@ export default function InscriptionDetailScreen() {
 
   const showRegistrationFooter =
     contentLocked || Boolean(data.registrationUrl?.trim());
-  const scrollPaddingBottom =
-    insets.bottom + spacing.lg + (showRegistrationFooter ? 92 : spacing.xl);
+  /** Hauteur barre sticky (padding + CTA, hors safe area du footer). */
+  const registrationFooterBarHeight = 80;
+  const scrollPaddingBottom = showRegistrationFooter
+    ? insets.bottom + registrationFooterBarHeight + spacing.lg + spacing.md
+    : insets.bottom + spacing.section + spacing.xl;
 
   return (
     <View style={styles.root}>
@@ -513,7 +523,7 @@ export default function InscriptionDetailScreen() {
         ref={scrollRef}
         contentContainerStyle={[
           styles.scroll,
-          { paddingBottom: insets.bottom + spacing.section + spacing.xl },
+          { paddingBottom: scrollPaddingBottom },
         ]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -621,6 +631,7 @@ export default function InscriptionDetailScreen() {
             isRTL={isRTL}
           />
           <Text style={[styles.title, isRTL && styles.rtl]}>{title}</Text>
+          {showTassjilServiceNotice ? <TassjilServiceIncludedNotice isRTL={isRTL} /> : null}
           {deadline.label ? (
             <View
               style={[

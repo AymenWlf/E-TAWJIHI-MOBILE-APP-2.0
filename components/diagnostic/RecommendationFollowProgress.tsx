@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { StyleSheet, View } from 'react-native';
+import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import {
@@ -15,9 +15,15 @@ type Props = {
   followCount: number;
   locale: RecommendationFollowCopyLocale;
   isRTL?: boolean;
+  style?: StyleProp<ViewStyle>;
 };
 
-export function RecommendationFollowProgress({ followCount, locale, isRTL = false }: Props) {
+export function RecommendationFollowProgress({
+  followCount,
+  locale,
+  isRTL = false,
+  style,
+}: Props) {
   const goal = RECOMMENDATION_FOLLOW_MIN_COUNT;
   const done = Math.max(0, Math.floor(followCount));
   const satisfied = done >= goal;
@@ -29,6 +35,7 @@ export function RecommendationFollowProgress({ followCount, locale, isRTL = fals
         styles.wrap,
         satisfied && styles.wrapDone,
         isRTL && styles.wrapRtl,
+        style,
       ]}>
       <View style={[styles.headRow, isRTL && styles.headRowRtl]}>
         <FontAwesome

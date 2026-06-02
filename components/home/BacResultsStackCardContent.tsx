@@ -19,6 +19,7 @@ import type { HomeCopyKey } from '@/constants/i18n';
 import {
   getBacCountdownParts,
   hasAnyBacResultPublished,
+  areBacNotesPublished,
   isBacResultsDay,
   pad2,
   type BacOutletStatus,
@@ -35,8 +36,6 @@ type Props = {
   isRTL?: boolean;
   onOpenVerification?: (channel: BacVerificationChannel) => void;
   onOpenThresholds?: () => void;
-  thresholdsLocked?: boolean;
-  /** Chargement config bac et/ou profil élève — affiche un skeleton à la place du CTA. */
   thresholdsLoading?: boolean;
   /** Carte en arrière-plan (peek) : masquer le CTA seuils. */
   hideThresholdsCta?: boolean;
@@ -216,7 +215,6 @@ export function BacResultsStackCardContent({
   isRTL: isRTLProp,
   onOpenVerification,
   onOpenThresholds,
-  thresholdsLocked = false,
   thresholdsLoading = false,
   hideThresholdsCta = false,
 }: Props) {
@@ -240,9 +238,10 @@ export function BacResultsStackCardContent({
   const compact = showCountdown;
   const isPublished =
     config.globalStatus === 'published' || hasAnyBacResultPublished(config);
-  /** CTA seuils visible même avant publication (comme une fois les résultats publiés). */
+  const notesPublished = areBacNotesPublished(config);
   const showThresholdsSlot = true;
-  const thresholdsCtaDisabled = thresholdsLocked || !onOpenThresholds;
+  const thresholdsNotesLocked = !notesPublished;
+  const thresholdsCtaDisabled = !onOpenThresholds || thresholdsNotesLocked;
 
   const fs = Math.max(compact ? 9 : 10, layout.validityLabel);
   const fsSm = Math.max(compact ? 8 : 9, layout.hint);
@@ -251,11 +250,10 @@ export function BacResultsStackCardContent({
   const outletRows: {
     key: HomeCopyKey;
     status: BacOutletStatus;
-    icon: 'envelope-o' | 'mobile' | 'graduation-cap';
+    icon: 'envelope-o' | 'graduation-cap';
     channel: BacVerificationChannel;
   }[] = [
     { key: 'bacOutletOutlook', status: config.outlook, icon: 'envelope-o', channel: 'outlook' },
-    { key: 'bacOutletSms', status: config.sms, icon: 'mobile', channel: 'sms' },
     { key: 'bacOutletMenResults', status: config.menResults, icon: 'graduation-cap', channel: 'men' },
   ];
 
@@ -359,65 +357,111 @@ export function BacResultsStackCardContent({
           numberOfLines={2}>
           {t('bacOutletsTitle')}
         </Text>
-        {outletRows.map((row) => (
-          <GHPressable
-            key={row.key}
-            onPress={() => onOpenVerification?.(row.channel)}
-            accessibilityRole="button"
-            accessibilityLabel={`${t(row.key)} — ${t('bacOutletGuideA11y')}`}
-            style={({ pressed }) => [
-              styles.outletRow,
-              styles.outletRowPressable,
-              styles.outletRowFill,
-              isRTL && styles.outletRowRtl,
-              pressed && styles.outletRowPressed,
-            ]}>
-            <View style={[styles.outletLeft, isRTL && styles.outletLeftRtl]}>
-              <FontAwesome
-                name={row.icon}
-                size={compact ? 11 : 13}
-                color={brand.primary}
-                style={styles.outletIcon}
-              />
-              <View style={styles.outletLabelWrap}>
+        <View style={[compact ? styles.outletsList : styles.outletsGrid, isRTL && styles.outletsGridRtl]}>
+          {outletRows.map((row) =>
+            compact ? (
+              <GHPressable
+                key={row.key}
+                onPress={() => onOpenVerification?.(row.channel)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t(row.key)} — ${t('bacOutletGuideA11y')}`}
+                style={({ pressed }) => [
+                  styles.outletRow,
+                  styles.outletRowPressable,
+                  styles.outletRowFill,
+                  isRTL && styles.outletRowRtl,
+                  pressed && styles.outletRowPressed,
+                ]}>
+                <View style={[styles.outletLeft, isRTL && styles.outletLeftRtl]}>
+                  <FontAwesome
+                    name={row.icon}
+                    size={11}
+                    color={brand.primary}
+                    style={styles.outletIcon}
+                  />
+                  <View style={styles.outletLabelWrap}>
+                    <Text
+                      style={[styles.outletLabel, { fontSize: fsSm }, isRTL ? styles.textRtl : styles.textLtr]}
+                      numberOfLines={isRTL ? 1 : 2}>
+                      {t(row.key)}
+                    </Text>
+                    {onOpenVerification ? (
+                      <Text
+                        style={[styles.outletGuideHint, isRTL ? styles.textRtl : styles.textLtr]}
+                        numberOfLines={1}>
+                        {t('bacTapForGuide')}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+                <View style={[styles.outletRight, isRTL && styles.outletRightRtl]}>
+                  <View style={[styles.statusTagWrap, isRTL && styles.statusTagWrapRtl]}>
+                    <OutletStatusTag
+                      status={row.status}
+                      publishedLabel={t('bacStatusPublished')}
+                      notYetLabel={t('bacStatusNotYet')}
+                      isRTL={isRTL}
+                    />
+                  </View>
+                  <FontAwesome
+                    name={isRTL ? 'chevron-left' : 'chevron-right'}
+                    size={10}
+                    color={brand.textMuted}
+                    style={styles.chevron}
+                  />
+                </View>
+              </GHPressable>
+            ) : (
+              <GHPressable
+                key={row.key}
+                onPress={() => onOpenVerification?.(row.channel)}
+                accessibilityRole="button"
+                accessibilityLabel={`${t(row.key)} — ${t('bacOutletGuideA11y')}`}
+                style={({ pressed }) => [
+                  styles.outletTile,
+                  isRTL && styles.outletTileRtl,
+                  pressed && styles.outletTilePressed,
+                ]}>
+                <View style={[styles.outletTileTop, isRTL && styles.outletTileTopRtl]}>
+                  <View style={styles.outletTileIconWrap}>
+                    <FontAwesome name={row.icon} size={14} color={brand.primary} />
+                  </View>
+                  <FontAwesome
+                    name={isRTL ? 'chevron-left' : 'chevron-right'}
+                    size={10}
+                    color={brand.textMuted}
+                  />
+                </View>
                 <Text
-                  style={[styles.outletLabel, { fontSize: fsSm }, isRTL ? styles.textRtl : styles.textLtr]}
-                  numberOfLines={compact && isRTL ? 1 : 2}>
+                  style={[styles.outletTileLabel, { fontSize: fsSm }, isRTL ? styles.textRtl : styles.textLtr]}
+                  numberOfLines={2}>
                   {t(row.key)}
                 </Text>
+                <View style={[styles.outletTileTag, isRTL && styles.outletTileTagRtl]}>
+                  <OutletStatusTag
+                    status={row.status}
+                    publishedLabel={t('bacStatusPublished')}
+                    notYetLabel={t('bacStatusNotYet')}
+                    isRTL={isRTL}
+                  />
+                </View>
                 {onOpenVerification ? (
                   <Text
-                    style={[styles.outletGuideHint, isRTL ? styles.textRtl : styles.textLtr]}
+                    style={[styles.outletTileHint, isRTL ? styles.textRtl : styles.textLtr]}
                     numberOfLines={1}>
                     {t('bacTapForGuide')}
                   </Text>
                 ) : null}
-              </View>
-            </View>
-            <View style={[styles.outletRight, isRTL && styles.outletRightRtl]}>
-              <View style={[styles.statusTagWrap, isRTL && styles.statusTagWrapRtl]}>
-                <OutletStatusTag
-                  status={row.status}
-                  publishedLabel={t('bacStatusPublished')}
-                  notYetLabel={t('bacStatusNotYet')}
-                  isRTL={isRTL}
-                />
-              </View>
-              <FontAwesome
-                name={isRTL ? 'chevron-left' : 'chevron-right'}
-                size={10}
-                color={brand.textMuted}
-                style={styles.chevron}
-              />
-            </View>
-          </GHPressable>
-        ))}
+              </GHPressable>
+            ),
+          )}
+        </View>
       </View>
 
       {showThresholdsSlot && !hideThresholdsCta ? (
         <BacThresholdsCtaSlot
           loading={thresholdsLoading}
-          locked={thresholdsLocked}
+          locked={thresholdsNotesLocked}
           disabled={thresholdsCtaDisabled}
           onPress={onOpenThresholds}
           isRTL={isRTL}
@@ -693,6 +737,73 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     color: brand.text,
     marginBottom: 0,
+  },
+  outletsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    width: '100%',
+  },
+  outletsGridRtl: {
+    flexDirection: 'row-reverse',
+  },
+  outletsList: {
+    width: '100%',
+    gap: 6,
+  },
+  outletTile: {
+    flex: 1,
+    minWidth: '46%',
+    maxWidth: '50%',
+    padding: 10,
+    borderRadius: radius.md,
+    backgroundColor: brand.white,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(51, 62, 143, 0.12)',
+    gap: 6,
+    minHeight: 96,
+  },
+  outletTileRtl: {
+    alignItems: 'stretch',
+  },
+  outletTilePressed: {
+    backgroundColor: 'rgba(51, 62, 143, 0.04)',
+    borderColor: 'rgba(51, 62, 143, 0.22)',
+  },
+  outletTileTop: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  outletTileTopRtl: {
+    flexDirection: 'row-reverse',
+  },
+  outletTileIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+    backgroundColor: 'rgba(51, 62, 143, 0.08)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  outletTileLabel: {
+    color: brand.text,
+    fontWeight: '700',
+    lineHeight: 16,
+  },
+  outletTileTag: {
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
+  },
+  outletTileTagRtl: {
+    alignSelf: 'flex-end',
+  },
+  outletTileHint: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: brand.primary,
+    marginTop: 'auto',
   },
   outletRow: {
     flexDirection: 'row',

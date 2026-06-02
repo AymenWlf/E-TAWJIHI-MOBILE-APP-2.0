@@ -1,5 +1,5 @@
 import { buildApiUrl } from '@/constants/api';
-import { httpGetJson } from '@/services/http';
+import { apiFetchInit, httpGetJson } from '@/services/http';
 import type { ShopOrderPayload } from '@/types/shop';
 
 export type UserOrderServicePaymentCard = {
@@ -80,14 +80,16 @@ export async function uploadUserOrderBankTransferReceipt(
     name: file.name || 'justificatif.pdf',
     type: file.type || 'application/octet-stream',
   } as unknown as Blob);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: form,
-  });
+  const res = await fetch(
+    url,
+    await apiFetchInit({
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: form,
+    }),
+  );
   const json = (await res.json().catch(() => null)) as ApiDataResponse<ShopOrderPayload> & { message?: string };
   if (!res.ok || !json?.success || !json.data) {
     throw new Error(typeof json?.message === 'string' ? json.message : `HTTP ${res.status}`);
@@ -101,15 +103,17 @@ export async function applyUserOrderPromo(
   promoCode: string,
 ): Promise<ShopOrderPayload> {
   const url = buildApiUrl(`/api/user/orders/${encodeURIComponent(publicId)}/apply-promo`);
-  const res = await fetch(url, {
-    method: 'POST',
-    headers: {
-      Accept: 'application/json',
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${accessToken}`,
-    },
-    body: JSON.stringify({ promoCode: promoCode.trim() }),
-  });
+  const res = await fetch(
+    url,
+    await apiFetchInit({
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ promoCode: promoCode.trim() }),
+    }),
+  );
   const json = (await res.json().catch(() => null)) as ApiDataResponse<ShopOrderPayload> & { message?: string };
   if (!res.ok || !json?.success || !json.data) {
     throw new Error(typeof json?.message === 'string' ? json.message : `HTTP ${res.status}`);
