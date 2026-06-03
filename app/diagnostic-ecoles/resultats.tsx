@@ -66,8 +66,6 @@ const COPY = {
       last: 'Dernier choix',
       avoid: 'À éviter',
     } as Record<DiagnosticTier, string>,
-    follow: 'Suivre',
-    following: 'Suivi',
   },
   ar: {
     eyebrow: 'تشخيص المدارس',
@@ -85,8 +83,6 @@ const COPY = {
       last: 'خيار أخير',
       avoid: 'يُفضّل تجنبه',
     } as Record<DiagnosticTier, string>,
-    follow: 'متابعة',
-    following: 'متابَع',
   },
 } as const;
 
@@ -403,8 +399,9 @@ export default function DiagnosticResultatsScreen() {
     [grouped],
   );
 
+  /** Non-client ayant terminé le diagnostic : toujours l’écran d’achat TAWJIH PLUS. */
   const showRecommendationsPaywall =
-    recommendationsDeferred && !tawjihPlusLoading && !hasTawjihPlusAccess;
+    !tawjihPlusLoading && !hasTawjihPlusAccess && Boolean(publicCode);
 
   if (loading || tawjihPlusLoading) {
     return (
@@ -581,8 +578,8 @@ export default function DiagnosticResultatsScreen() {
                       isFollowing={followedIds.has(row.establishmentId)}
                       followBusy={followBusyIds.has(row.establishmentId)}
                       onToggleFollow={() => void toggleFollow(row.establishmentId)}
-                      followLabelFollow={cpy.follow}
-                      followLabelFollowing={cpy.following}
+                      followLabelFollow={t('inscAnnouncementsFollow')}
+                      followLabelFollowing={t('inscAnnouncementsFollowing')}
                       onPress={() =>
                         router.push(`/etablissements/${row.establishmentId}/${row.slug}` as never)
                       }

@@ -5,7 +5,12 @@ import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { AppNotification } from '@/types/inscriptions';
-import { notificationMessage, notificationTimeAgo, notificationTitle } from '@/utils/notificationDisplay';
+import {
+  isFollowedSchoolNotification,
+  notificationMessage,
+  notificationTimeAgo,
+  notificationTitle,
+} from '@/utils/notificationDisplay';
 
 type Props = {
   notif: AppNotification;
@@ -40,8 +45,9 @@ export function NotificationCard({
   actionLabel,
   onActionPress,
 }: Props) {
-  const { isRTL, locale } = useLocale();
+  const { isRTL, locale, t } = useLocale();
   const icon = TYPE_ICON[notif.type] ?? 'bell';
+  const followedSchool = isFollowedSchoolNotification(notif);
   const title = notificationTitle(notif, locale);
   const message = notificationMessage(notif, locale);
   const timeAgo = notificationTimeAgo(notif, locale);
@@ -65,12 +71,20 @@ export function NotificationCard({
       </View>
       <View style={styles.body}>
         <View style={[styles.headerRow, isRTL && styles.rowRtl]}>
-          <Text
-            style={[styles.title, !notif.isRead && styles.titleUnread, isRTL && styles.rtl]}
-            numberOfLines={2}
-          >
-            {title}
-          </Text>
+          <View style={[styles.titleCol, isRTL && styles.titleColRtl]}>
+            {followedSchool ? (
+              <View style={[styles.followBadge, isRTL && styles.rowRtl]}>
+                <FontAwesome name="heart" size={9} color={brand.primary} />
+                <Text style={styles.followBadgeTxt}>{t('inscNotifFollowedSchoolBadge')}</Text>
+              </View>
+            ) : null}
+            <Text
+              style={[styles.title, !notif.isRead && styles.titleUnread, isRTL && styles.rtl]}
+              numberOfLines={2}
+            >
+              {title}
+            </Text>
+          </View>
           {!notif.isRead ? <View style={styles.dot} /> : null}
         </View>
         <Text style={[styles.message, isRTL && styles.rtl]} numberOfLines={4}>
@@ -117,16 +131,38 @@ const styles = StyleSheet.create({
   body: { flex: 1, gap: 2 },
   headerRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     justifyContent: 'space-between',
     gap: spacing.sm,
+  },
+  titleCol: {
+    flex: 1,
+    gap: 4,
+    minWidth: 0,
+  },
+  titleColRtl: {
+    alignItems: 'flex-end',
+  },
+  followBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(51,62,143,0.10)',
+  },
+  followBadgeTxt: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: brand.primary,
   },
   rowRtl: { flexDirection: 'row-reverse' },
   title: {
     fontSize: fontSize.sm,
     color: brand.text,
     fontWeight: '700',
-    flex: 1,
     lineHeight: 18,
   },
   titleUnread: {

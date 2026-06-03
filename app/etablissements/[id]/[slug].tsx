@@ -25,6 +25,8 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
+import { TawjihPlusPreviewLockPanel } from '@/components/inscriptions/TawjihPlusPaywall';
+import { resolveAnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 import { AnnouncementCardSkeletonStack } from '@/components/inscriptions/AnnouncementCardSkeleton';
 import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { ContestYoutubeTutorial } from '@/components/inscriptions/ContestYoutubeTutorial';
@@ -67,6 +69,11 @@ import { formatVillesCourtes, universityName } from '@/utils/establishmentFormat
 import { pickBrochureFromDocuments } from '@/utils/establishmentBrochure';
 import { sharePayloadEstablishmentDetail } from '@/utils/sharePagePayloads';
 import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
+import { isEstablishmentDetailAllowed } from '@/utils/establishmentLockDisplay';
+import {
+  isDefaultFreePreviewEstablishmentId,
+  loadDefaultFreePreviewEstablishmentIds,
+} from '@/services/establishmentFreePreview';
 
 export default function EstablishmentDetailScreen() {
   const router = useRouter();
@@ -82,13 +89,61 @@ export default function EstablishmentDetailScreen() {
     applyServerInscriptionsAccess,
     resolveInscriptionsAccessWithoutServer,
   } = useTawjihPlusAccessContext();
-  const announcementsLocked =
+  const showInscriptionsPaywall =
+    !isInscriptionsAccessPending && isInscriptionsLocked;
+  const schoolsCatalogLocked =
     !isInscriptionsAccessPending && isInscriptionsLocked;
   const { profile: eligibilityProfile, loading: eligibilityProfileLoading } = useEligibilityProfile();
   const isLoggedIn = Boolean(user);
-  const params = useLocalSearchParams<{ id?: string; slug?: string }>();
+  const params = useLocalSearchParams<{ id?: string; slug?: string; listIdx?: string }>();
   const id = useMemo(() => Number(params.id ?? 0), [params.id]);
   const slug = (params.slug ?? '').toString();
+  const listingIndex = useMemo(() => {
+    const raw = params.listIdx;
+    if (raw === undefined || raw === null || raw === '') return -1;
+    const n = Number(raw);
+    return Number.isFinite(n) ? n : -1;
+  }, [params.listIdx]);
+  const [freePreviewIds, setFreePreviewIds] = useState<number[]>([]);
+  const [freePreviewReady, setFreePreviewReady] = useState(false);
+
+  useEffect(() => {
+    if (!schoolsCatalogLocked) {
+      setFreePreviewReady(true);
+      return;
+    }
+    if (listingIndex >= 0) {
+      setFreePreviewReady(true);
+      return;
+    }
+    let cancelled = false;
+    void loadDefaultFreePreviewEstablishmentIds().then((ids) => {
+      if (!cancelled) {
+        setFreePreviewIds(ids);
+        setFreePreviewReady(true);
+      }
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [schoolsCatalogLocked, listingIndex]);
+
+  const canLoadEstablishmentDetail = useMemo(() => {
+    if (isInscriptionsAccessPending) return null;
+    if (!schoolsCatalogLocked) return true;
+    if (!freePreviewReady) return null;
+    if (isEstablishmentDetailAllowed(true, listingIndex)) return true;
+    if (listingIndex < 0 && isDefaultFreePreviewEstablishmentId(id, freePreviewIds)) return true;
+    return false;
+  }, [
+    freePreviewIds,
+    freePreviewReady,
+    id,
+    isInscriptionsAccessPending,
+    listingIndex,
+    schoolsCatalogLocked,
+  ]);
+  const establishmentDetailBlocked = canLoadEstablishmentDetail === false;
   const [data, setData] = useState<EstablishmentNormalized | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -131,6 +186,10 @@ export default function EstablishmentDetailScreen() {
   }, [refreshFollowState]);
 
   const onToggleFollow = useCallback(async () => {
+    if (establishmentDetailBlocked) {
+      openTawjihPlusProduct();
+      return;
+    }
     if (!isLoggedIn) {
       router.push('/login' as never);
       return;
@@ -155,6 +214,8 @@ export default function EstablishmentDetailScreen() {
               if (ok) {
                 setIsFollowing(false);
                 setFollowId(null);
+              } else {
+                Alert.alert('', t('inscErrorLoad'));
               }
             },
           },
@@ -171,10 +232,29 @@ export default function EstablishmentDetailScreen() {
     if (follow) {
       setIsFollowing(true);
       setFollowId(follow.id);
+    } else {
+      Alert.alert('', t('inscErrorLoad'));
     }
-  }, [getValidAccessToken, id, isFollowing, isLoggedIn, router, t]);
+  }, [
+    establishmentDetailBlocked,
+    getValidAccessToken,
+    id,
+    isFollowing,
+    isLoggedIn,
+    openTawjihPlusProduct,
+    router,
+    t,
+  ]);
 
   useEffect(() => {
+    if (canLoadEstablishmentDetail !== true) {
+      if (canLoadEstablishmentDetail === false) {
+        setLoading(false);
+        setData(null);
+        setErr(null);
+      }
+      return;
+    }
     let cancelled = false;
     setLoading(true);
     setErr(null);
@@ -195,7 +275,7 @@ export default function EstablishmentDetailScreen() {
     return () => {
       cancelled = true;
     };
-  }, [id, slug]);
+  }, [canLoadEstablishmentDetail, id, slug, t]);
 
   /* Tracking analytique : impression « detail » (1 fois par session pour
      éviter de gonfler les chiffres si l'utilisateur ouvre/ferme la même
@@ -329,7 +409,7 @@ export default function EstablishmentDetailScreen() {
       <Text style={[styles.topBarTitle, isRTL && styles.txtRtl]} numberOfLines={1}>
         {t('estDetailTitle')}
       </Text>
-      {id > 0 ? (
+      {id > 0 && !establishmentDetailBlocked ? (
         <ShareIconButton
           color={brand.white}
           style={{ backgroundColor: 'rgba(255,255,255,0.16)' }}
@@ -358,8 +438,12 @@ export default function EstablishmentDetailScreen() {
       <Stack.Screen options={{ headerShown: false }} />
       {renderTopBar()}
       <View style={styles.main}>
-      {loading ? (
+      {canLoadEstablishmentDetail === null || loading ? (
         <EstablishmentDetailLoadingSkeleton isRTL={isRTL} bottomInset={insets.bottom} style={styles.scroll} />
+      ) : establishmentDetailBlocked ? (
+        <View style={[styles.center, styles.detailLockCenter, { paddingBottom: insets.bottom }]}>
+          <TawjihPlusPreviewLockPanel locked />
+        </View>
       ) : err ? (
         <View style={[styles.center, { paddingBottom: insets.bottom }]}>
           <Text style={styles.errTxt}>{err}</Text>
@@ -584,18 +668,24 @@ export default function EstablishmentDetailScreen() {
               </Text>
             ) : (
               <View style={styles.announcementsList}>
-                {announcements.map((a) => (
+                {announcements.map((a, annIndex) => {
+                  const lockedVariant = resolveAnnouncementLockedVariant(
+                    Boolean(a.previewOnly) || showInscriptionsPaywall,
+                    annIndex,
+                  );
+                  const cardLocked = lockedVariant !== 'none';
+                  return (
                   <AnnouncementCard
                     key={`ann-${a.id}`}
                     item={a}
-                    previewOnly={a.previewOnly ?? announcementsLocked}
+                    lockedVariant={lockedVariant}
                     isFollowed={isFollowing}
                     followStateLoading={isLoggedIn && !followProbeDone}
                     eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
                     busy={followBusy}
                     onToggleFollow={onToggleFollow}
                     onOpenLink={() => {
-                      if (announcementsLocked) {
+                      if (cardLocked) {
                         openTawjihPlusProduct();
                         return;
                       }
@@ -604,11 +694,18 @@ export default function EstablishmentDetailScreen() {
                       }
                     }}
                     onUpdateStatus={() => {
-                      if (announcementsLocked) openTawjihPlusProduct();
+                      if (cardLocked) openTawjihPlusProduct();
                     }}
-                    onPress={() => router.push(`/inscriptions/${a.id}` as never)}
+                    onPress={() => {
+                      if (cardLocked) {
+                        openTawjihPlusProduct();
+                        return;
+                      }
+                      router.push(`/inscriptions/${a.id}` as never);
+                    }}
                   />
-                ))}
+                  );
+                })}
               </View>
             )}
           </Section>
@@ -866,6 +963,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: spacing.xl,
+  },
+  detailLockCenter: {
+    paddingHorizontal: spacing.xl,
   },
   errTxt: {
     color: brand.textSecondary,

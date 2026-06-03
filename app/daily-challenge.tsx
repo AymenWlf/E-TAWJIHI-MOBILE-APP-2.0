@@ -20,6 +20,7 @@ import {
 import { router, useFocusEffect } from 'expo-router';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { TawjihPlusUpgradeCta } from '@/components/inscriptions/TawjihPlusPaywall';
 import { DailyChallengeHubLoadingSkeleton } from '@/components/daily-challenge/DailyChallengeHubLoadingSkeleton';
 import { LoadingCardStack } from '@/components/ui/CardLoadingSkeleton';
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
@@ -43,6 +44,7 @@ import {
 } from '@/services/dailyChallenge';
 import { getZipGridPrefixIssue, getZipSnakeNextHintCellIndex, scoreZipGridPath } from '@/constants/zipPuzzleVariants';
 import { isDevApiBaseUrl } from '@/constants/api';
+import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
 /** Largeur disponible pour la grille SNAKE (marges scroll + carte quiz à padding horizontal réduit). */
@@ -409,6 +411,12 @@ export default function DailyChallengeScreen() {
 
   const playedAnyGameToday = useMemo(() => games.some((g) => g.played), [games]);
 
+  const playLocked = Boolean(user && today?.requiresTawjihPlusForPlay);
+
+  const openTawjihPlus = useCallback(() => {
+    router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
+  }, []);
+
   useEffect(() => {
     lbVmRef.current = lbVm;
   }, [lbVm]);
@@ -610,11 +618,15 @@ export default function DailyChallengeScreen() {
   }, []);
 
   const firstPlayableGame = useMemo(() => {
-    if (!user) return null;
+    if (!user || playLocked) return null;
     return games.find((g) => !g.played && canPlayGame(g)) ?? null;
-  }, [user, games, canPlayGame]);
+  }, [user, playLocked, games, canPlayGame]);
 
   const startQuizFor = (g: DailyChallengeGameEntry) => {
+    if (playLocked) {
+      openTawjihPlus();
+      return;
+    }
     if (g.played) return;
     if (g.type === 'zip' && g.zip) {
       setZipSnakeStarted(false);
@@ -688,6 +700,14 @@ export default function DailyChallengeScreen() {
     try {
       const res = await submitDailyChallenge(token, activeGame.id, finalAnswers, duration);
       if (!res.success || !res.data) {
+        const msg = (res.message ?? '').toLowerCase();
+        if (msg.includes('tawjih plus')) {
+          void load({ silent: true });
+          setStep('hub');
+          openTawjihPlus();
+          zipAutoSubmittedRef.current = false;
+          return;
+        }
         setError(getUserFacingApiFailureMessage(t, { context: 'dailyChallenge' }));
         setStep('quiz');
         zipAutoSubmittedRef.current = false;
@@ -1073,8 +1093,12 @@ export default function DailyChallengeScreen() {
   );
 
   const hubFooterHubPad =
-    step === 'hub' && today?.available && user && (firstPlayableGame != null || showHubLeaderboardCta)
-      ? Math.max(insets.bottom, spacing.sm) + (firstPlayableGame != null && showHubLeaderboardCta ? 64 : 56)
+    step === 'hub' &&
+    today?.available &&
+    user &&
+    (firstPlayableGame != null || showHubLeaderboardCta || playLocked)
+      ? Math.max(insets.bottom, spacing.sm) +
+        (firstPlayableGame != null && showHubLeaderboardCta ? 64 : 56)
       : 0;
   const scrollBottomPad = insets.bottom + spacing.xl + hubFooterHubPad;
   const backIcon = isRTL ? 'chevron-right' : 'chevron-left';
@@ -1255,8 +1279,22 @@ export default function DailyChallengeScreen() {
               <View style={styles.card}>
                 <Text style={[styles.missionsTitle, isRTL && styles.rtl]}>{t('dailyChallengeMissionsTitle')}</Text>
                 <Text style={[styles.hubIntro, isRTL && styles.rtl]}>{t('dailyChallengePickGames')}</Text>
-                {allDone ? (
+                {allDone && !playLocked ? (
                   <Text style={[styles.allDone, isRTL && styles.rtl]}>{t('dailyChallengeAllDone')}</Text>
+                ) : null}
+                {playLocked ? (
+                  <View style={styles.tawjihPlusUpsellCard}>
+                    <View style={[styles.tawjihPlusUpsellIcon, isRTL && styles.rowReverse]}>
+                      <FontAwesome name="lock" size={20} color={brand.primary} />
+                    </View>
+                    <Text style={[styles.tawjihPlusUpsellTitle, isRTL && styles.rtl]}>
+                      {t('dailyChallengeTawjihPlusTitle')}
+                    </Text>
+                    <Text style={[styles.tawjihPlusUpsellHint, isRTL && styles.rtl]}>
+                      {t('dailyChallengeTawjihPlusHint')}
+                    </Text>
+                    <TawjihPlusUpgradeCta onPress={openTawjihPlus} style={styles.tawjihPlusUpsellCta} />
+                  </View>
                 ) : null}
                 {!user ? (
                   <Text style={[styles.hint, isRTL && styles.rtl]}>{t('dailyChallengeLoginHint')}</Text>
@@ -1301,7 +1339,7 @@ export default function DailyChallengeScreen() {
                             <Text style={styles.btnSecTxt}>{t('dailyChallengeSeeScore')}</Text>
                           </Pressable>
                         ) : null}
-                        {g.type === 'zip' && user && !g.played && canPlayGame(g) ? (
+                        {g.type === 'zip' && user && !g.played && canPlayGame(g) && !playLocked ? (
                           <View style={styles.missionPlayWrap}>
                             <AnimatedPlayButton
                               label={t('dailyChallengePlayThis')}
@@ -1309,6 +1347,18 @@ export default function DailyChallengeScreen() {
                               isRTL={isRTL}
                             />
                           </View>
+                        ) : null}
+                        {user && !g.played && canPlayGame(g) && playLocked ? (
+                          <Pressable
+                            style={styles.missionPlayLocked}
+                            onPress={openTawjihPlus}
+                            accessibilityRole="button"
+                            accessibilityLabel={t('inscTawjihPlusUpgradeCta')}>
+                            <FontAwesome name="lock" size={12} color={brand.primary} />
+                            <Text style={[styles.missionPlayLockedTxt, isRTL && styles.rtl]}>
+                              {t('inscTawjihPlusUpgradeCta')}
+                            </Text>
+                          </Pressable>
                         ) : null}
                       </View>
                     </View>
@@ -1964,7 +2014,10 @@ export default function DailyChallengeScreen() {
             </View>
           ) : null}
         </ScrollView>
-        {step === 'hub' && today?.available && user && (firstPlayableGame != null || showHubLeaderboardCta) ? (
+        {step === 'hub' &&
+        today?.available &&
+        user &&
+        (firstPlayableGame != null || showHubLeaderboardCta || playLocked) ? (
           <View
             style={[
               styles.hubFooterFixed,
@@ -1985,12 +2038,20 @@ export default function DailyChallengeScreen() {
                 >
                   <Text style={styles.hubFooterBtnPrimaryTxt}>{t('dailyChallengePlayThis')}</Text>
                 </Pressable>
+              ) : playLocked ? (
+                <TawjihPlusUpgradeCta
+                  onPress={openTawjihPlus}
+                  style={[
+                    showHubLeaderboardCta ? styles.hubFooterBtnHalf : styles.hubFooterBtnFull,
+                    styles.hubFooterUpsellCta,
+                  ]}
+                />
               ) : null}
               {showHubLeaderboardCta ? (
                 <Pressable
                   style={[
                     styles.hubFooterBtnSecondary,
-                    firstPlayableGame != null ? styles.hubFooterBtnHalf : styles.hubFooterBtnFull,
+                    firstPlayableGame != null || playLocked ? styles.hubFooterBtnHalf : styles.hubFooterBtnFull,
                   ]}
                   onPress={() => void openLeaderboard(primaryLeaderboardGameId)}
                 >
@@ -2198,6 +2259,59 @@ const styles = StyleSheet.create({
   body: { fontSize: fontSize.md, color: brand.textMuted, marginBottom: spacing.md },
   hubIntro: { fontSize: fontSize.sm, color: brand.textMuted, marginBottom: spacing.md, lineHeight: 20 },
   allDone: { fontSize: fontSize.md, fontWeight: '700', color: brand.primary, marginBottom: spacing.md },
+  tawjihPlusUpsellCard: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#F8FAFC',
+    gap: spacing.sm,
+    alignItems: 'center',
+  },
+  tawjihPlusUpsellIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tawjihPlusUpsellTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    color: brand.text,
+    textAlign: 'center',
+  },
+  tawjihPlusUpsellHint: {
+    fontSize: fontSize.sm,
+    color: brand.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  tawjihPlusUpsellCta: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  missionPlayLocked: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#CBD5E1',
+    backgroundColor: '#F1F5F9',
+  },
+  missionPlayLockedTxt: {
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    color: '#64748B',
+  },
   card: {
     backgroundColor: brand.white,
     borderRadius: radius.lg,
@@ -2580,6 +2694,10 @@ const styles = StyleSheet.create({
     backgroundColor: brand.white,
   },
   hubFooterBtnSecondaryTxt: { color: brand.primary, fontWeight: '800', fontSize: fontSize.md },
+  hubFooterUpsellCta: {
+    flexGrow: 1,
+    minWidth: 0,
+  },
   missionsTitle: { fontSize: fontSize.lg, fontWeight: '800', color: brand.primary, marginBottom: spacing.xs },
   missionCard: {
     marginTop: spacing.md,

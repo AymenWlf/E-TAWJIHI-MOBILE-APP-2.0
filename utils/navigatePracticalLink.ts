@@ -1,4 +1,4 @@
-import { resolveUserDiagnosticPublicCode } from '@/utils/resolveSchoolDiagnosticNavigation';
+import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
 import type { PlanParcoursNavigationAuth } from '@/utils/planParcoursNavigation';
 import {
   guardTawjihPlusPracticalLink,
@@ -18,7 +18,7 @@ export function navigatePracticalLink(
   tawjihPlusGate?: TawjihPlusParcoursGate,
 ): void {
   guardTawjihPlusPracticalLink(id, tawjihPlusGate, () => {
-    navigatePracticalLinkUnlocked(push, id, auth);
+    navigatePracticalLinkUnlocked(push, id, auth, tawjihPlusGate);
   });
 }
 
@@ -26,6 +26,7 @@ function navigatePracticalLinkUnlocked(
   push: PushHref,
   id: string,
   auth?: PlanParcoursNavigationAuth,
+  tawjihPlusGate?: TawjihPlusParcoursGate,
 ): void {
   switch (id) {
     case 'ecoles':
@@ -47,26 +48,9 @@ function navigatePracticalLinkUnlocked(
       push('/evenements');
       return;
     case 'diagnostic-ecoles':
-      push('/diagnostic-ecoles');
-      return;
     case 'diagnostic-rapport':
     case 'diagnostic-recommandations':
-      if (!auth?.getValidAccessToken) {
-        push('/diagnostic-ecoles');
-        return;
-      }
-      void (async () => {
-        const code = await resolveUserDiagnosticPublicCode(
-          auth.getValidAccessToken,
-          auth.userId ?? null,
-          { uiLocale: auth.uiLocale },
-        );
-        if (code) {
-          push(`/diagnostic-ecoles/resultats?c=${encodeURIComponent(code)}`);
-        } else {
-          push('/diagnostic-ecoles');
-        }
-      })();
+      void navigateToSchoolDiagnosticEntry(auth, push, tawjihPlusGate);
       return;
     default:
       return;

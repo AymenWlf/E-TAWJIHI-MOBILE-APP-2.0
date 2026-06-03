@@ -1,15 +1,23 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useRouter } from 'expo-router';
 import { Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlusPaywall';
 import { HomeFeedHorizontalScroll } from '@/components/home/HomeFeedHorizontalScroll';
 import { HomeFeedSection, homeFeedCardShadow } from '@/components/home/HomeFeedSection';
+import {
+  EstablishmentTypeBadge,
+  establishmentTypeDisplayLabel,
+} from '@/components/ui/EstablishmentTypeBadge';
 import { SkeletonBlock, useSkeletonPulse } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import {
   fallbackEstablishmentAvatarName,
   getEstablishmentLogoUrl,
 } from '@/constants/establishmentMedia';
+import { FREE_ESTABLISHMENT_PREVIEW_COUNT, TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
 import type { MostVisitedEstablishment } from '@/services/establishments';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -24,7 +32,7 @@ type Props = {
   width: number;
   items: MostVisitedEstablishment[];
   loading?: boolean;
-  onPressSchool: (item: MostVisitedEstablishment) => void;
+  onPressSchool: (item: MostVisitedEstablishment, index: number) => void;
   onSeeMore: () => void;
 };
 
@@ -32,13 +40,17 @@ function MostVisitedSchoolCard({
   item,
   isRTL,
   locale,
+  compactLocked,
   onPress,
 }: {
   item: MostVisitedEstablishment;
   isRTL: boolean;
   locale: string;
+  /** Même carte ; nom / ville masqués, zones désactivées. */
+  compactLocked: boolean;
   onPress: () => void;
 }) {
+  const { t } = useLocale();
   const label = pickEstablishmentName(item, locale);
   const logoUri =
     getEstablishmentLogoUrl(item.logo) ?? fallbackEstablishmentAvatarName(item.nom, item.sigle);
@@ -47,60 +59,122 @@ function MostVisitedSchoolCard({
     (Array.isArray(item.villes) && item.villes[0] ? String(item.villes[0]) : '');
   const sigle = (item.sigle ?? '').trim();
   const showSigle = Boolean(sigle) && sigle.toLowerCase() !== label.trim().toLowerCase();
+  const typeA11y = establishmentTypeDisplayLabel(item.type, t);
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.card, homeFeedCardShadow, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.card,
+        homeFeedCardShadow,
+        compactLocked && styles.cardLocked,
+        pressed && styles.cardPressed,
+      ]}
       accessibilityRole="button"
-      accessibilityLabel={label}>
+      accessibilityLabel={compactLocked ? typeA11y : label}>
       <View style={[styles.accentBar, isRTL && styles.accentBarRtl]} />
-      <View style={[styles.cardBody, isRTL && styles.cardBodyRtl]}>
-        <View style={styles.logoWrap}>
-          <Image
-            source={{ uri: logoUri }}
-            style={styles.logo}
-            resizeMode="cover"
-            accessibilityIgnoresInvertColors
-          />
+      <View style={[styles.cardBody, isRTL && styles.cardBodyRtl, compactLocked && styles.cardBodyLocked]}>
+        <View style={[styles.logoWrap, compactLocked && styles.logoWrapLocked]}>
+          {compactLocked ? (
+            <View style={styles.logoPlaceholder}>
+              <FontAwesome name="university" size={16} color="#CBD5E1" />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: logoUri }}
+              style={styles.logo}
+              resizeMode="cover"
+              accessibilityIgnoresInvertColors
+            />
+          )}
         </View>
 
         <View style={[styles.textCol, isRTL && styles.textColRtl]}>
-          {showSigle ? (
-            <Text
-              style={[styles.sigle, isRTL && styles.sigleRtl, !isRTL && styles.sigleUpper]}
-              numberOfLines={1}
-              ellipsizeMode="tail">
-              {sigle}
-            </Text>
-          ) : null}
-          <View style={styles.nameWrap}>
-            <Text
-              style={[styles.name, isRTL && styles.nameRtl]}
-              numberOfLines={2}
-              ellipsizeMode="tail">
-              {label}
-            </Text>
-          </View>
-          {city ? (
-            <View style={[styles.cityRow, isRTL && styles.cityRowRtl]}>
-              <FontAwesome name="map-marker" size={10} color={brand.textMuted} />
-              <Text style={[styles.city, isRTL && styles.cityRtl]} numberOfLines={1} ellipsizeMode="tail">
-                {city}
-              </Text>
-            </View>
-          ) : null}
+          {compactLocked ? (
+            <>
+              <HiddenBar width="70%" height={8} isRTL={isRTL} />
+              <HiddenBar width="90%" height={10} style={{ marginTop: 4 }} isRTL={isRTL} />
+              <View style={[styles.cityRow, isRTL && styles.cityRowRtl, styles.cityRowLocked]}>
+                <FontAwesome name="map-marker" size={10} color="#CBD5E1" />
+                <HiddenBar flex={1} height={8} isRTL={isRTL} />
+              </View>
+              {(item.type ?? '').trim() ? (
+                <View style={[styles.typeRow, isRTL && styles.typeRowRtl]}>
+                  <EstablishmentTypeBadge type={item.type} size="xs" />
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {showSigle ? (
+                <Text
+                  style={[styles.sigle, isRTL && styles.sigleRtl, !isRTL && styles.sigleUpper]}
+                  numberOfLines={1}
+                  ellipsizeMode="tail">
+                  {sigle}
+                </Text>
+              ) : null}
+              <View style={styles.nameWrap}>
+                <Text
+                  style={[styles.name, isRTL && styles.nameRtl]}
+                  numberOfLines={2}
+                  ellipsizeMode="tail">
+                  {label}
+                </Text>
+              </View>
+              {city ? (
+                <View style={[styles.cityRow, isRTL && styles.cityRowRtl]}>
+                  <FontAwesome name="map-marker" size={10} color={brand.textMuted} />
+                  <Text style={[styles.city, isRTL && styles.cityRtl]} numberOfLines={1} ellipsizeMode="tail">
+                    {city}
+                  </Text>
+                </View>
+              ) : null}
+              {(item.type ?? '').trim() ? (
+                <View style={[styles.typeRow, isRTL && styles.typeRowRtl]}>
+                  <EstablishmentTypeBadge type={item.type} size="xs" />
+                </View>
+              ) : null}
+            </>
+          )}
         </View>
 
         <View style={styles.chevronWrap}>
           <FontAwesome
-            name={isRTL ? 'chevron-left' : 'chevron-right'}
+            name={compactLocked ? 'lock' : isRTL ? 'chevron-left' : 'chevron-right'}
             size={12}
-            color="rgba(51, 62, 143, 0.35)"
+            color={compactLocked ? brand.primary : 'rgba(51, 62, 143, 0.35)'}
           />
         </View>
       </View>
+      {compactLocked ? <PaywallCardReservedOverlay isRTL={isRTL} compact /> : null}
     </Pressable>
+  );
+}
+
+function HiddenBar({
+  width,
+  height = 8,
+  flex,
+  style,
+  isRTL,
+}: {
+  width?: number | `${number}%`;
+  height?: number;
+  flex?: number;
+  style?: object;
+  isRTL?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.hiddenBar,
+        flex != null ? { flex } : { width: width ?? '100%' },
+        { height },
+        isRTL && styles.hiddenBarRtl,
+        style,
+      ]}
+    />
   );
 }
 
@@ -129,6 +203,9 @@ export function HomeMostVisitedSchoolsSection({
   onSeeMore,
 }: Props) {
   const { t, isRTL, locale } = useLocale();
+  const router = useRouter();
+  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading } = useTawjihPlusAccess();
+  const schoolsCatalogLocked = !tawjihPlusLoading && !hasTawjihPlusAccess;
   const preview = items.slice(0, PREVIEW_LIMIT);
 
   return (
@@ -148,16 +225,27 @@ export function HomeMostVisitedSchoolsSection({
         </HomeFeedHorizontalScroll>
       ) : preview.length === 0 ? null : (
         <HomeFeedHorizontalScroll isRTL={isRTL}>
-          {preview.map((item) => (
+          {preview.map((item, index) => {
+            const compactLocked =
+              schoolsCatalogLocked && index >= FREE_ESTABLISHMENT_PREVIEW_COUNT;
+            return (
             <View key={item.id} style={styles.cardSlot}>
               <MostVisitedSchoolCard
                 item={item}
                 isRTL={isRTL}
                 locale={locale}
-                onPress={() => onPressSchool(item)}
+                compactLocked={compactLocked}
+                onPress={() => {
+                  if (compactLocked) {
+                    router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
+                    return;
+                  }
+                  onPressSchool(item, index);
+                }}
               />
             </View>
-          ))}
+            );
+          })}
         </HomeFeedHorizontalScroll>
       )}
     </HomeFeedSection>
@@ -180,6 +268,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(15, 23, 42, 0.08)',
     overflow: 'hidden',
+    position: 'relative',
   },
   cardSkeleton: {
     backgroundColor: brand.white,
@@ -187,6 +276,42 @@ const styles = StyleSheet.create({
   cardPressed: {
     opacity: 0.92,
     transform: [{ scale: 0.98 }],
+  },
+  cardLocked: {
+    backgroundColor: '#FAFBFC',
+  },
+  cardBodyLocked: {
+    opacity: 0.85,
+  },
+  logoWrapLocked: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
+  logoPlaceholder: {
+    width: LOGO,
+    height: LOGO,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hiddenBar: {
+    borderRadius: 3,
+    backgroundColor: '#E2E8F0',
+    maxWidth: '100%',
+  },
+  hiddenBarRtl: {
+    alignSelf: 'flex-end',
+  },
+  cityRowLocked: {
+    marginTop: 4,
+  },
+  typeRow: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  typeRowRtl: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'flex-end',
   },
   accentBar: {
     position: 'absolute',

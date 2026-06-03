@@ -19,3 +19,8 @@ export const ETAWJIHI_LOGO_TRANSPARENT: ImageSourcePropType = require('../assets
 
 /** Logo couleur (vert + blanc) — fiche détail service sur fond bleu. */
 export const ETAWJIHI_LOGO_COLOR: ImageSourcePropType = require('../assets/images/E-Tawjihi logo.png');
+
+/** Logo carré (icône app / favicon) — bandeau fiche service (évite le format rectangle 1000×500). */
+export const ETAWJIHI_LOGO_SQUARE: ImageSourcePropType = require('../assets/images/logo-carre-coul-new.png');
+
+export const ETAWJIHI_LOGO_SQUARE_URL = 'https://cdn.e-tawjihi.ma/logo-carre.jpg';

@@ -24,6 +24,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { AuthRememberMeRow } from '@/components/auth/AuthRememberMeRow';
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -49,6 +50,7 @@ export default function RegisterScreen() {
   const [confirm, setConfirm] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
+  const [rememberMe, setRememberMe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
   const [serverError, setServerError] = useState('');
   const [touched, setTouched] = useState({ phone: false, password: false, confirm: false });
@@ -147,7 +149,7 @@ export default function RegisterScreen() {
     setSubmitting(true);
     try {
       // Navigation handled by useSetupRedirectGate in _layout.tsx
-      await register(phone.trim(), password);
+      await register(phone.trim(), password, null, rememberMe);
     } catch (e: unknown) {
       setServerError(errorMessage(e, t, 'auth'));
     } finally {
@@ -345,6 +347,12 @@ export default function RegisterScreen() {
             {!!v.confirmError && <Text style={[styles.fieldHint, rtl && styles.rtl]}>{v.confirmError}</Text>}
             {!!v.matchError && <Text style={[styles.fieldHint, rtl && styles.rtl]}>{v.matchError}</Text>}
           </View>
+
+          <AuthRememberMeRow
+            checked={rememberMe}
+            onToggle={setRememberMe}
+            disabled={submitting}
+          />
 
           <Pressable
             accessibilityRole="button"

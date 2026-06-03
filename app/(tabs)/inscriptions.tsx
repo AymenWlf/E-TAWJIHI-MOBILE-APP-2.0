@@ -23,6 +23,7 @@ import { LoadErrorState, loadErrorRetryLabel } from '@/components/ui/LoadErrorSt
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
+import { resolveAnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 import { FollowedSchoolCard } from '@/components/inscriptions/FollowedSchoolCard';
 import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
 import { TawjihPlusLockBanner } from '@/components/inscriptions/TawjihPlusPaywall';
@@ -130,6 +131,13 @@ function InscriptionsTabScreenInner() {
       { text: t('inscTawjihPlusUpgradeCta'), onPress: openTawjihPlusProduct },
     ]);
   }, [openTawjihPlusProduct, t]);
+
+  const showCandidaciesTabUpgradeAlert = useCallback(() => {
+    Alert.alert(t('inscTawjihPlusLockTitle'), t('inscCandidaciesTabLockedHint'), [
+      { text: t('accountLogoutCancel'), style: 'cancel' },
+      { text: t('inscTawjihPlusUpgradeCta'), onPress: openTawjihPlusProduct },
+    ]);
+  }, [openTawjihPlusProduct, t]);
   const { tab: tabParam, clearFilters: clearFiltersParam } = useLocalSearchParams<{
     tab?: string | string[];
     clearFilters?: string | string[];
@@ -168,9 +176,17 @@ function InscriptionsTabScreenInner() {
   }, [clearFiltersParam]);
 
   useEffect(() => {
-    if (tabFromUrl === 'candidacies') setTab('candidacies');
-    else if (tabFromUrl === 'announcements') setTab('announcements');
-  }, [tabFromUrl]);
+    if (tabFromUrl === 'candidacies') {
+      if (!showInscriptionsPaywall) setTab('candidacies');
+      else setTab('announcements');
+    } else if (tabFromUrl === 'announcements') setTab('announcements');
+  }, [tabFromUrl, showInscriptionsPaywall]);
+
+  useEffect(() => {
+    if (showInscriptionsPaywall && tab === 'candidacies') {
+      setTab('announcements');
+    }
+  }, [showInscriptionsPaywall, tab]);
 
   /**
    * Suivi école : porte le statut de candidature de l'utilisateur sur
@@ -1044,6 +1060,57 @@ function InscriptionsTabScreenInner() {
    * Suivre une annonce ⇒ on suit l'école.
    * Le backend résout l'école côté serveur via `contestAnnouncementId`.
    */
+  /** Retire un suivi école (corbeille candidatures, cœur annonces, sheet statut). */
+  const confirmUnfollowEstablishment = useCallback(
+    (
+      establishmentId: number,
+      opts?: { followId?: number; busyAnnouncementId?: number; onDone?: () => void },
+    ) => {
+      Alert.alert(
+        t('followSchoolUnfollowConfirmTitle'),
+        t('followSchoolUnfollowConfirmMsg'),
+        [
+          { text: t('inscCancel'), style: 'cancel' },
+          {
+            text: t('inscDelete'),
+            style: 'destructive',
+            onPress: async () => {
+              if (opts?.busyAnnouncementId != null) {
+                setFollowBusyId(opts.busyAnnouncementId);
+              }
+              try {
+                const token = await getValidAccessToken();
+                if (!token) return;
+                const ok =
+                  opts?.followId != null
+                    ? await deleteEstablishmentFollow(token, opts.followId)
+                    : await deleteEstablishmentFollowByEstablishment(token, establishmentId);
+                if (ok) {
+                  setFollows((prev) =>
+                    prev.filter((f) =>
+                      opts?.followId != null
+                        ? f.id !== opts.followId
+                        : f.establishment?.id !== establishmentId,
+                    ),
+                  );
+                  await reloadFollows({ silent: true });
+                  opts?.onDone?.();
+                } else {
+                  Alert.alert('', t('inscErrorLoad'));
+                }
+              } finally {
+                if (opts?.busyAnnouncementId != null) {
+                  setFollowBusyId(null);
+                }
+              }
+            },
+          },
+        ],
+      );
+    },
+    [getValidAccessToken, reloadFollows, t],
+  );
+
   const handleFollow = useCallback(
     async (announcement: ContestAnnouncementCard) => {
       if (!isLoggedIn) {
@@ -1067,32 +1134,25 @@ function InscriptionsTabScreenInner() {
             }
             return [follow, ...prev];
           });
+          await reloadFollows({ silent: true });
+        } else {
+          Alert.alert('', t('inscErrorLoad'));
         }
       } finally {
         setFollowBusyId(null);
       }
     },
-    [getValidAccessToken, isLoggedIn, t],
+    [getValidAccessToken, isLoggedIn, reloadFollows, t],
   );
 
-  /** Ne plus suivre l'école associée à l'annonce. */
+  /** Ne plus suivre l'école associée à l'annonce (bouton cœur). */
   const handleUnfollow = useCallback(
-    async (announcement: ContestAnnouncementCard) => {
+    (announcement: ContestAnnouncementCard) => {
       const eid = announcement.establishment?.id;
       if (!eid) return;
-      setFollowBusyId(announcement.id);
-      try {
-        const token = await getValidAccessToken();
-        if (!token) return;
-        const ok = await deleteEstablishmentFollowByEstablishment(token, eid);
-        if (ok) {
-          setFollows((prev) => prev.filter((f) => f.establishment?.id !== eid));
-        }
-      } finally {
-        setFollowBusyId(null);
-      }
+      confirmUnfollowEstablishment(eid, { busyAnnouncementId: announcement.id });
     },
-    [getValidAccessToken],
+    [confirmUnfollowEstablishment],
   );
 
   const handleOpenFollowStatusSheet = useCallback(
@@ -1256,20 +1316,32 @@ function InscriptionsTabScreenInner() {
             isLoggedIn &&
             (activeCandidaciesCount > 0 || candidaciesAttentionTotalCount > 0);
           const isCandidacies = id === 'candidacies';
+          const tabLocked = isCandidacies && showInscriptionsPaywall;
           return (
             <Pressable
               key={id}
-              onPress={() => setTab(id)}
+              onPress={() => {
+                if (tabLocked) {
+                  showCandidaciesTabUpgradeAlert();
+                  return;
+                }
+                setTab(id);
+              }}
               style={({ pressed }) => [
                 styles.tab,
                 active && styles.tabActive,
+                tabLocked && !active && styles.tabLocked,
                 pressed && !active && { opacity: 0.85 },
               ]}
             >
               {isCandidacies ? (
                 <View style={styles.tabCandidaciesInline}>
                   <View style={[styles.tabCandidaciesIconText, isRTL && styles.rowRtl]}>
-                    <FontAwesome name={icon} size={13} color={active ? brand.primary : brand.white} />
+                    <FontAwesome
+                      name={tabLocked && !active ? 'lock' : icon}
+                      size={13}
+                      color={active ? brand.primary : tabLocked && !active ? '#94A3B8' : brand.white}
+                    />
                     <Text
                       style={[styles.tabTxt, active && styles.tabTxtActive, styles.tabCandidaciesLabel]}
                       numberOfLines={1}>
@@ -1495,26 +1567,9 @@ function InscriptionsTabScreenInner() {
             onUpdateStatus={() => handleOpenFollowStatusSheet(item)}
             statusUpdateLocked={showInscriptionsPaywall}
             onUnfollow={() => {
-              Alert.alert(
-                t('followSchoolUnfollowConfirmTitle'),
-                t('followSchoolUnfollowConfirmMsg'),
-                [
-                  { text: t('inscCancel'), style: 'cancel' },
-                  {
-                    text: t('inscDelete'),
-                    style: 'destructive',
-                    onPress: async () => {
-                      const token = await getValidAccessToken();
-                      if (!token) return;
-                      const ok = await deleteEstablishmentFollow(token, item.id);
-                      if (ok) {
-                        setFollows((prev) => prev.filter((x) => x.id !== item.id));
-                        await reloadFollows();
-                      }
-                    },
-                  },
-                ],
-              );
+              const eid = item.establishment?.id;
+              if (!eid) return;
+              confirmUnfollowEstablishment(eid, { followId: item.id });
             }}
             onOpenLatest={() => {
               if (item.latestAnnouncement?.id) {
@@ -1806,6 +1861,11 @@ function InscriptionsTabScreenInner() {
         if (!item) return null;
         const eid = item.establishment?.id ?? 0;
         const isFollowed = eid > 0 && followedEstablishmentSet.has(eid);
+        const lockedVariant = resolveAnnouncementLockedVariant(
+          item.previewOnly ?? showInscriptionsPaywall,
+          index,
+        );
+        const cardLocked = lockedVariant !== 'none';
         return (
         <View>
           {index === MID_BANNER_AFTER_CARD_INDEX ? (
@@ -1819,18 +1879,26 @@ function InscriptionsTabScreenInner() {
             followStateLoading={isLoggedIn && !followsReady}
             eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
             busy={followBusyId === item.id}
+            lockedVariant={lockedVariant}
             onPress={() => {
+              if (cardLocked) {
+                openTawjihPlusProduct();
+                return;
+              }
               void markAnnouncementSeen(item.id);
               router.push(`/inscriptions/${item.id}` as never);
             }}
             onToggleFollow={() => {
+              if (cardLocked) {
+                openTawjihPlusProduct();
+                return;
+              }
               if (isFollowed) void handleUnfollow(item);
               else void handleFollow(item);
             }}
             onOpenLink={() => handleOpenLink(null, item.registrationUrl, item.id)}
             currentStatus={eid > 0 ? followsByEstId.get(eid)?.status ?? null : null}
             onUpdateStatus={() => handleOpenAnnouncementStatusSheet(item)}
-            previewOnly={item.previewOnly ?? showInscriptionsPaywall}
           />
         </View>
         );
@@ -1901,6 +1969,18 @@ function InscriptionsTabScreenInner() {
           setActiveFollow(null);
         }}
         onConfirm={handleConfirmFollowStatus}
+        onRequestDelete={
+          activeFollow?.establishment?.id
+            ? () =>
+                confirmUnfollowEstablishment(activeFollow.establishment!.id, {
+                  followId: activeFollow.id,
+                  onDone: () => {
+                    setStatusSheetOpen(false);
+                    setActiveFollow(null);
+                  },
+                })
+            : undefined
+        }
       />
 
       {/* Sheet de mise à jour du statut depuis une carte annonce.
@@ -2064,6 +2144,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   tabActive: { backgroundColor: brand.white },
+  tabLocked: { opacity: 0.72 },
   tabTxt: { color: brand.white, fontWeight: '700', fontSize: fontSize.xs },
   tabTxtActive: { color: brand.primary, fontWeight: '800' },
   tabBadge: {

@@ -57,6 +57,8 @@ export type HomeCopyKey =
   | 'dailyChallengeSeeScore'
   | 'dailyChallengeBackToGames'
   | 'dailyChallengeAllDone'
+  | 'dailyChallengeTawjihPlusTitle'
+  | 'dailyChallengeTawjihPlusHint'
   | 'dailyChallengeZipHint'
   | 'dailyChallengeZipValidate'
   | 'dailyChallengeZipOrder'
@@ -513,6 +515,7 @@ export type HomeCopyKey =
   | 'loginPasswordLabel'
   | 'loginPasswordPlaceholder'
   | 'loginForgotPassword'
+  | 'loginRememberMe'
   | 'loginCta'
   | 'loginBack'
   | 'loginInvalidPhone'
@@ -1182,6 +1185,8 @@ export type HomeCopyKey =
   | 'shopThankCashplusActivationHint'
   | 'shopThankCashplusDelayHint'
   | 'shopThankCashplusGotoAccountCta'
+  | 'shopThankCashplusUnavailableTitle'
+  | 'shopThankCashplusUnavailable'
   | 'shopThankWhatsappPrefillCashplus'
   | 'shopThankPaymentHelpWhatsappTitle'
   | 'shopThankWhatsappHintHelp'
@@ -1216,6 +1221,8 @@ export type HomeCopyKey =
   | 'tabCompte'
   | 'hubWhatsAppA11y'
   | 'hubWhatsAppPrefill'
+  | 'hubWhatsAppPrefillClient'
+  | 'hubWhatsAppContractUnknown'
   | 'hubGlobalWallUnreadBadgeA11y'
   | 'globalWallTitle'
   | 'globalWallIntro'
@@ -1435,6 +1442,7 @@ export type HomeCopyKey =
   | 'inscTassjilServiceIncluded'
   | 'inscTabNotifications'
   | 'inscTabCandidacies'
+  | 'inscCandidaciesTabLockedHint'
   | 'inscTabAnnouncements'
   | 'inscCandidaciesActiveShort'
   | 'inscCandidaciesActiveBadgeA11y'
@@ -1468,6 +1476,7 @@ export type HomeCopyKey =
   | 'inscRequireLogin'
   | 'inscRequireLoginCta'
   | 'inscTawjihPlusUpgradeCta'
+  | 'paywallCardReservedLabel'
   | 'inscTawjihPlusLockTitle'
   | 'inscTawjihPlusLockHint'
   | 'diagnosticAnswersSavedHint'
@@ -1486,6 +1495,7 @@ export type HomeCopyKey =
   | 'inscNotifMarkAllRead'
   | 'inscNotifFilterAll'
   | 'inscNotifFilterUnread'
+  | 'inscNotifFollowedSchoolBadge'
   | 'inscCandidaciesEmptyTitle'
   | 'inscCandidaciesEmptyDesc'
   | 'inscCandidaciesEmptyCta'
@@ -1723,6 +1733,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     dailyChallengeSeeScore: 'Classement (ce jeu)',
     dailyChallengeBackToGames: 'Retour aux jeux',
     dailyChallengeAllDone: 'Bravo, tu as fini tous les jeux du jour !',
+    dailyChallengeTawjihPlusTitle: 'Partie gratuite utilisée',
+    dailyChallengeTawjihPlusHint:
+      'En tant qu’invité, vous pouvez jouer une fois par jour. Passez à TAWJIH PLUS pour jouer chaque jour sans limite et débloquer tout le contenu.',
     dailyChallengeZipHint:
       'Glisser pour tracer ; touche une case déjà sur le tracé pour raccourcir (pas en plein glissé).',
     dailyChallengeZipValidate: 'Valider l’ordre',
@@ -2230,6 +2243,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     loginPasswordLabel: 'Mot de passe',
     loginPasswordPlaceholder: 'Mot de passe',
     loginForgotPassword: 'Mot de passe oublié ?',
+    loginRememberMe: 'Se souvenir de moi',
     loginCta: 'Se connecter',
     loginBack: 'Retour',
     loginInvalidPhone: 'Numéro invalide',
@@ -2959,6 +2973,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopThankCashplusDelayHint:
       'Si l’activation tarde : ouvrez Mon compte → Mes commandes, puis téléversez le reçu Cashplus. Vous pouvez aussi nous écrire sur WhatsApp ci-dessous en indiquant votre n° de commande.',
     shopThankCashplusGotoAccountCta: 'Ouvrir Mon compte — Mes commandes',
+    shopThankCashplusUnavailableTitle: 'Code Cashplus — contactez l’équipe E-Tawjihi',
+    shopThankCashplusUnavailable:
+      'Connexion à Cashplus indisponible pour le moment. Veuillez contacter l’équipe E-Tawjihi (WhatsApp 06 55 69 06 32) afin de recevoir votre code Cashplus pour la commande {orderNumber}.',
     shopThankWhatsappPrefillCashplus:
       'Bonjour, paiement Cashplus effectué pour la commande {orderNumber}. Merci de confirmer la réception ou d’indiquer la suite. Cordialement.',
     shopThankPaymentHelpWhatsappTitle: 'Besoin d’aide ?',
@@ -2997,6 +3014,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     tabCompte: 'Compte',
     hubWhatsAppA11y: 'Nous contacter sur WhatsApp pour des informations',
     hubWhatsAppPrefill: 'Salam, j’aurais besoin d’informations sur E-TAWJIHI.',
+    hubWhatsAppPrefillClient:
+      'Salam, je suis {fullName}, dont le numéro de contrat est {contractNumber} et j’ai besoin d’informations.',
+    hubWhatsAppContractUnknown: 'non renseigné',
     hubGlobalWallUnreadBadgeA11y: '{{count}} nouveau(x) message(s) sur le groupe BAC 2026',
     globalWallTitle: 'Groupe BAC 2026',
     globalWallIntro:
@@ -3234,6 +3254,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       "Inclus dans le service d'inscription (Voir avec votre chargée d'inscription)",
     inscTabNotifications: 'Notifications',
     inscTabCandidacies: 'Candidatures',
+    inscCandidaciesTabLockedHint:
+      'Le suivi de vos candidatures est réservé aux clients TAWJIH PLUS. Passez à TAWJIH PLUS pour gérer vos écoles suivies et vos statuts.',
     inscTabAnnouncements: 'Annonces',
     inscCandidaciesActiveShort: 'actives',
     inscCandidaciesActiveBadgeA11y: '{{count}} candidatures actives',
@@ -3268,6 +3290,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscRequireLogin: 'Connectez-vous pour suivre vos candidatures.',
     inscRequireLoginCta: 'Se connecter',
     inscTawjihPlusUpgradeCta: 'Passer à TAWJIH PLUS',
+    paywallCardReservedLabel: 'Contenu réservé',
     inscTawjihPlusLockTitle: 'Contenu réservé aux clients TAWJIH PLUS',
     inscTawjihPlusLockHint:
       'Annonces détaillées, liens d’inscription, filtres avancés et suivi complet de statut.',
@@ -3291,6 +3314,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscNotifMarkAllRead: 'Tout marquer lu',
     inscNotifFilterAll: 'Toutes',
     inscNotifFilterUnread: 'Non lues',
+    inscNotifFollowedSchoolBadge: 'École suivie',
     inscCandidaciesEmptyTitle: 'Aucune candidature suivie',
     inscCandidaciesEmptyDesc: 'Suivez une annonce ci-contre pour démarrer le suivi.',
     inscCandidaciesEmptyCta: 'Voir les annonces',
@@ -3533,6 +3557,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     dailyChallengeSeeScore: 'التصنيف (هذه اللعبة)',
     dailyChallengeBackToGames: 'العودة إلى الألعاب',
     dailyChallengeAllDone: 'أحسنت، أنهيت كل ألعاب اليوم!',
+    dailyChallengeTawjihPlusTitle: 'تم استخدام المحاولة المجانية',
+    dailyChallengeTawjihPlusHint:
+      'كضيف يمكنك اللعب مرة واحدة في اليوم. انتقل إلى TAWJIH PLUS للعب كل يوم دون حدود وفتح كل المحتوى.',
     dailyChallengeZipHint:
       'اسحب لرسم المسار؛ المس خلية على المسار لتقصيره (ليس أثناء السحب).',
     dailyChallengeZipValidate: 'تأكيد الترتيب',
@@ -4031,6 +4058,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     loginPasswordLabel: 'كلمة المرور',
     loginPasswordPlaceholder: 'كلمة المرور',
     loginForgotPassword: 'نسيت كلمة المرور؟',
+    loginRememberMe: 'تذكرني',
     loginCta: 'تسجيل الدخول',
     loginBack: 'رجوع',
     loginInvalidPhone: '10 أرقام تبدأ بـ 06 أو 07',
@@ -4739,6 +4767,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopThankCashplusDelayHint:
       'إذا تأخّر التفعيل: افتح حسابي ← طلباتي، ثم ارفع إيصال كاش بلاس. أو راسلنا على واتساب أدناه مع رقم طلبك.',
     shopThankCashplusGotoAccountCta: 'فتح حسابي — طلباتي',
+    shopThankCashplusUnavailableTitle: 'رمز كاش بلاس — تواصل مع فريق إي‑توجيهي',
+    shopThankCashplusUnavailable:
+      'الاتصال بكاش بلاس غير متاح حاليًا. يرجى التواصل مع فريق إي‑توجيهي (واتساب 06 55 69 06 32) للحصول على رمز كاش بلاس لطلبكم {orderNumber}.',
     shopThankWhatsappPrefillCashplus:
       'مرحبًا، تم الدفع عبر كاش بلاس للطلب رقم {orderNumber}. يرجى تأكيد الاستلام أو توضيح الخطوة التالية. شكرًا.',
     shopThankPaymentHelpWhatsappTitle: 'تحتاج مساعدة؟',
@@ -4776,6 +4807,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     tabCompte: 'حسابي',
     hubWhatsAppA11y: 'التواصل عبر واتساب للحصول على معلومات',
     hubWhatsAppPrefill: 'السلام، أحتاج معلومات حول إ-توجيهي.',
+    hubWhatsAppPrefillClient:
+      'السلام، أنا {fullName}، رقم عقدي هو {contractNumber} وأحتاج إلى معلومات.',
+    hubWhatsAppContractUnknown: 'غير متوفر',
     hubGlobalWallUnreadBadgeA11y: '{{count}} رسالة جديدة في مجموعة الباك',
     globalWallTitle: 'مجموعة باك 2026',
     globalWallIntro:
@@ -5008,6 +5042,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       'مشمول في خدمة التسجيل (راجع مسؤولة التسجيل لديك)',
     inscTabNotifications: 'الإشعارات',
     inscTabCandidacies: 'الترشيحات',
+    inscCandidaciesTabLockedHint:
+      'متابعة ترشيحاتك مخصّصة لعملاء TAWJIH PLUS. انتقل إلى TAWJIH PLUS لإدارة مدارسك المتابَعة وحالاتك.',
     inscTabAnnouncements: 'الإعلانات',
     inscCandidaciesActiveShort: 'نشطة',
     inscCandidaciesActiveBadgeA11y: '{{count}} ترشيحات نشطة',
@@ -5042,6 +5078,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscRequireLogin: 'سجّل الدخول لمتابعة ترشيحاتك.',
     inscRequireLoginCta: 'تسجيل الدخول',
     inscTawjihPlusUpgradeCta: 'الانتقال إلى TAWJIH PLUS',
+    paywallCardReservedLabel: 'محتوى محجوز',
     inscTawjihPlusLockTitle: 'محتوى مخصّص لعملاء TAWJIH PLUS',
     inscTawjihPlusLockHint:
       'إعلانات مفصّلة، روابط التسجيل، فلاتر متقدمة ومتابعة كاملة للحالة.',
@@ -5065,6 +5102,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscNotifMarkAllRead: 'وسم الكل كمقروء',
     inscNotifFilterAll: 'الكل',
     inscNotifFilterUnread: 'غير المقروءة',
+    inscNotifFollowedSchoolBadge: 'مدرسة متابَعة',
     inscCandidaciesEmptyTitle: 'لا توجد ترشيحات متابَعة',
     inscCandidaciesEmptyDesc: 'تابع إعلانًا بجانب لتبدأ تتبع ترشيحك.',
     inscCandidaciesEmptyCta: 'استكشاف الإعلانات',

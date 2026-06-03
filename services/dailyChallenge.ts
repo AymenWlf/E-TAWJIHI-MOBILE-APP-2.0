@@ -53,6 +53,10 @@ export type DailyChallengeTodayData = {
   microLearnHtml?: string;
   playedToday?: boolean;
   allGamesPlayed?: boolean;
+  /** Client TAWJIH PLUS / TASSJIL actif. */
+  tawjihPlusAccess?: boolean;
+  /** Non-client ayant déjà joué aujourd’hui : prochaine partie = paywall. */
+  requiresTawjihPlusForPlay?: boolean;
   games?: DailyChallengeGameEntry[];
   streak?: {
     current: number;

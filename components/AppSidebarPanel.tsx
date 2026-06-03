@@ -24,11 +24,15 @@ import {
   GLOBAL_WALL_MOBILE_ENABLED,
   ORIENTATION_1BAC_SIDEBAR_ENABLED,
 } from '@/constants/mobileFeatureFlags';
+import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
+import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
 import { hasLegacyTassjilAccess } from '@/utils/tassjilPracticalLinkLock';
+import type { TawjihPlusParcoursGate } from '@/utils/tawjihPlusParcoursGate';
 import { CAIRO } from '@/theme/arabicTypography';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -126,8 +130,9 @@ export function AppSidebarPanel() {
   const { visible: ctxVisible, close } = useAppSidebar();
   const router = useRouter();
   const { t, isRTL } = useLocale();
-  const { user } = useAuth();
+  const { user, getValidAccessToken } = useAuth();
   const { count: cartCount } = useShopCart();
+  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading } = useTawjihPlusAccess();
   const { width: windowWidth } = useWindowDimensions();
 
   const insets = useSafeAreaInsets();
@@ -185,7 +190,6 @@ export function AppSidebarPanel() {
     const tools: SidebarLink[] = [
       {
         id: 'diagnostic',
-        href: '/diagnostic-ecoles',
         icon: 'graduation-cap',
         iconKind: 'fa',
         labelKey: 'practical_diagnostic_ecoles',
@@ -301,10 +305,33 @@ export function AppSidebarPanel() {
     });
   }, [ctxVisible, sheetMounted, closedTranslate, slide, backdropOpacity]);
 
+  const tawjihPlusGate = useMemo<TawjihPlusParcoursGate>(
+    () => ({
+      hasAccess: hasTawjihPlusAccess,
+      loading: tawjihPlusLoading,
+      openProduct: () => router.push(TAWJIH_PLUS_PRODUCT_PATH as Href),
+      t,
+    }),
+    [hasTawjihPlusAccess, router, t, tawjihPlusLoading],
+  );
+
+  const diagnosticNavAuth = useMemo(
+    () => ({
+      getValidAccessToken,
+      userId: user?.id ?? null,
+      uiLocale: (isRTL ? 'ar' : 'fr') as 'fr' | 'ar',
+    }),
+    [getValidAccessToken, isRTL, user?.id],
+  );
+
   const onNavigate = (link: SidebarLink) => {
     close();
     if (link.onPress) {
       link.onPress();
+      return;
+    }
+    if (link.id === 'diagnostic') {
+      void navigateToSchoolDiagnosticEntry(diagnosticNavAuth, (href) => router.push(href as Href), tawjihPlusGate);
       return;
     }
     if (link.href) router.push(link.href as Href);

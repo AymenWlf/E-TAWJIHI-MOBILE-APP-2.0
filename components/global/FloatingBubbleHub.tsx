@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useSegments } from 'expo-router';
-import { useCallback, useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Linking, Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,7 +10,14 @@ import {
 } from '@/constants/etawjihiWhatsApp';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { fetchUserActiveServices } from '@/services/userActiveServices';
+import { getUserProfile } from '@/services/userProfile';
 import { brand, spacing } from '@/theme/tokens';
+import {
+  applyMessageTemplate,
+  formatUserFullName,
+  pickPrimaryContractNumber,
+} from '@/utils/buildHubWhatsAppPrefill';
 
 /** Hauteur approx barre d’onglets. */
 const TAB_BAR_EXTRA = 56;
@@ -34,9 +41,11 @@ const AUTH_ROUTE_PREFIXES = [
 export function FloatingBubbleHub() {
   const insets = useSafeAreaInsets();
   const { t, isRTL } = useLocale();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, getValidAccessToken } = useAuth();
   const segments = useSegments();
   const route = segments.join('/');
+  const [contractNumber, setContractNumber] = useState<string | null>(null);
+  const [profileFullName, setProfileFullName] = useState('');
 
   const hidden = useMemo(() => {
     if (isLoading || !user) return true;
@@ -45,8 +54,59 @@ export function FloatingBubbleHub() {
 
   const bottom = TAB_BAR_EXTRA + Math.max(insets.bottom, spacing.sm) + spacing.sm;
 
+  const authFullName = useMemo(
+    () => formatUserFullName(user?.firstName, user?.lastName),
+    [user?.firstName, user?.lastName],
+  );
+
+  const fullName = authFullName || profileFullName;
+
+  useEffect(() => {
+    if (!user) {
+      setContractNumber(null);
+      setProfileFullName('');
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const token = await getValidAccessToken();
+      if (!token || cancelled) return;
+      try {
+        const [services, profile] = await Promise.all([
+          fetchUserActiveServices(token),
+          authFullName ? Promise.resolve(null) : getUserProfile(token),
+        ]);
+        if (!cancelled) {
+          setContractNumber(pickPrimaryContractNumber(services));
+          if (!authFullName && profile) {
+            setProfileFullName(formatUserFullName(profile.prenom, profile.nom));
+          }
+        }
+      } catch {
+        if (!cancelled) {
+          setContractNumber(null);
+          if (!authFullName) setProfileFullName('');
+        }
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [user, getValidAccessToken, authFullName]);
+
+  const buildPrefillMessage = useCallback(() => {
+    if (!fullName) {
+      return t('hubWhatsAppPrefill');
+    }
+    const contract = (contractNumber ?? '').trim() || t('hubWhatsAppContractUnknown');
+    return applyMessageTemplate(t('hubWhatsAppPrefillClient'), {
+      fullName,
+      contractNumber: contract,
+    });
+  }, [contractNumber, fullName, t]);
+
   const openWhatsApp = useCallback(() => {
-    const message = t('hubWhatsAppPrefill');
+    const message = buildPrefillMessage();
     const nativeUrl = buildEtawjihiSupportWhatsAppNativeUrl(message);
     const webUrl = buildEtawjihiSupportWhatsAppUrl(message);
     void Linking.canOpenURL(nativeUrl)
@@ -54,7 +114,7 @@ export function FloatingBubbleHub() {
       .catch(() => {
         void Linking.openURL(webUrl);
       });
-  }, [t]);
+  }, [buildPrefillMessage]);
 
   if (hidden) {
     return null;

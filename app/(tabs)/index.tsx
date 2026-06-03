@@ -717,8 +717,11 @@ export default function IndexScreen() {
     }, [loadHomeFeedSections, loadBacResultsConfig]),
   );
 
-  const onPressMostVisitedSchool = useCallback((item: MostVisitedEstablishment) => {
-    router.push(`/etablissements/${item.id}/${item.slug ?? ''}` as never);
+  const onPressMostVisitedSchool = useCallback((item: MostVisitedEstablishment, index: number) => {
+    router.push({
+      pathname: `/etablissements/${item.id}/${item.slug ?? ''}`,
+      params: { listIdx: String(index) },
+    } as never);
   }, []);
 
   const refreshHome = useCallback(async () => {

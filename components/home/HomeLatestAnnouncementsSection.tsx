@@ -19,6 +19,10 @@ import {
   pickAnnouncementTitle,
   pickEstablishmentName,
 } from '@/utils/candidacyStatus';
+import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlusPaywall';
+import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
+import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
+import { getAnnouncementTypeStyle } from '@/utils/announcementTypeStyle';
 
 const CARD_W = 212;
 const CARD_H = 108;
@@ -42,6 +46,7 @@ function LatestAnnouncementCard({
   closedLabel,
   datesLockedLabel,
   datesLocked,
+  compactLocked,
   onPress,
 }: {
   item: ContestAnnouncementCard;
@@ -51,6 +56,8 @@ function LatestAnnouncementCard({
   closedLabel: string;
   datesLockedLabel: string;
   datesLocked: boolean;
+  /** Même carte ; école / titre masqués, zones désactivées. */
+  compactLocked: boolean;
   onPress: () => void;
 }) {
   const title = pickAnnouncementTitle(item, locale);
@@ -63,17 +70,33 @@ function LatestAnnouncementCard({
   const dateLabel = formatShortDate(item.dateStart, locale);
   const showDateLocked = datesLocked || Boolean(item.previewOnly);
   const statusLabel = item.isOpen ? openLabel : closedLabel;
+  const typeVisual = getAnnouncementTypeStyle(item.announcementType);
 
   return (
     <Pressable
       onPress={onPress}
-      style={({ pressed }) => [styles.card, homeFeedCardShadow, pressed && styles.cardPressed]}
+      style={({ pressed }) => [
+        styles.card,
+        homeFeedCardShadow,
+        compactLocked && { borderStartColor: typeVisual.border, borderStartWidth: 3 },
+        compactLocked && styles.cardLocked,
+        pressed && styles.cardPressed,
+      ]}
       accessibilityRole="button"
-      accessibilityLabel={title}>
+      accessibilityLabel={compactLocked ? item.announcementType : title}>
       <View style={[styles.accentBar, isRTL && styles.accentBarRtl]} />
-      <View style={styles.cardBody}>
-        <View style={styles.logoWrap}>
-          {logoUri ? (
+      <View style={[styles.cardBody, isRTL && styles.cardBodyRtl, compactLocked && styles.cardBodyLocked]}>
+        <View style={[styles.logoWrap, compactLocked && styles.logoWrapLocked]}>
+          {compactLocked ? (
+            <View
+              style={[
+                styles.logo,
+                styles.logoPlaceholderLocked,
+                { backgroundColor: typeVisual.bg, borderColor: typeVisual.border },
+              ]}>
+              <FontAwesome name={typeVisual.icon} size={18} color={typeVisual.fg} />
+            </View>
+          ) : logoUri ? (
             <Image
               source={{ uri: logoUri }}
               style={styles.logo}
@@ -89,23 +112,37 @@ function LatestAnnouncementCard({
 
         <View style={styles.textCol}>
           <View style={[styles.metaRow, isRTL && styles.metaRowRtl]}>
-            <View
-              style={[
-                styles.statusPill,
-                item.isOpen ? styles.statusOpen : styles.statusClosed,
-              ]}>
-              <View style={[styles.statusDot, item.isOpen ? styles.statusDotOpen : styles.statusDotClosed]} />
-              <Text
+            {compactLocked ? (
+              <AnnouncementTypeChip type={item.announcementType} variant="pill" isRTL={isRTL} />
+            ) : (
+              <View
                 style={[
-                  styles.statusTxt,
-                  isRTL && styles.statusTxtRtl,
-                  item.isOpen ? styles.statusTxtOpen : styles.statusTxtClosed,
-                ]}
-                numberOfLines={1}>
-                {statusLabel}
-              </Text>
-            </View>
-            {showDateLocked && (dateLabel || item.dateStart) ? (
+                  styles.statusPill,
+                  item.isOpen ? styles.statusOpen : styles.statusClosed,
+                ]}>
+                <View style={[styles.statusDot, item.isOpen ? styles.statusDotOpen : styles.statusDotClosed]} />
+                <Text
+                  style={[
+                    styles.statusTxt,
+                    isRTL && styles.statusTxtRtl,
+                    item.isOpen ? styles.statusTxtOpen : styles.statusTxtClosed,
+                  ]}
+                  numberOfLines={1}>
+                  {statusLabel}
+                </Text>
+              </View>
+            )}
+            {compactLocked ? (
+              <View style={[styles.dateRow, styles.dateRowLocked, isRTL && styles.dateRowRtl]}>
+                <FontAwesome name="lock" size={9} color={brand.primary} />
+                <Text
+                  style={[styles.dateLocked, isRTL && styles.dateRtl]}
+                  numberOfLines={1}
+                  accessibilityLabel={datesLockedLabel}>
+                  {datesLockedLabel}
+                </Text>
+              </View>
+            ) : showDateLocked && (dateLabel || item.dateStart) ? (
               <View style={[styles.dateRow, styles.dateRowLocked, isRTL && styles.dateRowRtl]}>
                 <FontAwesome name="lock" size={9} color={brand.primary} />
                 <Text
@@ -125,33 +162,73 @@ function LatestAnnouncementCard({
             ) : null}
           </View>
 
-          {schoolLabel ? (
-            <Text style={[styles.school, isRTL && styles.schoolRtl]} numberOfLines={1}>
-              {schoolLabel}
-            </Text>
-          ) : null}
-
-          <Text
-            style={[
-              styles.title,
-              isRTL && styles.titleRtl,
-              schoolLabel ? styles.titleAfterSchool : styles.titleStandalone,
-            ]}
-            numberOfLines={2}
-            ellipsizeMode="tail">
-            {title}
-          </Text>
+          {compactLocked ? (
+            <>
+              <HiddenBar width="80%" height={10} isRTL={isRTL} />
+              <HiddenBar width="95%" height={12} style={{ marginTop: 4 }} isRTL={isRTL} />
+              {school?.type ? (
+                <View style={[styles.typeRowLocked, isRTL && styles.metaRowRtl]}>
+                  <EstablishmentTypeBadge type={school.type} size="xs" />
+                </View>
+              ) : null}
+            </>
+          ) : (
+            <>
+              {schoolLabel ? (
+                <Text style={[styles.school, isRTL && styles.schoolRtl]} numberOfLines={1}>
+                  {schoolLabel}
+                </Text>
+              ) : null}
+              <Text
+                style={[
+                  styles.title,
+                  isRTL && styles.titleRtl,
+                  schoolLabel ? styles.titleAfterSchool : styles.titleStandalone,
+                ]}
+                numberOfLines={2}
+                ellipsizeMode="tail">
+                {title}
+              </Text>
+            </>
+          )}
         </View>
 
         <View style={styles.chevronWrap}>
           <FontAwesome
-            name={isRTL ? 'chevron-left' : 'chevron-right'}
+            name={compactLocked ? 'lock' : isRTL ? 'chevron-left' : 'chevron-right'}
             size={12}
-            color="rgba(13, 148, 136, 0.45)"
+            color={compactLocked ? brand.primary : 'rgba(13, 148, 136, 0.45)'}
           />
         </View>
       </View>
+      {compactLocked ? <PaywallCardReservedOverlay isRTL={isRTL} compact /> : null}
     </Pressable>
+  );
+}
+
+function HiddenBar({
+  width,
+  height = 8,
+  flex,
+  style,
+  isRTL,
+}: {
+  width?: number | `${number}%`;
+  height?: number;
+  flex?: number;
+  style?: object;
+  isRTL?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.hiddenBar,
+        flex != null ? { flex } : { width: width ?? '100%' },
+        { height },
+        isRTL && styles.hiddenBarRtl,
+        style,
+      ]}
+    />
   );
 }
 
@@ -214,6 +291,7 @@ export function HomeLatestAnnouncementsSection({
                 closedLabel={t('homeAnnouncementClosed')}
                 datesLocked={datesLocked}
                 datesLockedLabel={t('homeAnnouncementDatesLocked')}
+                compactLocked={datesLocked}
                 onPress={() => onPressAnnouncement(item)}
               />
             </View>
@@ -243,6 +321,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(15, 23, 42, 0.08)',
     overflow: 'hidden',
+    position: 'relative',
   },
   cardSkeleton: {
     backgroundColor: brand.white,
@@ -250,6 +329,32 @@ const styles = StyleSheet.create({
   cardPressed: {
     opacity: 0.92,
     transform: [{ scale: 0.98 }],
+  },
+  cardLocked: {
+    backgroundColor: '#FAFBFC',
+  },
+  cardBodyLocked: {
+    opacity: 0.85,
+  },
+  logoWrapLocked: {
+    opacity: 0.9,
+  },
+  logoPlaceholderLocked: {
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  hiddenBar: {
+    borderRadius: 3,
+    backgroundColor: '#E2E8F0',
+    maxWidth: '100%',
+  },
+  hiddenBarRtl: {
+    alignSelf: 'flex-end',
+  },
+  typeRowLocked: {
+    marginTop: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   accentBar: {
     position: 'absolute',

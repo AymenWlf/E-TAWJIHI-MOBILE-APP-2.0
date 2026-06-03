@@ -161,8 +161,10 @@ export default function AccountOrderDetailScreen() {
   }
 
   const receiptUrl = receiptAbsoluteUrl(order.bankTransferReceiptUrl);
-  const cashplusCode =
-    followUp?.cashplusCode?.trim() || order.servicePaymentCashplusCode?.trim() || '';
+  const cashplusCode = followUp?.cashplusCode?.trim() || '';
+  const cashplusUnavailable =
+    followUp?.modality === 'cashplus' &&
+    (followUp.cashplusUnavailable === true || !cashplusCode);
 
   return (
     <View style={[styles.root, isRTL && styles.rtlRoot]}>
@@ -240,6 +242,15 @@ export default function AccountOrderDetailScreen() {
               </View>
             ) : null}
 
+            {followUp?.modality === 'cashplus' && cashplusUnavailable ? (
+              <View style={styles.cashplusUnavailableWrap}>
+                <Text style={[styles.subHead, isRTL && styles.txtRtl]}>{t('shopThankCashplusUnavailableTitle')}</Text>
+                <Text style={[styles.instructions, isRTL && styles.txtRtl]}>
+                  {followUp.cashplusUnavailableMessage?.trim() ||
+                    t('shopThankCashplusUnavailable').replaceAll('{orderNumber}', order.orderNumber)}
+                </Text>
+              </View>
+            ) : null}
             {followUp?.modality === 'cashplus' && cashplusCode ? (
               <View style={styles.cashplusBox}>
                 <Text style={[styles.cashplusLbl, isRTL && styles.txtRtl]}>{t('shopThankCashplusCodeLbl')}</Text>
@@ -461,6 +472,16 @@ const styles = StyleSheet.create({
   uploadBtnTxt: { color: brand.white, fontWeight: '700' },
   okNote: { fontSize: fontSize.sm, color: homeShell.greenDark },
   link: { color: brand.primary, fontWeight: '600', marginTop: 4 },
+  cashplusUnavailableWrap: {
+    marginTop: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: 'rgba(245,158,11,0.45)',
+    backgroundColor: 'rgba(254,243,199,0.5)',
+    gap: spacing.sm,
+  },
+  subHead: { fontSize: fontSize.sm, fontWeight: '800', color: homeShell.text },
   cashplusBox: {
     backgroundColor: '#F5F3FF',
     borderRadius: radius.md,

@@ -219,7 +219,7 @@ export function SchoolDiagnosticStoryReportScreen() {
   }, [publicCode, grokPending, recommendationsDeferred, getValidAccessToken, applyFromServer]);
 
   const showRecommendationsPaywall =
-    recommendationsDeferred && !tawjihPlusLoading && !hasTawjihPlusAccess;
+    !tawjihPlusLoading && !hasTawjihPlusAccess && Boolean(publicCode);
 
   const sortedItems = useMemo(() => {
     const summary = computeDiagnosticBacComparisonNote(diagnosticPayload);

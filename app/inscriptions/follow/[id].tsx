@@ -14,6 +14,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
+import { resolveAnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 import { FollowedSchoolDetailLoadingSkeleton } from '@/components/inscriptions/FollowedSchoolDetailLoadingSkeleton';
 import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { StatusBadge } from '@/components/inscriptions/StatusBadge';
@@ -81,7 +82,10 @@ export default function FollowedSchoolDetailScreen() {
         setData(null);
         resolveInscriptionsAccessWithoutServer();
       } else {
-        applyServerInscriptionsAccess(result.inscriptionsFullAccess);
+        const anns = result.timeline.announcements ?? [];
+        const inferredFromPayload =
+          anns.length > 0 && anns.every((a) => !a.previewOnly);
+        applyServerInscriptionsAccess(result.inscriptionsFullAccess || inferredFromPayload);
         setData(result.timeline);
       }
     } catch {
@@ -146,7 +150,11 @@ export default function FollowedSchoolDetailScreen() {
             setBusy(true);
             const ok = await deleteEstablishmentFollow(token, data.follow.id);
             setBusy(false);
-            if (ok) router.back();
+            if (ok) {
+              router.back();
+            } else {
+              Alert.alert('', t('inscErrorLoad'));
+            }
           },
         },
       ],
@@ -459,7 +467,13 @@ export default function FollowedSchoolDetailScreen() {
           </>
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
-        renderItem={({ item }) => (
+        renderItem={({ item, index }) => {
+          const lockedVariant = resolveAnnouncementLockedVariant(
+            showInscriptionsPaywall || Boolean(item.previewOnly),
+            index,
+          );
+          const cardLocked = lockedVariant !== 'none';
+          return (
           <View style={{ paddingHorizontal: spacing.lg }}>
             <AnnouncementCard
               item={{
@@ -491,13 +505,18 @@ export default function FollowedSchoolDetailScreen() {
                 if (showInscriptionsPaywall) openTawjihPlusProduct();
               }}
               onPress={() => {
+                if (cardLocked) {
+                  openTawjihPlusProduct();
+                  return;
+                }
                 void updateLatestSeenOnDisk(followId, item.id);
                 router.push(`/inscriptions/${item.id}` as never);
               }}
-              previewOnly={showInscriptionsPaywall || Boolean(item.previewOnly)}
+              lockedVariant={lockedVariant}
             />
           </View>
-        )}
+          );
+        }}
         ListEmptyComponent={
           <View style={{ paddingHorizontal: spacing.lg }}>
             <Text style={[styles.muted, isRTL && styles.rtl]}>

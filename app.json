@@ -1,30 +1,70 @@
 {
   "expo": {
-    "name": "E-Tawjihi",
-    "slug": "e-tawjihi-mobile-shell",
-    "version": "1.0.0",
+    "name": "E-TAWJIHI",
+    "slug": "etawjihi",
+    "version": "1.6.0",
     "orientation": "portrait",
-    "icon": "./assets/images/icon.png",
-    "scheme": "etawjihimobileshell",
+    "icon": "./assets/images/logo-carre-coul-new.png",
+    "scheme": "etawjihi",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/splash-icon.png",
+      "image": "./assets/images/logo-carre-coul-new.png",
       "resizeMode": "contain",
-      "backgroundColor": "#333E8F"
+      "backgroundColor": "#333e8f"
     },
     "ios": {
       "supportsTablet": true,
-      "softwareKeyboardLayoutMode": "resize",
+      "bundleIdentifier": "com.educalogy.etawjihi",
+      "buildNumber": "62",
+      "icon": "./assets/images/logo-carre-coul-new.png",
       "infoPlist": {
-        "UIViewControllerBasedStatusBarAppearance": true
+        "UIViewControllerBasedStatusBarAppearance": true,
+        "NSCameraUsageDescription": "Cette application a besoin de la caméra pour permettre le scan de documents.",
+        "NSPhotoLibraryUsageDescription": "Cette application a besoin d'accéder à vos photos pour l'upload de documents.",
+        "NSMicrophoneUsageDescription": "Cette application a besoin du micro pour les enregistrements audio.",
+        "ITSAppUsesNonExemptEncryption": false,
+        "UIBackgroundModes": ["remote-notification"],
+        "NSUserNotificationUsageDescription": "Cette application utilise les notifications pour vous informer des nouveautés importantes concernant l'orientation scolaire."
       }
     },
     "android": {
+      "package": "com.educalogy.etawjihi",
+      "versionCode": 63,
+      "icon": "./assets/images/logo-carre-coul-new.png",
+      "permissions": [
+        "INTERNET",
+        "ACCESS_NETWORK_STATE",
+        "ACCESS_WIFI_STATE",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.WAKE_LOCK",
+        "android.permission.VIBRATE"
+      ],
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [{ "scheme": "etawjihi" }],
+          "category": ["BROWSABLE", "DEFAULT"]
+        }
+      ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
-        "backgroundColor": "#333E8F"
+        "foregroundImage": "./assets/images/logo-carre-coul-new.png",
+        "backgroundColor": "#333e8f",
+        "monochromeImage": "./assets/images/logo-carre-coul-new.png"
       },
+      "splash": {
+        "image": "./assets/images/logo-carre-coul-new.png",
+        "resizeMode": "contain",
+        "backgroundColor": "#333e8f"
+      },
+      "allowBackup": false,
+      "googleServicesFile": "./google-services.json",
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
       "softwareKeyboardLayoutMode": "resize"
@@ -36,22 +76,62 @@
     },
     "plugins": [
       "expo-router",
+      "expo-font",
+      "expo-updates",
+      [
+        "expo-build-properties",
+        {
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
       "@react-native-community/datetimepicker",
       [
         "expo-notifications",
         {
-          "color": "#333E8F",
+          "icon": "./assets/images/logo-carre-coul-new.png",
+          "color": "#333e8f",
           "defaultChannel": "default",
           "sounds": [
             "./assets/sounds/notification.mp3",
             "./assets/sounds/cash_commande.mp3",
             "./assets/sounds/cash_transaction.mp3"
+          ],
+          "mode": "production",
+          "iosDisplayInForeground": true,
+          "androidMode": "default",
+          "androidCollapsedTitle": "E-TAWJIHI",
+          "androidChannels": [
+            {
+              "id": "default",
+              "name": "Notifications générales",
+              "description": "Notifications pour les inscriptions, bourses et actualités",
+              "priority": "high",
+              "vibrate": true,
+              "sound": true
+            }
           ]
         }
-      ]
+      ],
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "updates": {
+      "enabled": true,
+      "checkAutomatically": "ON_LOAD",
+      "fallbackToCacheTimeout": 0,
+      "url": "https://u.expo.dev/8607d592-f821-41d9-a62e-75c4c190d41e"
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "8607d592-f821-41d9-a62e-75c4c190d41e"
+      }
     }
   }
 }

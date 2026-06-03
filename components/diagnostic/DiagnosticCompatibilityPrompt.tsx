@@ -1,9 +1,16 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { router } from 'expo-router';
+import { useMemo } from 'react';
 import { Pressable, StyleSheet } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
+import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
+import { useAuth } from '@/contexts/AuthContext';
+import { useLocale } from '@/contexts/LocaleContext';
+import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
 import { brand, fontSize, radius } from '@/theme/tokens';
+import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
+import type { TawjihPlusParcoursGate } from '@/utils/tawjihPlusParcoursGate';
 
 const COPY = {
   fr: 'Passer le test de compatibilité',
@@ -17,6 +24,18 @@ type Props = {
 };
 
 export function DiagnosticCompatibilityPrompt({ size = 'xs', isRTL = false, locale = 'fr' }: Props) {
+  const { getValidAccessToken, user } = useAuth();
+  const { t } = useLocale();
+  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading } = useTawjihPlusAccess();
+  const tawjihPlusGate = useMemo<TawjihPlusParcoursGate>(
+    () => ({
+      hasAccess: hasTawjihPlusAccess,
+      loading: tawjihPlusLoading,
+      openProduct: () => router.push(TAWJIH_PLUS_PRODUCT_PATH as never),
+      t,
+    }),
+    [hasTawjihPlusAccess, t, tawjihPlusLoading],
+  );
   const compact = size === 'xs';
   const font = size === 'md' ? fontSize.sm : size === 'sm' ? fontSize.xs : 10;
   const padV = size === 'md' ? 6 : 4;
@@ -24,7 +43,17 @@ export function DiagnosticCompatibilityPrompt({ size = 'xs', isRTL = false, loca
 
   return (
     <Pressable
-      onPress={() => router.push('/diagnostic-ecoles' as never)}
+      onPress={() => {
+        void navigateToSchoolDiagnosticEntry(
+          {
+            getValidAccessToken,
+            userId: user?.id ?? null,
+            uiLocale: locale === 'ar' ? 'ar' : 'fr',
+          },
+          undefined,
+          tawjihPlusGate,
+        );
+      }}
       style={({ pressed }) => [
         styles.pill,
         isRTL && styles.pillRtl,

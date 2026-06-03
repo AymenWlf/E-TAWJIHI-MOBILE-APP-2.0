@@ -41,6 +41,7 @@ export default function DeviceTransferScreen() {
     supportPhone?: string;
     maxDevices?: string;
     activeSessions?: string;
+    rememberMe?: string;
   }>();
   const transferToken =
     typeof params.transferToken === 'string'
@@ -63,6 +64,11 @@ export default function DeviceTransferScreen() {
 
   const { t, isRTL } = useLocale();
   const rtl = isRTL;
+  const rememberMeParam = params.rememberMe;
+  const rememberMe =
+    rememberMeParam === undefined || rememberMeParam === null || rememberMeParam === ''
+      ? true
+      : rememberMeParam !== '0' && rememberMeParam !== 'false';
 
   const initialSessions = useMemo(() => parseSessionsParam(params.activeSessions), [params.activeSessions]);
   const [sessions] = useState<DeviceTransferSession[]>(initialSessions);
@@ -87,7 +93,7 @@ export default function DeviceTransferScreen() {
     setError(null);
     setSubmitting(true);
     try {
-      await completeDeviceTransfer(transferToken, selectedSessionId ?? undefined);
+      await completeDeviceTransfer(transferToken, selectedSessionId ?? undefined, rememberMe);
     } catch (e) {
       setError(getUserFacingApiError(e, t, { context: 'auth' }) || t('deviceTransferErrInvalid'));
     } finally {

@@ -65,6 +65,7 @@ import {
   sortEstablishmentsLikeEcolesSuperieuresWeb,
   sortSponsoredFirst,
 } from '@/utils/establishmentWebFilters';
+import { resolveEstablishmentLockedVariant } from '@/utils/establishmentLockDisplay';
 const PAGE_SIZE = 18;
 
 export default function EcolesScreen() {
@@ -119,6 +120,8 @@ export default function EcolesScreen() {
   /** Skeleton recherche/filtres tant que la session ou les droits TAWJIH PLUS ne sont pas connus. */
   const searchFiltersAccessLoading = authLoading || tawjihPlusLoading;
   const searchFiltersLocked = !searchFiltersAccessLoading && !hasTawjihPlusAccess;
+  /** Catalogue écoles : 3 premières fiches complètes, le reste réservé TAWJIH PLUS. */
+  const schoolsCatalogLocked = searchFiltersLocked;
 
   const openTawjihPlusProduct = useCallback(() => {
     router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
@@ -250,6 +253,7 @@ export default function EcolesScreen() {
             else next.delete(eid);
             return next;
           });
+          Alert.alert('', t('inscErrorLoad'));
         }
       } finally {
         setFollowBusyIds((prev) => {
@@ -719,25 +723,43 @@ export default function EcolesScreen() {
               </View>
             ) : null
           }
-          renderItem={({ item, index }) => (
+          renderItem={({ item, index }) => {
+            const lockedVariant = resolveEstablishmentLockedVariant(schoolsCatalogLocked, index);
+            const cardLocked = lockedVariant === 'compact';
+            return (
             <View>
               {index > 0 && index % 3 === 0 ? (
                 <AppBannerSlot zone="mid" analyticsPage="/mobile/ecoles" />
               ) : null}
               <EstablishmentCard
                 item={item}
+                lockedVariant={lockedVariant}
                 onPress={() => {
+                  if (cardLocked) {
+                    openTawjihPlusProduct();
+                    return;
+                  }
                   fireAndForget(recordEstablishmentClick(item.id, 'listing'));
-                  router.push(`/etablissements/${item.id}/${item.slug}`);
+                  router.push({
+                    pathname: `/etablissements/${item.id}/${item.slug}`,
+                    params: { listIdx: String(index) },
+                  } as never);
                 }}
                 isFollowed={followedIds.has(item.id)}
                 followStateLoading={isLoggedIn && !followsReady}
                 followBusy={followBusyIds.has(item.id)}
                 eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
-                onToggleFollow={() => handleToggleFollow(item.id)}
+                onToggleFollow={() => {
+                  if (cardLocked) {
+                    openTawjihPlusProduct();
+                    return;
+                  }
+                  void handleToggleFollow(item.id);
+                }}
               />
             </View>
-          )}
+            );
+          }}
         />
         {refreshing ? (
           <View style={styles.refreshOverlay} pointerEvents="none">

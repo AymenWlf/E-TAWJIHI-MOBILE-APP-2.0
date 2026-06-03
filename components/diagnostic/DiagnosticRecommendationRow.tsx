@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 
 import { EstablishmentRowLogoThumb } from '@/components/shop/EstablishmentRowLogoThumb';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
@@ -166,42 +166,46 @@ export function DiagnosticRecommendationRow({
       </Pressable>
 
       {showFollowAction && onToggleFollow ? (
-        <Pressable
-          onPress={() => {
-            if (!followBusy) onToggleFollow();
-          }}
-          disabled={followBusy}
-          style={({ pressed }) => [
-            styles.followRow,
-            isRTL && styles.followRowRtl,
-            isFollowing && styles.followRowActive,
-            followBusy && styles.followRowBusy,
-            pressed && !followBusy && { opacity: 0.9 },
-          ]}
-          accessibilityRole="button"
-          accessibilityLabel={isFollowing ? followLabelFollowing : followLabelFollow}>
-          {followBusy ? (
-            <FontAwesome
-              name="circle-o-notch"
-              size={14}
-              color={isFollowing ? brand.white : brand.primary}
-            />
-          ) : (
-            <FontAwesome
-              name={isFollowing ? 'check' : 'heart-o'}
-              size={14}
-              color={isFollowing ? brand.white : brand.primary}
-            />
-          )}
-          <Text
-            style={[
-              styles.followRowTxt,
-              isFollowing && styles.followRowTxtActive,
-              isRTL && styles.rtlText,
-            ]}>
-            {isFollowing ? followLabelFollowing : followLabelFollow}
-          </Text>
-        </Pressable>
+        <View style={[styles.followBar, isRTL && styles.followBarRtl]}>
+          <Pressable
+            onPress={() => {
+              if (!followBusy) onToggleFollow();
+            }}
+            disabled={followBusy}
+            style={({ pressed }) => [
+              styles.followBtn,
+              isFollowing && styles.followBtnActive,
+              followBusy && styles.followBtnBusy,
+              pressed && !followBusy && { opacity: 0.85 },
+            ]}
+            accessibilityRole="button"
+            accessibilityState={{ selected: isFollowing, busy: followBusy }}
+            accessibilityLabel={isFollowing ? followLabelFollowing : followLabelFollow}>
+            {followBusy ? (
+              <ActivityIndicator
+                size="small"
+                color={isFollowing ? brand.primary : brand.white}
+              />
+            ) : (
+              <>
+                <FontAwesome
+                  name={isFollowing ? 'heart' : 'heart-o'}
+                  size={12}
+                  color={isFollowing ? brand.primary : brand.white}
+                />
+                <Text
+                  style={[
+                    styles.followBtnTxt,
+                    isFollowing && styles.followBtnTxtActive,
+                    isRTL && styles.rtlText,
+                  ]}
+                  numberOfLines={1}>
+                  {isFollowing ? followLabelFollowing : followLabelFollow}
+                </Text>
+              </>
+            )}
+          </Pressable>
+        </View>
       ) : null}
     </View>
   );
@@ -321,29 +325,39 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   chevron: { marginStart: 2 },
-  followRow: {
+  followBar: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: homeShell.borderOnWhite,
+    backgroundColor: brand.white,
+    alignItems: 'stretch',
+  },
+  followBarRtl: { direction: 'rtl' },
+  /** Non suivi = fond bleu ; suivi = fond blanc + contour (comme Écoles / Inscriptions). */
+  followBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: spacing.sm,
-    paddingVertical: spacing.sm,
+    gap: 8,
+    paddingVertical: 10,
     paddingHorizontal: spacing.md,
-    borderTopWidth: 1,
-    borderTopColor: homeShell.borderOnWhite,
-    backgroundColor: `${brand.primary}08`,
-  },
-  followRowRtl: { direction: 'rtl' },
-  followRowActive: {
+    borderRadius: radius.lg,
     backgroundColor: brand.primary,
-    borderTopColor: brand.primary,
+    borderWidth: 1,
+    borderColor: brand.primary,
   },
-  followRowBusy: { opacity: 0.65 },
-  followRowTxt: {
+  followBtnActive: {
+    backgroundColor: brand.white,
+    borderColor: brand.primary,
+  },
+  followBtnBusy: { opacity: 0.6 },
+  followBtnTxt: {
     fontSize: fontSize.sm,
     fontWeight: '800',
-    color: brand.primary,
-  },
-  followRowTxtActive: {
     color: brand.white,
+  },
+  followBtnTxtActive: {
+    color: brand.primary,
   },
 });

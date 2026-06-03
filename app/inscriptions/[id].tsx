@@ -254,7 +254,11 @@ export default function InscriptionDetailScreen() {
               setFollowBusy(true);
               const ok = await deleteEstablishmentFollowByEstablishment(token, eid);
               setFollowBusy(false);
-              if (ok) setCurrentFollow(null);
+              if (ok) {
+                setCurrentFollow(null);
+              } else {
+                Alert.alert('', t('inscErrorLoad'));
+              }
             },
           },
         ],
@@ -267,7 +271,11 @@ export default function InscriptionDetailScreen() {
       establishmentId: eid,
     });
     setFollowBusy(false);
-    if (follow) setCurrentFollow(follow);
+    if (follow) {
+      setCurrentFollow(follow);
+    } else {
+      Alert.alert('', t('inscErrorLoad'));
+    }
   }, [
     data?.establishment?.id,
     getValidAccessToken,

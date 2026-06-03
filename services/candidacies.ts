@@ -1,5 +1,5 @@
 import { buildApiUrl } from '@/constants/api';
-import { httpGetJson, httpPostJson } from '@/services/http';
+import { httpDeleteJson, httpGetJson, httpPostJson } from '@/services/http';
 import type {
   Candidacy,
   CandidacyStatusType,
@@ -167,12 +167,9 @@ export async function fetchCandidacyTimeline(
 export async function deleteCandidacy(accessToken: string, id: number): Promise<boolean> {
   try {
     const url = buildApiUrl(`/api/candidacies/${id}`);
-    const res = await fetch(url, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    const json = await httpDeleteJson<SimpleResponse>(url, {
+      headers: { Authorization: `Bearer ${accessToken}` },
     });
-    if (!res.ok) return false;
-    const json = (await res.json()) as SimpleResponse;
     return Boolean(json.success);
   } catch {
     return false;

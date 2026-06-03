@@ -22,6 +22,48 @@ function referralNotificationMessage(n: AppNotification, locale: AppLocale): str
   return null;
 }
 
+export function isFollowedSchoolNotification(n: AppNotification): boolean {
+  if (n.type === 'follow_school_new_announcement') return true;
+  const meta = (n.metadata ?? {}) as Record<string, unknown>;
+  return meta.followed_school === true || meta.followed_school === 'true';
+}
+
+function isCommercialClientFlag(value: unknown): boolean {
+  if (value === false || value === 0) return false;
+  if (value === 'false' || value === '0') return false;
+  return value === true || value === 1 || value === 'true' || value === '1';
+}
+
+/** Annonce concours sans TAWJIH PLUS / service actif : message d’incitation uniquement. */
+export function isContestAnnouncementUpsellNotification(n: AppNotification): boolean {
+  const type = String(n.type ?? '');
+  if (
+    type !== 'contest_announcement' &&
+    type !== 'follow_school_new_announcement' &&
+    type !== 'announcement'
+  ) {
+    return false;
+  }
+  const meta = (n.metadata ?? {}) as Record<string, unknown>;
+  if (isCommercialClientFlag(meta.commercial_client)) return false;
+  if (
+    meta.commercial_client === false ||
+    meta.commercial_client === 0 ||
+    meta.commercial_client === 'false' ||
+    meta.commercial_client === '0' ||
+    meta.deep_link === 'tawjih_plus_upsell'
+  ) {
+    return true;
+  }
+  return false;
+}
+
+function contestAnnouncementUpsellMessage(locale: AppLocale): string {
+  return locale === 'ar'
+    ? 'اشترك في خدمة TAWJIH PLUS للحصول على مزيد من التفاصيل.'
+    : 'Inscrivez-vous au service TAWJIH PLUS pour recevoir plus de détails.';
+}
+
 export function notificationTitle(n: AppNotification, locale: AppLocale): string {
   if (locale === 'ar') {
     const a = n.titleAr?.trim();
@@ -33,6 +75,10 @@ export function notificationTitle(n: AppNotification, locale: AppLocale): string
 export function notificationMessage(n: AppNotification, locale: AppLocale): string {
   const referralMsg = referralNotificationMessage(n, locale);
   if (referralMsg) return referralMsg;
+
+  if (isContestAnnouncementUpsellNotification(n)) {
+    return contestAnnouncementUpsellMessage(locale);
+  }
 
   if (locale === 'ar') {
     const a = n.messageAr?.trim();

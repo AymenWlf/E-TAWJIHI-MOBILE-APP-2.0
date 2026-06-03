@@ -18,7 +18,8 @@ import { EstablishmentRowLogoThumb } from '@/components/shop/EstablishmentRowLog
 import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVisualThumb';
 import { ShopDetailScreenSkeleton } from '@/components/shop/ShopDetailScreenSkeleton';
 import { Text } from '@/components/ui/Text';
-import { ETAWJIHI_LOGO_COLOR, ETAWJIHI_LOGO_TRANSPARENT } from '@/constants/brandAssets';
+import { ETAWJIHI_LOGO_TRANSPARENT } from '@/constants/brandAssets';
+import { TAWJIH_PLUS_SERVICE_SLUG } from '@/constants/tawjihPlusAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
@@ -168,6 +169,14 @@ export default function PlatformServiceDetailScreen() {
     service && priceDisplay.compare && showPromoStyle
       ? shopPromoDiscountPercent(priceDisplay.primary, priceDisplay.compare)
       : null;
+
+  const galleryIconSize = useMemo(() => {
+    const defaultSize = Math.min(96, Math.round(width * 0.26));
+    if (slug === TAWJIH_PLUS_SERVICE_SLUG) {
+      return Math.min(288, Math.round(width * 0.78));
+    }
+    return defaultSize;
+  }, [slug, width]);
 
   const handleAdd = useCallback(async () => {
     if (!service) return;
@@ -433,10 +442,10 @@ export default function PlatformServiceDetailScreen() {
             brandIcon={service.brandIcon}
             brandColor={service.brandColor}
             size={width}
-            iconSize={Math.min(96, Math.round(width * 0.26))}
+            iconSize={galleryIconSize}
             borderRadius={0}
             surfaceColor={brand.primary}
-            imageSource={ETAWJIHI_LOGO_COLOR}
+            logoVariant="square"
           />
           {promoPct != null ? (
             <View style={styles.galPromoBadge}>

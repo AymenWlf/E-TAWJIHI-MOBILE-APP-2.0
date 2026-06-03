@@ -3,7 +3,7 @@ import { router } from 'expo-router';
 import { PLAN_PARCOURS_STEP_IDS, type PlanParcoursStepId } from '@/constants/orientationParcours';
 import { triggerAppFeedback } from '@/contexts/AppFeedbackContext';
 import { openApplyToSchoolsTour } from '@/utils/applyToSchoolsTourNavigation';
-import { resolveUserDiagnosticPublicCode } from '@/utils/resolveSchoolDiagnosticNavigation';
+import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
 import {
   guardTawjihPlusParcoursStep,
   type TawjihPlusParcoursGate,
@@ -36,28 +36,14 @@ function navigatePlanParcoursStepUnlocked(
       router.push('/account-setup' as never);
       return;
     case PLAN_PARCOURS_STEP_IDS.orientationDiagnostic:
-      router.push('/diagnostic-ecoles' as never);
-      return;
     case PLAN_PARCOURS_STEP_IDS.recommendation:
-      if (!auth?.getValidAccessToken) {
-        router.push('/diagnostic-ecoles' as never);
-        return;
-      }
-      void (async () => {
-        const code = await resolveUserDiagnosticPublicCode(
-          auth.getValidAccessToken,
-          auth.userId ?? null,
-          { uiLocale: auth.uiLocale },
-        );
-        if (code) {
-          router.push({
-            pathname: '/diagnostic-ecoles/resultats',
-            params: { c: code },
-          } as never);
-        } else {
-          router.push('/diagnostic-ecoles' as never);
-        }
-      })();
+      void navigateToSchoolDiagnosticEntry(
+        auth,
+        (href) => {
+          router.push(href as never);
+        },
+        tawjihPlusGate,
+      );
       return;
     case PLAN_PARCOURS_STEP_IDS.feedback:
       triggerAppFeedback({ markParcoursStep: true });

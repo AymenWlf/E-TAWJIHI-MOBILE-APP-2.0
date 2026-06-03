@@ -3,6 +3,9 @@ import type { UserActiveCommercialService } from '@/services/userActiveServices'
 /** Slug boutique / platform service TAWJIH PLUS. */
 export const TAWJIH_PLUS_SERVICE_SLUG = 'tawjih-plus';
 
+/** Nombre d’écoles visibles en entier (fiche détail incluse) sans TAWJIH PLUS. */
+export const FREE_ESTABLISHMENT_PREVIEW_COUNT = 3;
+
 export const TAWJIH_PLUS_PRODUCT_PATH = `/boutique/service/${TAWJIH_PLUS_SERVICE_SLUG}` as const;
 
 /**

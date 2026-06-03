@@ -137,6 +137,17 @@ export default function BoutiqueThankYouScreen() {
     followUp && (followUp.cashplusInstructions?.trim() || followUp.cashplusInstructionsAr?.trim())
       ? thankInstructionText(locale, followUp.cashplusInstructions?.trim() ?? '', followUp.cashplusInstructionsAr)
       : '';
+  const cashplusUnavailable =
+    followUp?.modality === 'cashplus' &&
+    (followUp.cashplusUnavailable === true || !followUp.cashplusCode?.trim());
+  const cashplusUnavailableLocalized = cashplusUnavailable
+    ? thankInstructionText(
+        locale,
+        followUp?.cashplusUnavailableMessage?.trim() ||
+          t('shopThankCashplusUnavailable').replaceAll('{orderNumber}', order?.orderNumber ?? ''),
+        followUp?.cashplusUnavailableMessageAr ?? null,
+      )
+    : '';
   const payOnDeliveryMessageLocalized =
     followUp && (followUp.payOnDeliveryMessage?.trim() || followUp.payOnDeliveryMessageAr?.trim())
       ? thankInstructionText(locale, followUp.payOnDeliveryMessage?.trim() ?? '', followUp.payOnDeliveryMessageAr)
@@ -539,7 +550,12 @@ export default function BoutiqueThankYouScreen() {
                   <FontAwesome name="mobile" size={18} color={brand.primary} />
                   <Text style={[styles.payBlockTitle, isRTL && styles.txtRtl]}>{payModalityLabel}</Text>
                 </View>
-                {followUp.cashplusCode ? (
+                {cashplusUnavailable ? (
+                  <View style={styles.cashplusUnavailableBox}>
+                    <Text style={[styles.subHead, isRTL && styles.txtRtl]}>{t('shopThankCashplusUnavailableTitle')}</Text>
+                    <InstructionCallout text={cashplusUnavailableLocalized} isRtl={isRTL} />
+                  </View>
+                ) : followUp.cashplusCode ? (
                   <CashplusCodeHeroBox
                     code={followUp.cashplusCode}
                     flashCopy={flashCopy}
@@ -547,28 +563,7 @@ export default function BoutiqueThankYouScreen() {
                     t={t}
                     onOpenAccount={() => router.push('/(tabs)/compte')}
                   />
-                ) : (
-                  <>
-                    <Text style={[styles.blockTxt, isRTL && styles.txtRtl, styles.cashplusHintPara]}>
-                      {t('shopThankCashplusAgencyHint')}
-                    </Text>
-                    <Text style={[styles.blockTxt, isRTL && styles.txtRtl, styles.cashplusHintPara]}>
-                      {t('shopThankCashplusActivationHint')}
-                    </Text>
-                    <Text style={[styles.blockTxt, isRTL && styles.txtRtl, styles.cashplusHintPara]}>
-                      {t('shopThankCashplusDelayHint')}
-                    </Text>
-                    <Pressable
-                      onPress={() => router.push('/(tabs)/compte')}
-                      style={({ pressed }) => [styles.accountCtaBtn, isRTL && styles.rowRtl, pressed && { opacity: 0.9 }]}
-                    >
-                      <FontAwesome name="user" size={16} color={brand.primary} />
-                      <Text style={[styles.accountCtaBtnTxt, isRTL && styles.txtRtl]}>
-                        {t('shopThankCashplusGotoAccountCta')}
-                      </Text>
-                    </Pressable>
-                  </>
-                )}
+                ) : null}
                 {cashplusInstructionsLocalized.trim() ? (
                   <View style={{ marginTop: spacing.sm }}>
                     <InstructionCallout text={cashplusInstructionsLocalized.trim()} isRtl={isRTL} />
@@ -1065,6 +1060,10 @@ const styles = StyleSheet.create({
   payBlockCashplus: {
     backgroundColor: 'rgba(47,206,148,0.08)',
     borderColor: 'rgba(47,206,148,0.28)',
+  },
+  cashplusUnavailableBox: {
+    marginTop: spacing.sm,
+    gap: spacing.sm,
   },
   payBlockCod: {
     backgroundColor: 'rgba(245,158,11,0.08)',

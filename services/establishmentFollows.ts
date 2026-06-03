@@ -1,5 +1,5 @@
 import { buildApiUrl } from '@/constants/api';
-import { httpGetJson, httpPostJson } from '@/services/http';
+import { httpDeleteJson, httpGetJson, httpPostJson } from '@/services/http';
 import type {
   EstablishmentFollow,
   EstablishmentFollowState,
@@ -35,6 +35,11 @@ export type EstablishmentFollowTimelineResult = {
 
 type SimpleResponse = { success: boolean; message?: string };
 
+/** En-têtes JWT — les appels passent par `http*Json` pour inclure les en-têtes appareil requis par l’API. */
+function bearerHeaders(accessToken: string): Record<string, string> {
+  return { Authorization: `Bearer ${accessToken}` };
+}
+
 export type EstablishmentFollowsPayload = {
   items: EstablishmentFollow[];
 };
@@ -54,7 +59,7 @@ export async function fetchEstablishmentFollows(
   try {
     const url = buildApiUrl('/api/establishment-follows');
     const res = await httpGetJson<ListResponse>(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: bearerHeaders(accessToken),
     });
     return {
       items: Array.isArray(res.data) ? res.data : [],
@@ -86,7 +91,7 @@ export async function upsertEstablishmentFollow(
   try {
     const url = buildApiUrl('/api/establishment-follows');
     const res = await httpPostJson<ItemResponse, UpsertFollowInput>(url, input, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: bearerHeaders(accessToken),
     });
     return { follow: res.success ? res.data : null, created: Boolean(res.created) };
   } catch {
@@ -105,7 +110,7 @@ export async function setFollowNotes(
     const res = await httpPostJson<ItemResponse, { notes: string }>(
       url,
       { notes },
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      { headers: bearerHeaders(accessToken) },
     );
     return res.success ? res.data : null;
   } catch {
@@ -130,7 +135,7 @@ export async function updateFollowStatus(
     const res = await httpPostJson<ItemResponse, { statusId: number | null }>(
       url,
       { statusId },
-      { headers: { Authorization: `Bearer ${accessToken}` } },
+      { headers: bearerHeaders(accessToken) },
     );
     return res.success ? res.data : null;
   } catch {
@@ -146,7 +151,7 @@ export async function fetchFollowStateByEstablishment(
   try {
     const url = buildApiUrl(`/api/establishment-follows/by-establishment/${establishmentId}`);
     const res = await httpGetJson<StateResponse>(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: bearerHeaders(accessToken),
     });
     return res.success ? res.data : { isFollowing: false, follow: null };
   } catch {
@@ -162,7 +167,7 @@ export async function fetchEstablishmentFollowTimeline(
   try {
     const url = buildApiUrl(`/api/establishment-follows/${id}/timeline`);
     const res = await httpGetJson<TimelineResponse>(url, {
-      headers: { Authorization: `Bearer ${accessToken}` },
+      headers: bearerHeaders(accessToken),
     });
     if (!res.success || !res.data) return null;
     return {
@@ -181,12 +186,9 @@ export async function deleteEstablishmentFollow(
 ): Promise<boolean> {
   try {
     const url = buildApiUrl(`/api/establishment-follows/${id}`);
-    const res = await fetch(url, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    const json = await httpDeleteJson<SimpleResponse>(url, {
+      headers: bearerHeaders(accessToken),
     });
-    if (!res.ok) return false;
-    const json = (await res.json()) as SimpleResponse;
     return Boolean(json.success);
   } catch {
     return false;
@@ -199,13 +201,12 @@ export async function deleteEstablishmentFollowByEstablishment(
   establishmentId: number,
 ): Promise<boolean> {
   try {
-    const url = buildApiUrl(`/api/establishment-follows/by-establishment/${establishmentId}`);
-    const res = await fetch(url, {
-      method: 'DELETE',
-      headers: { Authorization: `Bearer ${accessToken}`, Accept: 'application/json' },
+    const url = buildApiUrl(
+      `/api/establishment-follows/by-establishment/${establishmentId}`,
+    );
+    const json = await httpDeleteJson<SimpleResponse>(url, {
+      headers: bearerHeaders(accessToken),
     });
-    if (!res.ok) return false;
-    const json = (await res.json()) as SimpleResponse;
     return Boolean(json.success);
   } catch {
     return false;

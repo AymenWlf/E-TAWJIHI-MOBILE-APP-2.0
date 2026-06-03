@@ -91,8 +91,7 @@ export function establishmentTypeDisplayLabel(
   const kind = classifyEstablishmentType(raw);
   const visual = VISUALS[kind];
   if (visual.i18nKey) return t(visual.i18nKey);
-  const fallback = (raw ?? '').trim();
-  return fallback || '—';
+  return '';
 }
 
 type Props = {
@@ -117,7 +116,8 @@ export function EstablishmentTypeBadge({
     if (hideIfUnknown) return null;
   }
 
-  const label = visual.i18nKey ? t(visual.i18nKey) : (type ?? '').trim() || '—';
+  const label = visual.i18nKey ? t(visual.i18nKey) : (type ?? '').trim();
+  if (!label) return null;
 
   const sizeStyle =
     size === 'xs'

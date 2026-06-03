@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { GLOBAL_WALL_MOBILE_ENABLED, isGlobalWallMobileRoute } from '@/constants/mobileFeatureFlags';
 import type { AppNotification } from '@/types/inscriptions';
 import { navigateToContestAnnouncement } from '@/utils/contestAnnouncementNavigation';
+import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
 
 /** Indique si un bouton d’action peut naviguer (sans pousser de route). */
 export function canNavigateFromAppNotification(n: AppNotification): boolean {
@@ -81,7 +82,7 @@ export function navigateFromAppNotification(n: AppNotification): boolean {
         return true;
       }
     }
-    router.push('/diagnostic-ecoles' as never);
+    void navigateToSchoolDiagnosticEntry();
     return true;
   }
 

@@ -13,7 +13,7 @@ import {
 } from 'react-native';
 
 import { TassjilServiceIncludedNotice } from '@/components/inscriptions/TassjilServiceIncludedNotice';
-import { TawjihPlusPreviewLockPanel } from '@/components/inscriptions/TawjihPlusPaywall';
+import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlusPaywall';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
 import { TourFocusWrap } from '@/components/inscriptions/TourFocusWrap';
@@ -46,6 +46,7 @@ import {
 import { isPremiereBacNiveau } from '@/utils/academicFiliere';
 import { evaluateEligibility } from '@/utils/eligibility';
 import { shouldShowTassjilServiceIncludedNotice } from '@/utils/tassjilServiceIncludedNotice';
+import type { AnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 
 type Props = {
   item: ContestAnnouncementCard;
@@ -65,7 +66,12 @@ type Props = {
   tourGate?: ApplyToSchoolsTourGate;
   isUnread?: boolean;
   isUnseen?: boolean;
-  /** Aperçu gratuit : nom, logo, sigle, type seulement ; le reste est masqué derrière le paywall. */
+  /**
+   * Aperçu paywall : `featured` (1ʳᵉ annonce) ou `compact` — même carte,
+   * contenu sensible masqué + zones désactivées.
+   */
+  lockedVariant?: 'none' | AnnouncementLockedVariant;
+  /** @deprecated Préférer `lockedVariant="featured"`. */
   previewOnly?: boolean;
 };
 
@@ -132,6 +138,58 @@ function InfoLine({
   );
 }
 
+function InfoLineHidden({
+  icon,
+  iconColor,
+  label,
+  isRTL,
+}: {
+  icon: FaName;
+  iconColor: string;
+  label: string;
+  isRTL: boolean;
+}) {
+  return (
+    <View style={styles.infoLine} pointerEvents="none">
+      <View style={styles.infoIconWrap}>
+        <FontAwesome name={icon} size={11} color={iconColor} />
+      </View>
+      <View style={styles.infoTextCol}>
+        <Text style={[styles.infoLabel, isRTL && styles.rtlText]} numberOfLines={1}>
+          {label}
+        </Text>
+        <HiddenBar width="78%" height={12} isRTL={isRTL} />
+      </View>
+    </View>
+  );
+}
+
+function HiddenBar({
+  width,
+  height = 12,
+  flex,
+  style,
+  isRTL,
+}: {
+  width?: number | `${number}%`;
+  height?: number;
+  flex?: number;
+  style?: object;
+  isRTL?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.hiddenBar,
+        flex != null ? { flex } : { width: width ?? '100%' },
+        { height },
+        isRTL && styles.hiddenBarRtl,
+        style,
+      ]}
+    />
+  );
+}
+
 export function AnnouncementCard({
   item,
   isFollowed,
@@ -150,11 +208,19 @@ export function AnnouncementCard({
   tourGate,
   isUnread = false,
   isUnseen = false,
+  lockedVariant: lockedVariantProp,
   previewOnly = false,
 }: Props) {
   if (!item?.id) {
     return null;
   }
+  const lockVariant: 'none' | AnnouncementLockedVariant =
+    lockedVariantProp ?? (previewOnly ? 'featured' : 'none');
+  const contentLocked = lockVariant !== 'none';
+  const sensitiveHidden = contentLocked;
+  const showOgCoverImage = Boolean(item.ogImage) && !contentLocked;
+  const showOgCoverLocked = Boolean(item.ogImage) && contentLocked;
+  const showHeaderRow = !contentLocked || !item.ogImage;
   const { t, locale, isRTL } = useLocale();
   const { user } = useAuth();
   const router = useRouter();
@@ -198,7 +264,6 @@ export function AnnouncementCard({
     fallbackEstablishmentAvatarName(est?.nom, est?.sigle);
 
   const deadline = formatDaysUntilClose(item.daysUntilClose, locale);
-  const contentLocked = previewOnly;
   const canUpdateStatus =
     typeof onUpdateStatus === 'function' &&
     ((item.availableStatuses?.length ?? 0) > 0 || tourGate === 'status');
@@ -238,6 +303,80 @@ export function AnnouncementCard({
   const usefulLinks = Array.isArray(item.liensUtiles)
     ? item.liensUtiles.filter((l) => Boolean(l?.url?.trim())).slice(0, 6)
     : [];
+
+  const followBtn = (locked = false) => (
+    <TourFocusWrap
+      active={tourFocusActive('follow')}
+      dimmed={tourFocusDimmed('follow')}
+      pulse={tourFocusPulse}
+      label={tourFocusActive('follow') ? tourFocusLabel : undefined}
+      style={styles.btnFlex}>
+      <Pressable
+        onPress={(e) => {
+          e.stopPropagation?.();
+          if (locked) {
+            openTawjihPlusProduct();
+            return;
+          }
+          if (!followInteractionEnabled) return;
+          onToggleFollow();
+        }}
+        disabled={!locked && (busy || followStateLoading || !followInteractionEnabled)}
+        accessibilityRole="button"
+        accessibilityLabel={
+          locked ? t('inscTawjihPlusUpgradeCta') : isFollowed
+            ? t('inscAnnouncementsFollowing')
+            : t('inscAnnouncementsFollow')
+        }
+        style={({ pressed }) => [
+          styles.btn,
+          styles.btnFlex,
+          locked && styles.btnLockedPaywall,
+          !locked && !followStateLoading && isFollowed ? styles.btnFollowed : !locked ? styles.btnFollow : null,
+          pressed && (locked || followInteractionEnabled) && { opacity: 0.85 },
+          !locked && (busy || followStateLoading || !followInteractionEnabled) && { opacity: 0.5 },
+          tourFocusActive('follow') && styles.btnFollowFocus,
+          !locked && !followInteractionEnabled && styles.tourActionDisabled,
+        ]}>
+        {busy || followStateLoading ? (
+          <ActivityIndicator
+            size="small"
+            color={
+              locked
+                ? '#64748B'
+                : !followStateLoading && isFollowed
+                  ? brand.primary
+                  : brand.white
+            }
+          />
+        ) : (
+          <>
+            <FontAwesome
+              name={locked ? 'lock' : isFollowed ? 'heart' : 'heart-o'}
+              size={11}
+              color={locked ? '#64748B' : isFollowed ? brand.primary : brand.white}
+            />
+            <Text
+              style={[
+                locked
+                  ? styles.btnLinkTxtLocked
+                  : isFollowed
+                    ? styles.btnFollowedTxt
+                    : styles.btnFollowTxt,
+                isRTL && styles.rtlText,
+              ]}
+              numberOfLines={1}>
+              {locked
+                ? t('inscAnnouncementsFollow')
+                : isFollowed
+                  ? t('inscAnnouncementsFollowing')
+                  : t('inscAnnouncementsFollow')}
+            </Text>
+          </>
+        )}
+      </Pressable>
+    </TourFocusWrap>
+  );
 
   const registrationLinkBtn = (fullWidth: boolean, locked = false) => (
     <TourFocusWrap
@@ -340,7 +479,8 @@ export function AnnouncementCard({
           borderStartColor: typeVisual.border,
           borderStartWidth: 4,
         },
-        isUnread && styles.cardUnread,
+        contentLocked && styles.cardLocked,
+        isUnread && !contentLocked && styles.cardUnread,
         pressed && onPress && { opacity: 0.92 },
       ]}>
       {isUnseen ? (
@@ -349,9 +489,9 @@ export function AnnouncementCard({
         </View>
       ) : null}
 
-      {!previewOnly && item.ogImage ? (
+      {showOgCoverImage ? (
         <View style={styles.coverWrap}>
-          <Image source={{ uri: item.ogImage }} style={styles.cover} resizeMode="cover" />
+          <Image source={{ uri: item.ogImage! }} style={styles.cover} resizeMode="cover" />
           <View style={styles.coverChip}>
             <TourFocusWrap
               active={tourFocusActive('type')}
@@ -364,75 +504,106 @@ export function AnnouncementCard({
         </View>
       ) : null}
 
-      <View style={[styles.body, isRTL && styles.bodyRtl]}>
-        {/* En-tête : type (sans cover) + badge non lu */}
-        <View style={styles.headerRow}>
-          {!item.ogImage ? (
-            <TourFocusWrap
-              active={tourFocusActive('type')}
-              dimmed={tourFocusDimmed('type')}
-              pulse={tourFocusPulse}
-              label={tourFocusActive('type') ? tourFocusLabel : undefined}
-              style={styles.headerTypeWrap}>
-              <AnnouncementTypeChip
-                type={item.announcementType}
-                variant="banner"
-                isRTL={isRTL}
-              />
-            </TourFocusWrap>
-          ) : (
-            <View style={styles.headerTypeSpacer} />
-          )}
-          {isUnread ? (
-            <View style={styles.stateChipUnread}>
-              <View style={styles.stateDotUnread} />
-              <Text style={[styles.stateChipUnreadTxt, isRTL && styles.rtlText]}>
-                {t('inscAnnouncementUnread')}
-              </Text>
-            </View>
-          ) : null}
+      {showOgCoverLocked ? (
+        <View style={styles.coverWrap} pointerEvents="none">
+          <View style={[styles.cover, styles.coverLocked]} />
+          <View style={styles.coverChip}>
+            <AnnouncementTypeChip type={item.announcementType} variant="pill" isRTL={isRTL} />
+          </View>
         </View>
+      ) : null}
 
-        {/* Établissement */}
-        <View style={styles.schoolBlock}>
-          <Image
-            source={{ uri: logoUri }}
-            style={styles.estLogo}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-          />
-          <View style={styles.estTexts}>
-            <Text style={[styles.estName, isRTL && styles.rtlText]} numberOfLines={3}>
-              {estNamePrimary}
-            </Text>
-            {estNameSecondary ? (
-              <Text style={[styles.estNameAlt, isRTL && styles.rtlText]} numberOfLines={2}>
-                {estNameSecondary}
-              </Text>
-            ) : null}
-            {(est?.sigle || est?.type) ? (
-              <View style={styles.estMetaRow}>
-                {est?.sigle ? (
-                  <View style={styles.siglePill}>
-                    <Text style={styles.siglePillTxt}>{est.sigle}</Text>
-                  </View>
-                ) : null}
-                {est?.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
+      <View style={[styles.body, isRTL && styles.bodyRtl, contentLocked && styles.bodyLocked]}>
+        {showHeaderRow ? (
+          <View style={styles.headerRow}>
+            {!item.ogImage || sensitiveHidden ? (
+              <TourFocusWrap
+                active={tourFocusActive('type')}
+                dimmed={tourFocusDimmed('type')}
+                pulse={tourFocusPulse}
+                label={tourFocusActive('type') ? tourFocusLabel : undefined}
+                style={styles.headerTypeWrap}>
+                <AnnouncementTypeChip
+                  type={item.announcementType}
+                  variant="banner"
+                  isRTL={isRTL}
+                />
+              </TourFocusWrap>
+            ) : (
+              <View style={styles.headerTypeSpacer} />
+            )}
+            {isUnread && !contentLocked ? (
+              <View style={styles.stateChipUnread}>
+                <View style={styles.stateDotUnread} />
+                <Text style={[styles.stateChipUnreadTxt, isRTL && styles.rtlText]}>
+                  {t('inscAnnouncementUnread')}
+                </Text>
               </View>
             ) : null}
           </View>
+        ) : null}
+
+        <View style={[styles.schoolBlock, sensitiveHidden && styles.sectionDisabled]} pointerEvents={sensitiveHidden ? 'none' : 'auto'}>
+          {sensitiveHidden ? (
+            <>
+              <View
+                style={[
+                  styles.estLogo,
+                  styles.estLogoLocked,
+                  { backgroundColor: typeVisual.bg, borderColor: typeVisual.border },
+                ]}>
+                <FontAwesome name={typeVisual.icon} size={20} color={typeVisual.fg} />
+              </View>
+              <View style={styles.estTexts}>
+                <HiddenBar width="92%" height={14} isRTL={isRTL} />
+                <HiddenBar width="68%" height={11} style={{ marginTop: 4 }} isRTL={isRTL} />
+                {est?.type ? (
+                  <View style={[styles.estMetaRow, isRTL && styles.rowRtl]}>
+                    <EstablishmentTypeBadge type={est.type} size="xs" />
+                  </View>
+                ) : null}
+              </View>
+            </>
+          ) : (
+            <>
+              <Image
+                source={{ uri: logoUri }}
+                style={styles.estLogo}
+                resizeMode="contain"
+                accessibilityIgnoresInvertColors
+              />
+              <View style={styles.estTexts}>
+                <Text style={[styles.estName, isRTL && styles.rtlText]} numberOfLines={3}>
+                  {estNamePrimary}
+                </Text>
+                {estNameSecondary ? (
+                  <Text style={[styles.estNameAlt, isRTL && styles.rtlText]} numberOfLines={2}>
+                    {estNameSecondary}
+                  </Text>
+                ) : null}
+                {(est?.sigle || est?.type) ? (
+                  <View style={styles.estMetaRow}>
+                    {est?.sigle ? (
+                      <View style={styles.siglePill}>
+                        <Text style={styles.siglePillTxt}>{est.sigle}</Text>
+                      </View>
+                    ) : null}
+                    {est?.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
+                  </View>
+                ) : null}
+              </View>
+            </>
+          )}
         </View>
 
-        {previewOnly ? (
-          <View style={styles.previewLockBlock}>
-            <Text style={[styles.title, isRTL && styles.rtlText]} numberOfLines={2}>
-              {pickAnnouncementTitle(item, locale) || item.title}
-            </Text>
-            <TawjihPlusPreviewLockPanel locked={previewOnly} />
+        {sensitiveHidden ? (
+          <View style={styles.titleHiddenWrap} pointerEvents="none">
+            <HiddenBar width="100%" height={14} isRTL={isRTL} />
+            <HiddenBar width="88%" height={14} style={{ marginTop: 6 }} isRTL={isRTL} />
           </View>
         ) : null}
 
-        {!previewOnly ? (
+        {!contentLocked ? (
           <>
         {/* Titre de l'annonce */}
         <Text
@@ -577,59 +748,67 @@ export function AnnouncementCard({
         {/* Actions principales */}
         <View style={styles.actionsCol}>
           <View style={styles.actionsRow}>
-            <TourFocusWrap
-              active={tourFocusActive('follow')}
-              dimmed={tourFocusDimmed('follow')}
-              pulse={tourFocusPulse}
-              label={tourFocusActive('follow') ? tourFocusLabel : undefined}
-              style={styles.btnFlex}>
-              <Pressable
-                onPress={(e) => {
-                  e.stopPropagation?.();
-                  if (!followInteractionEnabled) return;
-                  onToggleFollow();
-                }}
-                disabled={busy || followStateLoading || !followInteractionEnabled}
-                style={({ pressed }) => [
-                  styles.btn,
-                  styles.btnFlex,
-                  !followStateLoading && isFollowed ? styles.btnFollowed : styles.btnFollow,
-                  pressed && followInteractionEnabled && { opacity: 0.85 },
-                  (busy || followStateLoading || !followInteractionEnabled) && { opacity: 0.5 },
-                  tourFocusActive('follow') && styles.btnFollowFocus,
-                  !followInteractionEnabled && styles.tourActionDisabled,
-                ]}>
-                {busy || followStateLoading ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={!followStateLoading && isFollowed ? brand.primary : brand.white}
-                  />
-                ) : (
-                  <>
-                    <FontAwesome
-                      name={isFollowed ? 'heart' : 'heart-o'}
-                      size={11}
-                      color={isFollowed ? brand.primary : brand.white}
-                    />
-                    <Text
-                      style={[
-                        isFollowed ? styles.btnFollowedTxt : styles.btnFollowTxt,
-                        isRTL && styles.rtlText,
-                      ]}
-                      numberOfLines={1}>
-                      {isFollowed ? t('inscAnnouncementsFollowing') : t('inscAnnouncementsFollow')}
-                    </Text>
-                  </>
-                )}
-              </Pressable>
-            </TourFocusWrap>
+            {followBtn(false)}
             {registrationLinkBtn(false)}
           </View>
         </View>
           </>
-        ) : null}
+        ) : (
+          <>
+            <View style={[styles.metaPanel, styles.sectionDisabled]} pointerEvents="none">
+              <InfoLineHidden
+                icon="map-marker"
+                iconColor={brand.textMuted}
+                label={t('schoolsCityLabel')}
+                isRTL={isRTL}
+              />
+              <InfoLineHidden
+                icon="play-circle"
+                iconColor={brand.success}
+                label={t('inscDateOpens')}
+                isRTL={isRTL}
+              />
+              <InfoLineHidden
+                icon="stop-circle"
+                iconColor={brand.textMuted}
+                label={t('inscDateCloses')}
+                isRTL={isRTL}
+              />
+            </View>
 
-        {previewOnly ? (
+            <View
+              style={[styles.countdown, styles.countdownLocked, styles.sectionDisabled]}
+              pointerEvents="none">
+              <FontAwesome name="lock" size={11} color="#64748B" />
+              <HiddenBar flex={1} height={12} isRTL={isRTL} />
+            </View>
+
+            <View style={[styles.badgeRow, styles.sectionDisabled]} pointerEvents="none">
+              <View style={styles.badgeLocked}>
+                <FontAwesome name="lock" size={10} color="#64748B" />
+              </View>
+              <View style={styles.badgeLocked}>
+                <FontAwesome name="lock" size={10} color="#64748B" />
+              </View>
+            </View>
+
+            <View style={[styles.linksPanel, styles.sectionDisabled]} pointerEvents="none">
+              <Text style={[styles.linksPanelTitle, isRTL && styles.rtlText]}>
+                {t('inscDetailUsefulLinks')}
+              </Text>
+              <View style={[styles.linksWrap, isRTL && styles.rowRtl]}>
+                <View style={styles.linkChipLocked}>
+                  <HiddenBar width={72} height={10} />
+                </View>
+                <View style={styles.linkChipLocked}>
+                  <HiddenBar width={56} height={10} />
+                </View>
+              </View>
+            </View>
+          </>
+        )}
+
+        {contentLocked ? (
           <>
             <View style={styles.statusPanel}>
               <View style={styles.statusPanelTop}>
@@ -639,56 +818,15 @@ export function AnnouncementCard({
             </View>
             <View style={styles.actionsCol}>
               <View style={[styles.actionsRow, isRTL && styles.rowRtl]}>
-                <TourFocusWrap
-                  active={tourFocusActive('follow')}
-                  dimmed={tourFocusDimmed('follow')}
-                  pulse={tourFocusPulse}
-                  label={tourFocusActive('follow') ? tourFocusLabel : undefined}
-                  style={styles.btnFlex}>
-                  <Pressable
-                    onPress={(e) => {
-                      e.stopPropagation?.();
-                      if (!followInteractionEnabled) return;
-                      onToggleFollow();
-                    }}
-                    disabled={busy || followStateLoading || !followInteractionEnabled}
-                    style={({ pressed }) => [
-                      styles.btn,
-                      styles.btnFlex,
-                      !followStateLoading && isFollowed ? styles.btnFollowed : styles.btnFollow,
-                      pressed && followInteractionEnabled && { opacity: 0.85 },
-                      (busy || followStateLoading || !followInteractionEnabled) && { opacity: 0.5 },
-                    ]}>
-                    {busy || followStateLoading ? (
-                      <ActivityIndicator
-                        size="small"
-                        color={!followStateLoading && isFollowed ? brand.primary : brand.white}
-                      />
-                    ) : (
-                      <>
-                        <FontAwesome
-                          name={isFollowed ? 'heart' : 'heart-o'}
-                          size={11}
-                          color={isFollowed ? brand.primary : brand.white}
-                        />
-                        <Text
-                          style={[
-                            isFollowed ? styles.btnFollowedTxt : styles.btnFollowTxt,
-                            isRTL && styles.rtlText,
-                          ]}
-                          numberOfLines={1}>
-                          {isFollowed ? t('inscAnnouncementsFollowing') : t('inscAnnouncementsFollow')}
-                        </Text>
-                      </>
-                    )}
-                  </Pressable>
-                </TourFocusWrap>
+                {followBtn(true)}
                 {registrationLinkBtn(false, true)}
               </View>
             </View>
           </>
         ) : null}
       </View>
+
+      {contentLocked ? <PaywallCardReservedOverlay isRTL={isRTL} /> : null}
     </Pressable>
   );
 }
@@ -711,10 +849,25 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(51,62,143,0.04)',
     borderColor: 'rgba(51,62,143,0.25)',
   },
+  cardLocked: {
+    backgroundColor: '#FAFBFC',
+  },
+  bodyLocked: {
+    opacity: 0.92,
+  },
+  sectionDisabled: {
+    opacity: 0.72,
+  },
   previewLockBlock: {
     alignSelf: 'stretch',
     width: '100%',
     gap: spacing.sm,
+    marginTop: spacing.xs,
+  },
+  titleHiddenWrap: {
+    alignSelf: 'stretch',
+    width: '100%',
+    gap: spacing.xs,
     marginTop: spacing.xs,
   },
   btnLockedPaywall: {
@@ -763,6 +916,17 @@ const styles = StyleSheet.create({
   },
   coverWrap: { position: 'relative' },
   cover: { width: '100%', height: 110, backgroundColor: brand.borderLight },
+  coverLocked: {
+    backgroundColor: '#E2E8F0',
+  },
+  hiddenBar: {
+    borderRadius: 3,
+    backgroundColor: '#E2E8F0',
+    maxWidth: '100%',
+  },
+  hiddenBarRtl: {
+    alignSelf: 'flex-end',
+  },
   coverChip: {
     position: 'absolute',
     top: spacing.sm,
@@ -828,6 +992,13 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: radius.sm,
     backgroundColor: brand.white,
+  },
+  estLogoLocked: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#F1F5F9',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E2E8F0',
   },
   estTexts: {
     flex: 1,
@@ -948,6 +1119,22 @@ const styles = StyleSheet.create({
   countdownTodayTxt: { color: '#B45309' },
   countdownClosed: { backgroundColor: '#FEE2E2', borderColor: '#FECACA' },
   countdownClosedTxt: { color: '#B91C1C' },
+  countdownLocked: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
+  badgeLocked: {
+    minWidth: 28,
+    minHeight: 22,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: '#F1F5F9',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   badgeRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -976,6 +1163,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 6,
+  },
+  linkChipLocked: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: '#F1F5F9',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E2E8F0',
   },
   linkChip: {
     flexDirection: 'row',

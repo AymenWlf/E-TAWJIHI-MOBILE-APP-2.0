@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "522377064386",
+    "project_id": "push-notif-e-tawjihi",
+    "storage_bucket": "push-notif-e-tawjihi.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:522377064386:android:23bb2f5a0a466b98f1b05b",
+        "android_client_info": {
+          "package_name": "com.educalogy.etawjihi"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBWWuOpIbul4sd0MBJXerkAN_qKv-LS5Ds"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

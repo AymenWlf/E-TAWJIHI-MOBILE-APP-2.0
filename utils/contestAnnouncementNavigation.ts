@@ -1,5 +1,7 @@
 import { router } from 'expo-router';
 
+import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
+
 function isCommercialClientFlag(value: unknown): boolean {
   if (value === false || value === 0) return false;
   if (value === 'false' || value === '0') return false;
@@ -15,6 +17,11 @@ export function navigateToContestAnnouncement(
 ): void {
   const commercialClient = isCommercialClientFlag(meta.commercial_client);
   const route = typeof meta.route === 'string' ? meta.route.trim() : '';
+
+  if (meta.deep_link === 'tawjih_plus_upsell') {
+    router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
+    return;
+  }
 
   if (!commercialClient) {
     try {

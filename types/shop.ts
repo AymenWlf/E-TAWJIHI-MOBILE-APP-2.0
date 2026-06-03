@@ -145,6 +145,9 @@ export type ShopOrderServicePaymentFollowUp = {
   /** Texte d’instructions en arabe (API) ; secours FR si absent. */
   bankInstructionsAr?: string | null;
   cashplusCode?: string | null;
+  cashplusUnavailable?: boolean;
+  cashplusUnavailableMessage?: string;
+  cashplusUnavailableMessageAr?: string | null;
   cashplusInstructions?: string;
   cashplusInstructionsAr?: string | null;
   officeAddress?: string;

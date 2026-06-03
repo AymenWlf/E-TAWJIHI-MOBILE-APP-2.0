@@ -2,9 +2,10 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
 
+import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlusPaywall';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { EligibilityBadge } from '@/components/inscriptions/EligibilityViews';
-import { EstablishmentTypeBadge, establishmentTypeDisplayLabel } from '@/components/ui/EstablishmentTypeBadge';
+import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
 
 import { useLocale } from '@/contexts/LocaleContext';
@@ -16,25 +17,23 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { evaluateEligibility } from '@/utils/eligibility';
 import { formatVillesCourtes, secteurTitres, universityName } from '@/utils/establishmentFormat';
 import { fireAndForget } from '@/utils/fireAndForget';
+import type { EstablishmentLockedVariant } from '@/utils/establishmentLockDisplay';
 
 type Props = {
   item: EstablishmentNormalized;
+  /** `compact` = même carte, contenu sensible masqué + zones désactivées. */
+  lockedVariant?: 'none' | EstablishmentLockedVariant;
   onPress?: () => void;
-  /**
-   * Suivi : bouton texte « Suivre » / « Abonné » en bas si `onToggleFollow` est fourni.
-   * Le tap ne déclenche pas l’`onPress` de la carte.
-   */
   isFollowed?: boolean;
-  /** Tant que `true`, n’affiche pas un état suivi/non suivi avant la fin du chargement serveur. */
   followStateLoading?: boolean;
   followBusy?: boolean;
   onToggleFollow?: () => void;
-  /** Profil éligibilité en cours de chargement — pas de badge « éligible » approximatif. */
   eligibilityLoading?: boolean;
 };
 
 export function EstablishmentCard({
   item,
+  lockedVariant = 'none',
   onPress,
   isFollowed,
   followStateLoading,
@@ -45,6 +44,7 @@ export function EstablishmentCard({
   const { isRTL, t, locale } = useLocale();
   const { profile: eligibilityProfile } = useEligibilityProfile();
   const referencingImpSent = useRef(false);
+  const contentLocked = lockedVariant === 'compact';
 
   const placementId = item.referencingPlacementId;
   useEffect(() => {
@@ -84,135 +84,228 @@ export function EstablishmentCard({
   const secShow = secteurs.slice(0, 2);
   const secExtra = secteurs.length > 2 ? ` +${secteurs.length - 2}` : '';
   const nbFil = item.academicInfo?.nbFilieres ?? item.nbFilieres;
-  const bourseLbl =
-    item.boursesDisponibles && item.bourseMin !== undefined != null ? 'Bourses' : '';
+  const showLocation = Boolean(villesTxt || uni);
+  const showDesc = Boolean(desc);
+  const showChips = dipShow.length > 0 || (typeof nbFil === 'number' && nbFil > 0);
+  const showFooter =
+    secShow.length > 0 || item.echangeInternational || item.eTawjihiInscription || item.boursesDisponibles;
+  const showMetrics = true;
 
   return (
     <Pressable
       onPress={handleCardPress}
       style={({ pressed }) => [
         styles.card,
-        item.isSponsored && styles.cardSponsored,
+        item.isSponsored && !contentLocked && styles.cardSponsored,
+        contentLocked && styles.cardLocked,
         isRTL && styles.cardRtl,
         pressed && { opacity: 0.96 },
       ]}>
       <View style={[styles.accentBar, isRTL && styles.accentBarRtl]} />
 
-      {item.isSponsored ? (
+      {item.isSponsored && !contentLocked ? (
         <View style={styles.sponsoredTopWrap}>
           <TinyBadge label={t('estCardBadgeSponsored')} tint="blue" textRtl={isRTL} />
         </View>
       ) : null}
 
-      <View style={[styles.topRow, isRTL && styles.topRowRtl]}>
-        <View style={[styles.logoOuter, isRTL && styles.logoOuterRtl]}>
-          <Image source={{ uri: item.displayLogoUrl }} style={styles.logo} resizeMode="contain" accessibilityIgnoresInvertColors />
+      <View style={[styles.topRow, isRTL && styles.topRowRtl, contentLocked && styles.sectionDisabled]}>
+        <View style={[styles.logoOuter, isRTL && styles.logoOuterRtl, contentLocked && styles.logoOuterLocked]}>
+          {contentLocked ? (
+            <View style={styles.logoPlaceholder}>
+              <FontAwesome name="university" size={22} color="#CBD5E1" />
+            </View>
+          ) : (
+            <Image
+              source={{ uri: item.displayLogoUrl }}
+              style={styles.logo}
+              resizeMode="contain"
+              accessibilityIgnoresInvertColors
+            />
+          )}
         </View>
         <View style={[styles.titleBlock, isRTL && styles.titleBlockRtl]}>
-          <View style={styles.titleLine}>
-            <Text style={[styles.title, isRTL && styles.titleRtl, isRTL && styles.txtRtl]} numberOfLines={2}>
-              {primaryName}
-            </Text>
-          </View>
-          {secondaryLine ? (
-            <Text style={[styles.sigleLine, isRTL && styles.sigleLineRtl, isRTL && styles.txtRtl]} numberOfLines={1}>
-              {secondaryLine}
-            </Text>
-          ) : null}
-          <View style={[styles.badgeRow, isRTL && styles.badgeRowRtl]}>
-            <EstablishmentTypeBadge type={item.type} size="xs" hideIfUnknown={false} />
-            {item.isRecommended ? <TinyBadge label="Recommandé" tint="green" /> : null}
-            {eligibilityLoading ? (
-              <View style={styles.eligibilityLoadingDot}>
-                <ActivityIndicator size="small" color={homeShell.blue} />
+          {contentLocked ? (
+            <>
+              <HiddenBar width="88%" height={14} isRTL={isRTL} />
+              <HiddenBar width="55%" height={11} style={{ marginTop: 6 }} isRTL={isRTL} />
+            </>
+          ) : (
+            <>
+              <View style={styles.titleLine}>
+                <Text style={[styles.title, isRTL && styles.titleRtl, isRTL && styles.txtRtl]} numberOfLines={2}>
+                  {primaryName}
+                </Text>
               </View>
+              {secondaryLine ? (
+                <Text style={[styles.sigleLine, isRTL && styles.sigleLineRtl, isRTL && styles.txtRtl]} numberOfLines={1}>
+                  {secondaryLine}
+                </Text>
+              ) : null}
+            </>
+          )}
+          <View style={[styles.badgeRow, isRTL && styles.badgeRowRtl]}>
+            {(item.type ?? '').trim() ? (
+              <EstablishmentTypeBadge type={item.type} size="xs" />
+            ) : null}
+            {contentLocked ? (
+              <>
+                <BadgeLockedPlaceholder />
+                <BadgeLockedPlaceholder />
+              </>
             ) : (
-              <EligibilityBadge result={eligibility} size="xs" />
+              <>
+                {item.isRecommended ? <TinyBadge label="Recommandé" tint="green" /> : null}
+                {eligibilityLoading ? (
+                  <View style={styles.eligibilityLoadingDot}>
+                    <ActivityIndicator size="small" color={homeShell.blue} />
+                  </View>
+                ) : (
+                  <EligibilityBadge result={eligibility} size="xs" />
+                )}
+                <DiagnosticEstablishmentCompatibilityBadge
+                  establishmentId={item.id}
+                  establishmentType={item.type}
+                  size="xs"
+                  isRTL={isRTL}
+                  locale={locale === 'ar' ? 'ar' : 'fr'}
+                />
+              </>
             )}
-            <DiagnosticEstablishmentCompatibilityBadge
-              establishmentId={item.id}
-              establishmentType={item.type}
-              size="xs"
-              isRTL={isRTL}
-              locale={locale === 'ar' ? 'ar' : 'fr'}
-            />
           </View>
         </View>
         <View style={[styles.topRight, isRTL && styles.topRightRtl]}>
           <FontAwesome
-            name={isRTL ? 'chevron-left' : 'chevron-right'}
+            name={contentLocked ? 'lock' : isRTL ? 'chevron-left' : 'chevron-right'}
             size={14}
-            color={homeShell.cardMuted}
+            color={contentLocked ? '#94A3B8' : homeShell.cardMuted}
             style={[styles.chev, isRTL && styles.chevRtl]}
           />
         </View>
       </View>
 
-      {(villesTxt || uni) && (
-        <View style={[styles.rowIcon, isRTL && styles.rowIconRtl]}>
-          <FontAwesome name="map-marker" size={13} color={homeShell.greenDark} />
-          <Text style={[styles.rowTxt, isRTL && styles.txtRtl]} numberOfLines={2}>
-            {villesTxt}
-            {villesTxt && uni ? ' · ' : ''}
-            {uni}
-          </Text>
-        </View>
-      )}
-
-      {desc ? (
-        <Text style={[styles.desc, isRTL && styles.txtRtl, isRTL && styles.blockRtl]} numberOfLines={3}>
-          {desc}
-        </Text>
-      ) : null}
-
-      <View style={[styles.metricRow, isRTL && styles.metricRowRtl]}>
-        <Metric
-          icon="building"
-          label={t('estLabelSchoolType')}
-          value={establishmentTypeDisplayLabel(item.type, t)}
-        />
-        {item.dureeLabel ? <Metric icon="clock-o" label={t('estLabelDuration')} value={item.dureeLabel} /> : null}
-        <Metric
-          icon="graduation-cap"
-          label={t('estLabelAdmission')}
-          value={item.concoursAdmission ? t('estAdmissionConcours') : t('estAdmissionDossier')}
-        />
-      </View>
-
-      {(dipShow.length > 0 || (typeof nbFil === 'number' && nbFil > 0)) && (
-        <View style={[styles.chipRow, isRTL && styles.blockRtl]}>
-          {dipShow.map((d) => (
-            <View key={d} style={styles.dipChip}>
-              <Text style={[styles.dipChipTxt, isRTL && styles.txtRtl]}>{d}</Text>
-            </View>
-          ))}
-          {dipExtra ? (
-            <View style={[styles.dipChip, styles.dipChipMuted]}>
-              <Text style={[styles.dipChipTxtMuted, isRTL && styles.txtRtl]}>{dipExtra.trim()}</Text>
-            </View>
-          ) : null}
-          {typeof nbFil === 'number' && nbFil > 0 && dipShow.length === 0 ? (
-            <View style={styles.dipChip}>
-              <Text style={[styles.dipChipTxt, isRTL && styles.txtRtl]}>{nbFil} filière{nbFil > 1 ? 's' : ''}</Text>
-            </View>
-          ) : null}
-        </View>
-      )}
-
-      {(secShow.length > 0 || item.echangeInternational || item.eTawjihiInscription || item.boursesDisponibles) && (
-        <View style={[styles.footerRow, isRTL && styles.footerRowRtl]}>
-          {secShow.length > 0 && (
-            <Text style={[styles.footerMeta, isRTL && styles.txtRtl]} numberOfLines={2}>
-              <Text style={[styles.footerLbl, isRTL && styles.txtRtl]}>{t('estLabelSectors')} · </Text>
-              {secShow.join(', ')}
-              {secExtra}
+      {(showLocation || contentLocked) && (
+        <View
+          style={[
+            styles.rowIcon,
+            isRTL && styles.rowIconRtl,
+            contentLocked && styles.sectionDisabled,
+          ]}
+          pointerEvents={contentLocked ? 'none' : 'auto'}>
+          <FontAwesome name="map-marker" size={13} color={contentLocked ? '#CBD5E1' : homeShell.greenDark} />
+          {contentLocked ? (
+            <HiddenBar flex={1} height={12} isRTL={isRTL} />
+          ) : (
+            <Text style={[styles.rowTxt, isRTL && styles.txtRtl]} numberOfLines={2}>
+              {villesTxt}
+              {villesTxt && uni ? ' · ' : ''}
+              {uni}
             </Text>
           )}
-          <View style={[styles.footerIcons, isRTL && styles.footerIconsRtl]}>
-            {item.echangeInternational ? <FontAwesome name="globe" size={14} color={homeShell.blue} /> : null}
-            {item.eTawjihiInscription ? <FontAwesome name="bolt" size={14} color={homeShell.greenDark} /> : null}
-            {item.boursesDisponibles ? <FontAwesome name="gift" size={13} color={homeShell.greenDark} /> : null}
-          </View>
+        </View>
+      )}
+
+      {(showDesc || contentLocked) && (
+        <View style={[contentLocked && styles.sectionDisabled]} pointerEvents={contentLocked ? 'none' : 'auto'}>
+          {contentLocked ? (
+            <View style={[styles.descPlaceholder, isRTL && styles.blockRtl]}>
+              <HiddenBar width="100%" height={10} isRTL={isRTL} />
+              <HiddenBar width="92%" height={10} style={{ marginTop: 6 }} isRTL={isRTL} />
+              <HiddenBar width="75%" height={10} style={{ marginTop: 6 }} isRTL={isRTL} />
+            </View>
+          ) : (
+            <Text style={[styles.desc, isRTL && styles.txtRtl, isRTL && styles.blockRtl]} numberOfLines={3}>
+              {desc}
+            </Text>
+          )}
+        </View>
+      )}
+
+      {showMetrics && (
+        <View
+          style={[styles.metricRow, isRTL && styles.metricRowRtl, contentLocked && styles.sectionDisabled]}
+          pointerEvents={contentLocked ? 'none' : 'auto'}>
+          <Metric icon="building" label={t('estLabelSchoolType')} value="" locked={contentLocked} />
+          <Metric
+            icon="clock-o"
+            label={t('estLabelDuration')}
+            value={item.dureeLabel ?? '—'}
+            locked={contentLocked}
+          />
+          <Metric
+            icon="graduation-cap"
+            label={t('estLabelAdmission')}
+            value={item.concoursAdmission ? t('estAdmissionConcours') : t('estAdmissionDossier')}
+            locked={contentLocked}
+          />
+        </View>
+      )}
+
+      {(showChips || contentLocked) && (
+        <View
+          style={[styles.chipRow, isRTL && styles.blockRtl, contentLocked && styles.sectionDisabled]}
+          pointerEvents={contentLocked ? 'none' : 'auto'}>
+          {contentLocked ? (
+            <>
+              <View style={styles.dipChipLocked}>
+                <HiddenBar width={48} height={10} />
+              </View>
+              <View style={styles.dipChipLocked}>
+                <HiddenBar width={56} height={10} />
+              </View>
+            </>
+          ) : (
+            <>
+              {dipShow.map((d) => (
+                <View key={d} style={styles.dipChip}>
+                  <Text style={[styles.dipChipTxt, isRTL && styles.txtRtl]}>{d}</Text>
+                </View>
+              ))}
+              {dipExtra ? (
+                <View style={[styles.dipChip, styles.dipChipMuted]}>
+                  <Text style={[styles.dipChipTxtMuted, isRTL && styles.txtRtl]}>{dipExtra.trim()}</Text>
+                </View>
+              ) : null}
+              {typeof nbFil === 'number' && nbFil > 0 && dipShow.length === 0 ? (
+                <View style={styles.dipChip}>
+                  <Text style={[styles.dipChipTxt, isRTL && styles.txtRtl]}>
+                    {nbFil} filière{nbFil > 1 ? 's' : ''}
+                  </Text>
+                </View>
+              ) : null}
+            </>
+          )}
+        </View>
+      )}
+
+      {(showFooter || contentLocked) && (
+        <View
+          style={[styles.footerRow, isRTL && styles.footerRowRtl, contentLocked && styles.sectionDisabled]}
+          pointerEvents={contentLocked ? 'none' : 'auto'}>
+          {contentLocked ? (
+            <HiddenBar flex={1} height={11} isRTL={isRTL} />
+          ) : (
+            <>
+              {secShow.length > 0 && (
+                <Text style={[styles.footerMeta, isRTL && styles.txtRtl]} numberOfLines={2}>
+                  <Text style={[styles.footerLbl, isRTL && styles.txtRtl]}>{t('estLabelSectors')} · </Text>
+                  {secShow.join(', ')}
+                  {secExtra}
+                </Text>
+              )}
+              <View style={[styles.footerIcons, isRTL && styles.footerIconsRtl]}>
+                {item.echangeInternational ? (
+                  <FontAwesome name="globe" size={14} color={homeShell.blue} />
+                ) : null}
+                {item.eTawjihiInscription ? (
+                  <FontAwesome name="bolt" size={14} color={homeShell.greenDark} />
+                ) : null}
+                {item.boursesDisponibles ? (
+                  <FontAwesome name="gift" size={13} color={homeShell.greenDark} />
+                ) : null}
+              </View>
+            </>
+          )}
         </View>
       )}
 
@@ -223,22 +316,29 @@ export function EstablishmentCard({
               e.stopPropagation?.();
               onToggleFollow();
             }}
-            disabled={followBusy || followStateLoading}
+            disabled={contentLocked || followBusy || followStateLoading}
             accessibilityRole="button"
             accessibilityState={{
-              selected: !!isFollowed,
-              busy: !!followBusy || !!followStateLoading,
+              selected: !contentLocked && !!isFollowed,
+              busy: !contentLocked && (!!followBusy || !!followStateLoading),
             }}
             accessibilityLabel={
-              followStateLoading ? t('inscLoading') : isFollowed ? t('followSchoolUnfollowBtn') : t('followSchoolBtn')
+              contentLocked
+                ? t('inscTawjihPlusUpgradeCta')
+                : followStateLoading
+                  ? t('inscLoading')
+                  : isFollowed
+                    ? t('followSchoolUnfollowBtn')
+                    : t('followSchoolBtn')
             }
             hitSlop={8}
             style={({ pressed }) => [
               styles.actionBarBtn,
               styles.followBtn,
-              !followStateLoading && isFollowed && styles.followBtnActive,
+              contentLocked && styles.followBtnLocked,
+              !contentLocked && !followStateLoading && isFollowed && styles.followBtnActive,
               pressed && { opacity: 0.85 },
-              (followBusy || followStateLoading) && { opacity: 0.6 },
+              !contentLocked && (followBusy || followStateLoading) && { opacity: 0.6 },
             ]}>
             {followBusy || followStateLoading ? (
               <ActivityIndicator
@@ -248,22 +348,66 @@ export function EstablishmentCard({
             ) : (
               <>
                 <FontAwesome
-                  name={isFollowed ? 'heart' : 'heart-o'}
+                  name={contentLocked ? 'lock' : isFollowed ? 'heart' : 'heart-o'}
                   size={12}
-                  color={isFollowed ? brand.primary : brand.white}
+                  color={contentLocked ? '#64748B' : isFollowed ? brand.primary : brand.white}
                 />
                 <Text
-                  style={[styles.followBtnTxt, isFollowed && styles.followBtnTxtActive, isRTL && styles.txtRtl]}
-                  numberOfLines={1}
-                >
-                  {isFollowed ? t('inscAnnouncementsFollowing') : t('inscAnnouncementsFollow')}
+                  style={[
+                    styles.followBtnTxt,
+                    contentLocked && styles.followBtnTxtLocked,
+                    !contentLocked && isFollowed && styles.followBtnTxtActive,
+                    isRTL && styles.txtRtl,
+                  ]}
+                  numberOfLines={1}>
+                  {contentLocked
+                    ? t('inscTawjihPlusUpgradeCta')
+                    : isFollowed
+                      ? t('inscAnnouncementsFollowing')
+                      : t('inscAnnouncementsFollow')}
                 </Text>
               </>
             )}
           </Pressable>
         </View>
       ) : null}
+
+      {contentLocked ? <PaywallCardReservedOverlay isRTL={isRTL} /> : null}
     </Pressable>
+  );
+}
+
+function HiddenBar({
+  width,
+  height = 12,
+  flex,
+  style,
+  isRTL,
+}: {
+  width?: number | `${number}%`;
+  height?: number;
+  flex?: number;
+  style?: object;
+  isRTL?: boolean;
+}) {
+  return (
+    <View
+      style={[
+        styles.hiddenBar,
+        flex != null ? { flex } : { width: width ?? '100%' },
+        { height },
+        isRTL && styles.hiddenBarRtl,
+        style,
+      ]}
+    />
+  );
+}
+
+function BadgeLockedPlaceholder() {
+  return (
+    <View style={styles.badgeLockedPill}>
+      <FontAwesome name="lock" size={9} color="#94A3B8" />
+    </View>
   );
 }
 
@@ -274,8 +418,7 @@ function TinyBadge({ label, tint, textRtl }: { label: string; tint: 'neutral' | 
       : tint === 'green'
         ? homeShell.greenAlpha11
         : homeShell.greenAlpha18;
-  const fg =
-    tint === 'blue' ? homeShell.blue : tint === 'green' ? homeShell.greenDark : homeShell.blueDeep;
+  const fg = tint === 'blue' ? homeShell.blue : tint === 'green' ? homeShell.greenDark : homeShell.blueDeep;
   return (
     <View style={[styles.tinyBadge, { backgroundColor: bg }]}>
       <Text style={[styles.tinyBadgeTxt, { color: fg }, textRtl && styles.txtRtl]}>{label}</Text>
@@ -283,14 +426,30 @@ function TinyBadge({ label, tint, textRtl }: { label: string; tint: 'neutral' | 
   );
 }
 
-function Metric({ icon, label, value }: { icon: React.ComponentProps<typeof FontAwesome>['name']; label: string; value: string }) {
+function Metric({
+  icon,
+  label,
+  value,
+  locked = false,
+}: {
+  icon: React.ComponentProps<typeof FontAwesome>['name'];
+  label: string;
+  value: string;
+  locked?: boolean;
+}) {
   return (
-    <View style={styles.metric}>
-      <FontAwesome name={icon} size={12} color={homeShell.cardMuted} />
-      <Text style={styles.metricLbl}>{label}</Text>
-      <Text style={styles.metricVal} numberOfLines={2}>
-        {value}
-      </Text>
+    <View style={[styles.metric, locked && styles.metricLocked]}>
+      <FontAwesome name={icon} size={12} color={locked ? '#CBD5E1' : homeShell.cardMuted} />
+      <Text style={[styles.metricLbl, locked && styles.metricLblLocked]}>{label}</Text>
+      {locked ? (
+        <View style={styles.metricValLockedRow}>
+          <FontAwesome name="lock" size={10} color="#94A3B8" />
+        </View>
+      ) : (
+        <Text style={styles.metricVal} numberOfLines={2}>
+          {value}
+        </Text>
+      )}
     </View>
   );
 }
@@ -310,6 +469,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 2,
     position: 'relative',
+  },
+  cardLocked: {
+    backgroundColor: '#FAFBFC',
   },
   cardSponsored: {
     borderColor: '#a78bfa',
@@ -342,6 +504,21 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
+  sectionDisabled: {
+    opacity: 0.72,
+  },
+  badgeLockedPill: {
+    minWidth: 28,
+    minHeight: 22,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: '#F1F5F9',
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   topRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -361,6 +538,10 @@ const styles = StyleSheet.create({
     padding: 8,
     marginStart: spacing.sm,
   },
+  logoOuterLocked: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
   logoOuterRtl: {
     marginStart: 0,
     marginEnd: spacing.sm,
@@ -368,6 +549,12 @@ const styles = StyleSheet.create({
   logo: {
     width: 52,
     height: 52,
+  },
+  logoPlaceholder: {
+    width: 52,
+    height: 52,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   titleBlock: {
     flex: 1,
@@ -390,7 +577,6 @@ const styles = StyleSheet.create({
     letterSpacing: -0.35,
     lineHeight: 22,
   },
-  /** Cairo / arabe : sans interligne explicite assez large, les lignes wrap se collent ou se chevauchent. */
   titleRtl: {
     lineHeight: Math.round(fontSize.lg * 1.45),
     letterSpacing: 0,
@@ -414,6 +600,14 @@ const styles = StyleSheet.create({
   },
   badgeRowRtl: {
     flexDirection: 'row-reverse',
+  },
+  hiddenBar: {
+    borderRadius: 4,
+    backgroundColor: '#E2E8F0',
+    maxWidth: '100%',
+  },
+  hiddenBarRtl: {
+    alignSelf: 'flex-end',
   },
   tinyBadge: {
     paddingHorizontal: 9,
@@ -444,7 +638,7 @@ const styles = StyleSheet.create({
   },
   rowIcon: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 8,
     marginTop: spacing.md,
     marginStart: 2 + spacing.sm,
@@ -470,6 +664,11 @@ const styles = StyleSheet.create({
     color: homeShell.cardMuted,
     fontSize: fontSize.sm,
     lineHeight: 19,
+  },
+  descPlaceholder: {
+    marginTop: spacing.md,
+    marginStart: 2 + spacing.sm,
+    gap: 0,
   },
   blockRtl: {
     marginStart: 0,
@@ -498,6 +697,10 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 4,
   },
+  metricLocked: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
   metricLbl: {
     fontSize: 10,
     fontWeight: '800',
@@ -506,11 +709,18 @@ const styles = StyleSheet.create({
     letterSpacing: 0.35,
     marginTop: 2,
   },
+  metricLblLocked: {
+    color: '#CBD5E1',
+  },
   metricVal: {
     fontSize: fontSize.sm,
     fontWeight: '700',
     color: homeShell.cardText,
     lineHeight: 18,
+  },
+  metricValLockedRow: {
+    minHeight: 18,
+    justifyContent: 'center',
   },
   chipRow: {
     flexDirection: 'row',
@@ -527,6 +737,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(47,206,148,0.22)',
     maxWidth: '100%',
+  },
+  dipChipLocked: {
+    backgroundColor: '#F1F5F9',
+    borderRadius: radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
   },
   dipChipMuted: {
     backgroundColor: '#F8FAFC',
@@ -600,7 +818,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     minHeight: 40,
   },
-  /** Non suivi = bouton rempli ; suivi = contour (via `followBtnActive`). */
   followBtn: {
     gap: 5,
     paddingHorizontal: spacing.sm,
@@ -622,6 +839,13 @@ const styles = StyleSheet.create({
   },
   followBtnTxtActive: {
     color: brand.primary,
+  },
+  followBtnLocked: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#CBD5E1',
+  },
+  followBtnTxtLocked: {
+    color: '#64748B',
   },
   eligibilityLoadingDot: {
     minWidth: 28,

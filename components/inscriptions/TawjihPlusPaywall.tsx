@@ -94,7 +94,7 @@ export function TawjihPlusPreviewLockPanel({
 }) {
   const paywall = usePaywall();
   const show = locked ?? paywall?.isInscriptionsLocked;
-  if (!show) return null;
+  if (!show || !paywall) return null;
 
   return (
     <View style={[styles.previewPanel, style]}>
@@ -123,6 +123,43 @@ export function TawjihPlusLockOverlay({ locked, children, style, minHeight = 200
       ) : null}
       <View style={[styles.overlayVeil, { minHeight }]}>
         <LockPanelContent />
+      </View>
+    </View>
+  );
+}
+
+type PaywallCardReservedOverlayProps = {
+  isRTL?: boolean;
+  /** Cartes horizontales compactes (accueil). */
+  compact?: boolean;
+};
+
+/** Voile superposé sur les cartes écoles / annonces verrouillées. */
+export function PaywallCardReservedOverlay({ isRTL = false, compact = false }: PaywallCardReservedOverlayProps) {
+  const { t } = useLocale();
+
+  return (
+    <View
+      style={[styles.cardReservedOverlay, compact && styles.cardReservedOverlayCompact]}
+      pointerEvents="none"
+      accessibilityElementsHidden
+      importantForAccessibility="no-hide-descendants">
+      <View
+        style={[
+          styles.cardReservedBadge,
+          compact && styles.cardReservedBadgeCompact,
+          isRTL && styles.cardReservedBadgeRtl,
+        ]}>
+        <FontAwesome name="lock" size={compact ? 10 : 13} color={brand.primary} />
+        <Text
+          style={[
+            styles.cardReservedTxt,
+            compact && styles.cardReservedTxtCompact,
+            isRTL && styles.rtl,
+          ]}
+          numberOfLines={2}>
+          {t('paywallCardReservedLabel')}
+        </Text>
       </View>
     </View>
   );
@@ -359,5 +396,57 @@ const styles = StyleSheet.create({
     color: brand.textSecondary,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  cardReservedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 4,
+    backgroundColor: 'rgba(248, 250, 252, 0.78)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  cardReservedOverlayCompact: {
+    backgroundColor: 'rgba(248, 250, 252, 0.82)',
+    paddingHorizontal: 6,
+    paddingVertical: 6,
+  },
+  cardReservedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    maxWidth: '92%',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.lg,
+    backgroundColor: 'rgba(255, 255, 255, 0.96)',
+    borderWidth: 1,
+    borderColor: 'rgba(51, 62, 143, 0.18)',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  cardReservedBadgeCompact: {
+    gap: 5,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
+    borderRadius: radius.md,
+  },
+  cardReservedBadgeRtl: {
+    flexDirection: 'row-reverse',
+  },
+  cardReservedTxt: {
+    flexShrink: 1,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    color: brand.primary,
+    textAlign: 'center',
+    letterSpacing: 0.2,
+  },
+  cardReservedTxtCompact: {
+    fontSize: 9,
+    letterSpacing: 0,
   },
 });
