@@ -5,7 +5,6 @@ import {
   ActivityIndicator,
   Alert,
   Clipboard,
-  Image,
   Pressable,
   StyleSheet,
   View,
@@ -15,6 +14,7 @@ import { CelebrationConfetti } from '@/components/ui/CelebrationConfetti';
 import { Text } from '@/components/ui/Text';
 import type { HomeCopyKey } from '@/constants/i18n';
 import { useAuth } from '@/contexts/AuthContext';
+import { ReferralTierProductThumb } from '@/components/account/ReferralTierProductThumb';
 import {
   claimReferralTierPromo,
   type ReferralTierInfo,
@@ -23,7 +23,7 @@ import {
 } from '@/services/userReferral';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
-import { resolveShopImageUrl, shopProductPrimaryImage } from '@/utils/shopImageUrl';
+import { getTierRewardProducts } from '@/utils/referralTierProduct';
 import { getUserFacingApiError } from '@/utils/apiError';
 
 type Props = {
@@ -37,25 +37,6 @@ type Props = {
 function tierLabel(tier: ReferralTierInfo, locale: 'fr' | 'ar'): string {
   if (locale === 'ar' && tier.rewardLabelAr) return tier.rewardLabelAr;
   return tier.rewardLabelFr ?? '';
-}
-
-function rewardProductImageUri(product: ReferralTierProduct): string {
-  const fromUrl = resolveShopImageUrl(product.imageUrl);
-  if (fromUrl) return fromUrl;
-  if (product.images?.length) return shopProductPrimaryImage(product.images);
-  return '';
-}
-
-function RewardProductThumb({ product, icon }: { product: ReferralTierProduct; icon: 'gift' | 'book' }) {
-  const uri = rewardProductImageUri(product);
-  if (uri) {
-    return <Image source={{ uri }} style={styles.productRowThumb} resizeMode="cover" />;
-  }
-  return (
-    <View style={[styles.productRowThumb, styles.productThumbFallback]}>
-      <FontAwesome name={icon} size={20} color={homeShell.cardMuted} />
-    </View>
-  );
 }
 
 function RewardProductPrice({
@@ -81,11 +62,7 @@ function RewardProductPrice({
 export function ReferralTierRewardPanel({ tier, rtl, locale, t, onClaimSuccess }: Props) {
   const router = useRouter();
   const { getValidAccessToken } = useAuth();
-  const products = tier.rewardProducts?.length
-    ? [...tier.rewardProducts].sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
-    : tier.rewardProduct
-      ? [tier.rewardProduct]
-      : [];
+  const products = getTierRewardProducts(tier);
 
   const [selectedId, setSelectedId] = useState<number | null>(
     tier.promoClaim?.shopProductId ?? products[0]?.id ?? null,
@@ -173,7 +150,7 @@ export function ReferralTierRewardPanel({ tier, rtl, locale, t, onClaimSuccess }
                   active && styles.productRowActive,
                   rtl && styles.rowRtl,
                 ]}>
-                <RewardProductThumb product={p} icon="gift" />
+                <ReferralTierProductThumb product={p} size={64} icon="gift" style={styles.productRowThumb} />
                 <View style={styles.productRowBody}>
                   <Text style={[styles.productRowTitle, rtl && styles.txtRtl]}>{p.title}</Text>
                   <RewardProductPrice product={p} rtl={rtl} t={t} />
@@ -193,7 +170,7 @@ export function ReferralTierRewardPanel({ tier, rtl, locale, t, onClaimSuccess }
         <Pressable
           onPress={() => router.push(`/boutique/${selected.slug}`)}
           style={[styles.singleProductRow, rtl && styles.rowRtl]}>
-          <RewardProductThumb product={selected} icon="book" />
+          <ReferralTierProductThumb product={selected} size={64} icon="book" style={styles.productRowThumb} />
           <View style={styles.singleBody}>
             <Text style={[styles.productRowTitle, rtl && styles.txtRtl]}>{selected.title}</Text>
             {selected.description ? (
@@ -362,12 +339,6 @@ const styles = StyleSheet.create({
     width: 96,
     height: 64,
     borderRadius: radius.md,
-    backgroundColor: '#E2E8F0',
-    flexShrink: 0,
-  },
-  productThumbFallback: {
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   productRowBody: {
     flex: 1,

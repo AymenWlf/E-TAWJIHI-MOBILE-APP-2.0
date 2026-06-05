@@ -385,6 +385,22 @@ type PushData = Record<string, unknown> & {
 
 function navigateFromPushPayload(data: PushData): boolean {
   const route = typeof data.route === 'string' ? data.route.trim() : '';
+  const type = String(data.type ?? '');
+
+  if (
+    type === 'admin_shop_order_new' ||
+    type === 'admin_shop_order_completed' ||
+    type === 'admin_commercial_transaction'
+  ) {
+    const target = route || '/(tabs)/compte';
+    try {
+      router.push(target as Parameters<typeof router.push>[0]);
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   if (route && isGlobalWallMobileRoute(route)) {
     if (GLOBAL_WALL_MOBILE_ENABLED) {
       try {
@@ -396,7 +412,6 @@ function navigateFromPushPayload(data: PushData): boolean {
     }
     return false;
   }
-  const type = String(data.type ?? '');
   const meta = data as Record<string, unknown>;
   const n: AppNotification = {
     id: Number(data.notification_id) || 0,

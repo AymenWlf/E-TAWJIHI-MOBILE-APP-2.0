@@ -28,8 +28,10 @@ import Animated, {
 import { AuthRememberMeRow } from '@/components/auth/AuthRememberMeRow';
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
+import { ToastAlert } from '@/components/ui/ToastAlert';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useToastAlert } from '@/hooks/useToastAlert';
 import { DeviceTransferRequiredError } from '@/services/auth';
 import { CAIRO } from '@/theme/arabicTypography';
 import { brand, radius, spacing } from '@/theme/tokens';
@@ -51,8 +53,8 @@ export default function LoginScreen() {
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(true);
   const [submitting, setSubmitting] = useState(false);
-  const [serverError, setServerError] = useState('');
   const [touched, setTouched] = useState({ phone: false, password: false });
+  const { toast, visible: toastVisible, showError, dismiss: dismissToast } = useToastAlert();
 
   const { bottom: safeBottom } = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
@@ -132,8 +134,15 @@ export default function LoginScreen() {
 
   async function onSubmit() {
     setTouched({ phone: true, password: true });
-    setServerError('');
-    if (!v.phoneOk || !v.passwordOk) return;
+    dismissToast();
+    if (!v.phoneOk) {
+      showError(t('loginInvalidPhone'));
+      return;
+    }
+    if (!v.passwordOk) {
+      showError(t('loginInvalidPassword'));
+      return;
+    }
     setSubmitting(true);
     try {
       // Navigation handled by useSetupRedirectGate in _layout.tsx
@@ -156,7 +165,7 @@ export default function LoginScreen() {
         });
         return;
       }
-      setServerError(errorMessage(e, t, 'auth'));
+      showError(errorMessage(e, t, 'auth'));
     } finally {
       setSubmitting(false);
     }
@@ -167,6 +176,13 @@ export default function LoginScreen() {
   return (
     <View style={styles.root}>
       <StatusBar barStyle="light-content" />
+      <ToastAlert
+        message={toast?.message ?? ''}
+        visible={toastVisible}
+        variant={toast?.variant ?? 'error'}
+        rtl={rtl}
+        onDismiss={dismissToast}
+      />
 
       {/* ─── PARTIE HAUTE BLEUE ───────────────── */}
       <SafeAreaView edges={['top']} style={styles.topSafe}>
@@ -205,13 +221,6 @@ export default function LoginScreen() {
           <View style={styles.sheetHandle} />
           <Text style={[styles.sheetTitle, rtl && styles.rtl]}>{t('loginTitle')}</Text>
           <Text style={[styles.sheetSub, rtl && styles.rtl]}>{t('loginSubtitle')}</Text>
-
-          {!!serverError && (
-            <View style={styles.errorRow}>
-              <FontAwesome name="exclamation-circle" size={14} color={brand.error} />
-              <Text style={styles.errorText}>{serverError}</Text>
-            </View>
-          )}
 
           {/* téléphone */}
           <View
@@ -457,23 +466,6 @@ const styles = StyleSheet.create({
     fontFamily: CAIRO.bold,
   },
   labelMt: { marginTop: spacing.lg },
-
-  /* ── ERREUR SERVEUR ────────────────────── */
-  errorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(239,68,68,0.07)',
-    borderRadius: radius.md,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  errorText: {
-    flex: 1,
-    fontSize: 13,
-    color: brand.error,
-    fontWeight: '700',
-  },
 
   /* ── FIELDS ────────────────────────────── */
   fieldWrap: {

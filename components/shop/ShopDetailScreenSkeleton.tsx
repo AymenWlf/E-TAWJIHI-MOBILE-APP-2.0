@@ -9,6 +9,8 @@ type Variant = 'product' | 'service';
 type Props = {
   variant: Variant;
   gallerySize: number;
+  /** Logo carré service (aligné fiche TAWJIH PLUS). */
+  galleryIconSize?: number;
   isRTL?: boolean;
   style?: StyleProp<ViewStyle>;
 };
@@ -17,9 +19,11 @@ type Props = {
 export function ShopDetailScreenSkeleton({
   variant,
   gallerySize,
+  galleryIconSize,
   isRTL = false,
   style,
 }: Props) {
+  const serviceIconSkeleton = galleryIconSize ?? 88;
   const pulseStyle = useSkeletonPulse();
   const insets = useSafeAreaInsets();
   const isService = variant === 'service';
@@ -28,7 +32,17 @@ export function ShopDetailScreenSkeleton({
     <View style={[styles.root, style]}>
       <View style={[styles.gallery, { height: gallerySize }, isService && styles.galleryService]}>
         {isService ? (
-          <SkeletonBlock style={styles.galleryIcon} pulseStyle={pulseStyle} />
+          <SkeletonBlock
+            style={[
+              styles.galleryIcon,
+              {
+                width: serviceIconSkeleton,
+                height: serviceIconSkeleton,
+                borderRadius: serviceIconSkeleton / 2,
+              },
+            ]}
+            pulseStyle={pulseStyle}
+          />
         ) : null}
       </View>
 

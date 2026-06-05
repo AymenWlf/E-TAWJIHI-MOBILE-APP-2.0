@@ -31,6 +31,14 @@ export function canNavigateFromAppNotification(n: AppNotification): boolean {
     return true;
   }
 
+  if (
+    type === 'admin_shop_order_new' ||
+    type === 'admin_shop_order_completed' ||
+    type === 'admin_commercial_transaction'
+  ) {
+    return Boolean(typeof meta.route === 'string' && meta.route.trim() !== '');
+  }
+
   if (type === 'platform_service_activated' || meta.deep_link === 'platform_service') {
     return true;
   }
@@ -121,6 +129,19 @@ export function navigateFromAppNotification(n: AppNotification): boolean {
 
   if (type === 'welcome') {
     router.push('/(tabs)' as never);
+    return true;
+  }
+
+  if (
+    type === 'admin_shop_order_new' ||
+    type === 'admin_shop_order_completed' ||
+    type === 'admin_commercial_transaction'
+  ) {
+    const route =
+      typeof meta.route === 'string' && meta.route.trim() !== ''
+        ? meta.route.trim()
+        : '/(tabs)/compte';
+    router.push(route as never);
     return true;
   }
 

@@ -1,12 +1,18 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { StyleSheet, View } from 'react-native';
 
+import { ReferralTierProductThumb } from '@/components/account/ReferralTierProductThumb';
 import { ReferralTierRewardPanel } from '@/components/account/ReferralTierRewardPanel';
 import { Text } from '@/components/ui/Text';
 import type { HomeCopyKey } from '@/constants/i18n';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { ReferralTierInfo, UserReferralProgram } from '@/services/userReferral';
+import {
+  getNextReferralTier,
+  getTierDisplayProduct,
+  getTierRewardProducts,
+} from '@/utils/referralTierProduct';
 
 type Props = {
   tierProgress: UserReferralProgram['tierProgress'];
@@ -32,6 +38,9 @@ export function ReferralTierProgress({
   embedded,
 }: Props) {
   const qualifiedCount = tierProgress?.qualifiedAffiliateCount ?? 0;
+  const tiers = tierProgress?.tiers ?? [];
+  const nextTier = getNextReferralTier(tiers);
+  const nextTierProduct = nextTier ? getTierDisplayProduct(nextTier) : null;
   const serviceName =
     tierProgress?.eligibleService?.name ??
     (locale === 'ar' ? 'TAWJIH PLUS' : 'TAWJIH PLUS');
@@ -54,10 +63,28 @@ export function ReferralTierProgress({
         </View>
       </View>
 
-      {(tierProgress?.tiers ?? []).map((tier) => {
+      {nextTier ? (
+        <View style={[styles.nextTierHighlight, rtl && styles.nextTierHighlightRtl]}>
+          <ReferralTierProductThumb product={nextTierProduct} size={72} />
+          <View style={[styles.nextTierTexts, rtl && styles.nextTierTextsRtl]}>
+            <Text style={[styles.nextTierEyebrow, rtl && styles.txtRtl]}>{t('loyaltyTeaserNextReward')}</Text>
+            <Text style={[styles.nextTierTitle, rtl && styles.txtRtl]} numberOfLines={2}>
+              {tierLabel(nextTier, locale)}
+            </Text>
+            <Text style={[styles.nextTierHint, rtl && styles.txtRtl]}>
+              {t('referralTierRemaining').replace('{{count}}', String(nextTier.remaining))}
+            </Text>
+          </View>
+        </View>
+      ) : null}
+
+      {tiers.map((tier) => {
         const label = tierLabel(tier, locale);
         const unlocked = tier.unlocked;
-        const productCount = tier.rewardProducts?.length ?? (tier.rewardProduct ? 1 : 0);
+        const rewardProducts = getTierRewardProducts(tier);
+        const productCount = rewardProducts.length;
+        const primaryProduct = getTierDisplayProduct(tier);
+        const isNextTier = nextTier?.tierIndex === tier.tierIndex;
 
         return (
           <View
@@ -66,6 +93,7 @@ export function ReferralTierProgress({
               styles.tierCard,
               embedded && styles.tierCardEmbedded,
               unlocked && styles.tierCardUnlocked,
+              isNextTier && styles.tierCardNext,
               rtl && styles.tierCardRtl,
             ]}>
             <View style={[styles.tierTop, rtl && styles.rowRtl]}>
@@ -84,15 +112,25 @@ export function ReferralTierProgress({
               )}
             </View>
 
-            <Text style={[styles.tierReward, rtl && styles.txtRtl]} numberOfLines={2}>
-              {label}
-            </Text>
-
-            {tier.rewardMode === 'choice' && productCount > 1 && !unlocked ? (
-              <Text style={[styles.choiceHint, rtl && styles.txtRtl]}>
-                {t('referralTierChoiceHint').replace('{{count}}', String(productCount))}
+            {productCount > 0 ? (
+              <View style={[styles.rewardPreviewRow, rtl && styles.rowRtl]}>
+                <ReferralTierProductThumb product={primaryProduct} size={64} />
+                <View style={[styles.rewardPreviewTexts, rtl && styles.rewardPreviewTextsRtl]}>
+                  <Text style={[styles.tierReward, rtl && styles.txtRtl]} numberOfLines={2}>
+                    {label}
+                  </Text>
+                  {tier.rewardMode === 'choice' && productCount > 1 ? (
+                    <Text style={[styles.choiceHint, rtl && styles.txtRtl]}>
+                      {t('referralTierChoiceHint').replace('{{count}}', String(productCount))}
+                    </Text>
+                  ) : null}
+                </View>
+              </View>
+            ) : (
+              <Text style={[styles.tierReward, rtl && styles.txtRtl]} numberOfLines={2}>
+                {label}
               </Text>
-            ) : null}
+            )}
 
             <View style={styles.progressTrack}>
               <View
@@ -115,17 +153,11 @@ export function ReferralTierProgress({
                 t={t}
                 onClaimSuccess={onClaimSuccess}
               />
-            ) : productCount > 0 ? (
-              <View style={styles.previewRow}>
-                {(tier.rewardProducts ?? (tier.rewardProduct ? [tier.rewardProduct] : []))
-                  .slice(0, 3)
-                  .map((p) => (
-                    <View key={p.id} style={styles.previewChip}>
-                      <Text style={[styles.previewChipTxt, rtl && styles.txtRtl]} numberOfLines={1}>
-                        {p.title}
-                      </Text>
-                    </View>
-                  ))}
+            ) : productCount > 1 && tier.rewardMode === 'choice' ? (
+              <View style={[styles.previewRow, rtl && styles.rowRtl]}>
+                {rewardProducts.slice(0, 3).map((p) => (
+                  <ReferralTierProductThumb key={p.id} product={p} size={44} />
+                ))}
                 {productCount > 3 ? (
                   <Text style={styles.previewMore}>+{productCount - 3}</Text>
                 ) : null}
@@ -182,6 +214,45 @@ const styles = StyleSheet.create({
     lineHeight: 17,
     paddingHorizontal: 2,
   },
+  nextTierHighlight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.sm,
+    borderRadius: radius.lg,
+    backgroundColor: `${brand.primary}08`,
+    borderWidth: 1,
+    borderColor: `${brand.primary}22`,
+  },
+  nextTierHighlightRtl: {
+    flexDirection: 'row-reverse',
+  },
+  nextTierTexts: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  nextTierTextsRtl: {
+    alignItems: 'flex-end',
+  },
+  nextTierEyebrow: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: homeShell.blue,
+    textTransform: 'uppercase',
+    letterSpacing: 0.35,
+  },
+  nextTierTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    color: homeShell.cardText,
+    lineHeight: 20,
+  },
+  nextTierHint: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: homeShell.greenDark,
+  },
   tierCard: {
     marginTop: spacing.xs,
     padding: spacing.sm,
@@ -198,6 +269,23 @@ const styles = StyleSheet.create({
   tierCardUnlocked: {
     borderColor: `${homeShell.green}66`,
     backgroundColor: '#F0FDF4',
+  },
+  tierCardNext: {
+    borderColor: `${brand.primary}44`,
+    backgroundColor: '#F8FAFF',
+  },
+  rewardPreviewRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  rewardPreviewTexts: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  rewardPreviewTextsRtl: {
+    alignItems: 'flex-end',
   },
   tierTop: {
     flexDirection: 'row',
@@ -264,20 +352,9 @@ const styles = StyleSheet.create({
   previewRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
     marginTop: 4,
-  },
-  previewChip: {
-    maxWidth: '48%',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-    backgroundColor: '#E2E8F0',
-  },
-  previewChipTxt: {
-    fontSize: 9,
-    fontWeight: '700',
-    color: homeShell.cardMuted,
+    alignItems: 'center',
   },
   previewMore: {
     fontSize: 9,

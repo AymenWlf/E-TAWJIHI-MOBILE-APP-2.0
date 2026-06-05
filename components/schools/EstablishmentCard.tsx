@@ -5,7 +5,10 @@ import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-nat
 import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlusPaywall';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { EligibilityBadge } from '@/components/inscriptions/EligibilityViews';
-import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
+import {
+  EstablishmentTypeBadge,
+  establishmentTypeDisplayLabel,
+} from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
 
 import { useLocale } from '@/contexts/LocaleContext';
@@ -90,6 +93,7 @@ export function EstablishmentCard({
   const showFooter =
     secShow.length > 0 || item.echangeInternational || item.eTawjihiInscription || item.boursesDisponibles;
   const showMetrics = true;
+  const typeLabel = establishmentTypeDisplayLabel(item.type, t) || '—';
 
   return (
     <Pressable
@@ -225,7 +229,7 @@ export function EstablishmentCard({
         <View
           style={[styles.metricRow, isRTL && styles.metricRowRtl, contentLocked && styles.sectionDisabled]}
           pointerEvents={contentLocked ? 'none' : 'auto'}>
-          <Metric icon="building" label={t('estLabelSchoolType')} value="" locked={contentLocked} />
+          <Metric icon="building" label={t('estLabelSchoolType')} value={typeLabel} locked={contentLocked} />
           <Metric
             icon="clock-o"
             label={t('estLabelDuration')}

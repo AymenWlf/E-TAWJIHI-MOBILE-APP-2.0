@@ -4,9 +4,11 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ReferralLockedBanner } from '@/components/account/ReferralLockedBanner';
 import { ReferralShareCodeBlock } from '@/components/account/ReferralShareCodeBlock';
 import { ReferralTeaserBodySkeleton } from '@/components/account/ReferralProgramSkeleton';
+import { ReferralTierProductThumb } from '@/components/account/ReferralTierProductThumb';
 import { Text } from '@/components/ui/Text';
 import type { HomeCopyKey } from '@/constants/i18n';
-import type { ReferralTierProgress } from '@/services/userReferral';
+import type { ReferralTierInfo, ReferralTierProgress } from '@/services/userReferral';
+import { getTierDisplayProduct, getTierRewardProducts } from '@/utils/referralTierProduct';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
@@ -26,10 +28,7 @@ type Props = {
   showShareActions?: boolean;
 };
 
-function tierRewardLabel(
-  tier: NonNullable<ReferralTierProgress['tiers']>[number],
-  locale: 'fr' | 'ar',
-): string {
+function tierRewardLabel(tier: ReferralTierInfo, locale: 'fr' | 'ar'): string {
   if (locale === 'ar' && tier.rewardLabelAr) return tier.rewardLabelAr;
   return tier.rewardLabelFr ?? tier.rewardProduct?.title ?? '';
 }
@@ -51,6 +50,8 @@ export function LoyaltyTeaserCard({
   const qualifiedCount = tierProgress?.qualifiedAffiliateCount ?? 0;
   const tiers = tierProgress?.tiers ?? [];
   const nextTier = tiers.find((tier) => !tier.unlocked);
+  const nextTierProduct = nextTier ? getTierDisplayProduct(nextTier) : null;
+  const nextTierProductCount = nextTier ? getTierRewardProducts(nextTier).length : 0;
   const allUnlocked = tiers.length > 0 && tiers.every((tier) => tier.unlocked);
   const serviceName = tierProgress?.eligibleService?.name ?? requiredServiceName;
 
@@ -97,13 +98,23 @@ export function LoyaltyTeaserCard({
 
                 {nextTier ? (
                   <View style={styles.nextRewardBox}>
-                    <Text style={[styles.statLabel, rtl && styles.txtRtl]}>{t('loyaltyTeaserNextReward')}</Text>
-                    <Text style={[styles.statValueSm, rtl && styles.txtRtl]} numberOfLines={2}>
-                      {tierRewardLabel(nextTier, locale)}
-                    </Text>
-                    <Text style={[styles.statHint, rtl && styles.txtRtl]}>
-                      {t('referralTierRemaining').replace('{{count}}', String(nextTier.remaining))}
-                    </Text>
+                    <View style={[styles.nextRewardRow, rtl && styles.rowRtl]}>
+                      <ReferralTierProductThumb product={nextTierProduct} size={52} />
+                      <View style={[styles.nextRewardTexts, rtl && styles.nextRewardTextsRtl]}>
+                        <Text style={[styles.statLabel, rtl && styles.txtRtl]}>{t('loyaltyTeaserNextReward')}</Text>
+                        <Text style={[styles.statValueSm, rtl && styles.txtRtl]} numberOfLines={2}>
+                          {tierRewardLabel(nextTier, locale)}
+                        </Text>
+                        <Text style={[styles.statHint, rtl && styles.txtRtl]}>
+                          {t('referralTierRemaining').replace('{{count}}', String(nextTier.remaining))}
+                        </Text>
+                        {nextTier.rewardMode === 'choice' && nextTierProductCount > 1 ? (
+                          <Text style={[styles.choiceHint, rtl && styles.txtRtl]}>
+                            {t('referralTierChoiceHint').replace('{{count}}', String(nextTierProductCount))}
+                          </Text>
+                        ) : null}
+                      </View>
+                    </View>
                   </View>
                 ) : allUnlocked ? (
                   <View style={[styles.nextRewardBox, rtl && styles.rowRtl]}>
@@ -257,6 +268,25 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.12)',
     gap: 4,
+  },
+  nextRewardRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  nextRewardTexts: {
+    flex: 1,
+    minWidth: 0,
+    gap: 4,
+  },
+  nextRewardTextsRtl: {
+    alignItems: 'flex-end',
+  },
+  choiceHint: {
+    fontSize: 9,
+    fontWeight: '600',
+    color: 'rgba(255,255,255,0.55)',
+    lineHeight: 13,
   },
   servicePill: {
     alignSelf: 'flex-start',

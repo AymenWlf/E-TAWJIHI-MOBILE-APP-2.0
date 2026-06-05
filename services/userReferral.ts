@@ -53,6 +53,8 @@ export type ReferralTierInfo = {
   rewardLabelAr: string | null;
   rewardProduct: ReferralTierProduct | null;
   rewardProducts: ReferralTierProduct[];
+  /** Visuel configuré dans le backoffice (produit ou pack) — prioritaire pour l’aperçu. */
+  displayImageProduct?: ReferralTierProduct | null;
   promoClaim: ReferralTierPromoClaim | null;
   canClaim: boolean;
   rewardTaken: boolean;

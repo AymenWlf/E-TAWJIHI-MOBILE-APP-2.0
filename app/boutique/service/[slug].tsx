@@ -19,7 +19,7 @@ import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVis
 import { ShopDetailScreenSkeleton } from '@/components/shop/ShopDetailScreenSkeleton';
 import { Text } from '@/components/ui/Text';
 import { ETAWJIHI_LOGO_TRANSPARENT } from '@/constants/brandAssets';
-import { TAWJIH_PLUS_SERVICE_SLUG } from '@/constants/tawjihPlusAccess';
+import { platformServiceGalleryLogoIconSize } from '@/constants/platformServiceBrandVisual';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
@@ -170,13 +170,7 @@ export default function PlatformServiceDetailScreen() {
       ? shopPromoDiscountPercent(priceDisplay.primary, priceDisplay.compare)
       : null;
 
-  const galleryIconSize = useMemo(() => {
-    const defaultSize = Math.min(96, Math.round(width * 0.26));
-    if (slug === TAWJIH_PLUS_SERVICE_SLUG) {
-      return Math.min(288, Math.round(width * 0.78));
-    }
-    return defaultSize;
-  }, [slug, width]);
+  const galleryIconSize = useMemo(() => platformServiceGalleryLogoIconSize(width), [width]);
 
   const handleAdd = useCallback(async () => {
     if (!service) return;
@@ -340,7 +334,12 @@ export default function PlatformServiceDetailScreen() {
             <View style={{ flex: 1 }} />
           </View>
         </SafeAreaView>
-        <ShopDetailScreenSkeleton variant="service" gallerySize={width} isRTL={isRTL} />
+        <ShopDetailScreenSkeleton
+          variant="service"
+          gallerySize={width}
+          galleryIconSize={galleryIconSize}
+          isRTL={isRTL}
+        />
       </View>
     );
   }
