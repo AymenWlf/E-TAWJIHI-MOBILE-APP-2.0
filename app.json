@@ -31,7 +31,7 @@
     "android": {
       "package": "com.educalogy.etawjihi",
       "versionCode": 63,
-      "icon": "./assets/images/logo-carre-coul-new.png",
+      "icon": "./assets/images/logo-carre-coul-android.png",
       "permissions": [
         "INTERNET",
         "ACCESS_NETWORK_STATE",
@@ -54,9 +54,9 @@
         }
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/adaptive-icon.png",
+        "foregroundImage": "./assets/images/adaptive-icon-android.png",
         "backgroundColor": "#333e8f",
-        "monochromeImage": "./assets/images/adaptive-icon.png"
+        "monochromeImage": "./assets/images/adaptive-icon-android.png"
       },
       "splash": {
         "image": "./assets/images/logo-carre-coul-new.png",

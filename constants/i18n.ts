@@ -424,10 +424,6 @@ export type HomeCopyKey =
   | 'appUpdateEyebrow'
   | 'appUpdateTitleRequired'
   | 'appUpdateTitleRecommended'
-  | 'appUpdateMajorTitle'
-  | 'appUpdateMajorLead'
-  | 'appUpdateStoreCtaIos'
-  | 'appUpdateStoreCtaAndroid'
   | 'appUpdateCta'
   | 'appUpdateLater'
   | 'appUpdateVersionHint'
@@ -2158,11 +2154,6 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     appUpdateEyebrow: 'Mise à jour',
     appUpdateTitleRequired: 'Mise à jour obligatoire',
     appUpdateTitleRecommended: 'Nouvelle version disponible',
-    appUpdateMajorTitle: 'Grande mise à jour disponible',
-    appUpdateMajorLead:
-      'Téléchargez la nouvelle version depuis le store pour continuer à utiliser E-TAWJIHI.',
-    appUpdateStoreCtaIos: 'Télécharger sur l’App Store',
-    appUpdateStoreCtaAndroid: 'Télécharger sur le Play Store',
     appUpdateCta: 'Mettre à jour depuis le store',
     appUpdateLater: 'Plus tard',
     appUpdateVersionHint: 'Votre version : {current} — dernière : {latest}',
@@ -4002,10 +3993,6 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     appUpdateEyebrow: 'تحديث',
     appUpdateTitleRequired: 'تحديث إلزامي',
     appUpdateTitleRecommended: 'إصدار جديد متوفر',
-    appUpdateMajorTitle: 'تحديث كبير متوفر',
-    appUpdateMajorLead: 'حمّل الإصدار الجديد من المتجر لمتابعة استخدام إي-توجيهي.',
-    appUpdateStoreCtaIos: 'التنزيل من App Store',
-    appUpdateStoreCtaAndroid: 'التنزيل من Play Store',
     appUpdateCta: 'التحديث من المتجر',
     appUpdateLater: 'لاحقاً',
     appUpdateVersionHint: 'إصدارك: {current} — آخر إصدار: {latest}',
