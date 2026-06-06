@@ -1,6 +1,8 @@
 import { forwardRef, useState } from 'react';
-import { Platform, StyleSheet, TextInput, type TextInputProps } from 'react-native';
+import { Platform, StyleSheet, TextInput, type TextInputProps, type TextStyle } from 'react-native';
 
+import { useLocale } from '@/contexts/LocaleContext';
+import { applyArabicFontOverlay } from '@/theme/arabicTypography';
 import { brand, radius, spacing } from '@/theme/tokens';
 
 const SOFT_BORDER = 'rgba(51, 62, 143, 0.14)';
@@ -16,7 +18,10 @@ export const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function Ap
   { style, onFocus, onBlur, textRtl, plain, placeholderTextColor, ...rest },
   ref,
 ) {
+  const { isRTL } = useLocale();
   const [focused, setFocused] = useState(false);
+  const flat = StyleSheet.flatten(style) as TextStyle | undefined;
+  const arabic = isRTL ? applyArabicFontOverlay(flat) : undefined;
   return (
     <TextInput
       ref={ref}
@@ -34,8 +39,9 @@ export const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function Ap
       style={[
         plain ? styles.plain : styles.filled,
         !plain && focused && styles.filledFocused,
-        textRtl && styles.rtlText,
+        (textRtl || isRTL) && styles.rtlText,
         style,
+        arabic,
       ]}
     />
   );

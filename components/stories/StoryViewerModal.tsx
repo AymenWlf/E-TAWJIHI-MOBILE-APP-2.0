@@ -1,16 +1,20 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { StatusBar } from 'expo-status-bar';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, Image, Linking, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Dimensions,
+  Image,
+  Linking,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import { PlatformSheetOverlay } from '@/components/ui/PlatformSheetOverlay';
 import { Text } from '@/components/ui/Text';
-import {
-  Gesture,
-  GestureDetector,
-  GestureHandlerRootView,
-  Pressable,
-} from 'react-native-gesture-handler';
+import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   cancelAnimation,
   executeOnUIRuntimeSync,
@@ -42,7 +46,11 @@ type Props = {
   analyticsVisitorId?: string | null;
 };
 
-const { height: WIN_H } = Dimensions.get('window');
+const { width: WIN_W, height: WIN_H } = Dimensions.get('window');
+/** Zone gauche (tap) — aligné sur l’ancien ratio 35 / 65. */
+const TAP_LEFT_RATIO = 0.35;
+const TAP_MOVE_PX = 14;
+const SWIPE_HORIZONTAL_PX = 40;
 
 function StoryProgressSegment({
   index,
@@ -97,6 +105,7 @@ export function StoryViewerModal({
   const segProgress = useSharedValue(0);
   const sheetY = useSharedValue(0);
   const slideIdxSv = useSharedValue(0);
+  const storyLongPressActive = useSharedValue(false);
 
   useEffect(() => {
     slideIdxSv.value = slideIdx;
@@ -116,9 +125,10 @@ export function StoryViewerModal({
   useEffect(() => {
     if (!visible) {
       sheetY.value = 0;
+      storyLongPressActive.value = false;
       cancelAnimation(segProgress);
     }
-  }, [visible, sheetY, segProgress]);
+  }, [visible, sheetY, segProgress, storyLongPressActive]);
 
   const currentChannel = channels[chIdx];
   const currentSlide = currentChannel?.slides[slideIdx];
@@ -319,40 +329,58 @@ export function StoryViewerModal({
     pause();
   }, [pause]);
 
-  const onPressOutStoryLeft = useCallback(() => {
+  const onLongPressRelease = useCallback(() => {
     if (storyPressRef.current.longFired) {
       resume();
       storyPressRef.current.longFired = false;
-      return;
     }
-    if (Date.now() - storyPressRef.current.t0 < 320) {
-      rewind();
-    }
-  }, [resume, rewind]);
+  }, [resume]);
 
-  const onPressOutStoryRight = useCallback(() => {
-    if (storyPressRef.current.longFired) {
-      resume();
-      storyPressRef.current.longFired = false;
-      return;
-    }
-    if (Date.now() - storyPressRef.current.t0 < 320) {
-      tapNext();
-    }
-  }, [resume, tapNext]);
+  const handleStoryTap = useCallback(
+    (x: number) => {
+      if (storyPressRef.current.longFired) return;
+      if (x < WIN_W * TAP_LEFT_RATIO) {
+        rewind();
+      } else {
+        tapNext();
+      }
+    },
+    [rewind, tapNext],
+  );
 
-  const pan = useMemo(
-    () =>
-      Gesture.Pan()
-        .activeOffsetY(24)
-        .failOffsetX([-56, 56])
-        .onUpdate((e) => {
-          'worklet';
-          const y = Math.max(0, e.translationY);
-          sheetY.value = y;
-        })
-        .onEnd((e) => {
-          'worklet';
+  const storyGesture = useMemo(() => {
+    const pan = Gesture.Pan()
+      .minDistance(0)
+      .maxPointers(1)
+      .onBegin(() => {
+        runOnJS(onPressInStory)();
+      })
+      .onUpdate((e) => {
+        'worklet';
+        if (storyLongPressActive.value) return;
+        const absX = Math.abs(e.translationX);
+        const absY = Math.abs(e.translationY);
+        if (absY > absX && e.translationY > 0) {
+          sheetY.value = Math.max(0, e.translationY);
+        }
+      })
+      .onEnd((e) => {
+        'worklet';
+        if (storyLongPressActive.value) {
+          sheetY.value = withSpring(0, { damping: 22, stiffness: 320 });
+          return;
+        }
+
+        const absX = Math.abs(e.translationX);
+        const absY = Math.abs(e.translationY);
+
+        if (absX < TAP_MOVE_PX && absY < TAP_MOVE_PX) {
+          runOnJS(handleStoryTap)(e.x);
+          sheetY.value = withSpring(0, { damping: 22, stiffness: 320 });
+          return;
+        }
+
+        if (absY > absX) {
           const y = sheetY.value;
           if (y > 88 || e.velocityY > 900) {
             sheetY.value = withSpring(WIN_H, { damping: 28, stiffness: 280 }, (done) => {
@@ -361,9 +389,40 @@ export function StoryViewerModal({
           } else {
             sheetY.value = withSpring(0, { damping: 22, stiffness: 320 });
           }
-        }),
-    [onClose, sheetY]
-  );
+          return;
+        }
+
+        sheetY.value = withSpring(0, { damping: 22, stiffness: 320 });
+        if (e.translationX < -SWIPE_HORIZONTAL_PX) {
+          runOnJS(tapNext)();
+        } else if (e.translationX > SWIPE_HORIZONTAL_PX) {
+          runOnJS(rewind)();
+        }
+      });
+
+    const longPress = Gesture.LongPress()
+      .minDuration(220)
+      .onStart(() => {
+        storyLongPressActive.value = true;
+        runOnJS(onLongPressStory)();
+      })
+      .onFinalize(() => {
+        storyLongPressActive.value = false;
+        runOnJS(onLongPressRelease)();
+      });
+
+    return Gesture.Simultaneous(pan, longPress);
+  }, [
+    handleStoryTap,
+    onClose,
+    onLongPressRelease,
+    onLongPressStory,
+    onPressInStory,
+    rewind,
+    sheetY,
+    storyLongPressActive,
+    tapNext,
+  ]);
 
   const sheetStyle = useAnimatedStyle(() => {
     const y = sheetY.value;
@@ -387,8 +446,7 @@ export function StoryViewerModal({
     <PlatformSheetOverlay visible={visible} onRequestClose={onClose} animationType="fade">
       <StatusBar style="light" />
       <GestureHandlerRootView style={styles.gestureRoot}>
-        <GestureDetector gesture={pan}>
-          <Animated.View style={[styles.sheet, sheetStyle]}>
+        <Animated.View style={[styles.sheet, sheetStyle]}>
             <View style={styles.imageWrap} pointerEvents="box-none">
               {currentSlide?.uri && isStoryImageUri(currentSlide.uri) ? (
                 <Image
@@ -409,6 +467,14 @@ export function StoryViewerModal({
               ) : null}
             </View>
 
+            <GestureDetector gesture={storyGesture}>
+              <View
+                style={styles.touchSurface}
+                accessibilityLabel="Navigation stories"
+                accessibilityRole="adjustable"
+              />
+            </GestureDetector>
+
             <View style={[styles.topChrome, { paddingTop: insets.top + 6 }]} pointerEvents="box-none">
               <View style={styles.progressRow}>
                 {Array.from({ length: Math.max(1, slideCount) }).map((_, i) => (
@@ -420,7 +486,7 @@ export function StoryViewerModal({
                   />
                 ))}
               </View>
-              <View style={styles.headerRow}>
+              <View style={styles.headerRow} pointerEvents="box-none">
                 <View style={styles.headerLeft}>
                   {coverUri && isStoryImageUri(coverUri) ? (
                     <Image source={{ uri: coverUri }} style={styles.avatarSm} />
@@ -438,7 +504,7 @@ export function StoryViewerModal({
                 </View>
                 <Pressable
                   onPress={onClose}
-                  hitSlop={14}
+                  hitSlop={16}
                   style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.75 }]}
                   accessibilityRole="button"
                   accessibilityLabel="Fermer les stories">
@@ -447,27 +513,10 @@ export function StoryViewerModal({
               </View>
             </View>
 
-            <View style={styles.tapZones} pointerEvents="box-none">
-              <Pressable
-                style={styles.tapLeft}
-                delayLongPress={220}
-                onPressIn={onPressInStory}
-                onLongPress={onLongPressStory}
-                onPressOut={onPressOutStoryLeft}
-                accessibilityLabel="Slide précédente ou pause"
-              />
-              <Pressable
-                style={styles.tapRight}
-                delayLongPress={220}
-                onPressIn={onPressInStory}
-                onLongPress={onLongPressStory}
-                onPressOut={onPressOutStoryRight}
-                accessibilityLabel="Slide suivante ou pause"
-              />
-            </View>
-
             {(currentSlide?.caption || currentSlide?.linkUrl) ? (
-              <View style={[styles.captionWrap, { paddingBottom: insets.bottom + spacing.lg }]}>
+              <View
+                style={[styles.captionWrap, { paddingBottom: insets.bottom + spacing.lg }]}
+                pointerEvents="box-none">
                 {currentSlide?.caption ? <Text style={styles.caption}>{currentSlide.caption}</Text> : null}
                 {currentSlide?.linkUrl ? (
                   <Pressable
@@ -480,8 +529,7 @@ export function StoryViewerModal({
                 ) : null}
               </View>
             ) : null}
-          </Animated.View>
-        </GestureDetector>
+        </Animated.View>
       </GestureHandlerRootView>
     </PlatformSheetOverlay>
   );
@@ -522,12 +570,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: 'rgba(15, 23, 42, 0.35)',
   },
+  touchSurface: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 12,
+  },
   topChrome: {
     position: 'absolute',
     left: 0,
     right: 0,
     top: 0,
-    zIndex: 10,
+    zIndex: 30,
+    ...(Platform.OS === 'android' ? { elevation: 30 } : null),
     paddingHorizontal: spacing.sm + 2,
   },
   progressRow: {
@@ -588,28 +641,16 @@ const styles = StyleSheet.create({
   },
   closeBtn: {
     padding: spacing.sm,
-  },
-  tapZones: {
-    ...StyleSheet.absoluteFillObject,
-    flexDirection: 'row',
-    zIndex: 5,
-  },
-  tapLeft: {
-    flexGrow: 35,
-    flexBasis: 0,
-    flexShrink: 0,
-  },
-  tapRight: {
-    flexGrow: 65,
-    flexBasis: 0,
-    flexShrink: 0,
+    zIndex: 31,
+    ...(Platform.OS === 'android' ? { elevation: 31 } : null),
   },
   captionWrap: {
     position: 'absolute',
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 8,
+    zIndex: 25,
+    ...(Platform.OS === 'android' ? { elevation: 25 } : null),
     paddingHorizontal: spacing.lg,
   },
   caption: {

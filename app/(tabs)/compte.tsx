@@ -49,6 +49,7 @@ import {
   sanitizeFiliereForNiveau,
 } from '@/utils/academicFiliere';
 import { anneesBacOptionsForLocale } from '@/utils/bacSchoolYearLabels';
+import { deleteMyAccount } from '@/services/auth';
 import { getApiBaseUrl } from '@/constants/api';
 import type { HomeCopyKey } from '@/constants/i18n';
 import { useAppFeedback } from '@/contexts/AppFeedbackContext';
@@ -86,6 +87,7 @@ export default function CompteTabScreen() {
   const [ordersSegment, setOrdersSegment] = useState<'all' | 'products' | 'services'>('all');
   const [loading, setLoading] = useState(false);
   const [loggingOut, setLoggingOut] = useState(false);
+  const [deletingAccount, setDeletingAccount] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [citiesLoading, setCitiesLoading] = useState(true);
   const [cities, setCities] = useState<CityRow[]>([]);
@@ -559,8 +561,8 @@ export default function CompteTabScreen() {
         diplomeEnCours: form.diplomeEnCours.trim(),
         nomEtablissement: form.nomEtablissement.trim(),
         typeLycee: form.typeLycee.trim(),
-        massarCode: form.massarCode.trim(),
-        studentCode: form.studentCode.trim(),
+        ...(form.bacType === 'normal' ? { massarCode: form.massarCode.trim() } : {}),
+        ...(form.bacType === 'mission' ? { studentCode: form.studentCode.trim() } : {}),
 
         /* Tuteur */
         tuteur: form.tuteur.trim(),
@@ -605,9 +607,37 @@ export default function CompteTabScreen() {
     ]);
   }, [logout, t]);
 
+  const handleDeleteAccount = useCallback(() => {
+    Alert.alert(t('accountDeleteTitle'), t('accountDeleteMessage'), [
+      { text: t('accountDeleteCancel'), style: 'cancel' },
+      {
+        text: t('accountDeleteConfirm'),
+        style: 'destructive',
+        onPress: async () => {
+          setDeletingAccount(true);
+          try {
+            const token = await getValidAccessToken();
+            if (!token) throw new Error(t('apiErrUnauthorized'));
+            const res = await deleteMyAccount(token);
+            if (!res.success) throw new Error(res.message || t('apiErrGeneric'));
+            await logout();
+            Alert.alert(t('accountDeleteSuccessTitle'), t('accountDeleteSuccessBody'));
+          } catch (e: unknown) {
+            Alert.alert(t('commonErrorTitle'), errorMessage(e, t, 'account'));
+          } finally {
+            setDeletingAccount(false);
+          }
+        },
+      },
+    ]);
+  }, [getValidAccessToken, logout, t]);
+
   return (
     <View style={[styles.root, isRTL ? styles.rtl : styles.ltr]}>
-      <StatusBar style="light" />
+      <StatusBar style="light" backgroundColor={homeShell.bg} />
+      {Platform.OS === 'android' ? (
+        <View pointerEvents="none" style={[styles.statusBarFill, { height: insets.top }]} />
+      ) : null}
       <View style={[styles.headerSafe, { paddingTop: insets.top }]}>
         <View style={styles.hero}>
           <View style={[styles.heroTitleRow, isRTL && styles.heroTitleRowRtl]}>
@@ -1170,7 +1200,7 @@ export default function CompteTabScreen() {
               accessibilityRole="button"
               accessibilityLabel={t('accountLogoutConfirm')}
               onPress={handleLogout}
-              disabled={loggingOut}
+              disabled={loggingOut || deletingAccount}
               style={({ pressed }) => [
                 styles.logoutBtn,
                 (loggingOut || pressed) && { opacity: 0.88 },
@@ -1181,6 +1211,27 @@ export default function CompteTabScreen() {
                 <>
                   <FontAwesome name="sign-out" size={16} color={brand.error} />
                   <Text style={[styles.logoutBtnTxt, isRTL && styles.txtRtl]}>{t('accountLogoutConfirm')}</Text>
+                </>
+              )}
+            </Pressable>
+
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={t('accountDeleteButton')}
+              onPress={handleDeleteAccount}
+              disabled={loggingOut || deletingAccount}
+              style={({ pressed }) => [
+                styles.deleteAccountBtn,
+                (deletingAccount || pressed) && { opacity: 0.88 },
+              ]}>
+              {deletingAccount ? (
+                <ActivityIndicator color={brand.error} />
+              ) : (
+                <>
+                  <FontAwesome name="trash-o" size={16} color={brand.error} />
+                  <Text style={[styles.deleteAccountBtnTxt, isRTL && styles.txtRtl]}>
+                    {t('accountDeleteButton')}
+                  </Text>
                 </>
               )}
             </Pressable>
@@ -1576,6 +1627,14 @@ const styles = StyleSheet.create({
   },
   ltr: { direction: 'ltr' },
   rtl: { direction: 'rtl' },
+  statusBarFill: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: homeShell.bg,
+    zIndex: 11,
+  },
   headerSafe: {
     backgroundColor: homeShell.bg,
     zIndex: 10,
@@ -2252,5 +2311,22 @@ const styles = StyleSheet.create({
     color: brand.error,
     fontSize: fontSize.md,
     fontWeight: '900',
+  },
+  deleteAccountBtn: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: 14,
+    borderRadius: radius.full,
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: 'rgba(220, 38, 38, 0.35)',
+  },
+  deleteAccountBtnTxt: {
+    color: brand.error,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
   },
 });

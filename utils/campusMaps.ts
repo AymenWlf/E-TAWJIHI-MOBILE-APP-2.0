@@ -195,6 +195,24 @@ function campusHasMinimalInfo(c: Record<string, unknown>): boolean {
 /**
  * Filtre et mappe les campus comme sur le web (nom, ville, quartier, carte).
  */
+/**
+ * Libellés campus pour les seuils d'admission (clés API = id campus, nom affiché).
+ */
+export function campusSeuilLabelsFromApi(campus: Record<string, unknown>[] | undefined): Record<string, string> {
+  const labels: Record<string, string> = {};
+  if (!Array.isArray(campus) || campus.length === 0) return labels;
+  campus.forEach((c, index) => {
+    const id = str((c as { id?: unknown }).id);
+    if (!id) return;
+    const ville = campusCityLabel(c);
+    const nom = str(c.nom);
+    const name = nom || (ville ? `Campus ${ville}` : `Campus ${index + 1}`);
+    labels[id] = name;
+    labels[`campus-${id}`] = name;
+  });
+  return labels;
+}
+
 export function mapCampusForDisplay(campus: Record<string, unknown>[] | undefined): CampusDisplayRow[] {
   if (!Array.isArray(campus) || campus.length === 0) return [];
   return campus.filter(campusHasMinimalInfo).map((c, index) => {

@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
 import { brand, fontSize, radius } from '@/theme/tokens';
-import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
+import { navigateToSchoolDiagnosticWizard } from '@/utils/navigateToSchoolDiagnosticEntry';
 import type { TawjihPlusParcoursGate } from '@/utils/tawjihPlusParcoursGate';
 
 const COPY = {
@@ -44,7 +44,7 @@ export function DiagnosticCompatibilityPrompt({ size = 'xs', isRTL = false, loca
   return (
     <Pressable
       onPress={() => {
-        void navigateToSchoolDiagnosticEntry(
+        void navigateToSchoolDiagnosticWizard(
           {
             getValidAccessToken,
             userId: user?.id ?? null,

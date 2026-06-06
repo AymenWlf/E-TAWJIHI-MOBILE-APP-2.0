@@ -8,6 +8,7 @@ import {
 export type ApiError = Error & {
   status?: number;
   url?: string;
+  code?: string;
 };
 
 function networkHint(): string {
@@ -53,10 +54,11 @@ async function buildRequestHeaders(init?: RequestInit): Promise<Record<string, s
   };
 }
 
-function throwApiError(message: string, url: string, status?: number): never {
+function throwApiError(message: string, url: string, status?: number, code?: string): never {
   const err = new Error(message) as ApiError;
   err.url = url;
   if (status !== undefined) err.status = status;
+  if (code) err.code = code;
   throw err;
 }
 
@@ -136,7 +138,16 @@ async function requestJson<T>(url: string, init: RequestInit): Promise<T> {
         }
       }
     }
-    throwApiError(humanizeApiErrorBody(text, res.status), url, res.status);
+    let errorCode: string | undefined;
+    try {
+      const j = JSON.parse(text) as { code?: string };
+      if (typeof j.code === 'string' && j.code.trim()) {
+        errorCode = j.code.trim();
+      }
+    } catch {
+      /* corps non JSON */
+    }
+    throwApiError(humanizeApiErrorBody(text, res.status), url, res.status, errorCode);
   }
 
   const raw = await res.text();

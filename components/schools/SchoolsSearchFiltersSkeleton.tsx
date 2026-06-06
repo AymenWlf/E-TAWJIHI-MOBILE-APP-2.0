@@ -24,19 +24,19 @@ export function SchoolsSearchFiltersSkeleton({ isRTL = false }: Props) {
 
 const styles = StyleSheet.create({
   root: {
-    gap: spacing.sm,
+    gap: 6,
     width: '100%',
   },
   searchSk: {
     width: '100%',
-    height: 46,
-    borderRadius: radius.lg,
+    height: 38,
+    borderRadius: radius.md,
     backgroundColor: 'rgba(51, 62, 143, 0.1)',
   },
   filterRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 6,
   },
   filterRowRtl: {
     flexDirection: 'row-reverse',
@@ -44,14 +44,14 @@ const styles = StyleSheet.create({
   filtersSk: {
     flex: 1,
     minWidth: 0,
-    height: 48,
-    borderRadius: radius.lg,
+    height: 40,
+    borderRadius: radius.md,
     backgroundColor: 'rgba(51, 62, 143, 0.12)',
   },
   heartSk: {
-    width: 48,
-    height: 48,
-    borderRadius: radius.lg,
+    width: 40,
+    height: 40,
+    borderRadius: radius.md,
     backgroundColor: 'rgba(51, 62, 143, 0.1)',
   },
 });

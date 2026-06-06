@@ -1,4 +1,20 @@
+import type { HomeCopyKey } from '@/constants/i18n';
 import type { EstablishmentListItem } from '@/services/establishments';
+
+const BOUCHE_TYPE_I18N_KEYS: Record<string, HomeCopyKey> = {
+  financiere: 'estBourseTypeFinanciere',
+  logement: 'estBourseTypeLogement',
+  reduction_scolarite: 'estBourseTypeReductionScolarite',
+};
+
+/** Libellé localisé d'un type de bourse (clés API : financiere, logement, reduction_scolarite). */
+export function labelEstablishmentBourseType(
+  raw: string,
+  translate: (key: HomeCopyKey) => string,
+): string {
+  const key = BOUCHE_TYPE_I18N_KEYS[raw.trim()];
+  return key ? translate(key) : raw.trim();
+}
 
 /** Normalise les libellés type comme sur le listing web */
 export function formatEstablishmentType(t?: string | null): string {

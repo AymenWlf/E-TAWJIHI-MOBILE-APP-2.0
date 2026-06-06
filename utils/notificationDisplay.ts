@@ -64,12 +64,22 @@ function contestAnnouncementUpsellMessage(locale: AppLocale): string {
     : 'Inscrivez-vous au service TAWJIH PLUS pour recevoir plus de détails.';
 }
 
+function withFollowedSchoolStar(title: string): string {
+  const t = title.trim();
+  if (!t || t.startsWith('⭐')) return t;
+  return `⭐ ${t}`;
+}
+
 export function notificationTitle(n: AppNotification, locale: AppLocale): string {
+  let title = n.title;
   if (locale === 'ar') {
     const a = n.titleAr?.trim();
-    if (a) return a;
+    if (a) title = a;
   }
-  return n.title;
+  if (isFollowedSchoolNotification(n)) {
+    return withFollowedSchoolStar(title);
+  }
+  return title;
 }
 
 export function notificationMessage(n: AppNotification, locale: AppLocale): string {

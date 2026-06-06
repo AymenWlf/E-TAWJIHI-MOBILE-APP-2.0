@@ -1,13 +1,7 @@
 import { Text as RNText, TextProps, StyleSheet, TextStyle } from 'react-native';
 
 import { useLocale } from '@/contexts/LocaleContext';
-import { resolveArabicFontFamily } from '@/theme/arabicTypography';
-
-function shouldSkipArabicFont(flat?: TextStyle | null): boolean {
-  const ff = flat?.fontFamily;
-  if (typeof ff !== 'string') return false;
-  return /mono|Menlo|Courier|Consolas/i.test(ff);
-}
+import { applyArabicFontOverlay, isMonospaceFontFamily } from '@/theme/arabicTypography';
 
 type AppTextProps = TextProps & {
   /** Chiffres / symboles latins (−10 %) : ne pas appliquer Cairo en mode arabe. */
@@ -18,7 +12,7 @@ type AppTextProps = TextProps & {
 export function Text({ style, latinDigits, ...props }: AppTextProps) {
   const { isRTL } = useLocale();
   const flat = StyleSheet.flatten(style) as TextStyle | undefined;
-  const skip = shouldSkipArabicFont(flat) || latinDigits;
-  const arabic = isRTL && !skip ? { fontFamily: resolveArabicFontFamily(flat) } : undefined;
-  return <RNText {...props} style={[arabic, style]} />;
+  const skip = isMonospaceFontFamily(flat?.fontFamily) || latinDigits;
+  const arabic = isRTL && !skip ? applyArabicFontOverlay(flat) : undefined;
+  return <RNText {...props} style={[style, arabic]} />;
 }

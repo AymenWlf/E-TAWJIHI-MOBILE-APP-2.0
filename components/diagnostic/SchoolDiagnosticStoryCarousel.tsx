@@ -6,6 +6,7 @@ import {
   I18nManager,
   NativeScrollEvent,
   NativeSyntheticEvent,
+  Platform,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -580,7 +581,9 @@ function StoryCardContent({
   return (
     <View style={[styles.cardInner, { minHeight: CARD_H }]}>
       {embedScreenHeader ? (
-        <View style={[styles.cardAccentBar, { backgroundColor: accent }]} />
+        Platform.OS === 'android' && card.kind === 'synthesis' ? null : (
+          <View style={[styles.cardAccentBar, { backgroundColor: accent }]} />
+        )
       ) : (
         <View style={[styles.cardHeader, { backgroundColor: headerBg(card) }]}>
           <View style={[styles.headerStripe, isRTL ? styles.headerStripeRtl : undefined]} />
@@ -618,7 +621,11 @@ function StoryCardContent({
         showsVerticalScrollIndicator={false}
         nestedScrollEnabled>
         {card.highlight ? (
-          <View style={styles.highlight}>
+          <View
+            style={[
+              styles.highlight,
+              card.kind === 'synthesis' && Platform.OS === 'android' && styles.highlightSynthesisAndroid,
+            ]}>
             <View style={[styles.highlightLabelRow, rowDir]}>
               <FontAwesome name="star" size={12} color={homeShell.greenDark} />
               <Text style={[styles.highlightLabel, { textAlign }, isRTL && styles.rtlText]}>
@@ -873,6 +880,10 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(47,206,148,0.35)',
     marginBottom: spacing.sm,
+  },
+  highlightSynthesisAndroid: {
+    backgroundColor: brand.white,
+    borderColor: homeShell.greenBorder,
   },
   highlightLabelRow: {
     flexDirection: 'row',

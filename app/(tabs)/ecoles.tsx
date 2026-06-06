@@ -107,6 +107,8 @@ export default function EcolesScreen() {
   const [placementByEid, setPlacementByEid] = useState<Record<number, ListingPlacementInfo>>({});
   /** Ne reshuffle le tri « style EcolesSupérieures » que si la piscine / les placements changent. */
   const listingWebOrderContentSigRef = useRef<string>('');
+  /** Ordre mélangé (client mode) — ne pas réécrire `filteredPool` pour éviter boucles de re-render. */
+  const orderedClientPoolRef = useRef<EstablishmentNormalized[] | null>(null);
 
   /* Suivi d'écoles : Set des IDs suivis + IDs en cours de toggle */
   const { user, getValidAccessToken, isLoading: authLoading } = useAuth();
@@ -179,15 +181,25 @@ export default function EcolesScreen() {
 
   /** Mode client : même composition que `EcolesSupérieures.tsx` (shuffle sponsorisés + blocs mélangés). */
   useEffect(() => {
-    if (!clientMode || !filteredPool?.length) return;
+    if (!clientMode || !filteredPool?.length) {
+      orderedClientPoolRef.current = null;
+      return;
+    }
     const merged = mergeEstablishmentsWithListingPlacements(filteredPool, placementByEid);
     const contentSig = getListingWebOrderContentSig(merged, placementByEid);
-    if (contentSig === listingWebOrderContentSigRef.current) return;
+    if (contentSig === listingWebOrderContentSigRef.current && orderedClientPoolRef.current) {
+      setItems(
+        orderedClientPoolRef.current.slice(
+          0,
+          Math.min(visibleEnd, orderedClientPoolRef.current.length),
+        ),
+      );
+      return;
+    }
     listingWebOrderContentSigRef.current = contentSig;
-    const next = sortEstablishmentsLikeEcolesSuperieuresWeb(merged, placementByEid);
-    setFilteredPool(next);
-    const end = Math.min(visibleEnd, next.length);
-    setItems(next.slice(0, end));
+    const ordered = sortEstablishmentsLikeEcolesSuperieuresWeb(merged, placementByEid);
+    orderedClientPoolRef.current = ordered;
+    setItems(ordered.slice(0, Math.min(visibleEnd, ordered.length)));
   }, [clientMode, filteredPool, placementByEid, visibleEnd]);
 
   // Tracking « impression card » : best-effort, dédupliqué côté service par
@@ -330,6 +342,7 @@ export default function EcolesScreen() {
     setClientMode(needsClientScan);
     setFilteredPool(null);
     listingWebOrderContentSigRef.current = '';
+    orderedClientPoolRef.current = null;
 
     if (needsClientScan) {
       if (needsCitiesForRegion && cities.length === 0) {
@@ -405,6 +418,7 @@ export default function EcolesScreen() {
     setVisibleEnd(PAGE_SIZE);
     setClientMode(needsClientScan);
     listingWebOrderContentSigRef.current = '';
+    orderedClientPoolRef.current = null;
 
     try {
       const rt = filtersValue.regionTitle.trim();
@@ -475,12 +489,13 @@ export default function EcolesScreen() {
     if (loadingMore || loading || refreshing) return;
 
     if (clientMode && filteredPool) {
-      if (visibleEnd >= filteredPool.length) return;
+      const orderedPool = orderedClientPoolRef.current ?? filteredPool;
+      if (visibleEnd >= orderedPool.length) return;
       setLoadingMore(true);
       try {
-        const next = Math.min(filteredPool.length, visibleEnd + PAGE_SIZE);
+        const next = Math.min(orderedPool.length, visibleEnd + PAGE_SIZE);
         setVisibleEnd(next);
-        setItems(filteredPool.slice(0, next));
+        setItems(orderedPool.slice(0, next));
       } finally {
         setLoadingMore(false);
       }
@@ -617,6 +632,7 @@ export default function EcolesScreen() {
                 locked={searchFiltersLocked}
                 lockedPlaceholder={t('schoolsSearchPlaceholderLocked')}
                 onLockedPress={showTawjihPlusUpgradeAlert}
+                compact
               />
 
               <View style={[styles.filterBarRow, isRTL && styles.filterBarRowRtl]}>
@@ -636,7 +652,7 @@ export default function EcolesScreen() {
                   }>
                   <FontAwesome
                     name={searchFiltersLocked ? 'lock' : 'sliders'}
-                    size={16}
+                    size={14}
                     color={searchFiltersLocked ? '#94A3B8' : homeShell.blue}
                   />
                   <Text
@@ -664,7 +680,7 @@ export default function EcolesScreen() {
                   accessibilityLabel={t('schoolsFollowedOnlyA11y')}>
                   <FontAwesome
                     name={followedOnly ? 'heart' : 'heart-o'}
-                    size={18}
+                    size={16}
                     color={followedOnly ? homeShell.blue : homeShell.cardMuted}
                   />
                 </Pressable>
@@ -729,7 +745,11 @@ export default function EcolesScreen() {
             return (
             <View>
               {index > 0 && index % 3 === 0 ? (
-                <AppBannerSlot zone="mid" analyticsPage="/mobile/ecoles" />
+                <AppBannerSlot
+                  key={`banner-mid-${Math.floor(index / 3)}`}
+                  zone="mid"
+                  analyticsPage="/mobile/ecoles"
+                />
               ) : null}
               <EstablishmentCard
                 item={item}
@@ -799,7 +819,7 @@ const styles = StyleSheet.create({
     backgroundColor: homeShell.bg,
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.md,
     borderBottomLeftRadius: radius.xl,
     borderBottomRightRadius: radius.xl,
   },
@@ -833,18 +853,18 @@ const styles = StyleSheet.create({
     writingDirection: 'rtl',
   },
   searchCard: {
-    marginTop: spacing.lg,
+    marginTop: spacing.md,
     backgroundColor: homeShell.card,
-    borderRadius: radius.xl,
-    padding: spacing.sm + 2,
-    gap: spacing.sm,
+    borderRadius: radius.lg,
+    padding: spacing.sm,
+    gap: 6,
     borderWidth: 1,
     borderColor: 'rgba(47,206,148,0.18)',
     shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 3,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
   },
   searchRow: {
     flexDirection: 'row',
@@ -874,7 +894,7 @@ const styles = StyleSheet.create({
   filterBarRow: {
     flexDirection: 'row',
     alignItems: 'stretch',
-    gap: spacing.sm,
+    gap: 6,
     alignSelf: 'stretch',
   },
   filterBarRowRtl: {
@@ -886,20 +906,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 8,
-    paddingVertical: 12,
-    paddingHorizontal: spacing.md,
-    borderRadius: radius.lg,
+    gap: 6,
+    paddingVertical: 9,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radius.md,
     backgroundColor: '#F0FDF4',
     borderWidth: 1,
     borderColor: 'rgba(47,206,148,0.35)',
     minWidth: 0,
   },
   followedOnlyBtn: {
-    width: 48,
+    width: 40,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: homeShell.borderOnWhite,

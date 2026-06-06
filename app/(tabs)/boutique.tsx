@@ -46,6 +46,7 @@ import {
 } from '@/services/platformServices';
 import { fetchShopProducts } from '@/services/shop';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
+import { countBadgeTextStyle } from '@/theme/countBadge';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { AppLocale } from '@/constants/i18n';
 import type { ShopProductListItem } from '@/types/shop';
@@ -512,13 +513,13 @@ export default function BoutiqueTabScreen() {
             <FontAwesome name="shopping-bag" size={19} color={brand.white} />
             {cartCount > 0 ? (
               <View style={[styles.cartBadge, isRTL ? { left: -5 } : { right: -5 }]}>
-                <Text style={styles.cartBadgeTxt}>{cartCount > 99 ? '99+' : cartCount}</Text>
+                <Text latinDigits style={styles.cartBadgeTxt}>
+                  {cartCount > 99 ? '99+' : cartCount}
+                </Text>
               </View>
             ) : null}
           </Pressable>
         </View>
-
-        <Text style={[styles.heroSub, isRTL && styles.txtRtl]}>{t('shopSubtitle')}</Text>
 
         <Pressable
           style={[styles.searchWrap, isRTL && styles.searchWrapRtl]}
@@ -1003,23 +1004,23 @@ function ServiceCompactCard({
   const showEligibilityBadge = !eligibilityProfileLoading;
 
   const purchasable = platformServiceCatalogPurchasable(entitlement, entitlementsLoading);
-  const { minHeight: uniformMinHeight, onLayout: onUniformLayout } = usePlatformServiceUniformCardHeight(s.slug);
+  const { outerMinHeightStyle, onMeasureLayout } = usePlatformServiceUniformCardHeight(s.slug);
   useEffect(() => {
     void recordShopBoutiqueEvent('impression_listing', undefined, s.slug);
   }, [s.slug]);
 
   return (
     <View
-      onLayout={onUniformLayout}
       style={[
         styles.svcCompactOuter,
         inactive && styles.svcCompactOuterInactive,
         isStack
           ? styles.svcCompactOuterStack
           : [styles.svcCompactOuterCarousel, { width: carouselCardW, marginEnd: spacing.sm }],
-        uniformMinHeight != null && { minHeight: uniformMinHeight },
+        outerMinHeightStyle,
       ]}
     >
+      <View onLayout={onMeasureLayout} collapsable={false}>
       <Pressable
         onPress={() => {
           void recordShopBoutiqueEvent('click_product', undefined, s.slug);
@@ -1224,6 +1225,7 @@ function ServiceCompactCard({
             </Text>
           </Pressable>
         </View>
+      </View>
       </View>
     </View>
   );
@@ -1454,9 +1456,9 @@ const styles = StyleSheet.create({
   hero: {
     backgroundColor: brand.primary,
     paddingTop: 0,
-    paddingBottom: spacing.xxl,
+    paddingBottom: spacing.md,
     paddingHorizontal: H_PAD,
-    gap: spacing.md,
+    gap: spacing.sm,
   },
   heroTop: {
     flexDirection: 'row',
@@ -1479,16 +1481,11 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   heroTitle: {
-    fontSize: 30,
+    fontSize: fontSize.xl,
     fontWeight: '900',
     color: brand.white,
-    letterSpacing: -0.5,
-    lineHeight: 38,
-  },
-  heroSub: {
-    fontSize: 12,
-    color: 'rgba(255,255,255,0.65)',
-    fontWeight: '600',
+    letterSpacing: -0.3,
+    lineHeight: 26,
   },
 
   /* Cart button */
@@ -1520,6 +1517,7 @@ const styles = StyleSheet.create({
     color: brand.white,
     fontSize: 9,
     fontWeight: '900',
+    ...countBadgeTextStyle(12),
   },
 
   /* Search */

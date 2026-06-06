@@ -54,9 +54,9 @@
         }
       ],
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/logo-carre-coul-new.png",
+        "foregroundImage": "./assets/images/adaptive-icon.png",
         "backgroundColor": "#333e8f",
-        "monochromeImage": "./assets/images/logo-carre-coul-new.png"
+        "monochromeImage": "./assets/images/adaptive-icon.png"
       },
       "splash": {
         "image": "./assets/images/logo-carre-coul-new.png",

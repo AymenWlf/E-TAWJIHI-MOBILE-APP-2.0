@@ -40,7 +40,7 @@ export function useTawjihPlusAccess() {
         setLoading(false);
       }
     }
-  }, [getValidAccessToken, user]);
+  }, [getValidAccessToken, user?.id]);
 
   useEffect(() => {
     void refresh();

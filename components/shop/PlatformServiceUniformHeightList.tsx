@@ -52,7 +52,7 @@ export function PlatformServiceUniformHeightProvider({
       if (waitForAllItems && measured < itemIds.length) return;
 
       const max = Math.max(...heightsRef.current.values());
-      setMinHeight((prev) => (max > prev ? max : prev));
+      setMinHeight(max);
     },
     [itemIds, waitForAllItems, resetKey],
   );
@@ -89,12 +89,15 @@ export function PlatformServiceUniformHeightList({
   );
 }
 
-/** Mesure la hauteur naturelle puis applique `minHeight` commun à toutes les cartes. */
+/**
+ * Mesure la hauteur naturelle du contenu (sans `minHeight`) puis applique
+ * `minHeight` commun sur le conteneur externe uniquement.
+ */
 export function usePlatformServiceUniformCardHeight(cardId: string) {
   const ctx = useContext(UniformHeightContext);
   const minHeight = ctx?.minHeight ?? 0;
 
-  const onLayout = useCallback(
+  const onMeasureLayout = useCallback(
     (event: LayoutChangeEvent) => {
       if (!ctx) return;
       ctx.reportHeight(cardId, Math.ceil(event.nativeEvent.layout.height));
@@ -103,7 +106,7 @@ export function usePlatformServiceUniformCardHeight(cardId: string) {
   );
 
   return {
-    minHeight: minHeight > 0 ? minHeight : undefined,
-    onLayout: ctx ? onLayout : undefined,
+    outerMinHeightStyle: minHeight > 0 ? ({ minHeight } satisfies ViewStyle) : undefined,
+    onMeasureLayout: ctx ? onMeasureLayout : undefined,
   };
 }

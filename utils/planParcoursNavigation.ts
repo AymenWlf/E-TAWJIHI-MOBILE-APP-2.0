@@ -3,7 +3,10 @@ import { router } from 'expo-router';
 import { PLAN_PARCOURS_STEP_IDS, type PlanParcoursStepId } from '@/constants/orientationParcours';
 import { triggerAppFeedback } from '@/contexts/AppFeedbackContext';
 import { openApplyToSchoolsTour } from '@/utils/applyToSchoolsTourNavigation';
-import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
+import {
+  navigateToSchoolDiagnosticEntry,
+  navigateToSchoolDiagnosticWizard,
+} from '@/utils/navigateToSchoolDiagnosticEntry';
 import {
   guardTawjihPlusParcoursStep,
   type TawjihPlusParcoursGate,
@@ -36,6 +39,14 @@ function navigatePlanParcoursStepUnlocked(
       router.push('/account-setup' as never);
       return;
     case PLAN_PARCOURS_STEP_IDS.orientationDiagnostic:
+      void navigateToSchoolDiagnosticWizard(
+        auth,
+        (href) => {
+          router.push(href as never);
+        },
+        tawjihPlusGate,
+      );
+      return;
     case PLAN_PARCOURS_STEP_IDS.recommendation:
       void navigateToSchoolDiagnosticEntry(
         auth,

@@ -6,8 +6,8 @@ const LRI = '\u2066';
 const PDI = '\u2069';
 const RLM = '\u200F';
 
-/** Segments latins / alphanum (sigle école…) isolés en LTR dans un paragraphe RTL. */
-function preserveLtrLatinRuns(text: string): string {
+/** Segments latins / alphanum (sigle école, URL…) isolés en LTR dans un paragraphe RTL. */
+export function preserveLtrLatinRuns(text: string): string {
   return text.replace(/[A-Za-z][A-Za-z0-9+\-_.]*/g, (m) => `${LRI}${m}${PDI}`);
 }
 

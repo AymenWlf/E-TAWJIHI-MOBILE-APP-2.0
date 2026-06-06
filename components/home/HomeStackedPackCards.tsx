@@ -1,13 +1,16 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Platform,
   StyleSheet,
   useWindowDimensions,
   View,
+  type PressableProps,
 } from 'react-native';
 
+import { DeckGesturePressable } from '@/components/ui/DeckGesturePressable';
 import { LoadingMiniIconSkeleton } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
-import { Gesture, GestureDetector, Pressable as GHPressable } from 'react-native-gesture-handler';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
 import Animated, {
   Easing,
   Extrapolation,
@@ -283,6 +286,13 @@ function OrientationParcoursProgress({
   );
 }
 
+/** Swipe horizontal : au-delà de ce seuil. Vertical : en dessous, le scroll parent prend la main. */
+const DECK_PAN_ACTIVATE_X = 12;
+const DECK_PAN_FAIL_Y = Platform.OS === 'android' ? 6 : 10;
+function DeckPressable(props: PressableProps) {
+  return <DeckGesturePressable {...props} />;
+}
+
 function DailyActionsBlock({
   daily,
   layout,
@@ -329,7 +339,7 @@ function DailyActionsBlock({
         isRTL && styles.dailyActionsWrapRtl,
         gameOnly && isRTL && styles.dailyActionsWrapGameOnlyRtl,
       ]}>
-      <GHPressable
+      <DeckPressable
         onPress={onPressDailyGame}
         disabled={!onPressDailyGame || gameLoading}
         accessibilityRole="button"
@@ -405,9 +415,9 @@ function DailyActionsBlock({
             </Text>
           </View>
         ) : null}
-      </GHPressable>
+      </DeckPressable>
       {showTassjil ? (
-        <GHPressable
+        <DeckPressable
           onPress={onPressTassjilTrack}
           disabled={!onPressTassjilTrack}
           accessibilityRole="button"
@@ -434,10 +444,10 @@ function DailyActionsBlock({
             numberOfLines={2}>
             {t('homeTassjilTrackCta')}
           </Text>
-        </GHPressable>
+        </DeckPressable>
       ) : null}
       {showInfo ? (
-        <GHPressable
+        <DeckPressable
           onPress={onPressDailyInfo}
           disabled={!onPressDailyInfo}
           accessibilityRole="button"
@@ -470,10 +480,10 @@ function DailyActionsBlock({
           ) : (
             <Text style={[styles.dailyMiniHint, { fontSize: badgeFs }]}>{t('dailyReadDone')}</Text>
           )}
-        </GHPressable>
+        </DeckPressable>
       ) : null}
       {showOrientation1Bac ? (
-        <GHPressable
+        <DeckPressable
           onPress={onPressOrientation1Bac}
           disabled={!onPressOrientation1Bac || orientationLocked}
           accessibilityRole="button"
@@ -524,7 +534,7 @@ function DailyActionsBlock({
               {unlockHint}
             </Text>
           ) : null}
-        </GHPressable>
+        </DeckPressable>
       ) : null}
     </View>
   );
@@ -744,7 +754,7 @@ function StackCardFace({
               { marginTop: layout.validityMT, gap: layout.validityMT },
             ]}>
             <View style={styles.firstCardStackHalf}>
-              <GHPressable
+              <DeckPressable
                 onPress={onOpenOrientationOverview}
                 disabled={!onOpenOrientationOverview}
                 accessibilityRole="button"
@@ -789,7 +799,7 @@ function StackCardFace({
                     {t('orientationTapHint')}
                   </Text>
                 ) : null}
-              </GHPressable>
+              </DeckPressable>
             </View>
             <View style={[styles.firstCardStackHalf, styles.firstCardStackHalfDaily]}>
               <View style={[styles.firstCardDailyStretch, isRTL && styles.firstCardDailyStretchRtl]}>
@@ -805,7 +815,7 @@ function StackCardFace({
             </View>
           </View>
         ) : practicalDef ? (
-          <GHPressable
+          <DeckPressable
             onPress={() => onPressPracticalLink?.(practicalDef.id)}
             disabled={!onPressPracticalLink}
             accessibilityRole="button"
@@ -843,9 +853,9 @@ function StackCardFace({
               ]}>
               {t('practicalCardTap')}
             </Text>
-          </GHPressable>
+          </DeckPressable>
         ) : progress != null ? (
-          <GHPressable
+          <DeckPressable
             onPress={onOpenOrientationOverview}
             disabled={!onOpenOrientationOverview}
             accessibilityRole="button"
@@ -889,7 +899,7 @@ function StackCardFace({
                 {t('orientationTapHint')}
               </Text>
             ) : null}
-          </GHPressable>
+          </DeckPressable>
         ) : card.dailyActions != null ? (
           <View style={[styles.dailyActionsColumn, { marginTop: layout.validityMT }]}>
             <DailyActionsBlock
@@ -1208,6 +1218,7 @@ export function HomeStackedPackCards({
   /** 1 = contenu carte principale visible ; 0 = voile blanc jusqu’à fin du swipe. */
   const revealTop = useSharedValue(1);
   const threshold = width * 0.14;
+  const deckNativeGesture = useMemo(() => Gesture.Native(), []);
 
   const bumpNextState = useCallback(() => {
     setHeadIndex((h) => (h + 1) % n);
@@ -1247,59 +1258,65 @@ export function HomeStackedPackCards({
     if (n <= 1) {
       return Gesture.Pan().enabled(false);
     }
-    return Gesture.Pan()
-      .activeOffsetX([-10, 10])
-      .failOffsetY([-28, 28])
-      .onUpdate((e) => {
-        'worklet';
-        translateX.value = e.translationX * DRAG_DAMPING;
-        translateY.value = e.translationY * DRAG_DAMPING;
-      })
-      .onEnd((e) => {
-        'worklet';
-        const tx = translateX.value;
-        const vx = e.velocityX;
-        /** LTR : swipe gauche → suivant ; RTL : swipe droite → suivant (parcours droite → gauche). */
-        const goNext = isRTL ? tx > threshold || vx > SWIPE_V : tx < -threshold || vx < -SWIPE_V;
-        const goPrev = isRTL ? tx < -threshold || vx < -SWIPE_V : tx > threshold || vx > SWIPE_V;
 
-        if (goNext) {
-          exitAnimating.value = 1;
-          const target = isRTL ? screenWShared.value * 1.12 : -screenWShared.value * 1.12;
-          translateX.value = withTiming(
-            target,
-            { duration: EXIT_MS, easing: EXIT_EASING },
-            (finished) => {
-              'worklet';
-              if (!finished) {
-                exitAnimating.value = 0;
-                return;
-              }
-              runOnJS(bumpNextThenResetTransforms)();
-            }
-          );
-        } else if (goPrev) {
-          exitAnimating.value = 1;
-          const target = isRTL ? -screenWShared.value * 1.12 : screenWShared.value * 1.12;
-          translateX.value = withTiming(
-            target,
-            { duration: EXIT_MS, easing: EXIT_EASING },
-            (finished) => {
-              'worklet';
-              if (!finished) {
-                exitAnimating.value = 0;
-                return;
-              }
-              runOnJS(bumpPrevThenResetTransforms)();
-            }
-          );
-        } else {
-          exitAnimating.value = 0;
-          revealTop.value = 1;
-          translateX.value = withSpring(0, SPRING_BACK);
-          translateY.value = withSpring(0, SPRING_BACK);
-        }
-      });
+    const attachPanHandlers = (gesture: ReturnType<typeof Gesture.Pan>) =>
+      gesture
+        .onUpdate((e) => {
+          'worklet';
+          translateX.value = e.translationX * DRAG_DAMPING;
+          translateY.value = e.translationY * DRAG_DAMPING;
+        })
+        .onEnd((e) => {
+          'worklet';
+          const tx = translateX.value;
+          const vx = e.velocityX;
+          /** LTR : swipe gauche → suivant ; RTL : swipe droite → suivant (parcours droite → gauche). */
+          const goNext = isRTL ? tx > threshold || vx > SWIPE_V : tx < -threshold || vx < -SWIPE_V;
+          const goPrev = isRTL ? tx < -threshold || vx < -SWIPE_V : tx > threshold || vx > SWIPE_V;
+
+          if (goNext) {
+            exitAnimating.value = 1;
+            const target = isRTL ? screenWShared.value * 1.12 : -screenWShared.value * 1.12;
+            translateX.value = withTiming(
+              target,
+              { duration: EXIT_MS, easing: EXIT_EASING },
+              (finished) => {
+                'worklet';
+                if (!finished) {
+                  exitAnimating.value = 0;
+                  return;
+                }
+                runOnJS(bumpNextThenResetTransforms)();
+              },
+            );
+          } else if (goPrev) {
+            exitAnimating.value = 1;
+            const target = isRTL ? -screenWShared.value * 1.12 : screenWShared.value * 1.12;
+            translateX.value = withTiming(
+              target,
+              { duration: EXIT_MS, easing: EXIT_EASING },
+              (finished) => {
+                'worklet';
+                if (!finished) {
+                  exitAnimating.value = 0;
+                  return;
+                }
+                runOnJS(bumpPrevThenResetTransforms)();
+              },
+            );
+          } else {
+            exitAnimating.value = 0;
+            revealTop.value = 1;
+            translateX.value = withSpring(0, SPRING_BACK);
+            translateY.value = withSpring(0, SPRING_BACK);
+          }
+        });
+
+    return attachPanHandlers(
+      Gesture.Pan()
+        .activeOffsetX([-DECK_PAN_ACTIVATE_X, DECK_PAN_ACTIVATE_X])
+        .failOffsetY([-DECK_PAN_FAIL_Y, DECK_PAN_FAIL_Y]),
+    );
   }, [
     n,
     screenWShared,
@@ -1312,6 +1329,17 @@ export function HomeStackedPackCards({
     bumpPrevThenResetTransforms,
     isRTL,
   ]);
+
+  /**
+   * iOS : Pan + Native (scroll + swipe).
+   * Android : Pan seul — échoue vite au vertical (failOffsetY) pour laisser le ScrollView défiler ;
+   * les boutons utilisent Gesture.Tap() enfant (DeckPressable).
+   */
+  const topDeckGesture = useMemo(() => {
+    if (n <= 1) return null;
+    if (Platform.OS === 'android') return panGesture;
+    return Gesture.Simultaneous(panGesture, deckNativeGesture);
+  }, [deckNativeGesture, n, panGesture]);
 
   if (n === 0) {
     return null;
@@ -1369,35 +1397,43 @@ export function HomeStackedPackCards({
           const bacStackPeek = card.bacResults != null && !isTop;
           const layerCardH = stackCardH;
 
+          const topLayer = (
+            <DeckLayer
+              stackPos={stackPos}
+              card={card}
+              accent={accent}
+              width={width}
+              layout={layout}
+              translateX={translateX}
+              translateY={translateY}
+              exitAnimating={exitAnimating}
+              revealTop={revealTop}
+              isTop
+              shellLoading={shellLoading}
+              onOpenOrientationOverview={orientationOverviewHandler}
+              onPressOrientationContinue={orientationContinueHandler}
+              onPressDailyGame={dailyGameHandler}
+              onPressDailyInfo={dailyInfoHandler}
+              onPressOrientation1Bac={dailyOrientation1BacHandler}
+              onPressTassjilTrack={tassjilTrackHandler}
+              onPressPracticalLink={onPressPracticalLink}
+              onOpenBacVerification={bacVerificationHandler}
+              onOpenBacThresholds={bacThresholdsHandler}
+              bacThresholdsLoading={bacThresholdsLoading}
+              cardH={layerCardH}
+              uniformStack={uniformStack}
+              bacStackPeek={bacStackPeek}
+            />
+          );
+
           return isTop ? (
-            <GestureDetector key={`deck-top-${card.id}`} gesture={panGesture}>
-              <DeckLayer
-                stackPos={stackPos}
-                card={card}
-                accent={accent}
-                width={width}
-                layout={layout}
-                translateX={translateX}
-                translateY={translateY}
-                exitAnimating={exitAnimating}
-                revealTop={revealTop}
-                isTop
-                shellLoading={shellLoading}
-                onOpenOrientationOverview={orientationOverviewHandler}
-                onPressOrientationContinue={orientationContinueHandler}
-                onPressDailyGame={dailyGameHandler}
-                onPressDailyInfo={dailyInfoHandler}
-                onPressOrientation1Bac={dailyOrientation1BacHandler}
-                onPressTassjilTrack={tassjilTrackHandler}
-                onPressPracticalLink={onPressPracticalLink}
-                onOpenBacVerification={bacVerificationHandler}
-                onOpenBacThresholds={bacThresholdsHandler}
-                bacThresholdsLoading={bacThresholdsLoading}
-                cardH={layerCardH}
-                uniformStack={uniformStack}
-                bacStackPeek={bacStackPeek}
-              />
-            </GestureDetector>
+            topDeckGesture ? (
+              <GestureDetector key={`deck-top-${card.id}`} gesture={topDeckGesture}>
+                {topLayer}
+              </GestureDetector>
+            ) : (
+              <Fragment key={`deck-top-${card.id}`}>{topLayer}</Fragment>
+            )
           ) : (
             <DeckLayer
               key={`deck-${stackPos}-${card.id}`}
@@ -1486,7 +1522,6 @@ const styles = StyleSheet.create({
     minHeight: 0,
     width: '100%',
     alignSelf: 'stretch',
-    overflow: 'hidden',
   },
   bacEyebrow: {
     flexShrink: 0,
@@ -1694,12 +1729,22 @@ const styles = StyleSheet.create({
   dailyMiniHighlight: {
     borderWidth: 1.5,
     borderColor: homeShell.greenDark,
-    backgroundColor: homeShell.greenAlpha11,
-    shadowColor: homeShell.green,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.22,
-    shadowRadius: 4,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        backgroundColor: homeShell.greenAlpha11,
+        shadowColor: homeShell.green,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.22,
+        shadowRadius: 4,
+      },
+      android: {
+        backgroundColor: homeShell.greenSurface,
+        elevation: 0,
+      },
+      default: {
+        backgroundColor: homeShell.greenAlpha11,
+      },
+    }),
   },
   dailyMiniTassjil: {
     borderWidth: 1.5,
@@ -1756,7 +1801,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor: homeShell.greenAlpha18,
+    backgroundColor:
+      Platform.OS === 'android' ? homeShell.greenSurfaceStrong : homeShell.greenAlpha18,
   },
   dailyMiniBadgeTxt: {
     color: homeShell.greenDark,

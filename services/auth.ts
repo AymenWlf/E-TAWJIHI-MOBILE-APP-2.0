@@ -211,6 +211,17 @@ export async function resetPasswordWithToken(token: string, password: string): P
 
 export type ChangePasswordResponse = { success: boolean; message?: string };
 
+export type DeleteAccountResponse = { success: boolean; message?: string };
+
+export async function deleteMyAccount(accessToken: string): Promise<DeleteAccountResponse> {
+  const url = buildApiUrl('/api/account/delete');
+  return await httpPostJson<DeleteAccountResponse, Record<string, never>>(
+    url,
+    {},
+    { headers: { Authorization: `Bearer ${accessToken}` } },
+  );
+}
+
 export async function changePasswordWithToken(
   accessToken: string,
   currentPassword: string,

@@ -1,21 +1,47 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-const STORAGE_KEY = 'etawjihi.bac.massar.confirmed';
+const STORAGE_KEY_PREFIX = 'etawjihi.bac.massar.confirmed';
+/** Ancienne clé globale (avant scope par utilisateur). */
+const LEGACY_STORAGE_KEY = STORAGE_KEY_PREFIX;
 
-export async function readBacResultsMassarLocal(): Promise<string> {
+function storageKeyForUser(userId?: number | string | null): string | null {
+  if (userId == null || userId === '') return null;
+  return `${STORAGE_KEY_PREFIX}.${userId}`;
+}
+
+export async function readBacResultsMassarLocal(userId?: number | string | null): Promise<string> {
   try {
-    const raw = await AsyncStorage.getItem(STORAGE_KEY);
-    return typeof raw === 'string' ? raw.trim() : '';
+    const scopedKey = storageKeyForUser(userId);
+    if (scopedKey) {
+      const scoped = await AsyncStorage.getItem(scopedKey);
+      if (typeof scoped === 'string' && scoped.trim()) {
+        return scoped.trim();
+      }
+    }
+    const legacy = await AsyncStorage.getItem(LEGACY_STORAGE_KEY);
+    return typeof legacy === 'string' ? legacy.trim() : '';
   } catch {
     return '';
   }
 }
 
-export async function writeBacResultsMassarLocal(code: string): Promise<void> {
+export async function writeBacResultsMassarLocal(
+  code: string,
+  userId?: number | string | null,
+): Promise<void> {
   const trimmed = code.replace(/\s/g, '').trim();
-  if (!trimmed) {
-    await AsyncStorage.removeItem(STORAGE_KEY);
+  const scopedKey = storageKeyForUser(userId);
+  if (!scopedKey) {
+    if (!trimmed) {
+      await AsyncStorage.removeItem(LEGACY_STORAGE_KEY);
+      return;
+    }
+    await AsyncStorage.setItem(LEGACY_STORAGE_KEY, trimmed);
     return;
   }
-  await AsyncStorage.setItem(STORAGE_KEY, trimmed);
+  if (!trimmed) {
+    await AsyncStorage.removeItem(scopedKey);
+    return;
+  }
+  await AsyncStorage.setItem(scopedKey, trimmed);
 }

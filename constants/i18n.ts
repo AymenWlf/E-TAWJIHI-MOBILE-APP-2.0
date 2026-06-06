@@ -424,6 +424,10 @@ export type HomeCopyKey =
   | 'appUpdateEyebrow'
   | 'appUpdateTitleRequired'
   | 'appUpdateTitleRecommended'
+  | 'appUpdateMajorTitle'
+  | 'appUpdateMajorLead'
+  | 'appUpdateStoreCtaIos'
+  | 'appUpdateStoreCtaAndroid'
   | 'appUpdateCta'
   | 'appUpdateLater'
   | 'appUpdateVersionHint'
@@ -701,6 +705,11 @@ export type HomeCopyKey =
   | 'setupDateOk'
   | 'estDetailTitle'
   | 'estDetailSummary'
+  | 'estDetailSeuilsAdmission'
+  | 'estDetailSeuilsDisclaimer'
+  | 'estDetailSeuilsBacNormal'
+  | 'estDetailSeuilsBacMission'
+  | 'estDetailSeuilsMode'
   | 'estDetailPresentation'
   | 'estDetailMediaPhotos'
   | 'estDetailMediaVideo'
@@ -730,6 +739,9 @@ export type HomeCopyKey =
   | 'estBadgeRecommended'
   | 'estBadgeSponsored'
   | 'estScholarshipsAvailable'
+  | 'estBourseTypeFinanciere'
+  | 'estBourseTypeLogement'
+  | 'estBourseTypeReductionScolarite'
   | 'accountTitle'
   | 'accountSubtitle'
   | 'accountLoginCta'
@@ -923,6 +935,15 @@ export type HomeCopyKey =
   | 'accountLogoutMessage'
   | 'accountLogoutConfirm'
   | 'accountLogoutCancel'
+  | 'accountDeleteButton'
+  | 'accountDeleteTitle'
+  | 'accountDeleteMessage'
+  | 'accountDeleteConfirm'
+  | 'accountDeleteCancel'
+  | 'accountDeleteSuccessTitle'
+  | 'accountDeleteSuccessBody'
+  | 'accountDeleteForbidden'
+  | 'loginAccountDeleted'
   | 'accountCityPlaceholder'
   | 'accountCitiesLoading'
   | 'commonErrorTitle'
@@ -2137,6 +2158,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     appUpdateEyebrow: 'Mise à jour',
     appUpdateTitleRequired: 'Mise à jour obligatoire',
     appUpdateTitleRecommended: 'Nouvelle version disponible',
+    appUpdateMajorTitle: 'Grande mise à jour disponible',
+    appUpdateMajorLead:
+      'Téléchargez la nouvelle version depuis le store pour continuer à utiliser E-TAWJIHI.',
+    appUpdateStoreCtaIos: 'Télécharger sur l’App Store',
+    appUpdateStoreCtaAndroid: 'Télécharger sur le Play Store',
     appUpdateCta: 'Mettre à jour depuis le store',
     appUpdateLater: 'Plus tard',
     appUpdateVersionHint: 'Votre version : {current} — dernière : {latest}',
@@ -2451,6 +2477,12 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     setupDateOk: 'OK',
     estDetailTitle: 'Fiche école',
     estDetailSummary: 'Synthèse',
+    estDetailSeuilsAdmission: "Seuils d'admission",
+    estDetailSeuilsDisclaimer:
+      'Informations indicatives (prévisionnel, année en cours, année précédente). Source officielle ou estimation selon les données de l\'établissement.',
+    estDetailSeuilsBacNormal: 'Bac marocain',
+    estDetailSeuilsBacMission: 'Bac mission',
+    estDetailSeuilsMode: 'Mode',
     estDetailPresentation: 'Présentation',
     estDetailMediaPhotos: 'Photos',
     estDetailMediaVideo: 'Vidéo',
@@ -2480,6 +2512,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estBadgeRecommended: 'Recommandé',
     estBadgeSponsored: 'Sponsorisé',
     estScholarshipsAvailable: 'Bourses disponibles',
+    estBourseTypeFinanciere: 'Bourse financière',
+    estBourseTypeLogement: 'Bourse logement',
+    estBourseTypeReductionScolarite: 'Réduction dans la scolarité',
     accountTitle: 'Mon compte',
     accountSubtitle: 'Consultez et mettez à jour vos informations.',
     accountLoginCta: 'Se connecter',
@@ -2688,6 +2723,17 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountLogoutMessage: 'Voulez-vous vraiment vous déconnecter ?',
     accountLogoutConfirm: 'Se déconnecter',
     accountLogoutCancel: 'Annuler',
+    accountDeleteButton: 'Supprimer mon compte',
+    accountDeleteTitle: 'Supprimer le compte',
+    accountDeleteMessage:
+      'Cette action est définitive : votre compte sera désactivé et vous ne pourrez plus vous connecter. Contactez le support pour créer un nouveau compte.\n\nConfirmez-vous la suppression ?',
+    accountDeleteConfirm: 'Supprimer',
+    accountDeleteCancel: 'Annuler',
+    accountDeleteSuccessTitle: 'Compte supprimé',
+    accountDeleteSuccessBody: 'Votre compte a été désactivé. Contactez le support pour créer un nouveau compte.',
+    accountDeleteForbidden:
+      'Les comptes administrateur ne peuvent pas être supprimés depuis l\'application. Utilisez un compte client ou contactez le support.',
+    loginAccountDeleted: 'Ce compte a été supprimé. Contactez le support pour créer un nouveau compte.',
     accountCityPlaceholder: 'Choisir une ville…',
     accountCitiesLoading: 'Chargement des villes…',
     commonErrorTitle: 'Erreur',
@@ -3009,7 +3055,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopEstCategoryOther: 'Autres',
     tabHome: 'Accueil',
     tabEcoles: 'Écoles',
-    tabInscriptions: 'Inscriptions',
+    tabInscriptions: 'Annonces',
     tabBoutique: 'Boutique',
     tabCompte: 'Compte',
     hubWhatsAppA11y: 'Nous contacter sur WhatsApp pour des informations',
@@ -3245,8 +3291,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     eventsAttendancePrefix: 'Présence',
 
   // ── Inscriptions / suivi de candidatures ──
-    inscEyebrow: 'Inscriptions & candidatures',
-    inscTitle: 'Mes inscriptions',
+    inscEyebrow: 'Concours & candidatures',
+    inscTitle: 'Annonces de concours',
     inscSubtitle: 'Suivez vos candidatures et restez informé des ouvertures.',
     inscTassjilTrackCta: 'Suivi des inscriptions — service TASSJIL',
     inscTassjilTrackHint: 'Vos écoles TASSJIL synchronisées avec E-Tawjihi',
@@ -3641,7 +3687,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     homeMostVisitedSchoolsSubtitle: 'المؤسسات التي يتصفحها المجتمع',
     homeMostVisitedSchoolsA11y: 'المدارس الأكثر زيارة',
     homeLatestAnnouncementsTitle: 'آخر الإعلانات',
-    homeLatestAnnouncementsSubtitle: 'مسابقات وتسجيلات منشورة حديثًا',
+    homeLatestAnnouncementsSubtitle: 'مباريات وتسجيلات منشورة حديثًا',
     homeLatestAnnouncementsA11y: 'آخر الإعلانات',
     homeAnnouncementOpen: 'مفتوح',
     homeAnnouncementClosed: 'مغلق',
@@ -3683,7 +3729,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     practical_ecoles_desc:
       'استكشاف المؤسسات والمسارات ومعايير القبول لصياغة مشروعك الدراسي.',
     practical_inscriptions_desc:
-      'تقاويم المسابقات والملفات المطلوبة والآجال حتى لا يفوتك أي موعد.',
+      'تقاويم المباريات والملفات المطلوبة والآجال حتى لا يفوتك أي موعد.',
     practical_candidatures_desc:
       'تتبّع حالة ملفاتك والخطوات القادمة في طلباتك.',
     practical_evenements_desc:
@@ -3956,12 +4002,16 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     appUpdateEyebrow: 'تحديث',
     appUpdateTitleRequired: 'تحديث إلزامي',
     appUpdateTitleRecommended: 'إصدار جديد متوفر',
+    appUpdateMajorTitle: 'تحديث كبير متوفر',
+    appUpdateMajorLead: 'حمّل الإصدار الجديد من المتجر لمتابعة استخدام إي-توجيهي.',
+    appUpdateStoreCtaIos: 'التنزيل من App Store',
+    appUpdateStoreCtaAndroid: 'التنزيل من Play Store',
     appUpdateCta: 'التحديث من المتجر',
     appUpdateLater: 'لاحقاً',
     appUpdateVersionHint: 'إصدارك: {current} — آخر إصدار: {latest}',
     pushPermissionModalTitle: 'فعّل الإشعارات',
     pushPermissionModalBody:
-      'استقبل تنبيهات فتح التسجيلات وإعلانات المسابقات ورسائل إي توجيهي المهمة.',
+      'استقبل تنبيهات فتح التسجيلات وإعلانات المباريات ورسائل إي توجيهي المهمة.',
     pushPermissionModalHint:
       'الإشعارات معطّلة على هذا الجهاز. افتح الإعدادات للسماح بها (الإعدادات → الإشعارات → E-Tawjihi على iPhone، أو الإعدادات → التطبيقات → E-Tawjihi على Android).',
     pushPermissionModalOpenSettings: 'فتح الإعدادات',
@@ -3981,7 +4031,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     applySchoolsTourTrackerActionTitle: 'الإجراء المطلوب',
     applySchoolsTourTrackerPending: 'لم يُنجَز بعد',
     applySchoolsTourTrackerDone: 'مكتمل',
-    applySchoolsTourActionTapNotification: 'اضغط على تنبيه المسابقة أدناه',
+    applySchoolsTourActionTapNotification: 'اضغط على تنبيه المباراة أدناه',
     applySchoolsTourActionTapContinue: 'اضغط « متابعة » في الأسفل',
     applySchoolsTourActionTapFollow: 'اضغط قلب « متابعة » على البطاقة',
     applySchoolsTourActionTapStatus: 'اضغط « تحديث » على البطاقة',
@@ -3990,11 +4040,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     applySchoolsTourTabsLegend:
       'الشارة الخضراء: {{active}} ترشيحات نشطة · الحمراء: {{attention}} إجراء(ات) مطلوب(ة).',
     applySchoolsTourTabsAnnouncementsPlaceholder:
-      'تبويب الإعلانات: كل منشورات المدارس (مسابقات، تسجيلات…).',
+      'تبويب الإعلانات: كل منشورات المدارس (مباريات، تسجيلات…).',
     applySchoolsTourTabsTapCandidaciesHint:
       'اضغط تبويب الترشيحات لعرض متابعاتك والإجراءات المطلوبة.',
     applySchoolsTourGoInscriptions: 'الذهاب إلى التسجيلات',
-    applySchoolsTourTeaseTitle: '{school} — تنبيه مسابقة',
+    applySchoolsTourTeaseTitle: '{school} — تنبيه مباراة',
     applySchoolsTourTeaseSub: 'اضغط لاستقبال تنبيه على هاتفك',
     applySchoolsTourTeaseHint: 'كما على هاتفك: يُعلِمك التنبيه عند نشر مدرسة لإعلان جديد.',
     applySchoolsTourPushHint: 'يفتح التنبيه الإعلان في التطبيق. هنا مثال لـ {school}.',
@@ -4006,8 +4056,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     applySchoolsTourCandidacyHint: 'في الترشيحات: البطاقة تتحول للون الوردي عند إعلان جديد يتطلب انتباهك.',
     applySchoolsTourBravoTitle: 'أحسنت!',
     applySchoolsTourBravoSub: 'تعرف متابعة إعلان، تحديث حالتك وإيجاد مدارسك.',
-    applySchoolsTourStep_notification_tease_title: '1. تنبيهات المسابقات',
-    applySchoolsTourStep_notification_tease_body: 'عند نشر مدرسة لإعلان (مسابقة، فتح تسجيلات…) يمكنك تلقي تنبيهاً.',
+    applySchoolsTourStep_notification_tease_title: '1. تنبيهات المباريات',
+    applySchoolsTourStep_notification_tease_body: 'عند نشر مدرسة لإعلان (مباراة، فتح تسجيلات…) يمكنك تلقي تنبيهاً.',
     applySchoolsTourStep_push_preview_title: '2. مثال تنبيه',
     applySchoolsTourStep_push_preview_body: 'هذا شكل التنبيه لفتح التسجيلات لدى {school}.',
     applySchoolsTourStep_announcement_card_title: '3. إعلان {school}',
@@ -4262,6 +4312,12 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     setupDateOk: 'حسناً',
     estDetailTitle: 'ملف المدرسة',
     estDetailSummary: 'ملخص',
+    estDetailSeuilsAdmission: 'عتبات القبول',
+    estDetailSeuilsDisclaimer:
+      'معلومات استرشادية (توقعي، السنة الجارية، السنة السابقة). مصدر رسمي أو تقدير حسب بيانات المؤسسة.',
+    estDetailSeuilsBacNormal: 'البكالوريا المغربية',
+    estDetailSeuilsBacMission: 'البكالوريا الدولية',
+    estDetailSeuilsMode: 'النمط',
     estDetailPresentation: 'نبذة',
     estDetailMediaPhotos: 'صور',
     estDetailMediaVideo: 'فيديو',
@@ -4291,6 +4347,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estBadgeRecommended: 'موصى بها',
     estBadgeSponsored: 'مموّلة',
     estScholarshipsAvailable: 'منح متاحة',
+    estBourseTypeFinanciere: 'منحة مالية',
+    estBourseTypeLogement: 'منحة سكن',
+    estBourseTypeReductionScolarite: 'تخفيض في الرسوم الدراسية',
     accountTitle: 'حسابي',
     accountSubtitle: 'اطّلع على معلوماتك وقم بتحديثها.',
     accountLoginCta: 'تسجيل الدخول',
@@ -4489,6 +4548,17 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     accountLogoutMessage: 'هل تريد حقاً تسجيل الخروج؟',
     accountLogoutConfirm: 'تسجيل الخروج',
     accountLogoutCancel: 'إلغاء',
+    accountDeleteButton: 'حذف حسابي',
+    accountDeleteTitle: 'حذف الحساب',
+    accountDeleteMessage:
+      'هذا الإجراء نهائي: سيتم تعطيل حسابك ولن تتمكن من تسجيل الدخول. تواصل مع الدعم لإنشاء حساب جديد.\n\nهل تؤكد الحذف؟',
+    accountDeleteConfirm: 'حذف',
+    accountDeleteCancel: 'إلغاء',
+    accountDeleteSuccessTitle: 'تم حذف الحساب',
+    accountDeleteSuccessBody: 'تم تعطيل حسابك. تواصل مع الدعم لإنشاء حساب جديد.',
+    accountDeleteForbidden:
+      'لا يمكن حذف حسابات المسؤولين من التطبيق. استخدم حساب عميل أو تواصل مع الدعم.',
+    loginAccountDeleted: 'تم حذف هذا الحساب. تواصل مع الدعم لإنشاء حساب جديد.',
     accountCityPlaceholder: 'اختر مدينة…',
     accountCitiesLoading: 'جارٍ تحميل المدن…',
     commonErrorTitle: 'خطأ',
@@ -4802,7 +4872,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopEstCategoryOther: 'أخرى',
     tabHome: 'الرئيسية',
     tabEcoles: 'المدارس',
-    tabInscriptions: 'التسجيلات',
+    tabInscriptions: 'الإعلانات',
     tabBoutique: 'المتجر',
     tabCompte: 'حسابي',
     hubWhatsAppA11y: 'التواصل عبر واتساب للحصول على معلومات',
@@ -4913,8 +4983,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shareKindHome: 'الرئيسية',
     shareKindSchools: 'المدارس العليا',
     shareKindSchool: 'بطاقة مؤسسة',
-    shareKindAnnouncement: 'إعلان مسابقة',
-    shareKindAnnouncements: 'إعلانات المسابقات',
+    shareKindAnnouncement: 'إعلان مباراة',
+    shareKindAnnouncements: 'إعلانات المباريات',
     shareKindEvent: 'فعالية / ندوة',
     shareKindEvents: 'أجندة الفعاليات',
     shareKindCommunity: 'مجموعة باك 2026',
@@ -5033,8 +5103,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     eventsAttendancePrefix: 'الحضور',
 
     // ── التسجيلات / تتبع الترشيحات ──
-    inscEyebrow: 'التسجيلات والترشيحات',
-    inscTitle: 'تسجيلاتي',
+    inscEyebrow: 'المباريات والترشيحات',
+    inscTitle: 'إعلانات المباريات',
     inscSubtitle: 'تابع ترشيحاتك وابقَ على اطلاع بفترات التسجيل.',
     inscTassjilTrackCta: 'متابعة التسجيلات — خدمة TASSJIL',
     inscTassjilTrackHint: 'مدارس TASSJIL المتزامنة مع E-Tawjihi',

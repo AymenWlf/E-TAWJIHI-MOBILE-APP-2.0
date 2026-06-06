@@ -22,6 +22,18 @@ type ChannelsApiResponse = {
   };
 };
 
+const storyChannelsCache: Partial<Record<'fr' | 'ar', StoryChannel[]>> = {};
+
+export function peekCachedStoryChannels(locale: 'fr' | 'ar'): StoryChannel[] | null {
+  const hit = storyChannelsCache[locale];
+  return hit?.length ? hit : null;
+}
+
+export function invalidateStoryChannelsCache(): void {
+  delete storyChannelsCache.fr;
+  delete storyChannelsCache.ar;
+}
+
 /**
  * Chaînes publiées depuis l’API (remplace le mock si au moins une chaîne renvoyée).
  */
@@ -53,6 +65,9 @@ export async function fetchStoryChannels(locale: 'fr' | 'ar'): Promise<StoryChan
       coverUri,
       slides,
     });
+  }
+  if (out.length > 0) {
+    storyChannelsCache[locale] = out;
   }
   return out;
 }

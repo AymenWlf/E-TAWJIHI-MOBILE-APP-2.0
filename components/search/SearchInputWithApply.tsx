@@ -18,6 +18,8 @@ type Props = {
   locked?: boolean;
   lockedPlaceholder?: string;
   onLockedPress?: () => void;
+  /** Variante plus basse (header Écoles sup). */
+  compact?: boolean;
 };
 
 export function SearchInputWithApply({
@@ -33,16 +35,18 @@ export function SearchInputWithApply({
   locked = false,
   lockedPlaceholder,
   onLockedPress,
+  compact = false,
 }: Props) {
   const canEdit = editable && !locked;
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, compact && styles.wrapCompact]}>
       <Pressable
         onPress={locked ? onLockedPress : undefined}
         disabled={!locked}
         style={({ pressed }) => [
           styles.row,
+          compact && styles.rowCompact,
           isRTL && styles.rowRtl,
           locked && styles.rowLocked,
           locked && pressed && { opacity: 0.92 },
@@ -50,7 +54,7 @@ export function SearchInputWithApply({
       >
         <FontAwesome
           name={locked ? 'lock' : 'search'}
-          size={16}
+          size={compact ? 14 : 16}
           color={locked ? '#94A3B8' : homeShell.cardMuted}
         />
         <TextInput
@@ -60,7 +64,12 @@ export function SearchInputWithApply({
           pointerEvents={canEdit ? 'auto' : 'none'}
           placeholder={locked ? lockedPlaceholder : placeholder}
           placeholderTextColor={locked ? '#94A3B8' : homeShell.cardMuted}
-          style={[styles.input, isRTL && styles.inputRtl, locked && styles.inputLocked]}
+          style={[
+            styles.input,
+            compact && styles.inputCompact,
+            isRTL && styles.inputRtl,
+            locked && styles.inputLocked,
+          ]}
           autoCapitalize="none"
           autoCorrect={false}
           returnKeyType="search"
@@ -72,18 +81,22 @@ export function SearchInputWithApply({
             hitSlop={10}
             accessibilityLabel="Effacer la recherche"
           >
-            <FontAwesome name="times-circle" size={18} color={homeShell.cardMuted} />
+            <FontAwesome name="times-circle" size={compact ? 16 : 18} color={homeShell.cardMuted} />
           </Pressable>
         ) : null}
       </Pressable>
       {showApply && canEdit ? (
         <Pressable
           onPress={onApply}
-          style={({ pressed }) => [styles.applyBtn, pressed && { opacity: 0.9 }]}
+          style={({ pressed }) => [
+            styles.applyBtn,
+            compact && styles.applyBtnCompact,
+            pressed && { opacity: 0.9 },
+          ]}
           accessibilityRole="button"
           accessibilityLabel={applyLabel}
         >
-          <Text style={styles.applyBtnTxt}>{applyLabel}</Text>
+          <Text style={[styles.applyBtnTxt, compact && styles.applyBtnTxtCompact]}>{applyLabel}</Text>
         </Pressable>
       ) : null}
     </View>
@@ -92,6 +105,7 @@ export function SearchInputWithApply({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
+  wrapCompact: { gap: spacing.xs },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -102,6 +116,12 @@ const styles = StyleSheet.create({
     backgroundColor: '#F8FAFC',
     borderWidth: 1,
     borderColor: homeShell.borderOnWhite,
+  },
+  rowCompact: {
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+    borderRadius: radius.md,
   },
   rowRtl: { flexDirection: 'row-reverse' },
   rowLocked: {
@@ -115,6 +135,10 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '600',
   },
+  inputCompact: {
+    fontSize: fontSize.sm,
+    paddingVertical: 0,
+  },
   inputRtl: { textAlign: 'right', writingDirection: 'rtl' },
   inputLocked: { color: '#94A3B8' },
   applyBtn: {
@@ -126,9 +150,17 @@ const styles = StyleSheet.create({
     borderRadius: radius.lg,
     backgroundColor: homeShell.blue,
   },
+  applyBtnCompact: {
+    paddingVertical: 8,
+    paddingHorizontal: spacing.sm + 2,
+    borderRadius: radius.md,
+  },
   applyBtnTxt: {
     color: brand.white,
     fontSize: fontSize.sm,
     fontWeight: '800',
+  },
+  applyBtnTxtCompact: {
+    fontSize: fontSize.xs + 1,
   },
 });

@@ -4,7 +4,7 @@ import RenderHTML from 'react-native-render-html';
 
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
-import { CAIRO } from '@/theme/arabicTypography';
+import { CAIRO, applyArabicFontOverlay } from '@/theme/arabicTypography';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, spacing } from '@/theme/tokens';
 import { prepareDescriptionHtmlForDisplay } from '@/utils/descriptionHtml';
@@ -97,7 +97,8 @@ export function EstablishmentDescriptionHtml({
       letterSpacing: -0.25,
       ...rtlText,
     };
-    const ar = (family: keyof typeof CAIRO) => (isRTL ? { fontFamily: CAIRO[family] } : {});
+    const ar = (family: keyof typeof CAIRO) =>
+      isRTL ? applyArabicFontOverlay({ fontFamily: CAIRO[family] }) : {};
 
     return {
       body: rtlText,
@@ -270,7 +271,7 @@ export function EstablishmentDescriptionHtml({
       fontSize: fontSize.md,
       lineHeight: 23,
       ...rtlText,
-      ...(isRTL ? { fontFamily: CAIRO.semibold } : {}),
+      ...(isRTL ? applyArabicFontOverlay({ fontFamily: CAIRO.semibold }) : {}),
     }),
     [isRTL, rtlText],
   );

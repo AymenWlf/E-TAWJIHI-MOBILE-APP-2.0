@@ -24,7 +24,13 @@ import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
-import { fetchPlatformEvents, type PlatformEventBrief, type PlatformEventKind } from '@/services/platformEvents';
+import {
+  fetchPlatformEvents,
+  recordPlatformEventClick,
+  recordPlatformEventListingImpressionsBatch,
+  type PlatformEventBrief,
+  type PlatformEventKind,
+} from '@/services/platformEvents';
 import { getUserFacingLoadError } from '@/utils/apiError';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -65,6 +71,7 @@ export default function EvenementsScreen() {
     try {
       const rows = await fetchPlatformEvents(token ?? undefined, tab, { throwOnError: true });
       setItems(rows);
+      recordPlatformEventListingImpressionsBatch(rows);
     } catch (e) {
       setItems([]);
       setLoadError(getUserFacingLoadError(e, t, { context: 'events' }));
@@ -181,7 +188,10 @@ export default function EvenementsScreen() {
               return (
                 <Pressable
                   style={({ pressed }) => [styles.card, pressed && styles.cardPressed]}
-                  onPress={() => router.push(`/evenements/${item.id}` as never)}
+                  onPress={() => {
+                    void recordPlatformEventClick(item.id, 'listing');
+                    router.push(`/evenements/${item.id}` as never);
+                  }}
                 >
                   <View style={[styles.cardAccentBar, isRTL && styles.cardAccentBarRtl]} />
                   <View style={styles.cardImageWrap}>

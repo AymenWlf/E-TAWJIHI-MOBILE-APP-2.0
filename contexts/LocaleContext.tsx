@@ -44,7 +44,7 @@ export function LocaleProvider({ children }: { children: ReactNode }) {
 
   const setLocale = useCallback((next: AppLocale) => {
     if (next !== 'fr' && next !== 'ar') return;
-    setLocaleState(next);
+    setLocaleState((prev) => (prev === next ? prev : next));
     void AsyncStorage.setItem(STORAGE_KEY, next).catch(() => undefined);
   }, []);
 

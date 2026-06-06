@@ -61,8 +61,9 @@ function PracticalLinkCard({
   const locked = Boolean(item.locked);
   const iconBg = withAlpha(item.accent, locked ? 0.08 : 0.14);
   const iconRing = withAlpha(item.accent, locked ? 0.16 : 0.28);
-  const glow = withAlpha(item.accent, locked ? 0.04 : 0.11);
   const footerBg = withAlpha(item.accent, locked ? 0.04 : 0.06);
+  const glow =
+    Platform.OS === 'android' ? null : withAlpha(item.accent, locked ? 0.04 : 0.11);
   const displayAccent = locked ? brand.textMuted : item.accent;
 
   return (
@@ -77,7 +78,7 @@ function PracticalLinkCard({
       accessibilityRole="button"
       accessibilityLabel={item.label}
       accessibilityState={{ disabled: locked }}>
-      <View style={[styles.glowOrb, { backgroundColor: glow }]} pointerEvents="none" />
+      {glow ? <View style={[styles.glowOrb, { backgroundColor: glow }]} pointerEvents="none" /> : null}
       <View style={[styles.cardBody, isRTL && styles.cardBodyRtl]}>
         <View style={styles.heroRow}>
           <View style={[styles.iconWrap, { backgroundColor: iconBg, borderColor: iconRing }]}>

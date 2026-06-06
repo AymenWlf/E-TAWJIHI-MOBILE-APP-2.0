@@ -4,11 +4,11 @@ import {
   Alert,
   InteractionManager,
   Platform,
-  ScrollView,
   StyleSheet,
   useWindowDimensions,
   View,
 } from 'react-native';
+import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
@@ -31,6 +31,7 @@ import { HomeTopBar } from '@/components/home/HomeTopBar';
 import { StoriesRow } from '@/components/home/StoriesRow';
 import { StoryViewerModal } from '@/components/stories/StoryViewerModal';
 import { homeStackCardsForLocale, storyChannelsForLocale } from '@/data/mock/homeFeed';
+import type { AppLocale } from '@/constants/i18n';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
 import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
@@ -72,7 +73,12 @@ import {
 } from '@/utils/tawjihPlusParcoursGate';
 import { httpGetJson } from '@/services/http';
 import { buildHomePlanParcoursData } from '@/utils/orientationParcoursTasks';
-import { fetchStoryChannels, recordStoryEvent } from '@/services/stories';
+import {
+  fetchStoryChannels,
+  invalidateStoryChannelsCache,
+  peekCachedStoryChannels,
+  recordStoryEvent,
+} from '@/services/stories';
 import { fetchDailyChallengeToday } from '@/services/dailyChallenge';
 import {
   clearContestAnnouncementsListCache,
@@ -204,50 +210,89 @@ export default function IndexScreen() {
     }, [loadActiveServices]),
   );
 
-  const loadStories = useCallback(async () => {
-    setStoriesLoading(true);
-      try {
-        const loc = locale === 'ar' ? 'ar' : 'fr';
-        const remote = await fetchStoryChannels(loc);
-      if (remote.length > 0) {
-          setStoryChannels(remote);
+  const storiesFetchGenRef = useRef(0);
+  const storiesBootstrappedRef = useRef(false);
+
+  const refreshStories = useCallback(
+    async (options?: { showLoading?: boolean; force?: boolean; targetLocale?: AppLocale }) => {
+      const targetLocale = options?.targetLocale ?? locale;
+      const apiLocale = targetLocale === 'ar' ? 'ar' : 'fr';
+      const gen = ++storiesFetchGenRef.current;
+
+      const cached = !options?.force ? peekCachedStoryChannels(apiLocale) : null;
+      if (cached) {
+        setStoryChannels(cached);
       } else {
-          setStoryChannels(storyChannelsForLocale(locale));
+        setStoryChannels(storyChannelsForLocale(targetLocale));
+      }
+
+      if (options?.showLoading) setStoriesLoading(true);
+
+      try {
+        const remote = await fetchStoryChannels(apiLocale);
+        if (gen !== storiesFetchGenRef.current) return;
+        if (remote.length > 0) {
+          setStoryChannels(remote);
+        } else if (!cached) {
+          setStoryChannels(storyChannelsForLocale(targetLocale));
         }
       } catch {
-      setStoryChannels(storyChannelsForLocale(locale));
-    } finally {
-      setStoriesLoading(false);
-    }
-  }, [locale]);
+        if (gen !== storiesFetchGenRef.current) return;
+        if (!cached) {
+          setStoryChannels(storyChannelsForLocale(targetLocale));
+        }
+      } finally {
+        if (gen === storiesFetchGenRef.current && options?.showLoading) {
+          setStoriesLoading(false);
+        }
+      }
+    },
+    [locale],
+  );
 
   useEffect(() => {
-    let cancelled = false;
-    const task = InteractionManager.runAfterInteractions(() => {
-      void (async () => {
+    const isFirstLoad = !storiesBootstrappedRef.current;
+    storiesBootstrappedRef.current = true;
+
+    if (isFirstLoad) {
+      let cancelled = false;
+      const task = InteractionManager.runAfterInteractions(() => {
         if (cancelled) return;
-        await loadStories();
-    })();
-    });
+        void refreshStories({ showLoading: true, targetLocale: locale });
+      });
+      return () => {
+        cancelled = true;
+        task.cancel();
+        storiesFetchGenRef.current += 1;
+      };
+    }
+
+    // Changement FR ↔ AR : texte immédiat (mock/cache), pas de skeleton, refresh API silencieux.
+    setStoriesLoading(false);
+    void refreshStories({ showLoading: false, targetLocale: locale });
     return () => {
-      cancelled = true;
-      task.cancel();
+      storiesFetchGenRef.current += 1;
     };
-  }, [loadStories]);
+  }, [locale, refreshStories]);
+
+  const storyChannelIdsKey = useMemo(
+    () => storyChannels.map((ch) => ch.id).join('\u0001'),
+    [storyChannels],
+  );
 
   /** Impressions « bande » stories (anneaux) — une fois par chaîne et session. */
   useEffect(() => {
-    if (!analyticsVisitorId || storyChannels.length === 0) return;
-    for (const ch of storyChannels) {
-      if (feedTrackedIdsRef.current.has(ch.id)) continue;
-      feedTrackedIdsRef.current.add(ch.id);
+    if (!analyticsVisitorId || !storyChannelIdsKey) return;
+    for (const channelId of storyChannelIdsKey.split('\u0001')) {
+      if (!channelId || feedTrackedIdsRef.current.has(channelId)) continue;
+      feedTrackedIdsRef.current.add(channelId);
       void recordStoryEvent('feed_impression', {
-        channelId: ch.id,
+        channelId,
         visitorId: analyticsVisitorId,
         viewport: 'mobile',
       });
     }
-  }, [analyticsVisitorId, storyChannels]);
+  }, [analyticsVisitorId, storyChannelIdsKey]);
   const [dailyOverlay, setDailyOverlay] = useState<{ playedToday: boolean; streakDays?: number } | null>(null);
   const [dailyLoading, setDailyLoading] = useState(false);
   const [planParcoursCompletion, setPlanParcoursCompletion] = useState<Awaited<
@@ -735,7 +780,10 @@ export default function IndexScreen() {
         loadActiveServices(),
         refreshUnread({ force: true }),
         loadHomeFeedSections({ force: true }),
-        loadStories(),
+        (() => {
+          invalidateStoryChannelsCache();
+          return refreshStories({ showLoading: false, force: true });
+        })(),
         loadDailyChallenge(),
         loadBacResultsConfig({ force: true }),
         refreshTawjihPlusAccess(),
@@ -753,7 +801,7 @@ export default function IndexScreen() {
     loadActiveServices,
     refreshUnread,
     loadHomeFeedSections,
-    loadStories,
+    refreshStories,
     loadDailyChallenge,
     loadBacResultsConfig,
     refreshPlanParcours,
@@ -792,22 +840,12 @@ export default function IndexScreen() {
     t,
   ]);
 
-  return (
-    <View style={styles.root}>
-      <SchoolDiagnosticPendingNavigation />
-      <StatusBar style="light" />
-      {/** Bleu jusqu’aux icônes de statut (iOS/Android) — plus de bande blanche au-dessus du header */}
-      <View style={[styles.headerSafe, { paddingTop: insets.top }]}>
-        <View style={styles.stickyHeader}>
-          <HomeTopBar
-            unreadCount={notifUnreadCount}
-            onPressNotifications={() => openDrawer()}
-            onPressProfile={() => router.push('/compte' as never)}
-            onPressMenu={openSidebar}
-          />
-        </View>
-      </View>
+  const androidHomeScrollNative = useMemo(
+    () => (Platform.OS === 'android' ? Gesture.Native() : null),
+    [],
+  );
 
+  const homeScrollView = (
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={[
@@ -922,6 +960,29 @@ export default function IndexScreen() {
         />
         </View>
       </ScrollView>
+  );
+
+  return (
+    <View style={styles.root}>
+      <SchoolDiagnosticPendingNavigation />
+      <StatusBar style="light" />
+      {/** Bleu jusqu’aux icônes de statut (iOS/Android) — plus de bande blanche au-dessus du header */}
+      <View style={[styles.headerSafe, { paddingTop: insets.top }]}>
+        <View style={styles.stickyHeader}>
+          <HomeTopBar
+            unreadCount={notifUnreadCount}
+            onPressNotifications={() => openDrawer()}
+            onPressProfile={() => router.push('/compte' as never)}
+            onPressMenu={openSidebar}
+          />
+        </View>
+      </View>
+
+      {androidHomeScrollNative ? (
+        <GestureDetector gesture={androidHomeScrollNative}>{homeScrollView}</GestureDetector>
+      ) : (
+        homeScrollView
+      )}
 
       <StoryViewerModal
         visible={storyViewer.open}

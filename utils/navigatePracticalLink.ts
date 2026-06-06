@@ -1,4 +1,7 @@
-import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
+import {
+  navigateToSchoolDiagnosticEntry,
+  navigateToSchoolDiagnosticWizard,
+} from '@/utils/navigateToSchoolDiagnosticEntry';
 import type { PlanParcoursNavigationAuth } from '@/utils/planParcoursNavigation';
 import {
   guardTawjihPlusPracticalLink,
@@ -49,6 +52,8 @@ function navigatePracticalLinkUnlocked(
       return;
     case 'diagnostic-ecoles':
     case 'diagnostic-rapport':
+      void navigateToSchoolDiagnosticWizard(auth, push, tawjihPlusGate);
+      return;
     case 'diagnostic-recommandations':
       void navigateToSchoolDiagnosticEntry(auth, push, tawjihPlusGate);
       return;

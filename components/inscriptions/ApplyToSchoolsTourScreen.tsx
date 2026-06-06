@@ -544,7 +544,7 @@ export function ApplyToSchoolsTourScreen() {
 
         {step === 'inscriptions_tabs' || step === 'candidacies_tab' ? (
           <View style={[styles.inscTourWrap, isRTL && styles.dirRtl]}>
-            <InscriptionsTourShell compactHero={step === 'candidacies_tab'}>
+            <InscriptionsTourShell>
               <InscriptionsTabsTourPreview
                 activeTab={demoInscriptionsTab}
                 activeCandidaciesCount={TOUR_DEMO_INSCRIPTIONS_TAB_ACTIVE_COUNT}
@@ -630,7 +630,7 @@ export function ApplyToSchoolsTourScreen() {
             </View>
           ) : (
             <View style={[styles.inscTourWrap, isRTL && styles.dirRtl]}>
-              <InscriptionsTourShell compactHero>
+              <InscriptionsTourShell>
                 <InscriptionsTabsTourPreview
                   activeTab="candidacies"
                   activeCandidaciesCount={TOUR_DEMO_INSCRIPTIONS_TAB_ACTIVE_COUNT}

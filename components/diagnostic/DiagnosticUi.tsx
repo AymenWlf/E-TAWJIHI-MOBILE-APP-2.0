@@ -10,6 +10,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
+import { AppTextInput } from '@/components/ui/AppTextInput';
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { getDiagnosticFormLabels } from '@/constants/schoolDiagnosticFormLabels';
@@ -98,7 +99,7 @@ export function DiagnosticTextInput({
   onBlur?: TextInputProps['onBlur'];
 }) {
   return (
-    <TextInput
+    <AppTextInput
       value={value}
       onChangeText={onChangeText}
       placeholder={placeholder}
@@ -107,8 +108,10 @@ export function DiagnosticTextInput({
       multiline={multiline}
       onFocus={onFocus}
       onBlur={onBlur}
+      textRtl={rtl}
       textAlign={rtl ? 'right' : 'left'}
       textAlignVertical={multiline ? 'top' : 'center'}
+      plain
       style={[
         styles.input,
         rtl && styles.inputRtl,

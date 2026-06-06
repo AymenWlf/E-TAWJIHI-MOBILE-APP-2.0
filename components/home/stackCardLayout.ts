@@ -5,7 +5,7 @@ export const BASE_CARD_H = 336;
 /** Marge supplémentaire (réf. iPhone) — carte bac + CTA seuils (LTR). */
 export const BAC_STACK_EXTRA_H = 44;
 /** Marge supplémentaire en arabe RTL (titres + sous-titre CTA sur 2 lignes, canaux plus hauts). */
-export const BAC_STACK_EXTRA_H_RTL = 76;
+export const BAC_STACK_EXTRA_H_RTL = 92;
 /** Marge verticale sous la pile (ombre + hint swipe). */
 export const STACK_VERTICAL_EXTRA = 36;
 export type StackCardLayout = {

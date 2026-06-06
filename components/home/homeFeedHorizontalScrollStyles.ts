@@ -7,9 +7,13 @@ export function homeFeedHorizontalScrollStyles() {
   return {
     scrollTrack: styles.scrollTrack,
     scrollTrackRtl: styles.scrollTrackRtl,
+    scrollTrackAndroidRtlMirror: styles.scrollTrackAndroidRtlMirror,
+    androidRtlMirrorChild: styles.androidRtlMirrorChild,
     contentContainer: styles.hScroll,
     /** Marge « début de liste » à gauche (dernières cartes), pas à droite (premières cartes). */
     contentContainerRtl: styles.hScrollRtl,
+    /** Android RTL miroir : même marge que iOS RTL (première carte côté droit). */
+    contentContainerAndroidRtl: styles.hScrollAndroidRtl,
   };
 }
 
@@ -19,9 +23,19 @@ const styles = StyleSheet.create({
     marginHorizontal: -spacing.xl,
     overflow: 'visible',
   },
-  /** Défilement de droite vers la gauche : premier élément ancré à droite. */
+  /** iOS : défilement de droite vers la gauche, premier élément ancré à droite. */
   scrollTrackRtl: {
     direction: 'rtl',
+  },
+  /**
+   * Android : `direction: 'rtl'` est ignoré sur ScrollView horizontal — miroir horizontal
+   * (scroll + enfants) pour aligner le premier item à droite comme sur iOS.
+   */
+  scrollTrackAndroidRtlMirror: {
+    transform: [{ scaleX: -1 }],
+  },
+  androidRtlMirrorChild: {
+    transform: [{ scaleX: -1 }],
   },
   hScroll: {
     flexDirection: 'row',
@@ -33,6 +47,10 @@ const styles = StyleSheet.create({
     paddingEnd: spacing.xs,
   },
   hScrollRtl: {
+    paddingStart: spacing.xs,
+    paddingEnd: spacing.xl,
+  },
+  hScrollAndroidRtl: {
     paddingStart: spacing.xs,
     paddingEnd: spacing.xl,
   },

@@ -30,7 +30,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
-import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
+import { navigateToSchoolDiagnosticWizard } from '@/utils/navigateToSchoolDiagnosticEntry';
 import { hasLegacyTassjilAccess } from '@/utils/tassjilPracticalLinkLock';
 import type { TawjihPlusParcoursGate } from '@/utils/tawjihPlusParcoursGate';
 import { CAIRO } from '@/theme/arabicTypography';
@@ -81,6 +81,7 @@ function SidebarSectionBlock({
             onPress={() => onNavigate(link)}
             style={({ pressed }): ViewStyle[] => [
               styles.linkRow,
+              ...(isRTL ? [styles.linkRowRtl] : []),
               ...(index > 0 ? [styles.linkRowBorder] : []),
               ...(index === section.links.length - 1 ? [styles.linkRowLast] : []),
               ...(pressed ? [styles.linkRowPressed] : []),
@@ -331,14 +332,15 @@ export function AppSidebarPanel() {
       return;
     }
     if (link.id === 'diagnostic') {
-      void navigateToSchoolDiagnosticEntry(diagnosticNavAuth, (href) => router.push(href as Href), tawjihPlusGate);
+      void navigateToSchoolDiagnosticWizard(diagnosticNavAuth, (href) => router.push(href as Href), tawjihPlusGate);
       return;
     }
     if (link.href) router.push(link.href as Href);
   };
 
   const safePadTop = Math.max(insets.top, spacing.md);
-  const safePadBottom = Math.max(insets.bottom, spacing.md);
+  const safePadBottom =
+    Platform.OS === 'android' ? Math.max(insets.bottom, 20) : Math.max(insets.bottom, spacing.md);
   const overlayVisible = ctxVisible || sheetMounted;
   const titleFont = isRTL ? CAIRO.extrabold : undefined;
   const subtitleFont = isRTL ? CAIRO.semibold : undefined;
@@ -579,6 +581,9 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     minHeight: 54,
   },
+  linkRowRtl: {
+    flexDirection: 'row-reverse',
+  },
   linkRowBorder: {
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: brand.borderLight,
@@ -596,10 +601,13 @@ const styles = StyleSheet.create({
   },
   linkLabel: {
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
     fontSize: fontSize.md,
     fontWeight: '600',
     color: brand.text,
-    lineHeight: 20,
+    lineHeight: Platform.OS === 'android' ? 22 : 20,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
   },
   linkBadge: {
     minWidth: 20,

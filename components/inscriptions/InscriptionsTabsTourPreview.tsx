@@ -11,12 +11,10 @@ export type InscriptionsTourTabId = 'announcements' | 'candidacies';
 
 type ShellProps = {
   children: ReactNode;
-  /** Masque le sous-titre hero (étapes où le corps explique déjà). */
-  compactHero?: boolean;
 };
 
 /** Bandeau + onglets calqués sur `InscriptionsTabScreen` (hero primary + corps soft). */
-export function InscriptionsTourShell({ children, compactHero = false }: ShellProps) {
+export function InscriptionsTourShell({ children }: ShellProps) {
   const { t, isRTL } = useLocale();
 
   return (
@@ -33,9 +31,6 @@ export function InscriptionsTourShell({ children, compactHero = false }: ShellPr
             <FontAwesome name="graduation-cap" size={16} color={brand.white} />
           </View>
         </View>
-        {!compactHero ? (
-          <Text style={[styles.heroSub, isRTL && styles.rtl]}>{t('inscSubtitle')}</Text>
-        ) : null}
         {children}
       </View>
       <View style={styles.bodyGap} />
@@ -312,13 +307,8 @@ const styles = StyleSheet.create({
   },
   heroTitle: {
     color: brand.white,
-    fontSize: fontSize.lg,
+    fontSize: fontSize.xl,
     fontWeight: '900',
-  },
-  heroSub: {
-    color: 'rgba(255,255,255,0.85)',
-    fontSize: fontSize.sm,
-    lineHeight: 19,
   },
   bodyGap: {
     height: 0,

@@ -13,7 +13,6 @@ import {
   Pressable,
   ScrollView,
   StyleSheet,
-  TextInput,
   useWindowDimensions,
   View,
 } from 'react-native';
@@ -32,6 +31,7 @@ import {
   ChatConversationBackground,
 } from '@/components/chatbot/ChatConversationBackground';
 import { ChatbotThinkingSteps } from '@/components/chatbot/ChatbotThinkingSteps';
+import { AppTextInput } from '@/components/ui/AppTextInput';
 import { LoadingCardStack } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
@@ -77,7 +77,7 @@ import {
   stripEstablishmentBulletLines,
 } from '@/utils/chatbotEstablishmentLines';
 import { homeShell } from '@/theme/homeShell';
-import { CAIRO } from '@/theme/arabicTypography';
+import { CAIRO, applyArabicFontOverlay } from '@/theme/arabicTypography';
 import type { ShopProductDetail } from '@/types/shop';
 import {
   formatShopPrice,
@@ -434,7 +434,8 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
 
   const contentWidth = useMemo(() => Math.max(140, screenW - spacing.xl * 3), [screenW]);
   const htmlTagsStyles = useMemo(() => {
-    const ar = (family: keyof typeof CAIRO) => (isRTL ? { fontFamily: CAIRO[family] } : {});
+    const ar = (family: keyof typeof CAIRO) =>
+      isRTL ? applyArabicFontOverlay({ fontFamily: CAIRO[family] }) : {};
     return {
       p: {
         color: homeShell.cardText,
@@ -970,7 +971,7 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
                         color: homeShell.cardText,
                         fontSize: fontSize.md,
                         lineHeight: 22,
-                        ...(isRTL ? { fontFamily: CAIRO.semibold } : {}),
+                        ...(isRTL ? applyArabicFontOverlay({ fontFamily: CAIRO.semibold }) : {}),
                       }}
                       tagsStyles={htmlTagsStyles}
                       defaultTextProps={{ selectable: true }}
@@ -1222,7 +1223,9 @@ export function ChatbotFloatingBubble({ hideLauncher }: { hideLauncher?: boolean
               ))}
             </ScrollView>
             <View style={styles.inputRow}>
-              <TextInput
+              <AppTextInput
+                plain
+                textRtl={isRTL}
                 style={[styles.input, isRTL && styles.inputRtl]}
                 placeholder={t('chatbotPlaceholder')}
                 placeholderTextColor={brand.textMuted}

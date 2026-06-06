@@ -3,6 +3,7 @@ import { router } from 'expo-router';
 import { type ComponentProps, type ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Keyboard,
   Modal,
   Platform,
   Pressable,
@@ -11,8 +12,9 @@ import {
   TextInput,
   useWindowDimensions,
   View,
+  type TextStyle,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import Animated, {
   Easing,
@@ -27,7 +29,7 @@ import {
   type SearchablePickItem,
 } from '@/components/schools/SearchablePickSheet';
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
-import { SelectField } from '@/components/ui/SelectField';
+import { SelectField, type SelectFieldProps } from '@/components/ui/SelectField';
 import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -59,6 +61,7 @@ import {
   type OldClientSetupSource,
 } from '@/utils/accountSetupAutofill';
 import type { UserProfile } from '@/services/userProfile';
+import { applyArabicFontOverlay } from '@/theme/arabicTypography';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { errorMessage } from '@/utils/errorMessage';
 import { isValidEmail } from '@/utils/isValidEmail';
@@ -128,6 +131,7 @@ const FR_WEEKDAYS = ['L', 'M', 'M', 'J', 'V', 'S', 'D'];
 const AR_WEEKDAYS = ['ن', 'ث', 'ر', 'خ', 'ج', 'س', 'ح'];
 
 const INPUT_PLACEHOLDER_RGBA = 'rgba(100,116,139,0.65)';
+const SETUP_ANDROID_TOUCH = Platform.OS === 'android';
 
 /** Couleurs littérales pour les worklets Reanimated. */
 const SHELL_BG_IDLE = '#F1F5F9';
@@ -182,6 +186,7 @@ function SetupTextInput({
 }: SetupTextInputProps) {
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
+  const arabicInput = rtl ? applyArabicFontOverlay(styles.inputInner as TextStyle) : undefined;
   return (
     <Pressable
       accessible={false}
@@ -203,11 +208,16 @@ function SetupTextInput({
             setFocused(false);
             onBlur?.(e);
           }}
-          style={[styles.inputInner, rtl && styles.rtl, style]}
+          style={[styles.inputInner, rtl && styles.rtl, style, arabicInput]}
         />
       </AnimatedFieldShell>
     </Pressable>
   );
+}
+
+/** Tous les selects du setup : taps fiables sur Android (ScrollView + clavier). */
+function SetupSelectField(props: SelectFieldProps) {
+  return <SelectField {...props} androidFormTouch={SETUP_ANDROID_TOUCH} />;
 }
 
 export default function AccountSetupScreen() {
@@ -216,8 +226,11 @@ export default function AccountSetupScreen() {
   const bacLocale = locale === 'ar' ? 'ar' : 'fr';
   const anneesBacOptions = useMemo(() => anneesBacOptionsForLocale(bacLocale), [bacLocale]);
   const { user, getValidAccessToken, reloadMe, sessionReady } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const scrollRef = useRef<ScrollView>(null);
+  /** Espace sous le contenu scrollé pour ne pas masquer les champs derrière le footer fixe. */
+  const scrollContentBottomPad = 88 + Math.max(insets.bottom, spacing.md);
   const [currentStep, setCurrentStep] = useState<StepId>(1);
   const [submitting, setSubmitting] = useState(false);
   const [loadingCities, setLoadingCities] = useState(true);
@@ -515,6 +528,7 @@ export default function AccountSetupScreen() {
   );
 
   function openPickField(field: SetupPickField) {
+    if (SETUP_ANDROID_TOUCH) Keyboard.dismiss();
     setServerError('');
     setPickField(field);
   }
@@ -643,6 +657,7 @@ export default function AccountSetupScreen() {
   const showHigherFields = ['BAC+1', 'BAC+2', 'BAC+3', 'BAC+4', 'BAC+5', 'BAC+6', 'Doctorant'].includes(data.niveau);
 
   function openBirthDatePicker() {
+    if (SETUP_ANDROID_TOUCH) Keyboard.dismiss();
     setServerError('');
     setShowDatePicker(true);
   }
@@ -721,10 +736,15 @@ export default function AccountSetupScreen() {
           <ScrollView
             pointerEvents={isLoadingUserData ? 'none' : 'auto'}
             ref={scrollRef}
-            {...(rtl ? { style: { direction: 'rtl' as const } } : {})}
-            contentContainerStyle={styles.content}
-            keyboardShouldPersistTaps="handled"
+            style={SETUP_ANDROID_TOUCH ? styles.scroll : undefined}
+            contentContainerStyle={[
+              styles.content,
+              SETUP_ANDROID_TOUCH ? { paddingBottom: scrollContentBottomPad } : styles.contentPadDefault,
+              rtl && Platform.OS === 'ios' ? styles.contentRtl : null,
+            ]}
+            keyboardShouldPersistTaps={SETUP_ANDROID_TOUCH ? 'always' : 'handled'}
             keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+            nestedScrollEnabled={SETUP_ANDROID_TOUCH}
             automaticallyAdjustKeyboardInsets
             alwaysBounceVertical
           >
@@ -749,14 +769,14 @@ export default function AccountSetupScreen() {
 
           {currentStep === 1 && (
             <>
-              <SelectField
+              <SetupSelectField
                 label={t('setupYouAre')}
                 value={labelFor(data.userType, setupPickConfig.userType.items)}
                 rtl={rtl}
                 onPress={() => openPickField('userType')}
               />
 
-              <SelectField
+              <SetupSelectField
                 label={t('setupStudyLevel')}
                 value={labelFor(data.niveau, setupPickConfig.niveau.items)}
                 rtl={rtl}
@@ -765,7 +785,7 @@ export default function AccountSetupScreen() {
 
               {showBacFields && (
                 <>
-                  <SelectField
+                  <SetupSelectField
                     label={t('setupBacType')}
                     value={labelFor(data.bacType, setupPickConfig.bacType.items)}
                     rtl={rtl}
@@ -773,7 +793,7 @@ export default function AccountSetupScreen() {
                   />
 
                   {data.bacType === 'normal' && (
-                    <SelectField
+                    <SetupSelectField
                       label={isPremiereBacNiveau(data.niveau) ? t('setupFiliere1Bac') : t('setupFiliere')}
                       value={
                         resolveFiliereDisplayLabel(data.filiere, locale === 'ar' ? 'ar' : 'fr') ||
@@ -786,19 +806,19 @@ export default function AccountSetupScreen() {
 
                   {data.bacType === 'mission' && (
                     <>
-                      <SelectField
+                      <SetupSelectField
                         label={t('setupSpecialite1')}
                         value={labelFor(data.specialite1, setupPickConfig.specialite1.items)}
                         rtl={rtl}
                         onPress={() => openPickField('specialite1')}
                       />
-                      <SelectField
+                      <SetupSelectField
                         label={t('setupSpecialite2')}
                         value={labelFor(data.specialite2, setupPickConfig.specialite2.items)}
                         rtl={rtl}
                         onPress={() => openPickField('specialite2')}
                       />
-                      <SelectField
+                      <SetupSelectField
                         label={t('setupSpecialite3Optional')}
                         value={labelFor(data.specialite3, setupPickConfig.specialite3.items)}
                         rtl={rtl}
@@ -807,7 +827,7 @@ export default function AccountSetupScreen() {
                     </>
                   )}
 
-                  <SelectField
+                  <SetupSelectField
                     label={t('setupBacAnnee')}
                     value={labelFor(data.bacAnnee, setupPickConfig.bacAnnee.items)}
                     rtl={rtl}
@@ -838,7 +858,7 @@ export default function AccountSetupScreen() {
                 />
               </View>
 
-              <SelectField
+              <SetupSelectField
                 label={t('setupLyceeType')}
                 value={labelFor(data.typeLycee, setupPickConfig.typeLycee.items)}
                 rtl={rtl}
@@ -898,22 +918,37 @@ export default function AccountSetupScreen() {
                   <Pressable
                     accessibilityRole="button"
                     onPress={openBirthDatePicker}
-                    style={[styles.dateField, rtl && styles.dateFieldRtl]}
+                    delayPressIn={SETUP_ANDROID_TOUCH ? 0 : undefined}
+                    hitSlop={
+                      SETUP_ANDROID_TOUCH ? { top: 8, bottom: 8, left: 4, right: 4 } : undefined
+                    }
+                    android_ripple={
+                      SETUP_ANDROID_TOUCH
+                        ? { color: 'rgba(51, 62, 143, 0.08)', borderless: false }
+                        : undefined
+                    }
+                    style={[
+                      styles.dateField,
+                      rtl && styles.dateFieldRtl,
+                      SETUP_ANDROID_TOUCH && styles.dateFieldAndroid,
+                    ]}
                   >
-                    <Text style={[styles.dateFieldText, rtl && styles.rtl, !birthDateDisplay && { color: brand.textMuted }]}>
+                    <Text
+                      pointerEvents={SETUP_ANDROID_TOUCH ? 'none' : undefined}
+                      style={[styles.dateFieldText, rtl && styles.rtl, !birthDateDisplay && { color: brand.textMuted }]}>
                       {birthDateDisplay || t('setupBirthDatePlaceholder')}
                     </Text>
                     <FontAwesome name="calendar" size={16} color={brand.textMuted} />
                   </Pressable>
                 )}
               </View>
-              <SelectField
+              <SetupSelectField
                 label={t('setupGender')}
                 value={labelFor(data.genre, setupPickConfig.genre.items)}
                 rtl={rtl}
                 onPress={() => openPickField('genre')}
               />
-              <SelectField
+              <SetupSelectField
                 label={t('setupCity')}
                 hint={t('setupCityHint')}
                 value={selectedCity?.titre ?? ''}
@@ -929,7 +964,15 @@ export default function AccountSetupScreen() {
 
           </ScrollView>
 
-          <View style={[styles.footer, rtl && styles.footerRtl]} pointerEvents={isLoadingUserData ? 'none' : 'auto'}>
+          <View
+            style={[
+              styles.footer,
+              SETUP_ANDROID_TOUCH
+                ? { paddingBottom: Math.max(insets.bottom, spacing.md) }
+                : { paddingBottom: spacing.lg },
+              rtl && styles.footerRtl,
+            ]}
+            pointerEvents={isLoadingUserData ? 'none' : 'auto'}>
             <Pressable
               accessibilityRole="button"
               onPress={goPrev}
@@ -1457,7 +1500,10 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 3 },
     elevation: 4,
   },
-  content: { padding: spacing.lg, paddingBottom: 120 },
+  scroll: { flex: 1 },
+  content: { padding: spacing.lg, flexGrow: 1 },
+  contentPadDefault: { paddingBottom: 120 },
+  contentRtl: { direction: 'rtl' },
   rtl: { writingDirection: 'rtl', textAlign: 'right' as const },
 
   stepHeader: {
@@ -1543,6 +1589,10 @@ const styles = StyleSheet.create({
     }),
   },
   dateFieldRtl: { flexDirection: 'row-reverse' },
+  dateFieldAndroid: {
+    minHeight: 52,
+    overflow: 'hidden',
+  },
   dateFieldText: {
     color: brand.text,
     fontWeight: '600',
@@ -1570,12 +1620,13 @@ const styles = StyleSheet.create({
   },
   footer: {
     paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.lg,
+    paddingTop: spacing.lg,
     borderTopWidth: 1,
     borderTopColor: 'rgba(15, 23, 42, 0.06)',
     backgroundColor: 'white',
     flexDirection: 'row',
     gap: 12,
+    ...(Platform.OS === 'android' ? { zIndex: 2, elevation: 6 } : null),
   },
   footerRtl: { flexDirection: 'row-reverse' },
   btn: { flex: 1, borderRadius: radius.lg, paddingVertical: 14, alignItems: 'center', justifyContent: 'center' },

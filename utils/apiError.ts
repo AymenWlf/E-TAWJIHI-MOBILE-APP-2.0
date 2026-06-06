@@ -156,10 +156,21 @@ export function getUserFacingApiError(
   if (code === 'insufficient_points') return t('loyaltyRedeemInsufficient');
   if (code === 'network') return t('apiErrNetwork');
   if (code === 'claim_failed') return t('referralTierPromoError');
+  if (code === 'ACCOUNT_DELETED') return t('loginAccountDeleted');
+  if (code === 'ACCOUNT_DELETE_FORBIDDEN') return t('accountDeleteForbidden');
 
   const kind = classifyApiError(error);
-  if (context === 'auth' && (kind === 'unauthorized' || kind === 'forbidden' || kind === 'validation')) {
-    return t('apiErrAuth');
+  const preferServerMessage =
+    (context === 'auth' || context === 'account') &&
+    (kind === 'unauthorized' || kind === 'forbidden' || kind === 'validation' || kind === 'notFound');
+  if (preferServerMessage) {
+    const { rawMessage } = extractErrorInfo(error);
+    if (rawMessage && !isTechnicalApiMessage(rawMessage)) {
+      return rawMessage;
+    }
+    if (context === 'auth') {
+      return t('apiErrAuth');
+    }
   }
   if (context === 'feedback' && kind === 'forbidden') {
     return t('appFeedbackClientRequired');

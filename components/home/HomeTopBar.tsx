@@ -9,6 +9,7 @@ import {
   ETAWJIHI_LOGO_LIGHT_URL,
 } from '@/constants/brandAssets';
 import { useLocale } from '@/contexts/LocaleContext';
+import { countBadgeTextStyle } from '@/theme/countBadge';
 import { homeShell } from '@/theme/homeShell';
 import { spacing } from '@/theme/tokens';
 import { heroShellHeaderUi, useHeroShellHeaderWide } from '@/utils/heroShellHeaderUi';
@@ -77,7 +78,9 @@ export function HomeTopBar({
           <FontAwesome name="bell-o" size={isWideHeader ? 20 : 22} color={homeShell.text} />
           {unreadCount > 0 ? (
             <View style={styles.badge}>
-              <Text style={styles.badgeTxt}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+              <Text latinDigits style={styles.badgeTxt}>
+                {unreadCount > 99 ? '99+' : unreadCount}
+              </Text>
             </View>
           ) : null}
         </Pressable>
@@ -177,5 +180,6 @@ const styles = StyleSheet.create({
     color: homeShell.notifBadgeText,
     fontSize: 10,
     fontWeight: '800',
+    ...countBadgeTextStyle(11),
   },
 });

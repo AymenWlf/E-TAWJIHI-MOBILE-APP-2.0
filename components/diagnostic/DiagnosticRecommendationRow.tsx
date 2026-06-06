@@ -1,5 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { memo } from 'react';
+import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { EstablishmentRowLogoThumb } from '@/components/shop/EstablishmentRowLogoThumb';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
@@ -40,7 +41,7 @@ type Props = {
   followLabelFollowing?: string;
 };
 
-export function DiagnosticRecommendationRow({
+function DiagnosticRecommendationRowInner({
   row,
   tier,
   isRTL,
@@ -211,6 +212,8 @@ export function DiagnosticRecommendationRow({
   );
 }
 
+export const DiagnosticRecommendationRow = memo(DiagnosticRecommendationRowInner);
+
 const styles = StyleSheet.create({
   card: {
     backgroundColor: brand.white,
@@ -219,11 +222,15 @@ const styles = StyleSheet.create({
     borderColor: homeShell.borderOnWhite,
     borderStartWidth: 4,
     overflow: 'hidden',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 6,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#0F172A',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 6,
+      },
+      android: { elevation: 0 },
+    }),
   },
   cardRtl: { direction: 'rtl' },
   rtlText: { writingDirection: 'rtl', textAlign: 'right' },

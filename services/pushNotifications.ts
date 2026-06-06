@@ -22,6 +22,7 @@
  * fonctionne plus dans Expo Go, mais reste valide en build natif (EAS
  * Build / dev client). On gère le rejet silencieusement.
  */
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import Constants from 'expo-constants';
 import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
@@ -55,6 +56,19 @@ const IS_WEB = Platform.OS === 'web';
 let foregroundHandlerSet = false;
 let listenersAttached = false;
 let lastRegisteredToken: string | null = null;
+let lastRegisteredLocale: 'fr' | 'ar' | null = null;
+
+/** Aligné sur `LocaleContext` (`etawjihi.locale`). */
+const APP_LOCALE_STORAGE_KEY = 'etawjihi.locale';
+
+async function getAppLocaleForPush(): Promise<'fr' | 'ar'> {
+  try {
+    const stored = await AsyncStorage.getItem(APP_LOCALE_STORAGE_KEY);
+    return stored === 'ar' ? 'ar' : 'fr';
+  } catch {
+    return 'fr';
+  }
+}
 let receivedSubscription: Notifications.EventSubscription | null = null;
 let responseSubscription: Notifications.EventSubscription | null = null;
 /** Push indisponible pour toute la session (projectId manquant, Expo Go, etc.). */
@@ -258,7 +272,8 @@ export async function registerForPushAndSubmit(getAuthToken: AuthTokenGetter): P
       const authToken = await getAuthToken();
       if (!authToken) return null;
 
-      if (lastRegisteredToken === expoToken) {
+      const locale = await getAppLocaleForPush();
+      if (lastRegisteredToken === expoToken && lastRegisteredLocale === locale) {
         return expoToken;
       }
 
@@ -269,16 +284,18 @@ export async function registerForPushAndSubmit(getAuthToken: AuthTokenGetter): P
       const platform = Platform.OS === 'ios' ? 'ios' : Platform.OS === 'android' ? 'android' : 'web';
       await httpPostJson<
         { success: boolean },
-        { token: string; platform: string; installationId: string; deviceId: string }
+        { token: string; platform: string; installationId: string; deviceId: string; locale: 'fr' | 'ar' }
       >(url, {
         token: expoToken,
         platform,
         installationId,
         deviceId,
+        locale,
       }, {
         headers: { Authorization: `Bearer ${authToken}` },
       });
       lastRegisteredToken = expoToken;
+      lastRegisteredLocale = locale;
       return expoToken;
     } catch (e) {
       // eslint-disable-next-line no-console
@@ -333,6 +350,7 @@ export async function unregisterPushToken(getAuthToken: AuthTokenGetter): Promis
   if (IS_WEB) return;
   const token = lastRegisteredToken;
   lastRegisteredToken = null;
+  lastRegisteredLocale = null;
   registerInFlight = null;
   if (!token) return;
 
@@ -357,6 +375,19 @@ async function recordPushClick(contestId: number, getAuthToken: AuthTokenGetter)
     const authToken = await getAuthToken();
     if (!authToken) return;
     const url = buildApiUrl(`/api/contest-announcements/${contestId}/record-push-click`);
+    await httpPostJson<{ success: boolean }, Record<string, never>>(url, {} as Record<string, never>, {
+      headers: { Authorization: `Bearer ${authToken}` },
+    });
+  } catch {
+    /* noop */
+  }
+}
+
+async function recordPlatformEventPushClick(eventId: number, getAuthToken: AuthTokenGetter): Promise<void> {
+  try {
+    const authToken = await getAuthToken();
+    if (!authToken) return;
+    const url = buildApiUrl(`/api/platform-events/${eventId}/record-push-click`);
     await httpPostJson<{ success: boolean }, Record<string, never>>(url, {} as Record<string, never>, {
       headers: { Authorization: `Bearer ${authToken}` },
     });
@@ -447,6 +478,24 @@ async function handleNotificationTap(
     if (id && Number.isFinite(id)) {
       await recordPushClick(id, getAuthToken);
       navigateToContestAnnouncement(id, data as Record<string, unknown>);
+    }
+    return;
+  }
+
+  if (data.type === 'platform_event' || data.type === 'follow_school_new_platform_event') {
+    const idRaw = data.platformEventId ?? data.platform_event_id;
+    const id = typeof idRaw === 'string' ? Number(idRaw) : idRaw;
+    if (id && Number.isFinite(id)) {
+      await recordPlatformEventPushClick(id, getAuthToken);
+      const route =
+        typeof data.route === 'string' && data.route.trim() !== ''
+          ? data.route.trim()
+          : `/evenements/${id}`;
+      try {
+        router.push(route as Parameters<typeof router.push>[0]);
+      } catch {
+        /* noop */
+      }
     }
     return;
   }

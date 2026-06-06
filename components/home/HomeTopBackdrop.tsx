@@ -1,7 +1,10 @@
 import { StyleSheet, View } from 'react-native';
 
 import { homeShell } from '@/theme/homeShell';
-import { computeHomeTopBackdropMetrics } from '@/utils/homeTopBackdropLayout';
+import {
+  computeHomeTopBackdropMetrics,
+  isHomeHeroWideLayout,
+} from '@/utils/homeTopBackdropLayout';
 
 type Props = {
   width: number;
@@ -15,22 +18,25 @@ type Props = {
  */
 export function HomeTopBackdrop({ width, topInset = 0 }: Props) {
   const m = computeHomeTopBackdropMetrics(width, topInset);
+  const wide = isHomeHeroWideLayout(width);
 
   return (
     <View style={StyleSheet.absoluteFill} pointerEvents="none">
-      <View
-        style={[
-          styles.disk,
-          {
-            width: m.glowSize,
-            height: m.glowSize,
-            borderRadius: m.glowSize / 2,
-            top: m.glowTop,
-            left: m.glowLeft,
-            backgroundColor: homeShell.greenAlpha28,
-          },
-        ]}
-      />
+      {!wide ? (
+        <View
+          style={[
+            styles.disk,
+            {
+              width: m.glowSize,
+              height: m.glowSize,
+              borderRadius: m.glowSize / 2,
+              top: m.glowTop,
+              left: m.glowLeft,
+              backgroundColor: homeShell.greenAlpha28,
+            },
+          ]}
+        />
+      ) : null}
       <View
         style={[
           styles.disk,
@@ -41,10 +47,10 @@ export function HomeTopBackdrop({ width, topInset = 0 }: Props) {
             top: m.top,
             left: m.left,
             backgroundColor: homeShell.bg,
-            shadowColor: homeShell.green,
-            shadowOffset: { width: 0, height: 10 },
-            shadowOpacity: 0.28,
-            shadowRadius: 28,
+            shadowColor: wide ? 'transparent' : homeShell.green,
+            shadowOffset: { width: 0, height: wide ? 0 : 10 },
+            shadowOpacity: wide ? 0 : 0.28,
+            shadowRadius: wide ? 0 : 28,
             elevation: 0,
           },
         ]}

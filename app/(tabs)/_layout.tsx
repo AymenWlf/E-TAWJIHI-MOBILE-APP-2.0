@@ -1,7 +1,8 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import type { BottomTabBarButtonProps } from '@react-navigation/bottom-tabs';
+import { BottomTabBar, type BottomTabBarButtonProps, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
 import { Tabs } from 'expo-router';
+import { useMemo } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,11 +11,53 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { CAIRO } from '@/theme/arabicTypography';
+import { countBadgeTextStyle } from '@/theme/countBadge';
 import { brand } from '@/theme/tokens';
 
 const INACTIVE = '#64748B';
 const CENTER_TAB_SIZE = 54;
-const CENTER_TAB_LIFT = 18;
+/** Surélévation bulle centrale (onglet Annonces). */
+const CENTER_TAB_LIFT = Platform.select({ ios: 18, android: 12, default: 18 }) as number;
+/** Hauteur utile icône + libellé (hors safe area bas). */
+const TAB_BAR_CONTENT_HEIGHT = Platform.select({ ios: 56, android: 58, default: 54 }) as number;
+/** Marge minimale au-dessus du bord / barre de navigation système. */
+const TAB_BAR_MIN_BOTTOM_INSET = Platform.select({ ios: 12, android: 18, default: 12 }) as number;
+/** Relevé visuel supplémentaire pour ne pas coller au bas du téléphone. */
+const TAB_BAR_EXTRA_BOTTOM = Platform.select({ ios: 4, android: 6, default: 4 }) as number;
+const TAB_LABEL_FONT_SIZE = Platform.OS === 'android' ? 10 : 11;
+
+function TabBarLabel({
+  color,
+  children,
+  focused,
+  isRTL,
+  compact,
+}: {
+  color: string;
+  children: string;
+  focused: boolean;
+  isRTL: boolean;
+  compact?: boolean;
+}) {
+  const label = typeof children === 'string' ? children : String(children ?? '');
+  return (
+    <Text
+      numberOfLines={2}
+      ellipsizeMode="tail"
+      style={[
+        styles.tabLabel,
+        compact && styles.tabLabelCompact,
+        {
+          color,
+          fontWeight: focused ? '700' : '600',
+          ...(isRTL ? { fontFamily: CAIRO.bold, textAlign: 'center', writingDirection: 'rtl' } : { textAlign: 'center' }),
+        },
+      ]}
+    >
+      {label}
+    </Text>
+  );
+}
 
 function TabIcon({
   name,
@@ -37,14 +80,16 @@ function TabIcon({
       </View>
       {badgeCount && badgeCount > 0 ? (
         <View style={styles.badge}>
-          <Text style={styles.badgeTxt}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+          <Text latinDigits style={styles.badgeTxt}>
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </Text>
         </View>
       ) : null}
     </View>
   );
 }
 
-/** Onglet central « Inscriptions » — bulle surélevée, arrondie, centrée (style chat FAB). */
+/** Onglet central « Annonces » — bulle surélevée, arrondie, centrée (style chat FAB). */
 function CenterInscriptionsTabIcon({
   focused,
   badgeCount,
@@ -59,7 +104,9 @@ function CenterInscriptionsTabIcon({
       </View>
       {badgeCount && badgeCount > 0 ? (
         <View style={styles.centerTabBadge}>
-          <Text style={styles.badgeTxt}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+          <Text latinDigits style={styles.badgeTxt}>
+            {badgeCount > 99 ? '99+' : badgeCount}
+          </Text>
         </View>
       ) : null}
     </View>
@@ -70,47 +117,91 @@ function CenterTabBarButton(props: BottomTabBarButtonProps) {
   return <PlatformPressable {...props} style={[props.style, styles.centerTabButton]} />;
 }
 
+/**
+ * Barre d’onglets RTL : inverse l’ordre des routes affichées.
+ * Accueil passe à droite, Compte à gauche (le style `direction` ne cible pas le flex interne de BottomTabBar).
+ */
+function RtlAwareTabBar(props: BottomTabBarProps) {
+  const { isRTL } = useLocale();
+
+  const displayState = useMemo(() => {
+    if (!isRTL) return props.state;
+    const routes = [...props.state.routes].reverse();
+    const activeKey = props.state.routes[props.state.index]?.key;
+    if (!activeKey) return props.state;
+    const index = routes.findIndex((route) => route.key === activeKey);
+    return {
+      ...props.state,
+      routes,
+      index: index >= 0 ? index : props.state.index,
+    };
+  }, [isRTL, props.state]);
+
+  return <BottomTabBar {...props} state={displayState} />;
+}
+
 export default function TabLayout() {
   const { t, isRTL } = useLocale();
   const { count: cartCount } = useShopCart();
   const { inscriptionsTabBadgeCount } = useNotificationsDrawer();
   const insets = useSafeAreaInsets();
 
+  /** Safe area bas + marge minimale + léger relevé au-dessus du bord du téléphone. */
+  const tabBarBottomInset =
+    Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM_INSET) + TAB_BAR_EXTRA_BOTTOM;
+  const tabBarHeight = TAB_BAR_CONTENT_HEIGHT + tabBarBottomInset;
+
+  const renderTabBarLabel =
+    (compact?: boolean) =>
+    ({
+      color,
+      children,
+      focused,
+    }: {
+      color: string;
+      children: string;
+      focused: boolean;
+    }) => (
+      <TabBarLabel color={color} focused={focused} isRTL={isRTL} compact={compact}>
+        {children}
+      </TabBarLabel>
+    );
+
   return (
     <Tabs
       screenOptions={{
         headerShown: false,
+        tabBar: (props) => <RtlAwareTabBar {...props} />,
         /** iPhone par défaut ; iPad/tablette (≥768px) passent en « beside-icon » sans cette option. */
         tabBarLabelPosition: 'below-icon',
+        tabBarAllowFontScaling: false,
         tabBarActiveTintColor: brand.primary,
         tabBarInactiveTintColor: INACTIVE,
+        tabBarLabel: renderTabBarLabel(false),
         /**
          * RN bottom-tabs utilise un cadre UIKit fixe (~31×28). Notre icône + pastille dépassait
          * → coupe horizontale/verticale (souvent « une moitié » de l’icône visible sur iOS).
          */
         tabBarIconStyle: {
           width: 42,
-          height: 34,
-          marginTop: Platform.OS === 'ios' ? 2 : 0,
+          height: Platform.OS === 'android' ? 30 : 34,
+          marginTop: Platform.OS === 'ios' ? 2 : 4,
           overflow: 'visible',
         },
         tabBarItemStyle: {
           overflow: 'visible',
+          paddingVertical: Platform.OS === 'android' ? 0 : 0,
+          minHeight: TAB_BAR_CONTENT_HEIGHT,
         },
         tabBarStyle: {
           backgroundColor: brand.white,
           borderTopColor: brand.border,
           borderTopWidth: StyleSheet.hairlineWidth,
-          paddingTop: 10,
-          paddingBottom: Math.max(8, insets.bottom),
+          paddingTop: Platform.OS === 'android' ? 8 : 10,
+          paddingBottom: tabBarBottomInset,
+          height: tabBarHeight,
           overflow: 'visible',
-          /** Pas de height fixe : laisse mesurer icônes + labels (évite clipping). */
-          minHeight: 56 + Math.max(0, insets.bottom),
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '600',
-          ...(isRTL ? { fontFamily: CAIRO.bold } : {}),
+          elevation: Platform.OS === 'android' ? 12 : 0,
         },
       }}>
       <Tabs.Screen
@@ -141,15 +232,15 @@ export default function TabLayout() {
           tabBarIconStyle: {
             width: CENTER_TAB_SIZE,
             height: CENTER_TAB_SIZE,
-            marginTop: 0,
+            marginTop: Platform.OS === 'android' ? -4 : 0,
             overflow: 'visible',
           },
-          tabBarLabelStyle: {
-            fontSize: 11,
-            fontWeight: '700',
-            marginTop: -4,
-            ...(isRTL ? { fontFamily: CAIRO.bold } : {}),
+          tabBarItemStyle: {
+            overflow: 'visible',
+            minHeight: TAB_BAR_CONTENT_HEIGHT,
+            paddingBottom: Platform.OS === 'android' ? 0 : undefined,
           },
+          tabBarLabel: renderTabBarLabel(true),
           tabBarActiveTintColor: brand.primary,
           tabBarInactiveTintColor: brand.textMuted,
           tabBarButton: CenterTabBarButton,
@@ -197,6 +288,21 @@ export default function TabLayout() {
 }
 
 const styles = StyleSheet.create({
+  tabLabel: {
+    fontSize: TAB_LABEL_FONT_SIZE,
+    lineHeight: Platform.OS === 'android' ? 13 : 14,
+    marginTop: Platform.OS === 'android' ? 2 : 0,
+    marginBottom: Platform.OS === 'android' ? 1 : 0,
+    paddingHorizontal: 2,
+    width: '100%',
+    maxWidth: 88,
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : {}),
+  },
+  tabLabelCompact: {
+    maxWidth: 76,
+    marginTop: Platform.OS === 'ios' ? -4 : -8,
+    marginBottom: Platform.OS === 'android' ? 0 : 0,
+  },
   iconWrap: {
     width: 42,
     height: 34,
@@ -233,9 +339,18 @@ const styles = StyleSheet.create({
     color: brand.white,
     fontSize: 9,
     fontWeight: '800',
+    ...countBadgeTextStyle(12),
   },
   centerTabButton: {
     overflow: 'visible',
+    ...Platform.select({
+      android: {
+        alignItems: 'center',
+        justifyContent: 'flex-start',
+        paddingTop: 2,
+      },
+      default: {},
+    }),
   },
   centerTabSlot: {
     width: CENTER_TAB_SIZE,

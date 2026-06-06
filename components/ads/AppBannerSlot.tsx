@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -25,6 +25,13 @@ import {
   type BannerZoneCode,
 } from '@/services/publicBanners';
 import { fireAndForget } from '@/utils/fireAndForget';
+
+/** Déduplication session (survit aux remontages FlatList). */
+const recordedBannerImpressions = new Set<string>();
+
+function bannerImpressionKey(slotId: number, page: string, position: number): string {
+  return `${slotId}|${page}|${position}`;
+}
 
 type Props = {
   /** `mid_square` = créatives carrées (300×300), aligné fiches détail web. */
@@ -64,7 +71,6 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
   const [creatives, setCreatives] = useState<BannerCreativePublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
-  const impRecorded = useRef<Set<string>>(new Set());
 
   useEffect(() => {
     let cancelled = false;
@@ -85,21 +91,22 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
   }, [zone]);
 
   const creative = creatives[index] ?? null;
+  const creativeId = creative?.id ?? 0;
   const imgUrl = useMemo(() => (creative ? pickBannerCreativeImageUrl(creative) : ''), [creative]);
 
   useEffect(() => {
-    if (!creative?.id) return;
-    const key = `${creative.id}|${analyticsPage}|${index}`;
-    if (impRecorded.current.has(key)) return;
-    impRecorded.current.add(key);
+    if (!creativeId) return;
+    const key = bannerImpressionKey(creativeId, analyticsPage, index + 1);
+    if (recordedBannerImpressions.has(key)) return;
+    recordedBannerImpressions.add(key);
     fireAndForget(
       recordBannerImpressionNative({
-        slotId: creative.id,
+        slotId: creativeId,
         page: analyticsPage,
         position: index + 1,
       }),
     );
-  }, [creative, analyticsPage, index]);
+  }, [creativeId, analyticsPage, index]);
 
   useEffect(() => {
     if (creatives.length <= 1) return;

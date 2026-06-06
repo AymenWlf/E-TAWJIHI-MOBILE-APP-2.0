@@ -45,6 +45,8 @@ import {
 import { getZipGridPrefixIssue, getZipSnakeNextHintCellIndex, scoreZipGridPath } from '@/constants/zipPuzzleVariants';
 import { isDevApiBaseUrl } from '@/constants/api';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
+import { useShopFlowSystemBars } from '@/hooks/useShopFlowSystemBars';
+import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
 /** Largeur disponible pour la grille SNAKE (marges scroll + carte quiz à padding horizontal réduit). */
@@ -359,6 +361,10 @@ export default function DailyChallengeScreen() {
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const headerPadTop = insets.top + spacing.sm;
+  useShopFlowSystemBars({
+    headerColor: brand.primary,
+    bottomColor: brand.chatSurface,
+  });
   const [step, setStep] = useState<Step>('load');
   const [today, setToday] = useState<DailyChallengeTodayData | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -1421,7 +1427,9 @@ export default function DailyChallengeScreen() {
                           },
                         ]}
                       />
-                      <View style={styles.progressXpGloss} pointerEvents="none" />
+                      {Platform.OS !== 'android' ? (
+                        <View style={styles.progressXpGloss} pointerEvents="none" />
+                      ) : null}
                     </View>
                   </View>
 
@@ -1919,7 +1927,7 @@ export default function DailyChallengeScreen() {
           {step === 'result' && submitResult && activeGame ? (
             <View style={styles.resultCelebrationRoot}>
               <View style={styles.resultHero}>
-                <CelebrationConfetti />
+                {Platform.OS !== 'android' ? <CelebrationConfetti /> : null}
                 <View style={styles.resultHeroContent}>
                   {submitResult.score >= activeMaxPoints && activeMaxPoints > 0 ? (
                     <View style={[styles.flawlessPill, isRTL && styles.rowReverse]}>
@@ -2828,7 +2836,7 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: 'rgba(248, 250, 252, 0.82)',
+    backgroundColor: Platform.OS === 'android' ? '#f8fafc' : 'rgba(248, 250, 252, 0.82)',
     borderRadius: radius.md,
     zIndex: 4,
   },
@@ -2854,10 +2862,13 @@ const styles = StyleSheet.create({
   gameRowTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: spacing.sm },
   gameTitle: { flex: 1, fontSize: fontSize.md, fontWeight: '700', color: brand.text },
   donePill: {
-    backgroundColor: '#dcfce7',
+    backgroundColor: Platform.OS === 'android' ? homeShell.greenSurface : '#dcfce7',
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: radius.md,
+    ...(Platform.OS === 'android'
+      ? { borderWidth: StyleSheet.hairlineWidth, borderColor: homeShell.greenBorder }
+      : null),
   },
   donePillTxt: { fontSize: fontSize.xs, fontWeight: '700', color: '#166534' },
   gameScore: { fontSize: fontSize.sm, color: brand.textMuted, marginTop: spacing.xs, marginBottom: spacing.sm },
@@ -3035,7 +3046,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   zipGridCellPath: {
-    backgroundColor: 'rgba(248, 250, 252, 0.42)',
+    backgroundColor: Platform.OS === 'android' ? '#f8fafc' : 'rgba(248, 250, 252, 0.42)',
     borderColor: brand.primary,
     borderWidth: StyleSheet.hairlineWidth,
   },
@@ -3263,7 +3274,7 @@ const styles = StyleSheet.create({
   lbCardRowYou: {
     borderColor: brand.emerald,
     borderWidth: 2,
-    backgroundColor: 'rgba(4,120,87,0.06)',
+    backgroundColor: Platform.OS === 'android' ? homeShell.greenSurface : 'rgba(4,120,87,0.06)',
   },
   lbRowToneGold: { borderLeftWidth: 4, borderLeftColor: '#CA8A04' },
   lbRowToneSilver: { borderLeftWidth: 4, borderLeftColor: '#94A3B8' },

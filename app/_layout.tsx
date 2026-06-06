@@ -29,7 +29,7 @@ import { NotificationsDrawerProvider } from '@/contexts/NotificationsDrawerConte
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { GlobalWallUnreadProvider } from '@/contexts/GlobalWallUnreadContext';
-import { LocaleProvider } from '@/contexts/LocaleContext';
+import { LocaleProvider, useLocale } from '@/contexts/LocaleContext';
 import { SharePreviewProvider } from '@/contexts/SharePreviewContext';
 import { SchoolDiagnosticRecommendationsProvider } from '@/contexts/SchoolDiagnosticRecommendationsContext';
 import { ShopCartProvider } from '@/contexts/ShopCartContext';
@@ -199,6 +199,7 @@ function RootLayoutNav() {
 /** Modal si notifications refusées — affiché à chaque retour au premier plan. */
 function NotificationPermissionGate() {
   const { user, isLoading, getValidAccessToken } = useAuth();
+  const { locale } = useLocale();
   const [showDeniedModal, setShowDeniedModal] = useState(false);
 
   const checkPermission = useCallback(async () => {
@@ -219,7 +220,7 @@ function NotificationPermissionGate() {
 
   useEffect(() => {
     void checkPermission();
-  }, [checkPermission]);
+  }, [checkPermission, locale]);
 
   useEffect(() => {
     if (isLoading || !user) return;

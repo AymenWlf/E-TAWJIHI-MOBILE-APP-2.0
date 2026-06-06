@@ -1,5 +1,7 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpDeleteJson, httpGetJson, httpPostJson } from '@/services/http';
+import { fireAndForget } from '@/utils/fireAndForget';
+import { getMobileVisitorId } from '@/utils/visitorId';
 
 export type PlatformEventKind = 'webinar' | 'live' | 'event';
 
@@ -194,5 +196,75 @@ export async function confirmPresencePlatformEvent(
     return res.success && res.data ? coercePlatformEventBrief(res.data) : null;
   } catch {
     return null;
+  }
+}
+
+export async function recordPlatformEventImpression(
+  eventId: number,
+  context: 'listing' | 'detail' = 'listing',
+): Promise<void> {
+  try {
+    const visitorId = await getMobileVisitorId();
+    const url = buildApiUrl('/api/platform-events/record-impression');
+    await httpPostJson<
+      { success: boolean },
+      { eventId: number; context: string; source: 'mobile'; visitorId: string }
+    >(url, {
+      eventId,
+      context,
+      source: 'mobile',
+      visitorId,
+    });
+  } catch {
+    /* noop */
+  }
+}
+
+const sessionListingTracked = new Set<number>();
+
+export function recordPlatformEventListingImpressionsBatch(items: { id: number }[]): void {
+  if (!items?.length) return;
+  const fresh = items.filter((i) => Number.isFinite(i.id) && !sessionListingTracked.has(i.id));
+  for (const it of fresh) {
+    sessionListingTracked.add(it.id);
+    fireAndForget(recordPlatformEventImpression(it.id, 'listing'));
+  }
+}
+
+export async function recordPlatformEventClick(
+  eventId: number,
+  context: 'listing' | 'detail' = 'listing',
+): Promise<void> {
+  try {
+    const visitorId = await getMobileVisitorId();
+    const url = buildApiUrl('/api/platform-events/record-click');
+    await httpPostJson<
+      { success: boolean },
+      { eventId: number; context: string; source: 'mobile'; visitorId: string }
+    >(url, {
+      eventId,
+      context,
+      source: 'mobile',
+      visitorId,
+    });
+  } catch {
+    /* noop */
+  }
+}
+
+export async function markPlatformEventSeenApi(
+  accessToken: string,
+  eventId: number,
+): Promise<void> {
+  if (!Number.isFinite(eventId) || eventId <= 0) return;
+  try {
+    const url = buildApiUrl(`/api/platform-events/${eventId}/mark-seen`);
+    await httpPostJson<{ success: boolean }, { source: 'mobile' }>(
+      url,
+      { source: 'mobile' },
+      { headers: { Authorization: `Bearer ${accessToken}` } },
+    );
+  } catch {
+    /* noop */
   }
 }

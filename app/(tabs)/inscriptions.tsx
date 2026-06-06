@@ -78,6 +78,7 @@ import {
   type CityRow,
   type SecteurRow,
 } from '@/services/referenceData';
+import { countBadgeTextStyle } from '@/theme/countBadge';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { homeShell } from '@/theme/homeShell';
 import type { CandidacyStatusType, EstablishmentFollow } from '@/types/inscriptions';
@@ -1272,8 +1273,6 @@ function InscriptionsTabScreenInner() {
         <HeroLangSwitch />
       </View>
 
-      <Text style={[styles.heroSub, isRTL && styles.rtl]}>{t('inscSubtitle')}</Text>
-
       {showLegacyTassjilCta ? (
         <Pressable
           accessibilityRole="button"
@@ -1360,7 +1359,7 @@ function InscriptionsTabScreenInner() {
                         .replace('{{attention}}', String(candidaciesAttentionTotalCount))}
                     >
                       <View style={[styles.tabBadge, styles.tabBadgeCandidaciesCompact, styles.candidaciesBadgeActive]}>
-                        <Text style={styles.tabBadgeTxt}>
+                        <Text latinDigits style={styles.tabBadgeTxt}>
                           {activeCandidaciesCount > 99 ? '99+' : activeCandidaciesCount}
                         </Text>
                       </View>
@@ -1371,7 +1370,7 @@ function InscriptionsTabScreenInner() {
                             styles.tabBadgeCandidaciesCompact,
                             styles.candidaciesBadgeAttention,
                           ]}>
-                          <Text style={styles.tabBadgeTxt}>
+                          <Text latinDigits style={styles.tabBadgeTxt}>
                             {candidaciesAttentionTotalCount > 99 ? '99+' : candidaciesAttentionTotalCount}
                           </Text>
                         </View>
@@ -2057,10 +2056,10 @@ const styles = StyleSheet.create({
   /* Hero */
   hero: {
     backgroundColor: brand.primary,
-    paddingTop: spacing.lg,
+    paddingTop: spacing.md,
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.lg,
-    gap: spacing.md,
+    paddingBottom: spacing.md,
+    gap: spacing.sm,
   },
   heroTop: { flexDirection: 'row', alignItems: 'center', gap: spacing.md },
   heroTitles: { flex: 1, gap: 3 },
@@ -2071,8 +2070,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.6,
     textTransform: 'uppercase',
   },
-  heroTitle: { color: brand.white, fontSize: fontSize.xxl, fontWeight: '900' },
-  heroSub: { color: 'rgba(255,255,255,0.85)', fontSize: fontSize.sm, lineHeight: 19 },
+  heroTitle: { color: brand.white, fontSize: fontSize.xl, fontWeight: '900' },
   tassjilCta: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2177,7 +2175,12 @@ const styles = StyleSheet.create({
   candidaciesBadgeAttention: {
     backgroundColor: '#DC2626',
   },
-  tabBadgeTxt: { color: brand.white, fontSize: 9, fontWeight: '800' },
+  tabBadgeTxt: {
+    color: brand.white,
+    fontSize: 9,
+    fontWeight: '800',
+    ...countBadgeTextStyle(11),
+  },
 
   /* Sub-header (filters) */
   subHeader: { paddingTop: spacing.md, paddingBottom: spacing.sm },

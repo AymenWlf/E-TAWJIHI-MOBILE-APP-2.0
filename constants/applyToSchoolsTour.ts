@@ -99,7 +99,7 @@ const FGSES_ESTABLISHMENT = {
 export const TOUR_DEMO_FGSES_ANNOUNCEMENT: ContestAnnouncementCard = {
   id: 1,
   title: 'Annonce de concours FGSES - UM6P : Ouverture des inscriptions',
-  titleAr: 'إعلان مسابقة FGSES - UM6P : فتح التسجيلات',
+  titleAr: 'إعلان مباراة FGSES - UM6P : فتح التسجيلات',
   announcementType: "Ouverture d'inscription",
   dateStart: '2026-05-01',
   dateEnd: '2026-06-30',

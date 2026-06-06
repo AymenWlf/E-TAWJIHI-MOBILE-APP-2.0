@@ -16,6 +16,7 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { EstablishmentFollow } from '@/types/inscriptions';
 import type { ApplyToSchoolsTourGate } from '@/utils/applyToSchoolsTourProgress';
 import { pickEstablishmentName } from '@/utils/candidacyStatus';
+import { followStatusesForLatestAnnouncementAction } from '@/utils/followLatestAnnouncementSeen';
 
 type Props = {
   follow: EstablishmentFollow;
@@ -54,7 +55,7 @@ export function FollowedSchoolCard({
   const cardBorder = actionRequired ? '#FECACA' : status?.colorBorder ?? brand.border;
   const accentColor = actionRequired ? '#DC2626' : status?.colorFg ?? brand.primary;
   const hasUpdateAction =
-    (follow.availableStatuses?.length ?? 0) > 0 ||
+    followStatusesForLatestAnnouncementAction(follow).length > 0 ||
     (tourGate === 'status' && typeof onUpdateStatus === 'function');
   const statusInteractionEnabled = !tourGate || tourGate === 'status';
   const secondaryActionsEnabled = !tourGate;

@@ -34,6 +34,8 @@ import { useLocale } from '@/contexts/LocaleContext';
 import {
   confirmPresencePlatformEvent,
   fetchPlatformEventDetail,
+  markPlatformEventSeenApi,
+  recordPlatformEventImpression,
   registerPlatformEvent,
   unregisterPlatformEvent,
   type PlatformEventBrief,
@@ -216,6 +218,15 @@ export default function EvenementDetailScreen() {
       cancelled = true;
     };
   }, [load]);
+
+  useEffect(() => {
+    if (!ev?.id) return;
+    void recordPlatformEventImpression(ev.id, 'detail');
+    void (async () => {
+      const token = await getValidAccessToken();
+      if (token) await markPlatformEventSeenApi(token, ev.id);
+    })();
+  }, [ev?.id, getValidAccessToken]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);

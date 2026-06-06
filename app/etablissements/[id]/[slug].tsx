@@ -36,6 +36,8 @@ import {
 } from '@/components/inscriptions/EligibilityViews';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { EstablishmentCampusSection } from '@/components/schools/EstablishmentCampusSection';
+import { EstablishmentSeuilAdmissionSection } from '@/components/schools/EstablishmentSeuilAdmissionSection';
+import { getSeuilAdmissionDisplay } from '@/utils/establishmentSeuilAdmission';
 import { EstablishmentDescriptionHtml } from '@/components/schools/EstablishmentDescriptionHtml';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { useAuth } from '@/contexts/AuthContext';
@@ -62,10 +64,10 @@ import { getEstablishmentFileUrl } from '@/constants/establishmentMedia';
 import { getEstablishmentByIdSlug, type EstablishmentNormalized } from '@/services/establishments';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
-import { mapCampusForDisplay } from '@/utils/campusMaps';
+import { campusSeuilLabelsFromApi, mapCampusForDisplay } from '@/utils/campusMaps';
 import { evaluateEligibility } from '@/utils/eligibility';
 import { fireAndForget } from '@/utils/fireAndForget';
-import { formatVillesCourtes, universityName } from '@/utils/establishmentFormat';
+import { formatVillesCourtes, labelEstablishmentBourseType, universityName } from '@/utils/establishmentFormat';
 import { pickBrochureFromDocuments } from '@/utils/establishmentBrochure';
 import { sharePayloadEstablishmentDetail } from '@/utils/sharePagePayloads';
 import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
@@ -329,6 +331,13 @@ export default function EstablishmentDetailScreen() {
   ]);
 
   const campusRows = useMemo(() => mapCampusForDisplay(data?.campus), [data?.campus]);
+  const seuilAdmissionDisplay = useMemo(() => {
+    if (!data?.seuilsAdmission) return null;
+    return getSeuilAdmissionDisplay(data.seuilsAdmission, {
+      locale: locale === 'ar' ? 'ar' : 'fr',
+      campusLabels: campusSeuilLabelsFromApi(data.campus),
+    });
+  }, [data?.seuilsAdmission, campusRows, locale]);
   const uni = useMemo(() => (data ? universityName(data, { rtl: isRTL }) : ''), [data, isRTL]);
   const primaryName = useMemo(() => (data && isRTL && data.nomArabe ? data.nomArabe : data?.nom ?? ''), [data, isRTL]);
   const secondaryLine = useMemo(() => {
@@ -559,6 +568,19 @@ export default function EstablishmentDetailScreen() {
             </Grid>
           </Section>
 
+          {seuilAdmissionDisplay?.hasAnyValue ? (
+            <Section title={t('estDetailSeuilsAdmission')} rtl={isRTL}>
+              <EstablishmentSeuilAdmissionSection
+                display={seuilAdmissionDisplay}
+                rtl={isRTL}
+                disclaimer={t('estDetailSeuilsDisclaimer')}
+                bacNormalLabel={t('estDetailSeuilsBacNormal')}
+                bacMissionLabel={t('estDetailSeuilsBacMission')}
+                modeLabel={t('estDetailSeuilsMode')}
+              />
+            </Section>
+          ) : null}
+
           <AppBannerSlot zone="mid_square" analyticsPage="/mobile/ecoles/detail" style={{ marginHorizontal: spacing.md }} />
 
           <Section title={t('estDetailPresentation')} rtl={isRTL}>
@@ -730,23 +752,26 @@ export default function EstablishmentDetailScreen() {
             </Section>
           ) : null}
 
-          {(data.boursesDisponibles || (data.typesBourse && data.typesBourse.length)) && (
+          {data.boursesDisponibles ? (
             <Section title={t('estDetailScholarships')} rtl={isRTL}>
               <Text style={[styles.body, isRTL && styles.txtRtl]}>
-                {data.boursesDisponibles ? t('estScholarshipsAvailable') : '—'}
+                {t('estScholarshipsAvailable')}
                 {data.bourseMin != null || data.bourseMax != null
                   ? ` · ${fmtMaybeNum(data.bourseMin)} → ${fmtMaybeNum(data.bourseMax)} Dhs`
                   : ''}
               </Text>
               {data.typesBourse && data.typesBourse.length ? (
                 <Wrap rtl={isRTL}>
-                  {data.typesBourse.map((t) => (
-                    <Chip key={t} txt={String(t)} />
+                  {data.typesBourse.map((typeKey) => (
+                    <Chip
+                      key={typeKey}
+                      txt={labelEstablishmentBourseType(String(typeKey), t)}
+                    />
                   ))}
                 </Wrap>
               ) : null}
             </Section>
-          )}
+          ) : null}
 
           <Section title={t('estDetailEngagements')} rtl={isRTL}>
             <View style={[styles.flagsRow, isRTL && styles.flagsRowRtl]}>

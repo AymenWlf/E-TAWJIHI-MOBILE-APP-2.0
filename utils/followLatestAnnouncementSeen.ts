@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-import type { EstablishmentFollow } from '@/types/inscriptions';
+import type { CandidacyStatusType, EstablishmentFollow } from '@/types/inscriptions';
 import { isCandidacyStatusFinalized } from '@/utils/candidacyStatus';
 import { getAnnouncementTypeStyle } from '@/utils/announcementTypeStyle';
 
@@ -84,14 +84,38 @@ export function followHasUnseenLatestAnnouncement(
  * Statut actuel du suivi absent des statuts proposés sur la **dernière**
  * annonce (ex. : nouvelle annonce « résultat » n’autorise plus que « admis »).
  */
+function statusIdEquals(a: number | string | null | undefined, b: number | string | null | undefined): boolean {
+  if (a == null || b == null) return false;
+  const na = Number(a);
+  const nb = Number(b);
+  return Number.isFinite(na) && Number.isFinite(nb) && na === nb;
+}
+
+/**
+ * Statuts autorisés **uniquement** sur la dernière annonce (pas l’union école).
+ * Utilisé pour détecter un décalage candidature / dernière annonce.
+ */
+export function latestAnnouncementAllowedStatuses(follow: EstablishmentFollow): CandidacyStatusType[] {
+  return follow.latestAnnouncement?.availableStatuses ?? [];
+}
+
+/** Statuts proposables pour la dernière annonce (sinon union école — picker UI). */
+export function followStatusesForLatestAnnouncementAction(
+  follow: EstablishmentFollow,
+): CandidacyStatusType[] {
+  const latest = latestAnnouncementAllowedStatuses(follow);
+  if (latest.length > 0) return latest;
+  return follow.availableStatuses ?? [];
+}
+
 export function followStatusMisalignedWithLatestAnnouncement(follow: EstablishmentFollow): boolean {
   const latest = follow.latestAnnouncement;
   if (!latest?.id) return false;
-  const allowed = latest.availableStatuses ?? [];
+  const allowed = latestAnnouncementAllowedStatuses(follow);
   if (allowed.length === 0) return false;
   const curId = follow.status?.id;
   if (curId == null) return true;
-  return !allowed.some((s) => s.id === curId);
+  return !allowed.some((s) => statusIdEquals(s.id, curId));
 }
 
 /**
@@ -110,18 +134,37 @@ export function followResultAnnouncementNeedsStatusRefresh(follow: Establishment
   return pub > upd;
 }
 
-/** Action requise : annonce non vue, statut incompatible avec la dernière annonce, ou rappel « résultat ». */
+/** Dernière annonce encore « actionnable » pour le filtre candidatures (ouverte ou à venir, pas expirée). */
+export function isLatestAnnouncementActionable(follow: EstablishmentFollow): boolean {
+  const latest = follow.latestAnnouncement;
+  if (!latest?.id) return false;
+  return !latest.isExpire;
+}
+
+/**
+ * Action requise :
+ * - **jamais** si le statut est finalisé (parcours clos) ;
+ * - **obligatoire** si le statut actuel n’est pas parmi ceux de la dernière annonce ;
+ * - sinon annonce non vue, rappel « résultat », etc. (si annonce encore actionnable).
+ */
 export function followRequiresAttention(
   follow: EstablishmentFollow,
   seenMap: FollowLatestSeenMap | null,
 ): boolean {
   if (!follow.latestAnnouncement?.id) return false;
+
   if (isCandidacyStatusFinalized(follow.status)) {
-    return followHasUnseenLatestAnnouncement(follow, seenMap);
+    return false;
   }
+
+  if (followStatusMisalignedWithLatestAnnouncement(follow)) {
+    return true;
+  }
+
+  if (!isLatestAnnouncementActionable(follow)) return false;
+
   return (
     followHasUnseenLatestAnnouncement(follow, seenMap) ||
-    followStatusMisalignedWithLatestAnnouncement(follow) ||
     followResultAnnouncementNeedsStatusRefresh(follow)
   );
 }

@@ -103,6 +103,8 @@ export type EstablishmentListItem = {
     siteWeb?: string | null;
     adresse?: string | null;
   };
+  /** Seuils d'admission (JSON — prévisionnel, année en cours, année précédente + sources). */
+  seuilsAdmission?: unknown;
   /** Nombre d’utilisateurs qui suivent l’école (API liste / détail). */
   followersCount?: number;
   /** Questions + réponses publiques non masquées (Q&R établissement). */

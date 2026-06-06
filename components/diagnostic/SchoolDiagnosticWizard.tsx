@@ -480,10 +480,12 @@ export function SchoolDiagnosticWizard() {
             visible
             title={L.citiesStudy}
             items={cityItems}
-            selectedValue={form.preferredStudyCityIds[0] ?? ''}
+            selectedValue=""
+            selectedValues={form.preferredStudyCityIds}
+            multiSelect
+            closeOnPick={false}
             onPick={(v) => {
               toggleArray('preferredStudyCityIds', v);
-              close();
             }}
             onClose={close}
             searchInSubtitle={false}

@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, Pressable, ScrollView, SectionList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DiagnosticRecommendationsTawjihPlusGate } from '@/components/diagnostic/DiagnosticRecommendationsTawjihPlusGate';
@@ -45,6 +45,7 @@ import { applyDiagnosticHardBlocksToRow } from '@/utils/schoolDiagnosticHardBloc
 import {
   getSeuilCompatibilityForRow,
   sortSchoolDiagnosticRecommendationsWithSeuil,
+  type SeuilCompatibilityInfo,
 } from '@/utils/schoolDiagnosticSeuilCompatibility';
 
 const COPY = {
@@ -94,6 +95,30 @@ const TIER_ICONS: Record<DiagnosticTier, ComponentProps<typeof FontAwesome>['nam
   last: 'exclamation-circle',
   avoid: 'ban',
 };
+
+type RecommendationListItem = {
+  key: string;
+  row: SchoolDiagnosticRecommendationItem;
+  tier: DiagnosticTier;
+  seuilCompatibility: SeuilCompatibilityInfo;
+};
+
+type RecommendationSection = {
+  key: DiagnosticTier;
+  tier: DiagnosticTier;
+  data: RecommendationListItem[];
+};
+
+function RecommendationItemSeparator() {
+  return <View style={styles.tierItemSeparator} />;
+}
+
+function RecommendationSectionSeparator() {
+  return <View style={styles.tierSectionSeparator} />;
+}
+
+const recommendationItemSeparator = RecommendationItemSeparator;
+const recommendationSectionSeparator = RecommendationSectionSeparator;
 
 export default function DiagnosticResultatsScreen() {
   const { c } = useLocalSearchParams<{ c?: string }>();
@@ -399,6 +424,157 @@ export default function DiagnosticResultatsScreen() {
     [grouped],
   );
 
+  const recommendationSections = useMemo((): RecommendationSection[] => {
+    return TIER_ORDER.filter((tier) => grouped[tier].length > 0).map((tier) => ({
+      key: tier,
+      tier,
+      data: grouped[tier].map((row) => ({
+        key: String(row.establishmentId),
+        row,
+        tier,
+        seuilCompatibility: getSeuilCompatibilityForRow(bacComparison, row),
+      })),
+    }));
+  }, [grouped, bacComparison]);
+
+  const openEstablishment = useCallback((establishmentId: number, slug: string) => {
+    router.push(`/etablissements/${establishmentId}/${slug}` as never);
+  }, []);
+
+  const renderRecommendationItem = useCallback(
+    ({ item }: { item: RecommendationListItem }) => (
+      <DiagnosticRecommendationRow
+        row={item.row}
+        tier={item.tier}
+        isRTL={isRTL}
+        reportLocale={reportLocale}
+        seuilCompatibility={item.seuilCompatibility}
+        showFollowAction={isLoggedIn}
+        isFollowing={followedIds.has(item.row.establishmentId)}
+        followBusy={followBusyIds.has(item.row.establishmentId)}
+        onToggleFollow={() => void toggleFollow(item.row.establishmentId)}
+        followLabelFollow={t('inscAnnouncementsFollow')}
+        followLabelFollowing={t('inscAnnouncementsFollowing')}
+        onPress={() => openEstablishment(item.row.establishmentId, item.row.slug)}
+      />
+    ),
+    [
+      followBusyIds,
+      followedIds,
+      isLoggedIn,
+      isRTL,
+      openEstablishment,
+      reportLocale,
+      t,
+      toggleFollow,
+    ],
+  );
+
+  const renderRecommendationSectionHeader = useCallback(
+    ({ section }: { section: RecommendationSection }) => {
+      const tier = section.tier;
+      const color = tierColor(tier);
+      const count = section.data.length;
+      return (
+        <View style={styles.section}>
+          <View style={[styles.tierHeader, isRTL && styles.tierHeaderRtl]}>
+            <View style={[styles.tierIconWrap, { backgroundColor: `${color}22` }]}>
+              <FontAwesome name={TIER_ICONS[tier]} size={14} color={color} />
+            </View>
+            <View style={styles.tierHeaderText}>
+              <Text style={[styles.tierTitle, isRTL && styles.rtlText]}>{cpy.tiers[tier]}</Text>
+              <Text style={[styles.tierSub, isRTL && styles.rtlText]}>
+                {cpy.tierEstablishments(count)}
+              </Text>
+            </View>
+            <View style={[styles.tierCountBadge, { backgroundColor: color }]}>
+              <Text style={styles.tierCountTxt}>{count}</Text>
+            </View>
+          </View>
+        </View>
+      );
+    },
+    [cpy, isRTL],
+  );
+
+  const recommendationListHeader = useMemo(() => {
+    if (!profileSummary && !globalComment) return null;
+    return (
+      <View style={styles.listHeaderWrap}>
+        {profileSummary ? (
+          <View style={[styles.insightCard, isRTL && styles.insightCardRtl]}>
+            <View style={[styles.insightIcon, { backgroundColor: diagnosticTheme.primarySoft }]}>
+              <FontAwesome name="user-circle" size={18} color={brand.primary} />
+            </View>
+            <View style={styles.insightBody}>
+              <Text
+                style={[styles.insightLabel, isRTL && styles.rtlText, isRTL && styles.rtlNoTransform]}>
+                {cpy.profile}
+              </Text>
+              <Text style={[styles.insightTxt, isRTL && styles.rtlText]}>{profileSummary}</Text>
+            </View>
+          </View>
+        ) : null}
+
+        {globalComment ? (
+          <View
+            style={[
+              styles.insightCard,
+              styles.synthesisCard,
+              Platform.OS === 'android' && styles.synthesisCardAndroid,
+              isRTL && styles.insightCardRtl,
+            ]}>
+            <View
+              style={[
+                styles.insightIcon,
+                {
+                  backgroundColor:
+                    Platform.OS === 'android' ? homeShell.greenSurface : homeShell.greenAlpha18,
+                },
+              ]}>
+              <FontAwesome name="comments" size={16} color={homeShell.greenDark} />
+            </View>
+            <View style={styles.insightBody}>
+              <Text
+                style={[styles.insightLabel, isRTL && styles.rtlText, isRTL && styles.rtlNoTransform]}>
+                {cpy.synthesis}
+              </Text>
+              <Text style={[styles.insightTxt, isRTL && styles.rtlText]}>{globalComment}</Text>
+            </View>
+          </View>
+        ) : null}
+      </View>
+    );
+  }, [cpy, globalComment, isRTL, profileSummary]);
+
+  const recommendationListFooter = useMemo(
+    () => (
+      <View style={[styles.footerActions, isRTL && styles.footerActionsRtl]}>
+        <Pressable
+          style={({ pressed }) => [
+            styles.ctaSecondary,
+            isRTL && styles.ctaSecondaryRtl,
+            pressed && { opacity: 0.9 },
+          ]}
+          onPress={() => router.replace('/diagnostic-ecoles' as never)}>
+          <FontAwesome name="pencil" size={14} color={brand.primary} />
+          <Text style={[styles.ctaSecondaryTxt, isRTL && styles.rtlText]}>{cpy.edit}</Text>
+        </Pressable>
+        <Pressable
+          style={({ pressed }) => [
+            styles.ctaPrimary,
+            isRTL && styles.ctaPrimaryRtl,
+            pressed && { opacity: 0.92 },
+          ]}
+          onPress={() => router.push('/(tabs)/ecoles' as never)}>
+          <Text style={[styles.ctaPrimaryTxt, isRTL && styles.rtlText]}>{cpy.schools}</Text>
+          <FontAwesome name="graduation-cap" size={14} color={brand.white} />
+        </Pressable>
+      </View>
+    ),
+    [cpy, isRTL],
+  );
+
   /** Non-client ayant terminé le diagnostic : toujours l’écran d’achat TAWJIH PLUS. */
   const showRecommendationsPaywall =
     !tawjihPlusLoading && !hasTawjihPlusAccess && Boolean(publicCode);
@@ -468,7 +644,6 @@ export default function DiagnosticResultatsScreen() {
               {cpy.eyebrow}
             </Text>
             <Text style={[styles.headerTitle, isRTL && styles.rtlText]}>{cpy.title}</Text>
-            <Text style={[styles.headerSub, isRTL && styles.rtlText]}>{cpy.subtitle}</Text>
             {academicYearLabel ? (
               <View style={[styles.yearPill, isRTL && styles.yearPillRtl]}>
                 <FontAwesome name="calendar" size={11} color={homeShell.greenDark} />
@@ -511,108 +686,24 @@ export default function DiagnosticResultatsScreen() {
         </View>
       ) : null}
 
-      <ScrollView
-          style={[styles.scroll, isRTL && styles.scrollRtl]}
-          contentContainerStyle={[styles.scrollContent, isRTL && styles.scrollContentRtl]}
-          showsVerticalScrollIndicator={false}>
-          {profileSummary ? (
-            <View style={[styles.insightCard, isRTL && styles.insightCardRtl]}>
-              <View style={[styles.insightIcon, { backgroundColor: diagnosticTheme.primarySoft }]}>
-                <FontAwesome name="user-circle" size={18} color={brand.primary} />
-              </View>
-              <View style={styles.insightBody}>
-                <Text
-                  style={[styles.insightLabel, isRTL && styles.rtlText, isRTL && styles.rtlNoTransform]}>
-                  {cpy.profile}
-                </Text>
-                <Text style={[styles.insightTxt, isRTL && styles.rtlText]}>{profileSummary}</Text>
-              </View>
-            </View>
-          ) : null}
-
-          {globalComment ? (
-            <View style={[styles.insightCard, styles.synthesisCard, isRTL && styles.insightCardRtl]}>
-              <View style={[styles.insightIcon, { backgroundColor: homeShell.greenAlpha18 }]}>
-                <FontAwesome name="comments" size={16} color={homeShell.greenDark} />
-              </View>
-              <View style={styles.insightBody}>
-                <Text
-                  style={[styles.insightLabel, isRTL && styles.rtlText, isRTL && styles.rtlNoTransform]}>
-                  {cpy.synthesis}
-                </Text>
-                <Text style={[styles.insightTxt, isRTL && styles.rtlText]}>{globalComment}</Text>
-              </View>
-            </View>
-          ) : null}
-
-          {TIER_ORDER.map((tier) => {
-            const list = grouped[tier];
-            if (!list.length) return null;
-            const color = tierColor(tier);
-            return (
-              <View key={tier} style={styles.section}>
-                <View style={[styles.tierHeader, isRTL && styles.tierHeaderRtl]}>
-                  <View style={[styles.tierIconWrap, { backgroundColor: `${color}22` }]}>
-                    <FontAwesome name={TIER_ICONS[tier]} size={14} color={color} />
-                  </View>
-                  <View style={styles.tierHeaderText}>
-                    <Text style={[styles.tierTitle, isRTL && styles.rtlText]}>{cpy.tiers[tier]}</Text>
-                    <Text style={[styles.tierSub, isRTL && styles.rtlText]}>
-                      {cpy.tierEstablishments(list.length)}
-                    </Text>
-                  </View>
-                  <View style={[styles.tierCountBadge, { backgroundColor: color }]}>
-                    <Text style={styles.tierCountTxt}>{list.length}</Text>
-                  </View>
-                </View>
-                <View style={styles.tierList}>
-                  {list.map((row) => (
-                    <DiagnosticRecommendationRow
-                      key={row.establishmentId}
-                      row={row}
-                      tier={tier}
-                      isRTL={isRTL}
-                      reportLocale={reportLocale}
-                      seuilCompatibility={getSeuilCompatibilityForRow(bacComparison, row)}
-                      showFollowAction
-                      isFollowing={followedIds.has(row.establishmentId)}
-                      followBusy={followBusyIds.has(row.establishmentId)}
-                      onToggleFollow={() => void toggleFollow(row.establishmentId)}
-                      followLabelFollow={t('inscAnnouncementsFollow')}
-                      followLabelFollowing={t('inscAnnouncementsFollowing')}
-                      onPress={() =>
-                        router.push(`/etablissements/${row.establishmentId}/${row.slug}` as never)
-                      }
-                    />
-                  ))}
-                </View>
-              </View>
-            );
-          })}
-
-          <View style={[styles.footerActions, isRTL && styles.footerActionsRtl]}>
-            <Pressable
-              style={({ pressed }) => [
-                styles.ctaSecondary,
-                isRTL && styles.ctaSecondaryRtl,
-                pressed && { opacity: 0.9 },
-              ]}
-              onPress={() => router.replace('/diagnostic-ecoles' as never)}>
-              <FontAwesome name="pencil" size={14} color={brand.primary} />
-              <Text style={[styles.ctaSecondaryTxt, isRTL && styles.rtlText]}>{cpy.edit}</Text>
-            </Pressable>
-            <Pressable
-              style={({ pressed }) => [
-                styles.ctaPrimary,
-                isRTL && styles.ctaPrimaryRtl,
-                pressed && { opacity: 0.92 },
-              ]}
-              onPress={() => router.push('/(tabs)/ecoles' as never)}>
-              <Text style={[styles.ctaPrimaryTxt, isRTL && styles.rtlText]}>{cpy.schools}</Text>
-              <FontAwesome name="graduation-cap" size={14} color={brand.white} />
-            </Pressable>
-          </View>
-        </ScrollView>
+      <SectionList
+        style={[styles.scroll, isRTL && styles.scrollRtl]}
+        contentContainerStyle={[styles.scrollContent, isRTL && styles.scrollContentRtl]}
+        sections={recommendationSections}
+        keyExtractor={(item) => item.key}
+        renderItem={renderRecommendationItem}
+        renderSectionHeader={renderRecommendationSectionHeader}
+        ListHeaderComponent={recommendationListHeader}
+        ListFooterComponent={recommendationListFooter}
+        ItemSeparatorComponent={recommendationItemSeparator}
+        SectionSeparatorComponent={recommendationSectionSeparator}
+        stickySectionHeadersEnabled={false}
+        showsVerticalScrollIndicator={false}
+        initialNumToRender={8}
+        maxToRenderPerBatch={6}
+        windowSize={7}
+        removeClippedSubviews={Platform.OS === 'android'}
+      />
       <SafeAreaView edges={['bottom']} style={styles.bottomSafe} />
     </View>
   );
@@ -627,7 +718,7 @@ const styles = StyleSheet.create({
   rtlNoTransform: { textTransform: 'none', letterSpacing: 0 },
   headerSafe: {
     backgroundColor: brand.primary,
-    paddingBottom: spacing.md,
+    paddingBottom: spacing.sm,
   },
   headerRow: {
     flexDirection: 'row',
@@ -656,17 +747,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   headerTitle: {
-    fontSize: fontSize.xl,
+    fontSize: fontSize.lg,
     fontWeight: '800',
     color: brand.white,
-    letterSpacing: -0.4,
-    lineHeight: 28,
-  },
-  headerSub: {
-    fontSize: fontSize.sm,
-    color: diagnosticTheme.headerMuted,
-    lineHeight: 20,
-    marginTop: 2,
+    letterSpacing: -0.3,
+    lineHeight: 22,
   },
   yearPill: {
     flexDirection: 'row',
@@ -730,8 +815,8 @@ const styles = StyleSheet.create({
   followStickyBar: {
     backgroundColor: '#F8FAFC',
     paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.sm,
+    paddingTop: spacing.xs,
+    paddingBottom: spacing.xs,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: homeShell.borderOnWhite,
     zIndex: 2,
@@ -756,6 +841,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   scrollContentRtl: { direction: 'rtl', alignItems: 'stretch' },
+  listHeaderWrap: { gap: spacing.md, marginBottom: spacing.md },
   centerRtl: { direction: 'rtl' },
   footerActionsRtl: { direction: 'rtl', alignItems: 'stretch' },
   ctaPrimaryRtl: { direction: 'rtl' },
@@ -784,16 +870,26 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: homeShell.borderOnWhite,
-    shadowColor: '#333E8F',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#333E8F',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: { elevation: 0 },
+    }),
   },
   insightCardRtl: { direction: 'rtl' },
   synthesisCard: {
     borderColor: 'rgba(47,206,148,0.35)',
     backgroundColor: 'rgba(47,206,148,0.06)',
+  },
+  synthesisCardAndroid: {
+    backgroundColor: brand.white,
+    borderColor: homeShell.greenBorder,
+    elevation: 0,
+    shadowOpacity: 0,
   },
   insightIcon: {
     width: 40,
@@ -851,6 +947,8 @@ const styles = StyleSheet.create({
     fontSize: fontSize.xs,
   },
   tierList: { gap: spacing.sm },
+  tierItemSeparator: { height: spacing.sm },
+  tierSectionSeparator: { height: spacing.md },
   footerActions: { gap: spacing.sm, marginTop: spacing.md },
   ctaSecondary: {
     flexDirection: 'row',

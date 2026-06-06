@@ -112,14 +112,6 @@ const BASE_SERVICE_PAYMENT_ICONS: Record<
   pay_on_delivery: 'truck',
 };
 
-function fillCheckoutTpl(template: string, vars: Record<string, string>): string {
-  let s = template;
-  for (const [k, v] of Object.entries(vars)) {
-    s = s.split(`{${k}}`).join(v);
-  }
-  return s;
-}
-
 type CheckoutFieldKey =
   | 'email'
   | 'fullName'
@@ -691,44 +683,6 @@ export default function BoutiqueCheckoutScreen() {
     [t, cartWideFreeShipping],
   );
 
-  const studentVilleHintText = useMemo(() => {
-    if (!selectedStudentVille) return '';
-    const price = selectedStudentVille.price;
-    const delais = selectedStudentVille.delais?.trim() || '—';
-    if (cartWideFreeShipping) {
-      return fillCheckoutTpl(t('shopCheckoutStudentHintFree'), { price, delais });
-    }
-    return fillCheckoutTpl(t('shopCheckoutStudentHint'), { price, delais });
-  }, [selectedStudentVille, cartWideFreeShipping, t]);
-
-  const deliveryVilleMetaText = useMemo(() => {
-    if (!selectedVille || !hasPhysicalProducts) return '';
-    const price = selectedVille.price;
-    const delais = selectedVille.delais?.trim() || '—';
-    if (cartWideFreeShipping) {
-      return fillCheckoutTpl(t('shopCheckoutVilleMetaFree'), { price, delais });
-    }
-    if (shippingFeeMode === 'fixed') {
-      return fillCheckoutTpl(t('shopCheckoutVilleMetaFixed'), {
-        price,
-        delais,
-        fee: String(fixedShippingFee).replace(',', '.'),
-      });
-    }
-    return fillCheckoutTpl(t('shopCheckoutVilleMetaCatalog'), {
-      fee: formatShopPrice(String(parseShopVillePriceAmount(selectedVille.price)), currency),
-      delais,
-    });
-  }, [
-    selectedVille,
-    hasPhysicalProducts,
-    cartWideFreeShipping,
-    shippingFeeMode,
-    fixedShippingFee,
-    currency,
-    t,
-  ]);
-
   const shippingSummaryText = useMemo(() => {
     if (!hasPhysicalProducts) return t('shopCheckoutShipNoPhysical');
     if (cartWideFreeShipping) return t('shopCheckoutShipFree');
@@ -1058,9 +1012,7 @@ export default function BoutiqueCheckoutScreen() {
                     </Text>
                     <FontAwesome name="chevron-down" size={12} color={brand.textMuted} />
                   </Pressable>
-                  {selectedStudentVille ? (
-                    <Text style={[styles.metaHint, isRTL && styles.txtRtl]}>{studentVilleHintText}</Text>
-                  ) : cartWideFreeShipping && hasPhysicalProducts ? (
+                  {cartWideFreeShipping && hasPhysicalProducts ? (
                     <Text style={[styles.metaHint, isRTL && styles.txtRtl]}>{t('shopCheckoutStudentHintFreeShort')}</Text>
                   ) : null}
                 </Field>
@@ -1132,9 +1084,6 @@ export default function BoutiqueCheckoutScreen() {
                   <FontAwesome name="chevron-down" size={12} color={brand.textMuted} />
                 </Pressable>
               </Field>
-              {deliveryVilleMetaText ? (
-                <Text style={[styles.metaHint, isRTL && styles.txtRtl]}>{deliveryVilleMetaText}</Text>
-              ) : null}
               <Field isRtl={isRTL} label={t('shopCheckoutLblAddress')} required>
                 <TextInput
                   style={[

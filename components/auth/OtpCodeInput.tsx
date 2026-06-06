@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { CAIRO } from '@/theme/arabicTypography';
+import { CAIRO, cairoFontStyle } from '@/theme/arabicTypography';
 import { brand, spacing } from '@/theme/tokens';
 
 const BLUE = brand.primary;
@@ -83,7 +83,7 @@ export function OtpCodeInput({ length = 6, value, onChange, isRTL, error, label 
                 onFocus={() => setFocusedIndex(i)}
                 keyboardType="number-pad"
                 maxLength={i === 0 ? length : 1}
-                style={[styles.cellInput, isRTL && styles.rtlInput]}
+                style={[styles.cellInput, cairoFontStyle('black'), isRTL && styles.rtlInput]}
                 textContentType={i === 0 ? 'oneTimeCode' : 'none'}
                 selectTextOnFocus
                 accessibilityLabel={`Chiffre ${i + 1}`}
@@ -145,9 +145,7 @@ const styles = StyleSheet.create({
     height: '100%',
     textAlign: 'center',
     fontSize: 24,
-    fontWeight: '900',
     color: brand.text,
-    fontFamily: CAIRO.black,
     padding: 0,
   },
   rtlInput: { writingDirection: 'ltr', textAlign: 'center' },

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
-import { Pressable as GHPressable } from 'react-native-gesture-handler';
+
+import { DeckGesturePressable } from '@/components/ui/DeckGesturePressable';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -29,6 +30,7 @@ import {
 import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { preserveLtrLatinRuns } from '@/utils/bidiText';
 
 type Props = {
   config: BacResultsCardConfig;
@@ -129,6 +131,49 @@ function NotYetTag({
   );
 }
 
+function outletChannelLabel(
+  label: string,
+  channel: BacVerificationChannel,
+  isRTL: boolean,
+): string {
+  if (!isRTL) return label;
+  return channel === 'men' ? label : preserveLtrLatinRuns(label);
+}
+
+function OutletChannelLabel({
+  label,
+  channel,
+  fontSize: fs,
+  isRTL,
+  numberOfLines,
+  variant,
+}: {
+  label: string;
+  channel: BacVerificationChannel;
+  fontSize: number;
+  isRTL: boolean;
+  numberOfLines: number;
+  variant: 'row' | 'tile';
+}) {
+  const display = outletChannelLabel(label, channel, isRTL);
+  const ltrUrl = channel === 'men' || /[a-z0-9-]+\.[a-z]{2,}/i.test(label);
+  const style =
+    variant === 'tile'
+      ? [styles.outletTileLabel, { fontSize: fs }]
+      : [styles.outletLabel, { fontSize: fs }];
+
+  return (
+    <Text
+      style={[
+        ...style,
+        isRTL && ltrUrl ? styles.outletLabelUrlRtl : isRTL ? styles.textRtl : styles.textLtr,
+      ]}
+      numberOfLines={numberOfLines}>
+      {display}
+    </Text>
+  );
+}
+
 function OutletStatusTag({
   status,
   publishedLabel,
@@ -170,7 +215,7 @@ function BacThresholdsCtaSlot({
 
   return (
     <View style={styles.thresholdsCtaOuter}>
-      <GHPressable
+      <DeckGesturePressable
         onPress={disabled ? undefined : onPress}
         disabled={disabled}
         accessibilityRole="button"
@@ -204,7 +249,7 @@ function BacThresholdsCtaSlot({
             color={brand.white}
           />
         </View>
-      </GHPressable>
+      </DeckGesturePressable>
     </View>
   );
 }
@@ -236,6 +281,8 @@ export function BacResultsStackCardContent({
     resultsDay && config.globalStatus === 'not_yet';
   const showCountdown = config.globalStatus === 'not_yet' && !countdown.isPast;
   const compact = showCountdown;
+  /** Grille 2 colonnes peu fiable en RTL (2e canal coupé) — liste verticale en arabe. */
+  const outletListLayout = compact || isRTL;
   const isPublished =
     config.globalStatus === 'published' || hasAnyBacResultPublished(config);
   const notesPublished = areBacNotesPublished(config);
@@ -357,12 +404,13 @@ export function BacResultsStackCardContent({
           numberOfLines={2}>
           {t('bacOutletsTitle')}
         </Text>
-        <View style={[compact ? styles.outletsList : styles.outletsGrid, isRTL && styles.outletsGridRtl]}>
+        <View style={outletListLayout ? styles.outletsList : styles.outletsGrid}>
           {outletRows.map((row) =>
-            compact ? (
-              <GHPressable
+            outletListLayout ? (
+              <DeckGesturePressable
                 key={row.key}
                 onPress={() => onOpenVerification?.(row.channel)}
+                disabled={!onOpenVerification}
                 accessibilityRole="button"
                 accessibilityLabel={`${t(row.key)} — ${t('bacOutletGuideA11y')}`}
                 style={({ pressed }) => [
@@ -370,7 +418,7 @@ export function BacResultsStackCardContent({
                   styles.outletRowPressable,
                   styles.outletRowFill,
                   isRTL && styles.outletRowRtl,
-                  pressed && styles.outletRowPressed,
+                  pressed && onOpenVerification ? styles.outletRowPressed : null,
                 ]}>
                 <View style={[styles.outletLeft, isRTL && styles.outletLeftRtl]}>
                   <FontAwesome
@@ -380,11 +428,14 @@ export function BacResultsStackCardContent({
                     style={styles.outletIcon}
                   />
                   <View style={styles.outletLabelWrap}>
-                    <Text
-                      style={[styles.outletLabel, { fontSize: fsSm }, isRTL ? styles.textRtl : styles.textLtr]}
-                      numberOfLines={isRTL ? 1 : 2}>
-                      {t(row.key)}
-                    </Text>
+                    <OutletChannelLabel
+                      label={t(row.key)}
+                      channel={row.channel}
+                      fontSize={fsSm}
+                      isRTL={isRTL}
+                      numberOfLines={isRTL ? 2 : 2}
+                      variant="row"
+                    />
                     {onOpenVerification ? (
                       <Text
                         style={[styles.outletGuideHint, isRTL ? styles.textRtl : styles.textLtr]}
@@ -410,17 +461,18 @@ export function BacResultsStackCardContent({
                     style={styles.chevron}
                   />
                 </View>
-              </GHPressable>
+              </DeckGesturePressable>
             ) : (
-              <GHPressable
+              <DeckGesturePressable
                 key={row.key}
                 onPress={() => onOpenVerification?.(row.channel)}
+                disabled={!onOpenVerification}
                 accessibilityRole="button"
                 accessibilityLabel={`${t(row.key)} — ${t('bacOutletGuideA11y')}`}
                 style={({ pressed }) => [
                   styles.outletTile,
                   isRTL && styles.outletTileRtl,
-                  pressed && styles.outletTilePressed,
+                  pressed && onOpenVerification ? styles.outletTilePressed : null,
                 ]}>
                 <View style={[styles.outletTileTop, isRTL && styles.outletTileTopRtl]}>
                   <View style={styles.outletTileIconWrap}>
@@ -432,11 +484,14 @@ export function BacResultsStackCardContent({
                     color={brand.textMuted}
                   />
                 </View>
-                <Text
-                  style={[styles.outletTileLabel, { fontSize: fsSm }, isRTL ? styles.textRtl : styles.textLtr]}
-                  numberOfLines={2}>
-                  {t(row.key)}
-                </Text>
+                <OutletChannelLabel
+                  label={t(row.key)}
+                  channel={row.channel}
+                  fontSize={fsSm}
+                  isRTL={isRTL}
+                  numberOfLines={2}
+                  variant="tile"
+                />
                 <View style={[styles.outletTileTag, isRTL && styles.outletTileTagRtl]}>
                   <OutletStatusTag
                     status={row.status}
@@ -452,7 +507,7 @@ export function BacResultsStackCardContent({
                     {t('bacTapForGuide')}
                   </Text>
                 ) : null}
-              </GHPressable>
+              </DeckGesturePressable>
             ),
           )}
         </View>
@@ -723,7 +778,7 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(15, 23, 42, 0.08)',
     gap: 6,
-    flexShrink: 1,
+    flexShrink: 0,
     minWidth: 0,
   },
   outletsCardRtl: {
@@ -743,9 +798,6 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 8,
     width: '100%',
-  },
-  outletsGridRtl: {
-    flexDirection: 'row-reverse',
   },
   outletsList: {
     width: '100%',
@@ -845,6 +897,12 @@ const styles = StyleSheet.create({
     color: brand.text,
     fontWeight: '600',
   },
+  /** URL bac.men.gov.ma : forcer LTR pour éviter la disparition du lien en UI RTL. */
+  outletLabelUrlRtl: {
+    textAlign: 'left',
+    writingDirection: 'ltr',
+    alignSelf: 'stretch',
+  },
   outletGuideHint: {
     fontSize: 9,
     fontWeight: '600',
@@ -861,7 +919,7 @@ const styles = StyleSheet.create({
   },
   outletRightRtl: {
     flexDirection: 'row-reverse',
-    maxWidth: '50%',
+    maxWidth: '40%',
   },
   outletIcon: {
     width: 16,

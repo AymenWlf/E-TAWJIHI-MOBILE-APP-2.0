@@ -40,7 +40,7 @@ export function RecommendationFollowProgress({
       <View style={[styles.headRow, isRTL && styles.headRowRtl]}>
         <FontAwesome
           name={satisfied ? 'check-circle' : 'heart-o'}
-          size={16}
+          size={13}
           color={satisfied ? homeShell.greenDark : brand.primary}
         />
         <Text style={[styles.title, isRTL && styles.rtlText]}>
@@ -68,13 +68,14 @@ export function RecommendationFollowProgress({
 
 const styles = StyleSheet.create({
   wrap: {
-    marginBottom: spacing.md,
-    padding: spacing.md,
-    borderRadius: radius.lg,
+    marginBottom: spacing.sm,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.md,
     borderWidth: 1,
     borderColor: `${brand.primary}40`,
     backgroundColor: `${brand.primary}10`,
-    gap: spacing.sm,
+    gap: spacing.xs,
   },
   wrapDone: {
     borderColor: `${homeShell.greenDark}55`,
@@ -84,25 +85,25 @@ const styles = StyleSheet.create({
   headRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: 6,
   },
   headRowRtl: { flexDirection: 'row-reverse' },
   title: {
     flex: 1,
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     fontWeight: '700',
     color: brand.text,
-    lineHeight: 20,
+    lineHeight: 16,
   },
   ratio: {
-    fontSize: fontSize.sm,
+    fontSize: fontSize.xs,
     fontWeight: '800',
     color: brand.primary,
-    minWidth: 36,
+    minWidth: 30,
     textAlign: 'right',
   },
   track: {
-    height: 8,
+    height: 5,
     borderRadius: radius.full,
     backgroundColor: `${brand.primary}18`,
     overflow: 'hidden',
@@ -116,8 +117,8 @@ const styles = StyleSheet.create({
     backgroundColor: homeShell.greenDark,
   },
   hint: {
-    fontSize: fontSize.xs,
-    lineHeight: 18,
+    fontSize: 10,
+    lineHeight: 14,
     color: brand.textMuted,
     fontWeight: '500',
   },

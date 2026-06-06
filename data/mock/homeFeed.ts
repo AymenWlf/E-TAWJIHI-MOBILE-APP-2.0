@@ -201,7 +201,7 @@ const mockHeroEducationSlidesAr: HeroEducationSlide[] = [
   {
     id: 'h1',
     title: 'المدارس العليا في المغرب',
-    subtitle: 'استكشف المؤسسات والمسارات والمسابقات وتواريخ التسجيل المهمة.',
+    subtitle: 'استكشف المؤسسات والمسارات والمباريات وتواريخ التسجيل المهمة.',
     tone: 'blue',
   },
   {
@@ -223,7 +223,7 @@ const mockPackOffersAr = [
     id: 'p1',
     primaryStat: '8',
     primaryTag: 'مدارس مشمولة',
-    feature: 'بطاقات + تقويم المسابقات',
+    feature: 'بطاقات + تقويم المباريات',
     name: 'الباقة البسيطة',
     price: '199 DH',
     period: '/ سنة',
@@ -240,7 +240,7 @@ const mockPackOffersAr = [
   {
     id: 'p3',
     primaryStat: '40+',
-    primaryTag: 'مدارس ومسابقات',
+    primaryTag: 'مدارس ومباريات',
     feature: 'بث مباشر + أولوية للملفات',
     name: 'الباقة المتميزة',
     price: '499 DH',
@@ -251,7 +251,7 @@ const mockPackOffersAr = [
 const mockNewsAr = [
   { id: 'n1', title: 'تمديد تسجيل EMI', date: 'اليوم', tag: 'تسجيل' },
   { id: 'n2', title: 'دليل جديد : استراتيجية المدارس الكبرى', date: 'أمس', tag: 'دليل' },
-  { id: 'n3', title: 'تذكير : مسابقة ISCAE', date: '3 أيام', tag: 'مسابقة' },
+  { id: 'n3', title: 'تذكير : مباراة ISCAE', date: '3 أيام', tag: 'مباراة' },
 ];
 
 const mockHomeStackCardsAr: HomeStackCard[] = [
@@ -282,7 +282,7 @@ const mockHomeStackCardsAr: HomeStackCard[] = [
 const STORY_LABEL_AR: Record<string, string> = {
   'story-cdn-1': 'إي-توجيهي',
   'story-cdn-2': 'المراحل',
-  'story-cdn-3': 'المسابقات',
+  'story-cdn-3': 'المباريات',
   'story-cdn-4': 'المدارس',
   'story-cdn-5': 'الأخبار',
 };

@@ -15,7 +15,7 @@ export function useBacResultsMassar() {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const local = await readBacResultsMassarLocal();
+      const local = await readBacResultsMassarLocal(user?.id);
       let fromProfile = '';
       if (user?.id) {
         const token = await getValidAccessToken();
@@ -24,7 +24,12 @@ export function useBacResultsMassar() {
           fromProfile = (profile?.massarCode ?? '').replace(/\s/g, '').trim();
         }
       }
-      setMassarCode(local || fromProfile || '');
+      // Profil API prioritaire (multi-appareils) ; cache local en secours.
+      const merged = fromProfile || local || '';
+      setMassarCode(merged);
+      if (user?.id && merged) {
+        await writeBacResultsMassarLocal(merged, user.id);
+      }
     } catch {
       setMassarCode('');
     } finally {
@@ -42,12 +47,21 @@ export function useBacResultsMassar() {
       if (normalized.length < 5) return false;
       setSaving(true);
       try {
-        await writeBacResultsMassarLocal(normalized);
         setMassarCode(normalized);
         const token = await getValidAccessToken();
         if (token && user?.id) {
-          await updateUserProfile(token, { massarCode: normalized });
+          const profile = await getUserProfile(token);
+          const payload: Parameters<typeof updateUserProfile>[1] = { massarCode: normalized };
+          // Massar = bac marocain : aligner le type si absent ou incohérent.
+          const bacType = profile?.bacType?.trim();
+          if (!bacType || bacType === 'normal') {
+            if (!bacType) payload.bacType = 'normal';
+          }
+          await updateUserProfile(token, payload);
           invalidateEligibilityProfileCache();
+          await writeBacResultsMassarLocal(normalized, user.id);
+        } else {
+          await writeBacResultsMassarLocal(normalized, user?.id);
         }
         return true;
       } catch {

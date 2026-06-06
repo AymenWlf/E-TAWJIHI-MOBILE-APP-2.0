@@ -14,7 +14,14 @@
 
 import { FontAwesome } from '@expo/vector-icons';
 import React from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View, type ViewStyle } from 'react-native';
+import {
+  ActivityIndicator,
+  Platform,
+  Pressable,
+  StyleSheet,
+  View,
+  type ViewStyle,
+} from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import { homeShell } from '@/theme/homeShell';
@@ -43,6 +50,11 @@ export type SelectFieldProps = {
   loadingLabel?: string;
   /** Style additionnel pour le bouton. */
   style?: ViewStyle;
+  /**
+   * Formulaires longs (setup compte) : zone tactile élargie et taps fiables
+   * dans un ScrollView Android (clavier ouvert, ripple, pas de `direction` RTL).
+   */
+  androidFormTouch?: boolean;
 };
 
 export function SelectField({
@@ -57,8 +69,10 @@ export function SelectField({
   loading = false,
   loadingLabel = 'Chargement…',
   style,
+  androidFormTouch = false,
 }: SelectFieldProps) {
   const isLocked = disabled || loading;
+  const androidTouch = Platform.OS === 'android' && androidFormTouch;
 
   return (
     <View style={styles.field}>
@@ -70,14 +84,27 @@ export function SelectField({
       </View>
 
       <Pressable
-        onPress={loading ? undefined : onPress}
+        onPress={isLocked ? undefined : onPress}
         disabled={isLocked}
+        delayPressIn={androidTouch ? 0 : undefined}
+        hitSlop={
+          androidTouch ? { top: 10, bottom: 10, left: 6, right: 6 } : undefined
+        }
+        pressRetentionOffset={
+          androidTouch ? { top: 24, bottom: 24, left: 16, right: 16 } : undefined
+        }
+        android_ripple={
+          androidTouch && !isLocked
+            ? { color: 'rgba(51, 62, 143, 0.1)', borderless: false }
+            : undefined
+        }
         accessibilityRole="button"
         accessibilityLabel={loading ? `${label} — ${loadingLabel}` : label}
         accessibilityState={{ disabled: isLocked, busy: loading }}
         style={({ pressed }) => [
           styles.input,
-          rtl && styles.inputRtl,
+          androidTouch && styles.inputAndroidForm,
+          rtl && (androidTouch ? styles.inputRtlTextOnly : styles.inputRtl),
           hasError && styles.inputError,
           loading && styles.inputLoading,
           pressed && !isLocked && { opacity: 0.85 },
@@ -86,8 +113,14 @@ export function SelectField({
         ]}>
         {loading ? (
           <>
-            <ActivityIndicator size="small" color={brand.primary} style={styles.loadingSpinner} />
+            <ActivityIndicator
+              size="small"
+              color={brand.primary}
+              style={styles.loadingSpinner}
+              pointerEvents={androidTouch ? 'none' : undefined}
+            />
             <Text
+              pointerEvents={androidTouch ? 'none' : undefined}
               numberOfLines={1}
               style={[styles.inputText, styles.inputTextLoading, rtl && styles.inputTextRtl]}>
               {loadingLabel}
@@ -96,6 +129,7 @@ export function SelectField({
         ) : (
           <>
             <Text
+              pointerEvents={androidTouch ? 'none' : undefined}
               numberOfLines={1}
               style={[
                 styles.inputText,
@@ -104,7 +138,9 @@ export function SelectField({
               ]}>
               {value || '—'}
             </Text>
-            <FontAwesome name="chevron-down" size={12} color={homeShell.cardMuted} />
+            <View pointerEvents={androidTouch ? 'none' : undefined}>
+              <FontAwesome name="chevron-down" size={12} color={homeShell.cardMuted} />
+            </View>
           </>
         )}
       </Pressable>
@@ -147,7 +183,14 @@ const styles = StyleSheet.create({
     minHeight: 48,
     gap: 10,
   },
+  inputAndroidForm: {
+    paddingVertical: 12,
+    minHeight: 52,
+    overflow: 'hidden',
+  },
   inputRtl: { direction: 'rtl' },
+  /** RTL sans `direction` sur le conteneur — évite les taps manqués sur Android. */
+  inputRtlTextOnly: {},
   inputError: {
     borderColor: '#DC2626',
     borderWidth: 2,

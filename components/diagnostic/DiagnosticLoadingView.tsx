@@ -1,7 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import type { ComponentProps } from 'react';
 import { useEffect, useRef } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -132,7 +132,9 @@ function SpinnerRing({ accent = 'primary' }: { accent?: 'primary' | 'green' }) {
 
   return (
     <View style={styles.spinnerWrap}>
-      <Animated.View style={[styles.spinnerGlow, glowStyle, { backgroundColor: ringSoft }]} />
+      {Platform.OS !== 'android' ? (
+        <Animated.View style={[styles.spinnerGlow, glowStyle, { backgroundColor: ringSoft }]} />
+      ) : null}
       <Animated.View
         style={[
           styles.spinnerRing,
@@ -207,7 +209,10 @@ function AnalysisProgressBar({
 
   const fillStyle = useAnimatedStyle(() => ({
     width: `${Math.round(progress.value * 100)}%`,
-    opacity: nearEnd ? interpolate(shimmer.value, [0, 1], [0.88, 1]) : 1,
+    opacity:
+      Platform.OS === 'android' || !nearEnd
+        ? 1
+        : interpolate(shimmer.value, [0, 1], [0.88, 1]),
   }));
 
   const display = Math.min(100, Math.max(0, Math.round(percent)));
@@ -458,7 +463,15 @@ export function DiagnosticLoadingView({
               ) : null}
             </View>
           ) : null}
-          <View style={[styles.footerPill, rtl && styles.footerPillRtl, { backgroundColor: homeShell.greenAlpha18 }]}>
+          <View
+            style={[
+              styles.footerPill,
+              rtl && styles.footerPillRtl,
+              {
+                backgroundColor:
+                  Platform.OS === 'android' ? homeShell.greenSurface : homeShell.greenAlpha18,
+              },
+            ]}>
             <FontAwesome name="shield" size={12} color={homeShell.greenDark} />
             <Text style={[styles.footerPillTxt, rtl && styles.rtlText]}>{copy.secureFooter}</Text>
           </View>

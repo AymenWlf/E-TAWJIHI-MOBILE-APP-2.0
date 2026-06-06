@@ -8,11 +8,11 @@ import { SchoolDiagnosticWizard } from '@/components/diagnostic/SchoolDiagnostic
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
-import { replaceToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
+import { resolveUserDiagnosticPublicCode } from '@/utils/resolveSchoolDiagnosticNavigation';
 
 /**
- * Entrée diagnostic écoles : wizard si client TAWJIH PLUS et pas encore terminé ;
- * sinon page résultats (recommandations ou paywall) si diagnostic déjà enregistré.
+ * Entrée `/diagnostic-ecoles` : affiche le wizard (reprise / refaire le questionnaire).
+ * Les recommandations sont accessibles via le lien dédié ou `/diagnostic-ecoles/resultats`.
  */
 export function DiagnosticEcolesEntry() {
   const { getValidAccessToken, user } = useAuth();
@@ -29,21 +29,21 @@ export function DiagnosticEcolesEntry() {
     void (async () => {
       if (tawjihPlusLoading) return;
 
-      const redirected = await replaceToSchoolDiagnosticEntry({
-        getValidAccessToken,
-        userId: user?.id ?? null,
-        uiLocale,
-      });
-      if (!alive) return;
-
-      if (redirected) return;
-
       if (!hasTawjihPlusAccess) {
-        setShowPaywall(true);
-        setBooting(false);
-        return;
+        const existingCode = await resolveUserDiagnosticPublicCode(
+          getValidAccessToken,
+          user?.id ?? null,
+          { uiLocale },
+        );
+        if (!alive) return;
+        if (!existingCode) {
+          setShowPaywall(true);
+          setBooting(false);
+          return;
+        }
       }
 
+      if (!alive) return;
       setBooting(false);
     })();
 
