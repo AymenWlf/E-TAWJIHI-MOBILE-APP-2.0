@@ -34,15 +34,17 @@ function swapHorizontalBoxSides(css: string): string {
     .replace(/\bmargin-right-tmp\b/gi, 'margin-right');
 }
 
-function normalizeRtlInlineStyle(style: string): string {
+export function normalizeRtlInlineStyle(style: string): string {
   let s = style
-    .replace(/\btext-align\s*:\s*(left|start|justify)\b/gi, 'text-align:right')
+    .replace(/\btext-align\s*:\s*(left|start|justify|center)\b/gi, 'text-align:right')
     .replace(/\bdirection\s*:\s*ltr\b/gi, 'direction:rtl')
+    .replace(/\bunicode-bidi\s*:\s*[^;]+/gi, 'unicode-bidi:embed')
     .replace(/\bfloat\s*:\s*left\b/gi, 'float:right')
     .replace(/\bfloat\s*:\s*right\b/gi, 'float:left');
   s = swapHorizontalBoxSides(s);
   if (!/\bdirection\s*:/i.test(s)) s = `direction:rtl;${s}`;
   if (!/\btext-align\s*:/i.test(s)) s = `text-align:right;${s}`;
+  if (!/\bunicode-bidi\s*:/i.test(s)) s = `unicode-bidi:embed;${s}`;
   return s.replace(/;;+/g, ';').replace(/^;|;$/g, '');
 }
 
@@ -80,7 +82,9 @@ function forceRtlOnAllTags(html: string): string {
 
     attrs = attrs
       .replace(/\bql-align-left\b/g, 'ql-align-right')
-      .replace(/\bql-direction-ltr\b/g, 'ql-direction-rtl');
+      .replace(/\bql-align-center\b/g, 'ql-align-right')
+      .replace(/\bql-direction-ltr\b/g, 'ql-direction-rtl')
+      .replace(/\bql-direction-rtl\b/g, 'ql-direction-rtl');
 
     return `<${tagName}${attrs}${selfClose}>`;
   });
@@ -90,15 +94,16 @@ function forceRtlOnAllTags(html: string): string {
 function applyRtlToDescriptionHtml(html: string): string {
   let out = html
     .replace(/\bdir\s*=\s*["']ltr["']/gi, 'dir="rtl"')
-    .replace(/\salign\s*=\s*["']left["']/gi, ' align="right"')
-    .replace(/text-align\s*:\s*(left|start|justify)/gi, 'text-align:right')
+    .replace(/\salign\s*=\s*["'](left|center)["']/gi, ' align="right"')
+    .replace(/text-align\s*:\s*(left|start|justify|center)/gi, 'text-align:right')
     .replace(/direction\s*:\s*ltr/gi, 'direction:rtl')
     .replace(/\bql-align-left\b/g, 'ql-align-right')
+    .replace(/\bql-align-center\b/g, 'ql-align-right')
     .replace(/\bql-direction-ltr\b/g, 'ql-direction-rtl');
 
   out = forceRtlOnAllTags(out);
 
-  return `<div dir="rtl" style="direction:rtl;text-align:right;width:100%">${out}</div>`;
+  return `<div dir="rtl" style="direction:rtl;text-align:right;unicode-bidi:embed;width:100%"><div dir="rtl" style="direction:rtl;text-align:right;unicode-bidi:embed;width:100%">${out}</div></div>`;
 }
 
 /** Prépare le HTML description pour l’affichage (RTL notamment). */

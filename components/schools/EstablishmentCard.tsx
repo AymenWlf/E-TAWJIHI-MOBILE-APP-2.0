@@ -20,6 +20,7 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { evaluateEligibility } from '@/utils/eligibility';
 import { formatVillesCourtes, secteurTitres, universityName } from '@/utils/establishmentFormat';
 import { fireAndForget } from '@/utils/fireAndForget';
+import { stripHtmlToText } from '@/utils/sanitizeRichHtml';
 import type { EstablishmentLockedVariant } from '@/utils/establishmentLockDisplay';
 
 type Props = {
@@ -81,7 +82,8 @@ export function EstablishmentCard({
     isRTL && item.nomArabe
       ? [item.sigle, item.nom].filter(Boolean).join(' · ')
       : [item.sigle, item.nomArabe].filter(Boolean).join(' · ');
-  const desc = (isRTL ? item.descriptionAr || item.description : item.description) || '';
+  const descRaw = (isRTL ? item.descriptionAr || item.description : item.description) || '';
+  const desc = stripHtmlToText(descRaw, 220);
   const dipShow = item.mergedDiplomes.slice(0, 2);
   const dipExtra = item.mergedDiplomes.length > 2 ? ` +${item.mergedDiplomes.length - 2}` : '';
   const secShow = secteurs.slice(0, 2);
@@ -218,9 +220,11 @@ export function EstablishmentCard({
               <HiddenBar width="75%" height={10} style={{ marginTop: 6 }} isRTL={isRTL} />
             </View>
           ) : (
-            <Text style={[styles.desc, isRTL && styles.txtRtl, isRTL && styles.blockRtl]} numberOfLines={3}>
-              {desc}
-            </Text>
+            <View style={[isRTL && styles.descWrapRtl, isRTL && styles.blockRtl]}>
+              <Text style={[styles.desc, isRTL && styles.txtRtl, isRTL && styles.blockRtl]} numberOfLines={3}>
+                {desc}
+              </Text>
+            </View>
           )}
         </View>
       )}
@@ -668,6 +672,12 @@ const styles = StyleSheet.create({
     color: homeShell.cardMuted,
     fontSize: fontSize.sm,
     lineHeight: 19,
+    fontWeight: '600',
+  },
+  descWrapRtl: {
+    direction: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
   },
   descPlaceholder: {
     marginTop: spacing.md,

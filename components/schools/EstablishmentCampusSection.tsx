@@ -1,6 +1,8 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Linking from 'expo-linking';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { WebView } from 'react-native-webview';
 
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -9,10 +11,82 @@ import { fontSize, radius, spacing } from '@/theme/tokens';
 import { type CampusDisplayRow } from '@/utils/campusMaps';
 
 const CARD_WIDTH = 236;
+const MAP_HEIGHT = 132;
 
 type Props = {
   rows: CampusDisplayRow[];
 };
+
+function CampusMapEmbed({ embedUrl, openMapUrl, isRTL, t }: {
+  embedUrl: string;
+  openMapUrl: string | null;
+  isRTL: boolean;
+  t: (key: string) => string;
+}) {
+  const [failed, setFailed] = useState(false);
+
+  if (failed) {
+    return openMapUrl ? (
+      <Pressable
+        onPress={() => void Linking.openURL(openMapUrl)}
+        style={({ pressed }) => [
+          styles.mapsLinkRow,
+          isRTL && styles.mapsLinkRowRtl,
+          pressed && { opacity: 0.92 },
+        ]}
+        accessibilityRole="link"
+        accessibilityLabel={t('eventsMapsLink')}>
+        <View style={styles.mapsIconWrap}>
+          <FontAwesome name="map" size={14} color="#fff" />
+        </View>
+        <View style={[styles.mapsLinkTextCol, isRTL && styles.rtlCol]}>
+          <Text style={[styles.mapsLinkLabel, isRTL && styles.rtlText]}>{t('eventsMapsLink')}</Text>
+          <Text style={[styles.mapsLinkSub, isRTL && styles.rtlText]} numberOfLines={1}>
+            Google Maps
+          </Text>
+        </View>
+        <FontAwesome name="external-link" size={13} color="#059669" />
+      </Pressable>
+    ) : (
+      <View style={[styles.mapsEmptyRow, isRTL && styles.mapsLinkRowRtl]}>
+        <FontAwesome name="map-o" size={16} color={homeShell.cardMuted} />
+        <Text style={[styles.mapsEmptyTxt, isRTL && styles.rtlText]} numberOfLines={2}>
+          {t('estDetailCampusNoMapsUrl')}
+        </Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.mapBlock}>
+      <WebView
+        source={{ uri: embedUrl }}
+        style={styles.webview}
+        scrollEnabled={false}
+        nestedScrollEnabled={false}
+        javaScriptEnabled
+        domStorageEnabled
+        setSupportMultipleWindows={false}
+        onError={() => setFailed(true)}
+        onHttpError={() => setFailed(true)}
+      />
+      {openMapUrl ? (
+        <Pressable
+          onPress={() => void Linking.openURL(openMapUrl)}
+          style={({ pressed }) => [
+            styles.mapOpenLink,
+            isRTL && styles.mapsLinkRowRtl,
+            pressed && { opacity: 0.88 },
+          ]}
+          accessibilityRole="link"
+          accessibilityLabel={t('eventsMapsLink')}>
+          <FontAwesome name="external-link" size={11} color="#047857" />
+          <Text style={[styles.mapOpenLinkTxt, isRTL && styles.rtlText]}>{t('eventsMapsLink')}</Text>
+        </Pressable>
+      ) : null}
+    </View>
+  );
+}
 
 export function EstablishmentCampusSection({ rows }: Props) {
   const { isRTL, t } = useLocale();
@@ -27,12 +101,19 @@ export function EstablishmentCampusSection({ rows }: Props) {
       contentContainerStyle={styles.hScroll}
       accessibilityLabel="Liste des campus">
       {rows.map((campus) => {
-        const mapsHref = campus.openMapUrl ?? campus.embedUrl;
+        const openMapUrl = campus.openMapUrl;
         return (
           <View key={campus.key} style={[styles.card, { width: CARD_WIDTH }]}>
-            {mapsHref ? (
+            {campus.embedUrl ? (
+              <CampusMapEmbed
+                embedUrl={campus.embedUrl}
+                openMapUrl={openMapUrl}
+                isRTL={isRTL}
+                t={t}
+              />
+            ) : openMapUrl ? (
               <Pressable
-                onPress={() => void Linking.openURL(mapsHref)}
+                onPress={() => void Linking.openURL(openMapUrl)}
                 style={({ pressed }) => [
                   styles.mapsLinkRow,
                   isRTL && styles.mapsLinkRowRtl,
@@ -98,6 +179,31 @@ const styles = StyleSheet.create({
     backgroundColor: '#FAFBFC',
     overflow: 'hidden',
     flexShrink: 0,
+  },
+  mapBlock: {
+    borderBottomWidth: 1,
+    borderBottomColor: homeShell.borderOnWhite,
+    backgroundColor: '#E2E8F0',
+  },
+  webview: {
+    width: '100%',
+    height: MAP_HEIGHT,
+    backgroundColor: '#E2E8F0',
+  },
+  mapOpenLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 4,
+    paddingVertical: 6,
+    backgroundColor: '#ECFDF5',
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: '#D1FAE5',
+  },
+  mapOpenLinkTxt: {
+    fontSize: 10,
+    fontWeight: '700',
+    color: '#047857',
   },
   mapsLinkRow: {
     flexDirection: 'row',

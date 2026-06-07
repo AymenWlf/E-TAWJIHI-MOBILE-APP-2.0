@@ -1,13 +1,19 @@
-import { useMemo } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
 import RenderHTML from 'react-native-render-html';
+import { WebView } from 'react-native-webview';
 
 import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { CAIRO, applyArabicFontOverlay } from '@/theme/arabicTypography';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, spacing } from '@/theme/tokens';
-import { prepareDescriptionHtmlForDisplay } from '@/utils/descriptionHtml';
+import { normalizeRtlInlineStyle, prepareDescriptionHtmlForDisplay } from '@/utils/descriptionHtml';
+import {
+  RTL_DESCRIPTION_HEIGHT_SCRIPT,
+  RTL_DESCRIPTION_WEBVIEW_BASE_URL,
+  buildRtlDescriptionWebHtml,
+} from '@/utils/rtlDescriptionWebHtml';
 import { safeOpenUrl } from '@/utils/safeOpenUrl';
 
 type Props = {
@@ -15,57 +21,137 @@ type Props = {
   description: string | null | undefined;
   /** Fallback si vide. */
   emptyLabel?: string;
+  /** Largeur utile RenderHTML (défaut : écran − marges fiche). */
+  contentWidth?: number;
+  /** Force RTL + Cairo même si le conteneur parent est LTR (défaut : locale ar). */
+  forceRtl?: boolean;
 };
+
+const MIN_RTL_WEBVIEW_HEIGHT = 120;
 
 export function EstablishmentDescriptionHtml({
   description,
   emptyLabel = 'Aucune description publiée pour cet établissement.',
+  contentWidth: contentWidthProp,
+  forceRtl,
 }: Props) {
-  const { isRTL } = useLocale();
+  const { isRTL: localeRtl } = useLocale();
+  const rtl = forceRtl ?? localeRtl;
   const { width: screenW } = useWindowDimensions();
-  /** Section : marges latérales + padding carte (voir fiche détail). */
-  const contentWidth = Math.max(120, screenW - spacing.xl * 4);
+  const contentWidth = contentWidthProp ?? Math.max(120, screenW - spacing.xl * 4);
+
+  const [webViewHeight, setWebViewHeight] = useState(MIN_RTL_WEBVIEW_HEIGHT);
+
+  const systemFonts = useMemo(() => Object.values(CAIRO), []);
+
+  const htmlDocument = useMemo(
+    () => (rtl ? buildRtlDescriptionWebHtml(description) : ''),
+    [description, rtl],
+  );
 
   const source = useMemo(
     () => ({
-      html: prepareDescriptionHtmlForDisplay(description, { rtl: isRTL }),
+      html: prepareDescriptionHtmlForDisplay(description, { rtl }),
     }),
-    [description, isRTL],
+    [description, rtl],
   );
+
+  useEffect(() => {
+    setWebViewHeight(MIN_RTL_WEBVIEW_HEIGHT);
+  }, [htmlDocument]);
+
+  const onWebViewMessage = useCallback((raw: string) => {
+    try {
+      const msg = JSON.parse(raw) as { type?: string; value?: number };
+      if (msg.type === 'height' && typeof msg.value === 'number' && msg.value > 0) {
+        setWebViewHeight(Math.max(MIN_RTL_WEBVIEW_HEIGHT, Math.ceil(msg.value)));
+      }
+    } catch {
+      /* ignore */
+    }
+  }, []);
 
   const defaultTextProps = useMemo(
     () => ({
       selectable: true as const,
-      ...(isRTL ? { style: { writingDirection: 'rtl' as const, textAlign: 'right' as const } } : {}),
+      ...(rtl
+        ? {
+            style: {
+              writingDirection: 'rtl' as const,
+              textAlign: 'right' as const,
+              ...applyArabicFontOverlay({ fontFamily: CAIRO.semibold }),
+            },
+          }
+        : {}),
     }),
-    [isRTL],
+    [rtl],
   );
 
   const rtlText = useMemo(
     () =>
-      isRTL
-        ? ({ textAlign: 'right' as const, writingDirection: 'rtl' as const })
-        : ({ textAlign: 'left' as const, writingDirection: 'ltr' as const }),
-    [isRTL],
+      rtl
+        ? ({
+            textAlign: 'right' as const,
+            writingDirection: 'rtl' as const,
+            direction: 'rtl' as const,
+            width: '100%' as const,
+            alignSelf: 'stretch' as const,
+          })
+        : ({
+            textAlign: 'left' as const,
+            writingDirection: 'ltr' as const,
+            direction: 'ltr' as const,
+          }),
+    [rtl],
+  );
+
+  const domVisitors = useMemo(
+    () =>
+      rtl
+        ? {
+            onElement: (element: { attribs?: Record<string, string> }) => {
+              if (!element.attribs) {
+                element.attribs = {};
+              }
+              element.attribs.dir = 'rtl';
+              const merged = normalizeRtlInlineStyle(
+                element.attribs.style
+                  ? `${element.attribs.style};direction:rtl;text-align:right;unicode-bidi:embed`
+                  : 'direction:rtl;text-align:right;unicode-bidi:embed',
+              );
+              element.attribs.style = merged;
+              const cls = element.attribs.class ?? '';
+              element.attribs.class = cls
+                .replace(/\bql-align-left\b/g, 'ql-align-right')
+                .replace(/\bql-align-center\b/g, 'ql-align-right')
+                .replace(/\bql-direction-ltr\b/g, 'ql-direction-rtl');
+            },
+          }
+        : undefined,
+    [rtl],
   );
 
   const classesStyles = useMemo(() => {
-    if (!isRTL) return undefined;
-    const rtlBlock = { textAlign: 'right' as const, writingDirection: 'rtl' as const };
+    if (!rtl) return undefined;
+    const rtlBlock = {
+      textAlign: 'right' as const,
+      writingDirection: 'rtl' as const,
+      direction: 'rtl' as const,
+      width: '100%' as const,
+    };
     return {
       'ql-align-left': rtlBlock,
       'ql-align-right': rtlBlock,
-      'ql-align-center': { textAlign: 'center' as const, writingDirection: 'rtl' as const },
+      'ql-align-center': rtlBlock,
       'ql-align-justify': rtlBlock,
       'ql-direction-ltr': rtlBlock,
       'ql-direction-rtl': rtlBlock,
     };
-  }, [isRTL]);
+  }, [rtl]);
 
-  /** Les styles inline CMS (Quill) ne doivent pas réimposer du LTR / align left. */
   const ignoredStyles = useMemo(
     () =>
-      isRTL
+      rtl
         ? ([
             'textAlign',
             'direction',
@@ -77,18 +163,18 @@ export function EstablishmentDescriptionHtml({
             'paddingRight',
           ] as const)
         : undefined,
-    [isRTL],
+    [rtl],
   );
 
   const renderersProps = useMemo(
     () =>
-      isRTL
+      rtl
         ? {
             ul: { enableExperimentalRtl: true },
             ol: { enableExperimentalRtl: true },
           }
         : undefined,
-    [isRTL],
+    [rtl],
   );
 
   const tagsStyles = useMemo(() => {
@@ -98,7 +184,7 @@ export function EstablishmentDescriptionHtml({
       ...rtlText,
     };
     const ar = (family: keyof typeof CAIRO) =>
-      isRTL ? applyArabicFontOverlay({ fontFamily: CAIRO[family] }) : {};
+      rtl ? applyArabicFontOverlay({ fontFamily: CAIRO[family] }) : {};
 
     return {
       body: rtlText,
@@ -121,105 +207,24 @@ export function EstablishmentDescriptionHtml({
         ...rtlText,
         ...ar('semibold'),
       },
-      h1: {
-        ...commonHeading,
-        fontSize: fontSize.md + 2,
-        fontWeight: '900' as const,
-        marginTop: 14,
-        marginBottom: 6,
-        ...ar('black'),
-      },
-      h2: {
-        ...commonHeading,
-        fontSize: fontSize.md + 1.5,
-        fontWeight: '800' as const,
-        marginTop: 12,
-        marginBottom: 5,
-        ...ar('extrabold'),
-      },
-      h3: {
-        ...commonHeading,
-        fontSize: fontSize.md + 1,
-        fontWeight: '800' as const,
-        marginTop: 10,
-        marginBottom: 5,
-        ...ar('extrabold'),
-      },
-      h4: {
-        ...commonHeading,
-        fontSize: fontSize.md + 0.5,
-        fontWeight: '800' as const,
-        marginTop: 9,
-        marginBottom: 4,
-        ...ar('extrabold'),
-      },
-      h5: {
-        ...commonHeading,
-        fontSize: fontSize.md + 0.5,
-        fontWeight: '700' as const,
-        marginTop: 8,
-        marginBottom: 4,
-        color: homeShell.blueDeep,
-        ...ar('bold'),
-      },
-      h6: {
-        ...commonHeading,
-        fontSize: fontSize.md,
-        fontWeight: '800' as const,
-        marginTop: 8,
-        marginBottom: 4,
-        color: homeShell.cardMuted,
-        ...ar('extrabold'),
-      },
-      ul: {
-        marginBottom: 10,
-        ...(isRTL ? { paddingRight: 18, paddingLeft: 0 } : { paddingLeft: 18 }),
-      },
-      ol: {
-        marginBottom: 10,
-        ...(isRTL ? { paddingRight: 18, paddingLeft: 0 } : { paddingLeft: 18 }),
-      },
-      li: {
-        color: homeShell.cardMuted,
-        fontSize: fontSize.md,
-        lineHeight: 22,
-        fontWeight: '600' as const,
-        marginBottom: 6,
-        ...rtlText,
-        ...ar('semibold'),
-      },
-      span: {
-        color: homeShell.cardMuted,
-        fontSize: fontSize.md,
-        lineHeight: 23,
-        fontWeight: '600' as const,
-        ...rtlText,
-        ...ar('semibold'),
-      },
+      h1: { ...commonHeading, fontSize: fontSize.md + 2, fontWeight: '900' as const, marginTop: 14, marginBottom: 6, ...ar('black') },
+      h2: { ...commonHeading, fontSize: fontSize.md + 1.5, fontWeight: '800' as const, marginTop: 12, marginBottom: 5, ...ar('extrabold') },
+      h3: { ...commonHeading, fontSize: fontSize.md + 1, fontWeight: '800' as const, marginTop: 10, marginBottom: 5, ...ar('extrabold') },
+      h4: { ...commonHeading, fontSize: fontSize.md + 0.5, fontWeight: '800' as const, marginTop: 9, marginBottom: 4, ...ar('extrabold') },
+      h5: { ...commonHeading, fontSize: fontSize.md + 0.5, fontWeight: '700' as const, marginTop: 8, marginBottom: 4, color: homeShell.blueDeep, ...ar('bold') },
+      h6: { ...commonHeading, fontSize: fontSize.md, fontWeight: '800' as const, marginTop: 8, marginBottom: 4, color: homeShell.cardMuted, ...ar('extrabold') },
+      ul: { marginBottom: 10, ...rtlText, ...(rtl ? { paddingRight: 18, paddingLeft: 0 } : { paddingLeft: 18 }) },
+      ol: { marginBottom: 10, ...rtlText, ...(rtl ? { paddingRight: 18, paddingLeft: 0 } : { paddingLeft: 18 }) },
+      li: { color: homeShell.cardMuted, fontSize: fontSize.md, lineHeight: 22, fontWeight: '600' as const, marginBottom: 6, ...rtlText, ...ar('semibold') },
+      span: { color: homeShell.cardMuted, fontSize: fontSize.md, lineHeight: 23, fontWeight: '600' as const, ...rtlText, ...ar('semibold') },
       strong: { fontWeight: '800' as const, color: homeShell.cardText, ...rtlText, ...ar('extrabold') },
       b: { fontWeight: '800' as const, color: homeShell.cardText, ...rtlText, ...ar('extrabold') },
       em: { fontStyle: 'italic' as const, ...rtlText },
-      a: {
-        color: homeShell.blue,
-        textDecorationLine: 'underline' as const,
-        fontWeight: '700' as const,
-        ...rtlText,
-        ...ar('bold'),
-      },
+      a: { color: homeShell.blue, textDecorationLine: 'underline' as const, fontWeight: '700' as const, ...rtlText, ...ar('bold') },
       blockquote: {
-        ...(isRTL
-          ? {
-              borderRightWidth: 3,
-              borderRightColor: homeShell.green,
-              paddingRight: 12,
-              borderLeftWidth: 0,
-              paddingLeft: 0,
-            }
-          : {
-              borderLeftWidth: 3,
-              borderLeftColor: homeShell.green,
-              paddingLeft: 12,
-            }),
+        ...(rtl
+          ? { borderRightWidth: 3, borderRightColor: homeShell.green, paddingRight: 12, borderLeftWidth: 0, paddingLeft: 0 }
+          : { borderLeftWidth: 3, borderLeftColor: homeShell.green, paddingLeft: 12 }),
         marginVertical: 8,
         paddingVertical: 4,
         fontStyle: 'italic' as const,
@@ -227,43 +232,18 @@ export function EstablishmentDescriptionHtml({
         ...rtlText,
         ...ar('semibold'),
       },
-      pre: {
-        backgroundColor: '#F1F5F9',
-        padding: 12,
-        borderRadius: 10,
-        marginVertical: 8,
-        overflow: 'hidden' as const,
-        ...rtlText,
-        ...ar('semibold'),
-      },
+      pre: { backgroundColor: '#F1F5F9', padding: 12, borderRadius: 10, marginVertical: 8, overflow: 'hidden' as const, ...rtlText, ...ar('semibold') },
       code: {
         fontFamily: Platform.select({ ios: 'Menlo', android: 'monospace', default: 'monospace' }) as string,
         fontSize: 13,
         color: homeShell.blueDeep,
         ...rtlText,
       },
-      th: {
-        color: homeShell.cardText,
-        fontWeight: '700' as const,
-        paddingVertical: 6,
-        paddingHorizontal: 8,
-        ...rtlText,
-        ...ar('bold'),
-      },
-      td: {
-        color: homeShell.cardMuted,
-        fontSize: fontSize.sm,
-        paddingVertical: 6,
-        paddingHorizontal: 8,
-        ...rtlText,
-        ...ar('semibold'),
-      },
-      table: {
-        marginVertical: 8,
-        ...(isRTL ? { alignSelf: 'flex-end' as const } : {}),
-      },
+      th: { color: homeShell.cardText, fontWeight: '700' as const, paddingVertical: 6, paddingHorizontal: 8, ...rtlText, ...ar('bold') },
+      td: { color: homeShell.cardMuted, fontSize: fontSize.sm, paddingVertical: 6, paddingHorizontal: 8, ...rtlText, ...ar('semibold') },
+      table: { marginVertical: 8, ...(rtl ? { alignSelf: 'flex-end' as const } : {}) },
     };
-  }, [isRTL, rtlText]);
+  }, [rtl, rtlText]);
 
   const baseStyle = useMemo(
     () => ({
@@ -271,17 +251,52 @@ export function EstablishmentDescriptionHtml({
       fontSize: fontSize.md,
       lineHeight: 23,
       ...rtlText,
-      ...(isRTL ? applyArabicFontOverlay({ fontFamily: CAIRO.semibold }) : {}),
+      ...(rtl ? applyArabicFontOverlay({ fontFamily: CAIRO.semibold }) : {}),
     }),
-    [isRTL, rtlText],
+    [rtl, rtlText],
   );
 
-  if (!source.html) {
-    return <Text style={[styles.empty, isRTL && styles.emptyRtl]}>{emptyLabel}</Text>;
+  const hasContent = rtl ? Boolean(htmlDocument) : Boolean(source.html);
+
+  if (!hasContent) {
+    return <Text style={[styles.empty, rtl && styles.emptyRtl]}>{emptyLabel}</Text>;
+  }
+
+  if (rtl) {
+    return (
+      <View style={[styles.wrap, styles.wrapRtl]}>
+        <WebView
+          key={htmlDocument.slice(0, 120)}
+          originWhitelist={['*']}
+          source={{ html: htmlDocument, baseUrl: RTL_DESCRIPTION_WEBVIEW_BASE_URL }}
+          style={[styles.webView, { height: webViewHeight }]}
+          scrollEnabled={false}
+          nestedScrollEnabled={false}
+          showsVerticalScrollIndicator={false}
+          showsHorizontalScrollIndicator={false}
+          javaScriptEnabled
+          opaque={false}
+          injectedJavaScript={RTL_DESCRIPTION_HEIGHT_SCRIPT}
+          onMessage={(event) => onWebViewMessage(event.nativeEvent.data)}
+          onShouldStartLoadWithRequest={(request) => {
+            const url = request.url ?? '';
+            if (
+              url === 'about:blank' ||
+              url.startsWith(RTL_DESCRIPTION_WEBVIEW_BASE_URL) ||
+              url.startsWith('data:')
+            ) {
+              return true;
+            }
+            void safeOpenUrl(url);
+            return false;
+          }}
+        />
+      </View>
+    );
   }
 
   return (
-    <View style={[styles.wrap, isRTL && styles.wrapRtl]}>
+    <View style={styles.wrap}>
       <RenderHTML
         contentWidth={contentWidth}
         source={source}
@@ -289,6 +304,9 @@ export function EstablishmentDescriptionHtml({
         tagsStyles={tagsStyles}
         classesStyles={classesStyles}
         defaultTextProps={defaultTextProps}
+        systemFonts={systemFonts}
+        domVisitors={domVisitors}
+        enableCSSInlineProcessing
         enableUserAgentStyles={false}
         ignoredStyles={ignoredStyles}
         ignoredDomTags={['script', 'iframe', 'object', 'embed', 'style', 'form', 'button', 'input']}
@@ -309,10 +327,16 @@ export function EstablishmentDescriptionHtml({
 const styles = StyleSheet.create({
   wrap: {
     alignSelf: 'stretch',
+    width: '100%',
   },
   wrapRtl: {
     direction: 'rtl',
     alignSelf: 'stretch',
+    width: '100%',
+  },
+  webView: {
+    width: '100%',
+    backgroundColor: 'transparent',
   },
   empty: {
     color: homeShell.cardMuted,

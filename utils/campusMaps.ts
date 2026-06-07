@@ -24,7 +24,7 @@ export type CampusDisplayRow = {
   name: string;
   city: string;
   district: string;
-  /** Conservé pour compatibilité ; toujours null (plus d’embed WebView). */
+  /** URL embed Google Maps (iframe / WebView). */
   embedUrl: string | null;
   /** Lien Google Maps (navigateur / app). */
   openMapUrl: string | null;
@@ -171,21 +171,68 @@ function toReliableGoogleMapsOpenUrl(s: string): string {
   return out;
 }
 
+function absolutizeMapsUrl(url: string): string {
+  let out = url.trim();
+  if (!out) return '';
+  if (!/^https?:\/\//i.test(out) && out.startsWith('//')) {
+    return `https:${out}`;
+  }
+  if (!/^https?:\/\//i.test(out)) {
+    return `https://${out}`;
+  }
+  return out;
+}
+
+/** URL utilisable dans une iframe / WebView (`/maps/embed` ou équivalent). */
+function toGoogleMapsEmbedUrl(s: string): string | null {
+  const out = absolutizeMapsUrl(s);
+  if (!out) return null;
+
+  if (/\/maps\/embed/i.test(out)) {
+    return out;
+  }
+
+  if (!looksLikeGoogleMapsUrl(s)) {
+    return null;
+  }
+
+  try {
+    const u = new URL(out);
+    const pb = u.searchParams.get('pb');
+    if (pb) {
+      return `https://www.google.com/maps/embed?pb=${pb}`;
+    }
+    const q = u.searchParams.get('q');
+    if (q) {
+      return `https://maps.google.com/maps?q=${encodeURIComponent(q)}&output=embed`;
+    }
+  } catch {
+    /* ignore */
+  }
+
+  const ll = latLngFromGoogleMapsUrl(out);
+  if (ll) {
+    return `https://maps.google.com/maps?q=${encodeURIComponent(`${ll.lat},${ll.lng}`)}&output=embed`;
+  }
+
+  return null;
+}
+
 /**
- * Extrait un lien Google Maps depuis la valeur API (URL ou iframe HTML, `src` avec " ou ').
- * On ne renvoie plus d’URL d’embed : uniquement un lien externe exploitable.
+ * Extrait embed + lien externe depuis la valeur API (URL directe ou HTML iframe).
  */
 export function extractGoogleMapsUrls(input: string): { embed: string | null; external: string | null } {
   const s = extractMapsSrcFromIframeOrUrl(input);
   if (!s) return { embed: null, external: null };
 
-  if (/\/maps\/embed/i.test(s)) {
-    return { embed: null, external: toReliableGoogleMapsOpenUrl(s) };
+  if (!looksLikeGoogleMapsUrl(s) && !/\/maps\/embed/i.test(s)) {
+    return { embed: null, external: null };
   }
-  if (looksLikeGoogleMapsUrl(s)) {
-    return { embed: null, external: toReliableGoogleMapsOpenUrl(s) };
-  }
-  return { embed: null, external: null };
+
+  return {
+    embed: toGoogleMapsEmbedUrl(s),
+    external: toReliableGoogleMapsOpenUrl(s),
+  };
 }
 
 function campusHasMinimalInfo(c: Record<string, unknown>): boolean {

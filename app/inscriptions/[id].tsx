@@ -825,10 +825,13 @@ export default function InscriptionDetailScreen() {
               resizeMode="cover"
             />
           ) : null}
-          <EstablishmentDescriptionHtml
-            description={descriptionHtml}
-            emptyLabel={t('inscDetailAnnouncementDescription')}
-          />
+          <View style={[styles.presentationBody, isRTL && styles.presentationBodyRtl]}>
+            <EstablishmentDescriptionHtml
+              description={descriptionHtml}
+              forceRtl={isRTL}
+              emptyLabel={t('inscDetailAnnouncementDescription')}
+            />
+          </View>
         </DetailSection>
 
         {/* ── Eligibilité ── */}
@@ -1520,6 +1523,15 @@ const styles = StyleSheet.create({
 
   /* Description */
   leadImage: { width: '100%', height: 160, borderRadius: radius.md, backgroundColor: brand.borderLight },
+  presentationBody: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  presentationBodyRtl: {
+    direction: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
+  },
 
   /* Eligibility section */
   muted: { color: brand.textMuted, fontSize: fontSize.sm, lineHeight: 20 },

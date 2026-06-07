@@ -18,10 +18,10 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import RenderHtml from 'react-native-render-html';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { CommunityQnaSection } from '@/components/community/CommunityQnaSection';
+import { EstablishmentDescriptionHtml } from '@/components/schools/EstablishmentDescriptionHtml';
 import { LiveNowPill } from '@/components/events/LiveNowPill';
 import { SidebarMenuIconButton } from '@/components/SidebarMenuIconButton';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
@@ -48,7 +48,6 @@ import { contactStatusLabelMobile } from '@/utils/platformEventRegistrationLabel
 import { formatPlatformEventDurationMobile } from '@/utils/eventDuration';
 import { classifyApiError, getUserFacingApiError, getUserFacingLoadError } from '@/utils/apiError';
 import { formatPlatformEventDetailDateTime } from '@/utils/platformEventFormat';
-import { sanitizeRichHtml } from '@/utils/sanitizeRichHtml';
 function InfoRow({
   icon,
   label,
@@ -152,11 +151,9 @@ export default function EvenementDetailScreen() {
   const [regPhone, setRegPhone] = useState('');
   const [regSubmitting, setRegSubmitting] = useState(false);
 
-  const htmlSource = useMemo(() => {
+  const descriptionHtml = useMemo(() => {
     const ar = locale === 'ar' && ev?.descriptionHtmlAr?.trim();
-    const h = (ar ? ev?.descriptionHtmlAr : ev?.descriptionHtml)?.trim();
-    if (!h) return undefined;
-    return { html: sanitizeRichHtml(h) };
+    return (ar ? ev?.descriptionHtmlAr : ev?.descriptionHtml)?.trim() || null;
   }, [ev?.descriptionHtml, ev?.descriptionHtmlAr, locale]);
 
   const registrationExplain = useMemo(() => {
@@ -653,26 +650,17 @@ export default function EvenementDetailScreen() {
             </SectionCard>
           ) : null}
 
-          {htmlSource ? (
+          {descriptionHtml ? (
             <SectionCard>
               {!ev.summary ? (
                 <Text style={[styles.sectionHeading, isRTL && styles.rtl]}>{t('eventsDetailDescription')}</Text>
               ) : null}
-              <View style={[styles.htmlWrap, isRTL && { direction: 'rtl' }]}>
-                <RenderHtml
+              <View style={[styles.htmlWrap, isRTL && styles.htmlWrapRtl]}>
+                <EstablishmentDescriptionHtml
+                  description={descriptionHtml}
                   contentWidth={htmlContentWidth}
-                  source={htmlSource}
-                  tagsStyles={{
-                    body: {
-                      color: brand.textSecondary,
-                      fontSize: 15,
-                      lineHeight: 24,
-                      textAlign: isRTL ? 'right' : 'left',
-                      writingDirection: isRTL ? 'rtl' : 'ltr',
-                    },
-                    p: { marginTop: 0, marginBottom: 12 },
-                    li: { marginBottom: 6 },
-                  }}
+                  forceRtl={isRTL}
+                  emptyLabel={t('eventsDetailDescription')}
                 />
               </View>
             </SectionCard>
@@ -1073,6 +1061,11 @@ const styles = StyleSheet.create({
   },
   btnDisabled: { opacity: 0.5 },
   htmlWrap: { marginTop: spacing.sm },
+  htmlWrapRtl: {
+    direction: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   emptyTxt: { color: brand.textMuted },
   backBtn: { marginTop: spacing.md, padding: spacing.md },
   backBtnTxt: { color: brand.primary, fontWeight: '700' },

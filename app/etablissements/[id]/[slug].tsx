@@ -584,7 +584,9 @@ export default function EstablishmentDetailScreen() {
           <AppBannerSlot zone="mid_square" analyticsPage="/mobile/ecoles/detail" style={{ marginHorizontal: spacing.md }} />
 
           <Section title={t('estDetailPresentation')} rtl={isRTL}>
-            <EstablishmentDescriptionHtml description={desc} />
+            <View style={[styles.presentationBody, isRTL && styles.presentationBodyRtl]}>
+              <EstablishmentDescriptionHtml description={desc} forceRtl={isRTL} />
+            </View>
           </Section>
 
           {schoolMedia.photoUris.length > 0 ? (
@@ -1158,6 +1160,15 @@ const styles = StyleSheet.create({
     letterSpacing: 0.55,
     textTransform: 'uppercase',
     marginBottom: spacing.md,
+  },
+  presentationBody: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  presentationBodyRtl: {
+    direction: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
   },
   body: {
     color: homeShell.cardMuted,
