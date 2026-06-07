@@ -30,6 +30,51 @@ export type CampusDisplayRow = {
   openMapUrl: string | null;
 };
 
+/** Base WebView pour l’iframe Maps (même origine que le site). */
+export const GOOGLE_MAPS_EMBED_WEBVIEW_BASE_URL = 'https://www.google.com';
+
+function escapeHtmlAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
+ * Document HTML minimal : Google Maps Embed API doit être chargé dans un `<iframe>`
+ * (comme `EcoleDetail.tsx` sur le web), pas comme navigation directe du WebView.
+ */
+export function buildGoogleMapsEmbedWebHtml(embedUrl: string): string {
+  const src = escapeHtmlAttr(embedUrl.trim());
+  return `<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    html, body { width: 100%; height: 100%; overflow: hidden; background: #e2e8f0; }
+    iframe {
+      display: block;
+      width: 100%;
+      height: 100%;
+      border: 0;
+    }
+  </style>
+</head>
+<body>
+  <iframe
+    src="${src}"
+    title="Google Maps"
+    loading="lazy"
+    referrerpolicy="no-referrer-when-downgrade"
+    allowfullscreen
+  ></iframe>
+</body>
+</html>`;
+}
+
 function rawMapField(c: Record<string, unknown>): string {
   return str(c.mapUrl) || str((c as { googleMapsUrl?: unknown }).googleMapsUrl) || str((c as { mapEmbedUrl?: unknown }).mapEmbedUrl);
 }
@@ -183,12 +228,21 @@ function absolutizeMapsUrl(url: string): string {
   return out;
 }
 
-/** URL utilisable dans une iframe / WebView (`/maps/embed` ou équivalent). */
+/** URL utilisable dans une iframe (`https://www.google.com/maps/embed…`). */
 function toGoogleMapsEmbedUrl(s: string): string | null {
-  const out = absolutizeMapsUrl(s);
+  let out = absolutizeMapsUrl(s);
   if (!out) return null;
 
   if (/\/maps\/embed/i.test(out)) {
+    try {
+      const u = new URL(out);
+      if (/^maps\.google\./i.test(u.hostname)) {
+        u.hostname = 'www.google.com';
+        out = u.toString();
+      }
+    } catch {
+      /* garder out */
+    }
     return out;
   }
 

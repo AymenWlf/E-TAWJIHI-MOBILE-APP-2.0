@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import * as Linking from 'expo-linking';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 
@@ -8,7 +8,11 @@ import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, radius, spacing } from '@/theme/tokens';
-import { type CampusDisplayRow } from '@/utils/campusMaps';
+import {
+  buildGoogleMapsEmbedWebHtml,
+  GOOGLE_MAPS_EMBED_WEBVIEW_BASE_URL,
+  type CampusDisplayRow,
+} from '@/utils/campusMaps';
 
 const CARD_WIDTH = 236;
 const MAP_HEIGHT = 132;
@@ -24,6 +28,7 @@ function CampusMapEmbed({ embedUrl, openMapUrl, isRTL, t }: {
   t: (key: string) => string;
 }) {
   const [failed, setFailed] = useState(false);
+  const mapHtml = useMemo(() => buildGoogleMapsEmbedWebHtml(embedUrl), [embedUrl]);
 
   if (failed) {
     return openMapUrl ? (
@@ -60,12 +65,15 @@ function CampusMapEmbed({ embedUrl, openMapUrl, isRTL, t }: {
   return (
     <View style={styles.mapBlock}>
       <WebView
-        source={{ uri: embedUrl }}
+        key={embedUrl.slice(0, 80)}
+        originWhitelist={['https://*', 'http://*']}
+        source={{ html: mapHtml, baseUrl: GOOGLE_MAPS_EMBED_WEBVIEW_BASE_URL }}
         style={styles.webview}
         scrollEnabled={false}
         nestedScrollEnabled={false}
         javaScriptEnabled
         domStorageEnabled
+        allowsFullscreenVideo
         setSupportMultipleWindows={false}
         onError={() => setFailed(true)}
         onHttpError={() => setFailed(true)}
