@@ -37,7 +37,11 @@ import {
   tierColor,
   type DiagnosticTier,
 } from '@/utils/schoolDiagnosticTier';
-import { DIAGNOSTIC_ANALYSIS_MESSAGES } from '@/constants/diagnosticWizardUi';
+import {
+  DIAGNOSTIC_ANALYSIS_MESSAGES,
+  DIAGNOSTIC_LOADING_COPY,
+  DIAGNOSTIC_RECOMMENDATION_HOME_DELAY_MS,
+} from '@/constants/diagnosticWizardUi';
 import { resolveDiagnosticReportLocale } from '@/utils/schoolDiagnosticPayloadDisplayContext';
 import { computeDiagnosticBacComparisonNote } from '@/utils/diagnosticBacComparisonNote';
 import { emitNotificationsRefresh } from '@/services/notifications';
@@ -393,6 +397,18 @@ export default function DiagnosticResultatsScreen() {
   const loadingRtl = appLocale === 'ar';
   const cpy = COPY[reportLocale];
 
+  const recommendationGenerationFooter = useMemo(() => {
+    const loadingCopy = DIAGNOSTIC_LOADING_COPY[reportLocale];
+    return {
+      footerActionDelayMs: DIAGNOSTIC_RECOMMENDATION_HOME_DELAY_MS,
+      footerAction: {
+        label: loadingCopy.goHomeWhileGenerating,
+        hint: loadingCopy.goHomeWhileGeneratingHint,
+        onPress: () => router.replace('/(tabs)' as never),
+      },
+    };
+  }, [reportLocale]);
+
   const bacComparison = useMemo(
     () => computeDiagnosticBacComparisonNote(diagnosticPayload),
     [diagnosticPayload],
@@ -619,6 +635,7 @@ export default function DiagnosticResultatsScreen() {
         rtl={isRTL}
         locale={reportLocale}
         messageIndex={grokMsg}
+        {...recommendationGenerationFooter}
       />
     );
   }

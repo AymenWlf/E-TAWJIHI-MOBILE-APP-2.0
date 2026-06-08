@@ -12,18 +12,13 @@ import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { CAIRO } from '@/theme/arabicTypography';
 import { countBadgeTextStyle } from '@/theme/countBadge';
+import { buildTabBarStyle, centerTabBarItemStyle, defaultTabBarItemStyle } from '@/theme/tabBar';
 import { brand } from '@/theme/tokens';
 
 const INACTIVE = '#64748B';
 const CENTER_TAB_SIZE = 54;
 /** Surélévation bulle centrale (onglet Annonces). */
 const CENTER_TAB_LIFT = Platform.select({ ios: 18, android: 12, default: 18 }) as number;
-/** Hauteur utile icône + libellé (hors safe area bas). */
-const TAB_BAR_CONTENT_HEIGHT = Platform.select({ ios: 56, android: 58, default: 54 }) as number;
-/** Marge minimale au-dessus du bord / barre de navigation système. */
-const TAB_BAR_MIN_BOTTOM_INSET = Platform.select({ ios: 12, android: 18, default: 12 }) as number;
-/** Relevé visuel supplémentaire pour ne pas coller au bas du téléphone. */
-const TAB_BAR_EXTRA_BOTTOM = Platform.select({ ios: 4, android: 6, default: 4 }) as number;
 const TAB_LABEL_FONT_SIZE = Platform.OS === 'android' ? 10 : 11;
 
 function TabBarLabel({
@@ -146,11 +141,6 @@ export default function TabLayout() {
   const { inscriptionsTabBadgeCount } = useNotificationsDrawer();
   const insets = useSafeAreaInsets();
 
-  /** Safe area bas + marge minimale + léger relevé au-dessus du bord du téléphone. */
-  const tabBarBottomInset =
-    Math.max(insets.bottom, TAB_BAR_MIN_BOTTOM_INSET) + TAB_BAR_EXTRA_BOTTOM;
-  const tabBarHeight = TAB_BAR_CONTENT_HEIGHT + tabBarBottomInset;
-
   const renderTabBarLabel =
     (compact?: boolean) =>
     ({
@@ -188,21 +178,8 @@ export default function TabLayout() {
           marginTop: Platform.OS === 'ios' ? 2 : 4,
           overflow: 'visible',
         },
-        tabBarItemStyle: {
-          overflow: 'visible',
-          paddingVertical: Platform.OS === 'android' ? 0 : 0,
-          minHeight: TAB_BAR_CONTENT_HEIGHT,
-        },
-        tabBarStyle: {
-          backgroundColor: brand.white,
-          borderTopColor: brand.border,
-          borderTopWidth: StyleSheet.hairlineWidth,
-          paddingTop: Platform.OS === 'android' ? 8 : 10,
-          paddingBottom: tabBarBottomInset,
-          height: tabBarHeight,
-          overflow: 'visible',
-          elevation: Platform.OS === 'android' ? 12 : 0,
-        },
+        tabBarItemStyle: defaultTabBarItemStyle,
+        tabBarStyle: buildTabBarStyle(insets.bottom),
       }}>
       <Tabs.Screen
         name="index"
@@ -235,11 +212,7 @@ export default function TabLayout() {
             marginTop: Platform.OS === 'android' ? -4 : 0,
             overflow: 'visible',
           },
-          tabBarItemStyle: {
-            overflow: 'visible',
-            minHeight: TAB_BAR_CONTENT_HEIGHT,
-            paddingBottom: Platform.OS === 'android' ? 0 : undefined,
-          },
+          tabBarItemStyle: centerTabBarItemStyle,
           tabBarLabel: renderTabBarLabel(true),
           tabBarActiveTintColor: brand.primary,
           tabBarInactiveTintColor: brand.textMuted,

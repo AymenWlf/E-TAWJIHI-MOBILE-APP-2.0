@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useNavigation } from '@react-navigation/native';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect, router } from 'expo-router';
 import {
   Alert,
@@ -30,7 +31,8 @@ import { HomeTopBackdrop } from '@/components/home/HomeTopBackdrop';
 import { HomeTopBar } from '@/components/home/HomeTopBar';
 import { StoriesRow } from '@/components/home/StoriesRow';
 import { StoryViewerModal } from '@/components/stories/StoryViewerModal';
-import { homeStackCardsForLocale, storyChannelsForLocale } from '@/data/mock/homeFeed';
+import { homeStackCardsForLocale, type StoryChannel } from '@/data/mock/homeFeed';
+import { buildTabBarStyle } from '@/theme/tabBar';
 import type { AppLocale } from '@/constants/i18n';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
@@ -141,11 +143,23 @@ export default function IndexScreen() {
   const heroWide = isHomeHeroWideLayout(screenW);
   const stackCardW = heroWide ? Math.min(screenW - 2 * H_PAD, 720) : screenW - 2 * H_PAD;
   const { readIds, markChannelRead } = useStoryReadChannels();
+  const navigation = useNavigation();
   const [storyViewer, setStoryViewer] = useState<{ open: boolean; index: number }>({
     open: false,
     index: 0,
   });
-  const [storyChannels, setStoryChannels] = useState(() => storyChannelsForLocale(locale));
+  const [storyChannels, setStoryChannels] = useState<StoryChannel[]>([]);
+
+  /** Plein écran stories : masquer la barre d’onglets, puis restaurer le fond blanc explicitement. */
+  useLayoutEffect(() => {
+    const visibleStyle = buildTabBarStyle(insets.bottom);
+    navigation.setOptions({
+      tabBarStyle: storyViewer.open ? { display: 'none' } : visibleStyle,
+    });
+    return () => {
+      navigation.setOptions({ tabBarStyle: visibleStyle });
+    };
+  }, [navigation, storyViewer.open, insets.bottom]);
   const [storiesLoading, setStoriesLoading] = useState(true);
   const [analyticsVisitorId, setAnalyticsVisitorId] = useState<string | null>(null);
   const feedTrackedIdsRef = useRef<Set<string>>(new Set());
@@ -212,6 +226,7 @@ export default function IndexScreen() {
 
   const storiesFetchGenRef = useRef(0);
   const storiesBootstrappedRef = useRef(false);
+  const storiesHomeFocusedOnceRef = useRef(false);
 
   const refreshStories = useCallback(
     async (options?: { showLoading?: boolean; force?: boolean; targetLocale?: AppLocale }) => {
@@ -222,27 +237,23 @@ export default function IndexScreen() {
       const cached = !options?.force ? peekCachedStoryChannels(apiLocale) : null;
       if (cached) {
         setStoryChannels(cached);
+        setStoriesLoading(false);
       } else {
-        setStoryChannels(storyChannelsForLocale(targetLocale));
+        setStoryChannels([]);
       }
 
-      if (options?.showLoading) setStoriesLoading(true);
+      const showSkeleton = Boolean(options?.showLoading) && !cached;
+      if (showSkeleton) setStoriesLoading(true);
 
       try {
         const remote = await fetchStoryChannels(apiLocale);
         if (gen !== storiesFetchGenRef.current) return;
-        if (remote.length > 0) {
-          setStoryChannels(remote);
-        } else if (!cached) {
-          setStoryChannels(storyChannelsForLocale(targetLocale));
-        }
+        setStoryChannels(remote);
       } catch {
         if (gen !== storiesFetchGenRef.current) return;
-        if (!cached) {
-          setStoryChannels(storyChannelsForLocale(targetLocale));
-        }
+        setStoryChannels(cached ?? []);
       } finally {
-        if (gen === storiesFetchGenRef.current && options?.showLoading) {
+        if (gen === storiesFetchGenRef.current) {
           setStoriesLoading(false);
         }
       }
@@ -267,13 +278,23 @@ export default function IndexScreen() {
       };
     }
 
-    // Changement FR ↔ AR : texte immédiat (mock/cache), pas de skeleton, refresh API silencieux.
-    setStoriesLoading(false);
-    void refreshStories({ showLoading: false, targetLocale: locale });
+    // Changement FR ↔ AR : cache immédiat si dispo, sinon skeleton puis API.
+    void refreshStories({ showLoading: true, targetLocale: locale });
     return () => {
       storiesFetchGenRef.current += 1;
     };
   }, [locale, refreshStories]);
+
+  /** Retour sur l’accueil : réappliquer le cache et terminer un chargement interrompu. */
+  useFocusEffect(
+    useCallback(() => {
+      if (!storiesHomeFocusedOnceRef.current) {
+        storiesHomeFocusedOnceRef.current = true;
+        return;
+      }
+      void refreshStories({ showLoading: false, targetLocale: locale });
+    }, [locale, refreshStories]),
+  );
 
   const storyChannelIdsKey = useMemo(
     () => storyChannels.map((ch) => ch.id).join('\u0001'),

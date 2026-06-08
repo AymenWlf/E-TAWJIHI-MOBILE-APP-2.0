@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import type { ComponentProps } from 'react';
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Image, Platform, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -54,6 +54,8 @@ type Props = {
   locale?: DiagnosticUiLocale;
   /** Bouton optionnel sous la carte (ex. continuer en arrière-plan pendant l’analyse). */
   footerAction?: DiagnosticLoadingFooterAction;
+  /** Affiche `footerAction` après ce délai (ms). 0 = immédiat. */
+  footerActionDelayMs?: number;
 };
 
 const ANALYSIS_ICONS: ComponentProps<typeof FontAwesome>['name'][] = [
@@ -403,10 +405,28 @@ export function DiagnosticLoadingView({
   rtl = false,
   locale,
   footerAction,
+  footerActionDelayMs = 0,
 }: Props) {
   const fullscreen = fullScreen ?? variant !== 'saving';
   const lang = loadingLocale(rtl, locale);
   const copy = DIAGNOSTIC_LOADING_COPY[lang];
+  const [footerActionVisible, setFooterActionVisible] = useState(
+    Boolean(footerAction) && footerActionDelayMs <= 0,
+  );
+
+  useEffect(() => {
+    if (!footerAction) {
+      setFooterActionVisible(false);
+      return;
+    }
+    if (footerActionDelayMs <= 0) {
+      setFooterActionVisible(true);
+      return;
+    }
+    setFooterActionVisible(false);
+    const timer = setTimeout(() => setFooterActionVisible(true), footerActionDelayMs);
+    return () => clearTimeout(timer);
+  }, [footerAction, footerActionDelayMs]);
 
   if (variant === 'saving') {
     return (
@@ -450,7 +470,7 @@ export function DiagnosticLoadingView({
       </View>
       <SafeAreaView edges={['bottom']} style={styles.screenFooterSafe}>
         <View style={styles.screenFooter}>
-          {footerAction ? (
+          {footerAction && footerActionVisible ? (
             <View style={styles.footerActionWrap}>
               <Pressable
                 onPress={footerAction.onPress}

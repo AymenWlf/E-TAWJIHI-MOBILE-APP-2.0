@@ -69,6 +69,8 @@ export const DIAGNOSTIC_LOADING_COPY: Record<
     saving: string;
     progressLabel: string;
     secureFooter: string;
+    goHomeWhileGenerating: string;
+    goHomeWhileGeneratingHint: string;
   }
 > = {
   fr: {
@@ -85,6 +87,8 @@ export const DIAGNOSTIC_LOADING_COPY: Record<
     saving: 'Enregistrement…',
     progressLabel: 'Progression',
     secureFooter: 'Données sécurisées · E-Tawjihi',
+    goHomeWhileGenerating: 'Retour à l’accueil',
+    goHomeWhileGeneratingHint: 'La génération du rapport continue en arrière-plan.',
   },
   ar: {
     bootTitle: 'تشخيص التوجيه',
@@ -100,8 +104,13 @@ export const DIAGNOSTIC_LOADING_COPY: Record<
     saving: 'جاري الحفظ…',
     progressLabel: 'التقدم',
     secureFooter: 'بيانات آمنة · E-Tawjihi',
+    goHomeWhileGenerating: 'العودة إلى الرئيسية',
+    goHomeWhileGeneratingHint: 'يستمر إنشاء التقرير في الخلفية.',
   },
 };
+
+/** Délai avant d’afficher le bouton accueil pendant la génération des recommandations. */
+export const DIAGNOSTIC_RECOMMENDATION_HOME_DELAY_MS = 10_000;
 
 /** Locale des textes UI / analyse IA (priorité à `locale` explicite, sinon déduit du RTL). */
 export function diagnosticContentLocale(

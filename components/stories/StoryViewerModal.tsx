@@ -47,9 +47,8 @@ type Props = {
 };
 
 const { width: WIN_W, height: WIN_H } = Dimensions.get('window');
-/** Zone gauche (tap) — aligné sur l’ancien ratio 35 / 65. */
-const TAP_LEFT_RATIO = 0.35;
-const TAP_MOVE_PX = 14;
+/** Zone gauche (tap) — style Instagram : ~⅓ gauche, ~⅔ droite. */
+const TAP_LEFT_RATIO = 1 / 3;
 const SWIPE_HORIZONTAL_PX = 40;
 
 function StoryProgressSegment({
@@ -133,7 +132,6 @@ export function StoryViewerModal({
   const currentChannel = channels[chIdx];
   const currentSlide = currentChannel?.slides[slideIdx];
   const slideCount = currentChannel?.slides.length ?? 0;
-  const coverUri = currentChannel?.coverUri ?? currentChannel?.slides[0]?.uri;
 
   useEffect(() => {
     if (!visible || !currentChannel) return;
@@ -320,10 +318,6 @@ export function StoryViewerModal({
     advanceFromCurrent,
   ]);
 
-  const onPressInStory = useCallback(() => {
-    storyPressRef.current = { t0: Date.now(), longFired: false };
-  }, []);
-
   const onLongPressStory = useCallback(() => {
     storyPressRef.current.longFired = true;
     pause();
@@ -340,27 +334,33 @@ export function StoryViewerModal({
     (x: number) => {
       if (storyPressRef.current.longFired) return;
       if (x < WIN_W * TAP_LEFT_RATIO) {
+        cancelAnimation(segProgress);
         rewind();
       } else {
         tapNext();
       }
     },
-    [rewind, tapNext],
+    [rewind, segProgress, tapNext],
   );
 
   const storyGesture = useMemo(() => {
+    const tap = Gesture.Tap()
+      .maxDuration(220)
+      .maxDistance(14)
+      .onEnd((e, success) => {
+        'worklet';
+        if (!success || storyLongPressActive.value) return;
+        runOnJS(handleStoryTap)(e.x);
+      });
+
     const pan = Gesture.Pan()
-      .minDistance(0)
       .maxPointers(1)
-      .onBegin(() => {
-        runOnJS(onPressInStory)();
-      })
+      .activeOffsetY(10)
+      .failOffsetX([-28, 28])
       .onUpdate((e) => {
         'worklet';
         if (storyLongPressActive.value) return;
-        const absX = Math.abs(e.translationX);
-        const absY = Math.abs(e.translationY);
-        if (absY > absX && e.translationY > 0) {
+        if (e.translationY > 0) {
           sheetY.value = Math.max(0, e.translationY);
         }
       })
@@ -374,13 +374,7 @@ export function StoryViewerModal({
         const absX = Math.abs(e.translationX);
         const absY = Math.abs(e.translationY);
 
-        if (absX < TAP_MOVE_PX && absY < TAP_MOVE_PX) {
-          runOnJS(handleStoryTap)(e.x);
-          sheetY.value = withSpring(0, { damping: 22, stiffness: 320 });
-          return;
-        }
-
-        if (absY > absX) {
+        if (absY >= absX) {
           const y = sheetY.value;
           if (y > 88 || e.velocityY > 900) {
             sheetY.value = withSpring(WIN_H, { damping: 28, stiffness: 280 }, (done) => {
@@ -401,7 +395,7 @@ export function StoryViewerModal({
       });
 
     const longPress = Gesture.LongPress()
-      .minDuration(220)
+      .minDuration(280)
       .onStart(() => {
         storyLongPressActive.value = true;
         runOnJS(onLongPressStory)();
@@ -411,13 +405,12 @@ export function StoryViewerModal({
         runOnJS(onLongPressRelease)();
       });
 
-    return Gesture.Simultaneous(pan, longPress);
+    return Gesture.Simultaneous(Gesture.Exclusive(tap, pan), longPress);
   }, [
     handleStoryTap,
     onClose,
     onLongPressRelease,
     onLongPressStory,
-    onPressInStory,
     rewind,
     sheetY,
     storyLongPressActive,
@@ -475,49 +468,15 @@ export function StoryViewerModal({
               />
             </GestureDetector>
 
-            <View style={[styles.topChrome, { paddingTop: insets.top + 6 }]} pointerEvents="box-none">
-              <View style={styles.progressRow}>
-                {Array.from({ length: Math.max(1, slideCount) }).map((_, i) => (
-                  <StoryProgressSegment
-                    key={`${currentChannel?.id}-${i}`}
-                    index={i}
-                    slideIdxSv={slideIdxSv}
-                    progress={segProgress}
-                  />
-                ))}
-              </View>
-              <View style={styles.headerRow} pointerEvents="box-none">
-                <View style={styles.headerLeft}>
-                  {coverUri && isStoryImageUri(coverUri) ? (
-                    <Image source={{ uri: coverUri }} style={styles.avatarSm} />
-                  ) : (
-                    <View style={[styles.avatarSm, styles.avatarPlaceholder]} />
-                  )}
-                  <View style={styles.headerTexts}>
-                    <Text style={styles.headerTitle} numberOfLines={1}>
-                      {currentChannel?.label ?? ''}
-                    </Text>
-                    <Text style={styles.headerSub} numberOfLines={1}>
-                      À l&apos;instant
-                    </Text>
-                  </View>
-                </View>
-                <Pressable
-                  onPress={onClose}
-                  hitSlop={16}
-                  style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.75 }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Fermer les stories">
-                  <FontAwesome name="times" size={24} color={brand.white} />
-                </Pressable>
-              </View>
-            </View>
-
             {(currentSlide?.caption || currentSlide?.linkUrl) ? (
               <View
                 style={[styles.captionWrap, { paddingBottom: insets.bottom + spacing.lg }]}
                 pointerEvents="box-none">
-                {currentSlide?.caption ? <Text style={styles.caption}>{currentSlide.caption}</Text> : null}
+                {currentSlide?.caption ? (
+                  <Text style={styles.caption} pointerEvents="none">
+                    {currentSlide.caption}
+                  </Text>
+                ) : null}
                 {currentSlide?.linkUrl ? (
                   <Pressable
                     onPress={() => void openSlideLink()}
@@ -529,6 +488,29 @@ export function StoryViewerModal({
                 ) : null}
               </View>
             ) : null}
+
+            <View style={[styles.topChrome, { paddingTop: insets.top + 6 }]} pointerEvents="box-none">
+              <View style={styles.progressHeaderRow}>
+                <View style={styles.progressRow} pointerEvents="none">
+                  {Array.from({ length: Math.max(1, slideCount) }).map((_, i) => (
+                    <StoryProgressSegment
+                      key={`${currentChannel?.id}-${i}`}
+                      index={i}
+                      slideIdxSv={slideIdxSv}
+                      progress={segProgress}
+                    />
+                  ))}
+                </View>
+                <Pressable
+                  onPress={onClose}
+                  hitSlop={16}
+                  style={({ pressed }) => [styles.closeBtn, pressed && { opacity: 0.75 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Fermer les stories">
+                  <FontAwesome name="times" size={22} color={brand.white} />
+                </Pressable>
+              </View>
+            </View>
         </Animated.View>
       </GestureHandlerRootView>
     </PlatformSheetOverlay>
@@ -572,21 +554,28 @@ const styles = StyleSheet.create({
   },
   touchSurface: {
     ...StyleSheet.absoluteFillObject,
-    zIndex: 12,
+    zIndex: 32,
+    ...(Platform.OS === 'android' ? { elevation: 32 } : null),
   },
   topChrome: {
     position: 'absolute',
     left: 0,
     right: 0,
     top: 0,
-    zIndex: 30,
-    ...(Platform.OS === 'android' ? { elevation: 30 } : null),
+    zIndex: 40,
+    ...(Platform.OS === 'android' ? { elevation: 40 } : null),
     paddingHorizontal: spacing.sm + 2,
   },
+  progressHeaderRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
   progressRow: {
+    flex: 1,
     flexDirection: 'row',
     gap: 2,
-    marginBottom: 10,
+    minWidth: 0,
   },
   progressTrack: {
     flex: 1,
@@ -600,47 +589,8 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     backgroundColor: '#fff',
   },
-  headerRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  headerLeft: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-    minWidth: 0,
-  },
-  avatarSm: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    borderWidth: 2,
-    borderColor: 'rgba(255,255,255,0.45)',
-  },
-  avatarPlaceholder: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-  },
-  headerTexts: {
-    flex: 1,
-    minWidth: 0,
-  },
-  headerTitle: {
-    color: brand.white,
-    fontSize: fontSize.sm,
-    fontWeight: '800',
-    letterSpacing: -0.2,
-  },
-  headerSub: {
-    marginTop: 2,
-    color: 'rgba(255,255,255,0.72)',
-    fontSize: 12,
-    fontWeight: '600',
-  },
   closeBtn: {
-    padding: spacing.sm,
+    padding: spacing.xs,
     zIndex: 31,
     ...(Platform.OS === 'android' ? { elevation: 31 } : null),
   },
@@ -649,8 +599,8 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 25,
-    ...(Platform.OS === 'android' ? { elevation: 25 } : null),
+    zIndex: 38,
+    ...(Platform.OS === 'android' ? { elevation: 38 } : null),
     paddingHorizontal: spacing.lg,
   },
   caption: {

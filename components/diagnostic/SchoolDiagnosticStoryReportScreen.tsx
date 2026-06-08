@@ -1,6 +1,10 @@
 import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  DIAGNOSTIC_LOADING_COPY,
+  DIAGNOSTIC_RECOMMENDATION_HOME_DELAY_MS,
+} from '@/constants/diagnosticWizardUi';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
@@ -257,6 +261,18 @@ export function SchoolDiagnosticStoryReportScreen() {
       ? 'اسحب للمتابعة'
       : 'Glissez pour continuer';
 
+  const recommendationGenerationFooter = useMemo(() => {
+    const loadingCopy = DIAGNOSTIC_LOADING_COPY[reportLocale];
+    return {
+      footerActionDelayMs: DIAGNOSTIC_RECOMMENDATION_HOME_DELAY_MS,
+      footerAction: {
+        label: loadingCopy.goHomeWhileGenerating,
+        hint: loadingCopy.goHomeWhileGeneratingHint,
+        onPress: () => router.replace('/(tabs)' as never),
+      },
+    };
+  }, [reportLocale]);
+
   const openFullReport = useCallback(() => {
     router.push({
       pathname: '/diagnostic-ecoles/resultats',
@@ -295,7 +311,12 @@ export function SchoolDiagnosticStoryReportScreen() {
 
   if (generatingRecommendations || (grokPending && items.length === 0)) {
     return (
-      <DiagnosticLoadingView variant="ia" rtl={storyRtl} locale={reportLocale} />
+      <DiagnosticLoadingView
+        variant="ia"
+        rtl={storyRtl}
+        locale={reportLocale}
+        {...recommendationGenerationFooter}
+      />
     );
   }
 

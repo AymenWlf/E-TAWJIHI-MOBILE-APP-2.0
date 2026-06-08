@@ -62,6 +62,11 @@ import {
   shopParsePriceString,
   shopPriceFormatOptsForCatalogOrCartLine,
 } from '@/utils/shopFormatPrice';
+import {
+  buildShopPromoAppliedMessage,
+  buildShopPromoSummaryLabel,
+  normalizeShopPromoDiscountType,
+} from '@/utils/shopPromoCheckoutLabels';
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
 import { saveShopOrderAccessToken } from '@/utils/shopOrderTokenStorage';
 import { getMobileVisitorId } from '@/utils/visitorId';
@@ -580,6 +585,8 @@ export default function BoutiqueCheckoutScreen() {
     setPromoValidating(true);
     setPromoMessage(null);
     setPromoDiscount(0);
+    setPromoDiscountType(null);
+    setPromoDiscountValue(null);
     try {
       const accessToken = user ? await getValidAccessToken() : null;
       const res = await validateShopPromoCode(
@@ -594,25 +601,23 @@ export default function BoutiqueCheckoutScreen() {
       if (res.valid) {
         const disc = Number.parseFloat(res.discountAmount) || 0;
         const eligible = res.eligibleSubtotal ? Number.parseFloat(res.eligibleSubtotal) : null;
+        const discountType = normalizeShopPromoDiscountType(res.discountType);
+        const discountValue = res.discountValue?.trim() ? res.discountValue : null;
         setPromoDiscount(disc);
         setPromoEligibleSubtotal(eligible != null && !Number.isNaN(eligible) ? eligible : null);
-        setPromoDiscountType(res.discountType ?? null);
-        setPromoDiscountValue(res.discountValue ?? null);
+        setPromoDiscountType(discountType);
+        setPromoDiscountValue(discountValue);
         setPromoCode(res.code);
-        if (res.discountType === 'percent' && res.discountValue && eligible != null && !Number.isNaN(eligible)) {
-          setPromoMessage(
-            t('shopCheckoutPromoAppliedPercent')
-              .replace('{pct}', res.discountValue.replace(/\.00$/, ''))
-              .replace('{base}', formatShopPrice(String(eligible), currency)),
-          );
-        } else if (res.discountType === 'fixed' && res.discountValue) {
-          setPromoMessage(
-            t('shopCheckoutPromoAppliedFixed')
-              .replace('{amount}', formatShopPrice(res.discountValue, currency)),
-          );
-        } else {
-          setPromoMessage(res.message);
-        }
+        setPromoMessage(
+          buildShopPromoAppliedMessage({
+            discountType,
+            discountValue,
+            eligibleSubtotal: eligible,
+            currency,
+            fallbackMessage: res.message,
+            t,
+          }),
+        );
       } else {
         setPromoDiscount(0);
         setPromoEligibleSubtotal(null);
@@ -659,12 +664,23 @@ export default function BoutiqueCheckoutScreen() {
         if (res.valid && res.autoApplied) {
           const disc = Number.parseFloat(res.discountAmount) || 0;
           const eligible = res.eligibleSubtotal ? Number.parseFloat(res.eligibleSubtotal) : null;
+          const discountType = normalizeShopPromoDiscountType(res.discountType);
+          const discountValue = res.discountValue?.trim() ? res.discountValue : null;
           setPromoDiscount(disc);
           setPromoEligibleSubtotal(eligible != null && !Number.isNaN(eligible) ? eligible : null);
-          setPromoDiscountType(res.discountType ?? null);
-          setPromoDiscountValue(res.discountValue ?? null);
+          setPromoDiscountType(discountType);
+          setPromoDiscountValue(discountValue);
           setPromoCode(res.code);
-          setPromoMessage(res.message);
+          setPromoMessage(
+            buildShopPromoAppliedMessage({
+              discountType,
+              discountValue,
+              eligibleSubtotal: eligible,
+              currency,
+              fallbackMessage: res.message,
+              t,
+            }),
+          );
         } else if (!promoCode.trim()) {
           setPromoDiscount(0);
           setPromoMessage(null);
@@ -1184,8 +1200,11 @@ export default function BoutiqueCheckoutScreen() {
                   onChangeText={(v) => {
                     promoManualEditRef.current = true;
                     setPromoCode(v.toUpperCase());
-                    if (promoDiscount > 0) {
+                    if (promoDiscount > 0 || promoDiscountType || promoDiscountValue) {
                       setPromoDiscount(0);
+                      setPromoEligibleSubtotal(null);
+                      setPromoDiscountType(null);
+                      setPromoDiscountValue(null);
                       setPromoMessage(null);
                     }
                   }}
@@ -1234,11 +1253,13 @@ export default function BoutiqueCheckoutScreen() {
             {promoDiscount > 0 ? (
               <View style={[styles.summaryRow, isRTL && styles.rowRtl]}>
                 <Text style={[styles.summaryLbl, styles.promoDiscountLbl, isRTL && styles.txtRtl]}>
-                  {promoDiscountType === 'percent' && promoDiscountValue
-                    ? t('shopCheckoutLblDiscountPercent')
-                        .replace('{code}', promoCode)
-                        .replace('{pct}', promoDiscountValue.replace(/\.00$/, ''))
-                    : t('shopCheckoutLblDiscount').replace('{code}', promoCode)}
+                  {buildShopPromoSummaryLabel({
+                    discountType: promoDiscountType,
+                    discountValue: promoDiscountValue,
+                    code: promoCode,
+                    currency,
+                    t,
+                  })}
                 </Text>
                 <Text style={[styles.summaryVal, styles.promoDiscountVal, isRTL && styles.txtRtl]}>
                   −{formatShopPrice(String(promoDiscount), currency)}

@@ -1070,6 +1070,7 @@ export type HomeCopyKey =
   | 'shopCheckoutPromoRemove'
   | 'shopCheckoutLblDiscount'
   | 'shopCheckoutLblDiscountPercent'
+  | 'shopCheckoutLblDiscountFixed'
   | 'shopCheckoutLblArticlesNet'
   | 'shopCheckoutPromoAppliedPercent'
   | 'shopCheckoutPromoAppliedFixed'
@@ -2864,6 +2865,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCheckoutPromoRemove: 'Retirer',
     shopCheckoutLblDiscount: 'Remise ({code})',
     shopCheckoutLblDiscountPercent: 'Remise {pct} % ({code})',
+    shopCheckoutLblDiscountFixed: 'Remise {amount} ({code})',
     shopCheckoutLblArticlesNet: 'Total articles',
     shopCheckoutPromoAppliedPercent: '−{pct} % appliqué sur {base} (articles éligibles).',
     shopCheckoutPromoAppliedFixed: 'Remise fixe de {amount} sur les articles éligibles.',
@@ -4683,6 +4685,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopCheckoutPromoRemove: 'إزالة',
     shopCheckoutLblDiscount: 'خصم ({code})',
     shopCheckoutLblDiscountPercent: 'خصم {pct} % ({code})',
+    shopCheckoutLblDiscountFixed: 'خصم {amount} ({code})',
     shopCheckoutLblArticlesNet: 'مجموع المنتجات',
     shopCheckoutPromoAppliedPercent: '−{pct} % على {base} (منتجات مشمولة).',
     shopCheckoutPromoAppliedFixed: 'خصم ثابت {amount} على المنتجات المشمولة.',

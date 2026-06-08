@@ -1,8 +1,8 @@
 import { buildApiUrl } from '@/constants/api';
-import { httpPostJson } from '@/services/http';
+import { httpGetJson, httpPostJson } from '@/services/http';
 
 import type { StoryChannel } from '@/data/mock/homeFeed';
-import { isStoryImageUri } from '@/constants/storyMedia';
+import { isStoryImageUri, resolvePublicMediaUrl } from '@/constants/storyMedia';
 
 type ChannelsApiResponse = {
   success: boolean;
@@ -39,26 +39,23 @@ export function invalidateStoryChannelsCache(): void {
  */
 export async function fetchStoryChannels(locale: 'fr' | 'ar'): Promise<StoryChannel[]> {
   const url = buildApiUrl('/api/stories/channels', { locale });
-  const res = await fetch(url, { headers: { Accept: 'application/json' } });
-  if (!res.ok) {
-    throw new Error(`Stories HTTP ${res.status}`);
-  }
-  const json = (await res.json()) as ChannelsApiResponse;
+  const json = await httpGetJson<ChannelsApiResponse>(url);
   const raw = json.data?.channels ?? [];
   const out: StoryChannel[] = [];
   for (const ch of raw) {
     const slides = ch.slides
       .map((s) => ({
         id: String(s.id),
-        uri: s.uri,
+        uri: resolvePublicMediaUrl(s.uri),
         durationMs: s.durationMs ?? 5000,
         caption: s.caption ?? undefined,
         linkUrl: s.linkUrl ?? undefined,
       }))
       .filter((s) => isStoryImageUri(s.uri));
     if (slides.length === 0) continue;
+    const rawCover = ch.coverUri ? resolvePublicMediaUrl(ch.coverUri) : slides[0]?.uri;
     const coverUri =
-      ch.coverUri && isStoryImageUri(ch.coverUri) ? ch.coverUri : slides[0]?.uri;
+      rawCover && isStoryImageUri(rawCover) ? rawCover : slides[0]?.uri;
     out.push({
       id: String(ch.id),
       label: ch.label,
