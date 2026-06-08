@@ -84,6 +84,7 @@ import { downloadDocument, pickDocumentIcon, viewDocument } from '@/utils/docume
 import { evaluateEligibility } from '@/utils/eligibility';
 import { shouldShowTassjilServiceIncludedNotice } from '@/utils/tassjilServiceIncludedNotice';
 import { fireAndForget } from '@/utils/fireAndForget';
+import { promptTawjihPlusPartialFeatureLock } from '@/utils/tawjihPlusParcoursGate';
 import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
 
 export default function InscriptionDetailScreen() {
@@ -127,6 +128,10 @@ export default function InscriptionDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const showInscriptionsPaywall = !isInscriptionsAccessPending && isInscriptionsLocked;
   const contentLocked = !isInscriptionsAccessPending && (data?.previewOnly ?? isInscriptionsLocked);
+  const registrationLocked =
+    contentLocked || (data?.registrationLinkLocked === true && !contentLocked);
+  const deadlineLockedPartial =
+    !contentLocked && data?.deadlineLocked === true;
   const pageLoading = loading || isInscriptionsAccessPending;
 
   /**
@@ -168,7 +173,10 @@ export default function InscriptionDetailScreen() {
         setError(t('inscDetailNotFound'));
         setData(null);
       } else {
-        applyServerInscriptionsAccess(result.inscriptionsFullAccess);
+        applyServerInscriptionsAccess(
+          result.inscriptionsFullAccess,
+          result.inscriptionsPartialAccess,
+        );
         setData(ensureContestDetailEstablishment(result.detail));
         fireAndForget(recordContestImpression(result.detail.id, 'detail'));
       }
@@ -368,8 +376,17 @@ export default function InscriptionDetailScreen() {
   }, [data?.establishment, router]);
 
   const onPressOpenLink = useCallback(() => {
-    if (contentLocked) {
-      openTawjihPlusProduct();
+    if (registrationLocked) {
+      if (contentLocked) {
+        openTawjihPlusProduct();
+      } else {
+        promptTawjihPlusPartialFeatureLock({
+          hasAccess: false,
+          loading: false,
+          openProduct: openTawjihPlusProduct,
+          t,
+        });
+      }
       return;
     }
     if (!data?.registrationUrl) return;
@@ -377,7 +394,7 @@ export default function InscriptionDetailScreen() {
     void Linking.openURL(data.registrationUrl).catch(() =>
       Alert.alert('Erreur', "Impossible d'ouvrir le lien."),
     );
-  }, [contentLocked, data, openTawjihPlusProduct]);
+  }, [contentLocked, data, openTawjihPlusProduct, registrationLocked, t]);
 
   /* ───────── Render ───────── */
 
@@ -475,7 +492,7 @@ export default function InscriptionDetailScreen() {
   );
 
   const showRegistrationFooter =
-    contentLocked || Boolean(data.registrationUrl?.trim());
+    registrationLocked || Boolean(data.registrationUrl?.trim());
   /** Hauteur barre sticky (padding + CTA, hors safe area du footer). */
   const registrationFooterBarHeight = 80;
   const scrollPaddingBottom = showRegistrationFooter
@@ -640,7 +657,24 @@ export default function InscriptionDetailScreen() {
           />
           <Text style={[styles.title, isRTL && styles.rtl]}>{title}</Text>
           {showTassjilServiceNotice ? <TassjilServiceIncludedNotice isRTL={isRTL} /> : null}
-          {deadline.label ? (
+          {deadlineLockedPartial ? (
+            <Pressable
+              onPress={() =>
+                promptTawjihPlusPartialFeatureLock({
+                  hasAccess: false,
+                  loading: false,
+                  openProduct: openTawjihPlusProduct,
+                  t,
+                })
+              }
+              style={[styles.countdown, styles.countdownLocked, isRTL && styles.rowRtl]}
+            >
+              <FontAwesome name="lock" size={12} color="#64748B" />
+              <Text style={[styles.countdownTxt, { color: '#64748B' }]}>
+                {t('inscPartialFeatureLockedHint')}
+              </Text>
+            </Pressable>
+          ) : deadline.label ? (
             <View
               style={[
                 styles.countdown,
@@ -775,12 +809,35 @@ export default function InscriptionDetailScreen() {
                 {t('inscDateOpens')}: {formatShortDate(data.dateStart, locale)}
               </Text>
             </View>
-            <View style={[styles.datePill, isRTL && styles.rowRtl]}>
-              <FontAwesome name="stop-circle" size={11} color={brand.textMuted} />
-              <Text style={styles.datePillTxt}>
-                {t('inscDateCloses')}: {formatShortDate(data.dateEnd, locale)}
-              </Text>
-            </View>
+            {data.dateEnd ? (
+              deadlineLockedPartial ? (
+                <Pressable
+                  onPress={() =>
+                    promptTawjihPlusPartialFeatureLock({
+                      hasAccess: false,
+                      loading: false,
+                      openProduct: openTawjihPlusProduct,
+                      t,
+                    })
+                  }
+                  style={[styles.datePill, styles.datePillLocked, isRTL && styles.rowRtl]}
+                >
+                  <FontAwesome name="stop-circle" size={11} color={brand.textMuted} />
+                  <Text style={styles.datePillTxt}>{t('inscDateCloses')}:</Text>
+                  <Text style={styles.datePillLockedPlaceholder} aria-hidden>
+                    ——————
+                  </Text>
+                  <FontAwesome name="lock" size={10} color="#64748B" />
+                </Pressable>
+              ) : (
+                <View style={[styles.datePill, isRTL && styles.rowRtl]}>
+                  <FontAwesome name="stop-circle" size={11} color={brand.textMuted} />
+                  <Text style={styles.datePillTxt}>
+                    {t('inscDateCloses')}: {formatShortDate(data.dateEnd, locale)}
+                  </Text>
+                </View>
+              )
+            ) : null}
           </View>
         </DetailSection>
 
@@ -1017,21 +1074,21 @@ export default function InscriptionDetailScreen() {
             onPress={onPressOpenLink}
             style={({ pressed }) => [
               styles.cta,
-              contentLocked && styles.ctaLocked,
+              registrationLocked && styles.ctaLocked,
               isRTL && styles.rowRtl,
               pressed && { opacity: 0.9 },
             ]}
           >
             <FontAwesome
-              name={contentLocked ? 'lock' : 'external-link'}
+              name={registrationLocked ? 'lock' : 'external-link'}
               size={14}
-              color={contentLocked ? '#64748B' : brand.white}
+              color={registrationLocked ? '#64748B' : brand.white}
             />
             <Text
-              style={contentLocked ? styles.ctaTxtLocked : styles.ctaTxt}
+              style={registrationLocked ? styles.ctaTxtLocked : styles.ctaTxt}
               numberOfLines={2}
             >
-              {contentLocked
+              {registrationLocked
                 ? registrationLinkLabel
                 : pickRegistrationUrlLabel(
                     data.registrationUrlLabel,
@@ -1447,6 +1504,23 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   countdownTxt: { fontWeight: '800', fontSize: fontSize.xs },
+  countdownLocked: {
+    backgroundColor: '#F1F5F9',
+    borderColor: '#E2E8F0',
+  },
+  datePillLocked: {
+    backgroundColor: '#F8FAFC',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#E2E8F0',
+    gap: 6,
+  },
+  datePillLockedPlaceholder: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+    letterSpacing: 0.8,
+  },
   countdownOpen: { backgroundColor: '#DCFCE7', borderColor: '#BBF7D0' },
   countdownSoon: { backgroundColor: '#FFEDD5', borderColor: '#FED7AA' },
   countdownToday: { backgroundColor: '#FEF3C7', borderColor: '#FDE68A' },

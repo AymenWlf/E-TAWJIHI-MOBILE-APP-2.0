@@ -25,12 +25,13 @@ type StateResponse = {
 type TimelineResponse = {
   success: boolean;
   data: EstablishmentFollowTimeline;
-  meta?: { inscriptionsFullAccess?: boolean };
+  meta?: { inscriptionsFullAccess?: boolean; inscriptionsPartialAccess?: boolean };
 };
 
 export type EstablishmentFollowTimelineResult = {
   timeline: EstablishmentFollowTimeline;
   inscriptionsFullAccess: boolean;
+  inscriptionsPartialAccess: boolean;
 };
 
 type SimpleResponse = { success: boolean; message?: string };
@@ -173,6 +174,7 @@ export async function fetchEstablishmentFollowTimeline(
     return {
       timeline: res.data,
       inscriptionsFullAccess: res.meta?.inscriptionsFullAccess === true,
+      inscriptionsPartialAccess: res.meta?.inscriptionsPartialAccess === true,
     };
   } catch {
     return null;

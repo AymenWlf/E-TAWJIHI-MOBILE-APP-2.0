@@ -1461,6 +1461,7 @@ export type HomeCopyKey =
   | 'inscTabNotifications'
   | 'inscTabCandidacies'
   | 'inscCandidaciesTabLockedHint'
+  | 'inscCandidaciesPartialLimitHint'
   | 'inscTabAnnouncements'
   | 'inscCandidaciesActiveShort'
   | 'inscCandidaciesActiveBadgeA11y'
@@ -1497,6 +1498,7 @@ export type HomeCopyKey =
   | 'paywallCardReservedLabel'
   | 'inscTawjihPlusLockTitle'
   | 'inscTawjihPlusLockHint'
+  | 'inscPartialFeatureLockedHint'
   | 'diagnosticAnswersSavedHint'
   | 'diagnosticRecoGateEyebrow'
   | 'diagnosticRecoGateHeaderTitle'
@@ -3295,6 +3297,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscTabCandidacies: 'Candidatures',
     inscCandidaciesTabLockedHint:
       'Le suivi de vos candidatures est réservé aux clients TAWJIH PLUS. Passez à TAWJIH PLUS pour gérer vos écoles suivies et vos statuts.',
+    inscCandidaciesPartialLimitHint:
+      'En accès partiel, seules 2 candidatures sont accessibles. Passez à TAWJIH PLUS pour voir et gérer toutes vos écoles suivies.',
     inscTabAnnouncements: 'Annonces',
     inscCandidaciesActiveShort: 'actives',
     inscCandidaciesActiveBadgeA11y: '{{count}} candidatures actives',
@@ -3333,6 +3337,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscTawjihPlusLockTitle: 'Contenu réservé aux clients TAWJIH PLUS',
     inscTawjihPlusLockHint:
       'Annonces détaillées, liens d’inscription, filtres avancés et suivi complet de statut.',
+    inscPartialFeatureLockedHint:
+      'Le pack TAWJIH PLUS est nécessaire pour accéder à ce contenu.',
     diagnosticAnswersSavedHint:
       'Vos réponses au diagnostic sont enregistrées. Passez à TAWJIH PLUS pour générer vos recommandations personnalisées.',
     diagnosticRecoGateEyebrow: 'Diagnostic écoles',
@@ -5104,6 +5110,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscTabCandidacies: 'الترشيحات',
     inscCandidaciesTabLockedHint:
       'متابعة ترشيحاتك مخصّصة لعملاء TAWJIH PLUS. انتقل إلى TAWJIH PLUS لإدارة مدارسك المتابَعة وحالاتك.',
+    inscCandidaciesPartialLimitHint:
+      'في الوضع الجزئي، تتاح ترشيحتان فقط. انتقل إلى TAWJIH PLUS لعرض وإدارة جميع مدارسك المتابَعة.',
     inscTabAnnouncements: 'الإعلانات',
     inscCandidaciesActiveShort: 'نشطة',
     inscCandidaciesActiveBadgeA11y: '{{count}} ترشيحات نشطة',
@@ -5142,6 +5150,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscTawjihPlusLockTitle: 'محتوى مخصّص لعملاء TAWJIH PLUS',
     inscTawjihPlusLockHint:
       'إعلانات مفصّلة، روابط التسجيل، فلاتر متقدمة ومتابعة كاملة للحالة.',
+    inscPartialFeatureLockedHint: 'حزمة TAWJIH PLUS ضرورية للوصول إلى هذا المحتوى.',
     diagnosticAnswersSavedHint:
       'تم حفظ إجابات التشخيص. انتقل إلى TAWJIH PLUS لتوليد توصياتك المخصّصة.',
     diagnosticRecoGateEyebrow: 'تشخيص المدارس',

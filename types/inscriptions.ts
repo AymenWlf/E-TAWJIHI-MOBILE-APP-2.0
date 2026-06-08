@@ -111,6 +111,10 @@ export type AnnouncementBrief = {
   communityQnaMessageCount?: number;
   /** Payload limité (TAWJIH PLUS / TASSJIL requis). */
   previewOnly?: boolean;
+  /** Lien d'inscription masqué (accès partiel annonces). */
+  registrationLinkLocked?: boolean;
+  /** Countdown / dernier délai masqués (accès partiel annonces). */
+  deadlineLocked?: boolean;
 };
 
 export type CandidacyEventType =

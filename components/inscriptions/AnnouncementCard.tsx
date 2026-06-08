@@ -12,6 +12,8 @@ import {
   View,
 } from 'react-native';
 
+import { promptTawjihPlusPartialFeatureLock } from '@/utils/tawjihPlusParcoursGate';
+
 import { TassjilServiceIncludedNotice } from '@/components/inscriptions/TassjilServiceIncludedNotice';
 import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlusPaywall';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
@@ -138,6 +140,50 @@ function InfoLine({
   );
 }
 
+function InfoLineLocked({
+  icon,
+  iconColor,
+  label,
+  value,
+  isRTL,
+  onPress,
+}: {
+  icon: FaName;
+  iconColor: string;
+  label: string;
+  value: string;
+  isRTL: boolean;
+  onPress: () => void;
+}) {
+  if (!value.trim()) return null;
+  return (
+    <Pressable
+      onPress={(e) => {
+        e.stopPropagation?.();
+        onPress();
+      }}
+      style={styles.infoLine}>
+      <View style={styles.infoIconWrap}>
+        <FontAwesome name={icon} size={11} color={iconColor} />
+      </View>
+      <View style={styles.infoTextCol}>
+        <Text style={[styles.infoLabel, isRTL && styles.rtlText]} numberOfLines={1}>
+          {label}
+        </Text>
+        <View style={[styles.infoValueLockedRow, isRTL && styles.rowRtl]}>
+          <Text
+            style={[styles.infoValueLockedPlaceholder, isRTL && styles.rtlText]}
+            aria-hidden
+            importantForAccessibility="no-hide-descendants">
+            ————————
+          </Text>
+          <FontAwesome name="lock" size={10} color="#64748B" />
+        </View>
+      </View>
+    </Pressable>
+  );
+}
+
 function InfoLineHidden({
   icon,
   iconColor,
@@ -217,6 +263,8 @@ export function AnnouncementCard({
   const lockVariant: 'none' | AnnouncementLockedVariant =
     lockedVariantProp ?? (previewOnly ? 'featured' : 'none');
   const contentLocked = lockVariant !== 'none';
+  const registrationLocked = contentLocked || item.registrationLinkLocked === true;
+  const deadlineLocked = contentLocked || item.deadlineLocked === true;
   const sensitiveHidden = contentLocked;
   const showOgCoverImage = Boolean(item.ogImage) && !contentLocked;
   const showOgCoverLocked = Boolean(item.ogImage) && contentLocked;
@@ -294,7 +342,8 @@ export function AnnouncementCard({
   const hasRegistrationUrl = Boolean(item.registrationUrl?.trim());
   /** Tutoriel « lien d'inscription » : le tap doit rester actif même sans URL API. */
   const canPressRegistrationLink =
-    linkInteractionEnabled && (hasRegistrationUrl || tourGate === 'link');
+    linkInteractionEnabled &&
+    (registrationLocked || hasRegistrationUrl || tourGate === 'link');
 
   const hasMetaPanel =
     Boolean(villesShort) ||
@@ -378,6 +427,15 @@ export function AnnouncementCard({
     </TourFocusWrap>
   );
 
+  const promptPartialLock = useCallback(() => {
+    promptTawjihPlusPartialFeatureLock({
+      hasAccess: false,
+      loading: false,
+      openProduct: openTawjihPlusProduct,
+      t,
+    });
+  }, [openTawjihPlusProduct, t]);
+
   const registrationLinkBtn = (fullWidth: boolean, locked = false) => (
     <TourFocusWrap
       active={tourFocusActive('link')}
@@ -390,7 +448,8 @@ export function AnnouncementCard({
         onPress={(e) => {
           e.stopPropagation?.();
           if (locked) {
-            openTawjihPlusProduct();
+            if (contentLocked) openTawjihPlusProduct();
+            else promptPartialLock();
             return;
           }
           if (!linkInteractionEnabled) return;
@@ -636,19 +695,42 @@ export function AnnouncementCard({
               />
             ) : null}
             {item.dateEnd ? (
-              <InfoLine
-                icon="stop-circle"
-                iconColor={brand.textMuted}
-                label={t('inscDateCloses')}
-                value={formatShortDate(item.dateEnd, locale)}
-                isRTL={isRTL}
-              />
+              deadlineLocked && !contentLocked ? (
+                <InfoLineLocked
+                  icon="stop-circle"
+                  iconColor={brand.textMuted}
+                  label={t('inscDateCloses')}
+                  value={formatShortDate(item.dateEnd, locale)}
+                  isRTL={isRTL}
+                  onPress={promptPartialLock}
+                />
+              ) : (
+                <InfoLine
+                  icon="stop-circle"
+                  iconColor={brand.textMuted}
+                  label={t('inscDateCloses')}
+                  value={formatShortDate(item.dateEnd, locale)}
+                  isRTL={isRTL}
+                />
+              )
             ) : null}
           </View>
         ) : null}
 
         {/* Countdown (ouverture / clôture) */}
-        {deadline.label ? (
+        {deadlineLocked && !contentLocked ? (
+          <Pressable
+            onPress={(e) => {
+              e.stopPropagation?.();
+              promptPartialLock();
+            }}
+            style={[styles.countdown, styles.countdownLocked]}>
+            <FontAwesome name="lock" size={11} color="#64748B" />
+            <Text style={[styles.countdownTxt, styles.countdownLockedTxt, isRTL && styles.rtlText]}>
+              {t('inscPartialFeatureLockedHint')}
+            </Text>
+          </Pressable>
+        ) : deadline.label ? (
           <View
             style={[
               styles.countdown,
@@ -749,7 +831,7 @@ export function AnnouncementCard({
         <View style={styles.actionsCol}>
           <View style={styles.actionsRow}>
             {followBtn(false)}
-            {registrationLinkBtn(false)}
+            {registrationLinkBtn(false, registrationLocked && !contentLocked)}
           </View>
         </View>
           </>
@@ -1089,6 +1171,19 @@ const styles = StyleSheet.create({
     color: brand.text,
     lineHeight: 18,
   },
+  infoValueLockedRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  infoValueLockedPlaceholder: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: '#94A3B8',
+    textDecorationLine: 'line-through',
+    letterSpacing: 1,
+    lineHeight: 18,
+  },
   countdown: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1123,6 +1218,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     borderColor: '#E2E8F0',
   },
+  countdownLockedTxt: { color: '#64748B' },
   badgeLocked: {
     minWidth: 28,
     minHeight: 22,

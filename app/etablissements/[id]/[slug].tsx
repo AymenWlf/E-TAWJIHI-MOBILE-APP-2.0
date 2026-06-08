@@ -307,7 +307,10 @@ export default function EstablishmentDetailScreen() {
           accessToken: token,
         });
         if (cancelled) return;
-        applyServerInscriptionsAccess(result.inscriptionsFullAccess);
+        applyServerInscriptionsAccess(
+          result.inscriptionsFullAccess,
+          result.inscriptionsPartialAccess,
+        );
         setAnnouncements(result.items);
         recordContestListingImpressionsBatch(result.items);
       } catch {

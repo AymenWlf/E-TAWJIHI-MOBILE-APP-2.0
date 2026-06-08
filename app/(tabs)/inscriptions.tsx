@@ -101,6 +101,8 @@ import { isAnnouncementUnseen } from '@/utils/announcementSeenState';
 
 /** Nombre de cartes chargées par « page » lors du scroll (lazy loading client). */
 const LIST_PAGE_SIZE = 15;
+/** Accès partiel TAWJIH PLUS : candidatures / suivis visibles sans pack complet. */
+const PARTIAL_CANDIDACIES_VISIBLE_LIMIT = 2;
 /** Bandeau partenaire « milieu de liste » : une seule fois, après la 3e annonce. */
 const MID_BANNER_AFTER_CARD_INDEX = 3;
 
@@ -118,12 +120,15 @@ function InscriptionsTabScreenInner() {
   const router = useRouter();
   const {
     isInscriptionsLocked,
+    isInscriptionsPartialAccess,
     isInscriptionsAccessPending,
     openTawjihPlusProduct,
     applyServerInscriptionsAccess,
     resolveInscriptionsAccessWithoutServer,
   } = useTawjihPlusAccessContext();
   const showInscriptionsPaywall = !isInscriptionsAccessPending && isInscriptionsLocked;
+  const isCandidaciesPartialLimited =
+    !isInscriptionsAccessPending && isInscriptionsPartialAccess && !showInscriptionsPaywall;
   const announcementsFiltersLocked = showInscriptionsPaywall;
 
   const showAnnouncementsFiltersUpgradeAlert = useCallback(() => {
@@ -135,6 +140,13 @@ function InscriptionsTabScreenInner() {
 
   const showCandidaciesTabUpgradeAlert = useCallback(() => {
     Alert.alert(t('inscTawjihPlusLockTitle'), t('inscCandidaciesTabLockedHint'), [
+      { text: t('accountLogoutCancel'), style: 'cancel' },
+      { text: t('inscTawjihPlusUpgradeCta'), onPress: openTawjihPlusProduct },
+    ]);
+  }, [openTawjihPlusProduct, t]);
+
+  const showCandidaciesPartialLimitAlert = useCallback(() => {
+    Alert.alert(t('inscTawjihPlusLockTitle'), t('inscCandidaciesPartialLimitHint'), [
       { text: t('accountLogoutCancel'), style: 'cancel' },
       { text: t('inscTawjihPlusUpgradeCta'), onPress: openTawjihPlusProduct },
     ]);
@@ -378,11 +390,11 @@ function InscriptionsTabScreenInner() {
     setAnnouncementsLoadError(null);
     try {
       const token = isLoggedIn ? await getValidAccessToken() : null;
-      const { items, inscriptionsFullAccess } = await fetchContestAnnouncements({
+      const { items, inscriptionsFullAccess, inscriptionsPartialAccess } = await fetchContestAnnouncements({
         throwOnError: true,
         accessToken: token,
       });
-      applyServerInscriptionsAccess(inscriptionsFullAccess);
+      applyServerInscriptionsAccess(inscriptionsFullAccess, inscriptionsPartialAccess);
       setAnnouncements(items);
       recordContestListingImpressionsBatch(items.slice(0, LIST_PAGE_SIZE));
     } catch (e) {
@@ -907,12 +919,21 @@ function InscriptionsTabScreenInner() {
     return sortFollowsActionRequiredFirst(rows, latestSeenMap);
   }, [filteredFollows, candidaciesAttentionFilter, latestSeenMap]);
 
-  const paginatedCandidaciesDisplayFollows = useMemo(
-    () => candidaciesDisplayFollows.slice(0, candidaciesVisibleEnd),
-    [candidaciesDisplayFollows, candidaciesVisibleEnd],
-  );
+  const paginatedCandidaciesDisplayFollows = useMemo(() => {
+    const rows = candidaciesDisplayFollows.slice(0, candidaciesVisibleEnd);
+    if (isCandidaciesPartialLimited) {
+      return rows.slice(0, PARTIAL_CANDIDACIES_VISIBLE_LIMIT);
+    }
+    return rows;
+  }, [candidaciesDisplayFollows, candidaciesVisibleEnd, isCandidaciesPartialLimited]);
 
-  const hasMoreCandidacies = paginatedCandidaciesDisplayFollows.length < candidaciesDisplayFollows.length;
+  const candidaciesPartialOverflow =
+    isCandidaciesPartialLimited &&
+    candidaciesDisplayFollows.length > PARTIAL_CANDIDACIES_VISIBLE_LIMIT;
+
+  const hasMoreCandidacies =
+    !isCandidaciesPartialLimited &&
+    paginatedCandidaciesDisplayFollows.length < candidaciesDisplayFollows.length;
 
   useEffect(() => {
     setCandidaciesVisibleEnd(LIST_PAGE_SIZE);
@@ -946,6 +967,10 @@ function InscriptionsTabScreenInner() {
   ]);
 
   const loadMoreCandidacies = useCallback(() => {
+    if (isCandidaciesPartialLimited && candidaciesPartialOverflow) {
+      showCandidaciesPartialLimitAlert();
+      return;
+    }
     if (candidaciesListLoading || loadingMoreCandidacies || refreshing || !hasMoreCandidacies) {
       return;
     }
@@ -963,7 +988,28 @@ function InscriptionsTabScreenInner() {
     hasMoreCandidacies,
     candidaciesDisplayFollows.length,
     candidaciesVisibleEnd,
+    candidaciesPartialOverflow,
+    isCandidaciesPartialLimited,
+    showCandidaciesPartialLimitAlert,
   ]);
+
+  const guardNewFollowInPartialAccess = useCallback(
+    (establishmentId: number): boolean => {
+      if (!isCandidaciesPartialLimited) return true;
+      if (establishmentId > 0 && followedEstablishmentSet.has(establishmentId)) return true;
+      if (follows.length >= PARTIAL_CANDIDACIES_VISIBLE_LIMIT) {
+        showCandidaciesPartialLimitAlert();
+        return false;
+      }
+      return true;
+    },
+    [
+      followedEstablishmentSet,
+      follows.length,
+      isCandidaciesPartialLimited,
+      showCandidaciesPartialLimitAlert,
+    ],
+  );
 
   useEffect(() => {
     if (!isLoggedIn) {
@@ -1118,6 +1164,8 @@ function InscriptionsTabScreenInner() {
         Alert.alert(t('inscRequireLogin'));
         return;
       }
+      const eid = announcement.establishment?.id ?? 0;
+      if (!guardNewFollowInPartialAccess(eid)) return;
       setFollowBusyId(announcement.id);
       try {
         const token = await getValidAccessToken();
@@ -1143,7 +1191,7 @@ function InscriptionsTabScreenInner() {
         setFollowBusyId(null);
       }
     },
-    [getValidAccessToken, isLoggedIn, reloadFollows, t],
+    [getValidAccessToken, guardNewFollowInPartialAccess, isLoggedIn, reloadFollows, t],
   );
 
   /** Ne plus suivre l'école associée à l'annonce (bouton cœur). */
@@ -1198,11 +1246,20 @@ function InscriptionsTabScreenInner() {
         router.push('/login' as never);
         return;
       }
+      const eid = a.establishment?.id ?? 0;
+      if (!followsByEstId.has(eid) && !guardNewFollowInPartialAccess(eid)) return;
       if (!(a.availableStatuses?.length ?? 0)) return;
       setActiveAnnouncement(a);
       setAnnStatusSheetOpen(true);
     },
-    [isInscriptionsLocked, isLoggedIn, openTawjihPlusProduct, router],
+    [
+      followsByEstId,
+      guardNewFollowInPartialAccess,
+      isInscriptionsLocked,
+      isLoggedIn,
+      openTawjihPlusProduct,
+      router,
+    ],
   );
 
   /**
@@ -1225,6 +1282,7 @@ function InscriptionsTabScreenInner() {
       const token = await getValidAccessToken();
       if (!token) return;
       const existing = followsByEstId.get(eid) ?? null;
+      if (!existing && !guardNewFollowInPartialAccess(eid)) return;
 
       let changed = false;
       if (!existing) {
@@ -1253,6 +1311,7 @@ function InscriptionsTabScreenInner() {
       activeAnnouncement,
       followsByEstId,
       getValidAccessToken,
+      guardNewFollowInPartialAccess,
       isInscriptionsLocked,
       openTawjihPlusProduct,
       reloadFollows,
@@ -1422,6 +1481,31 @@ function InscriptionsTabScreenInner() {
         ListFooterComponent={
           loadingMoreCandidacies ? (
             <AnnouncementCardSkeletonStack count={1} isRTL={isRTL} style={styles.listFooter} />
+          ) : candidaciesPartialOverflow ? (
+            <Pressable
+              onPress={showCandidaciesPartialLimitAlert}
+              style={({ pressed }) => [
+                styles.partialLimitFooter,
+                isRTL && styles.rowRtl,
+                pressed && { opacity: 0.9 },
+              ]}
+              accessibilityRole="button"
+              accessibilityLabel={t('inscTawjihPlusUpgradeCta')}>
+              <FontAwesome name="lock" size={14} color={brand.primary} />
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.partialLimitFooterTitle, isRTL && styles.rtl]}>
+                  {t('inscTawjihPlusLockTitle')}
+                </Text>
+                <Text style={[styles.partialLimitFooterHint, isRTL && styles.rtl]} numberOfLines={3}>
+                  {t('inscCandidaciesPartialLimitHint')}
+                </Text>
+              </View>
+              <FontAwesome
+                name={isRTL ? 'chevron-left' : 'chevron-right'}
+                size={12}
+                color={brand.primary}
+              />
+            </Pressable>
           ) : null
         }
         ListHeaderComponent={
@@ -1542,7 +1626,9 @@ function InscriptionsTabScreenInner() {
 
             <Text style={[styles.followsCount, isRTL && styles.rtl]}>
               {t('followedSchoolsTitle')} (
-              {candidacyStatusFilter
+              {candidaciesPartialOverflow
+                ? `${PARTIAL_CANDIDACIES_VISIBLE_LIMIT} / ${candidaciesDisplayFollows.length}`
+                : candidacyStatusFilter
                 ? `${filteredFollows.length}${
                     follows.length !== filteredFollows.length ? ` / ${follows.length}` : ''
                   }`
@@ -2460,5 +2546,27 @@ const styles = StyleSheet.create({
     color: brand.primary,
     fontWeight: '800',
     fontSize: fontSize.sm,
+  },
+  partialLimitFooter: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: '#BFDBFE',
+    backgroundColor: '#EFF6FF',
+  },
+  partialLimitFooterTitle: {
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    color: '#0F172A',
+  },
+  partialLimitFooterHint: {
+    marginTop: 2,
+    fontSize: fontSize.xs,
+    color: '#475569',
+    lineHeight: 18,
   },
 });

@@ -1,6 +1,7 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
 import type {
+  AnnouncementBrief,
   CandidacyStatusType,
   CustomLink,
   EstablishmentBrief,
@@ -26,8 +27,8 @@ export type ContestAnnouncementCard = {
   dateEnd: string;
   isOpen: boolean;
   isExpire: boolean;
-  /** Jours restants avant clôture (négatif si déjà clos). */
-  daysUntilClose: number;
+  /** Jours restants avant clôture (négatif si déjà clos). `null` si masqué (accès partiel). */
+  daysUntilClose: number | null;
   registrationUrl: string;
   /** Libellé personnalisé du bouton CTA (vide ⇒ libellé par défaut selon le type). */
   registrationUrlLabel: string | null;
@@ -54,6 +55,8 @@ export type ContestAnnouncementCard = {
   communityQnaMessageCount?: number;
   /** Payload limité côté API (TAWJIH PLUS / TASSJIL requis pour le détail). */
   previewOnly?: boolean;
+  registrationLinkLocked?: boolean;
+  deadlineLocked?: boolean;
 };
 
 type RawCard = {
@@ -76,6 +79,8 @@ type RawCard = {
   availableStatuses?: RawAvailableStatus[];
   communityQnaMessageCount?: number;
   previewOnly?: boolean;
+  registrationLinkLocked?: boolean;
+  deadlineLocked?: boolean;
   etablissement?: {
     id?: number;
     nom?: string;
@@ -94,13 +99,25 @@ type RawCard = {
 type ListResponse = {
   success: boolean;
   data: RawCard[];
-  meta?: { inscriptionsFullAccess?: boolean };
+  meta?: { inscriptionsFullAccess?: boolean; inscriptionsPartialAccess?: boolean };
 };
 
-export type ContestAnnouncementsListResult = {
-  items: ContestAnnouncementCard[];
+export type InscriptionsAccessMeta = {
   inscriptionsFullAccess: boolean;
+  inscriptionsPartialAccess: boolean;
 };
+
+export type ContestAnnouncementsListResult = InscriptionsAccessMeta & {
+  items: ContestAnnouncementCard[];
+};
+
+function parseInscriptionsAccessMeta(meta: unknown): InscriptionsAccessMeta {
+  const o = meta && typeof meta === 'object' ? (meta as Record<string, unknown>) : {};
+  return {
+    inscriptionsFullAccess: o.inscriptionsFullAccess === true,
+    inscriptionsPartialAccess: o.inscriptionsPartialAccess === true,
+  };
+}
 
 /**
  * Forme brute d'un `CandidacyStatusType` côté API. On accepte les types
@@ -158,7 +175,10 @@ function computeDaysUntilClose(dateEnd: string): number {
 }
 
 function normalize(c: RawCard): ContestAnnouncementCard {
-  const days = c.daysUntilClose ?? computeDaysUntilClose(c.dateFin);
+  const deadlineLocked = c.deadlineLocked === true;
+  const days = deadlineLocked
+    ? null
+    : c.daysUntilClose ?? computeDaysUntilClose(c.dateFin);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const start = new Date(c.dateDebut);
@@ -214,6 +234,8 @@ function normalize(c: RawCard): ContestAnnouncementCard {
         ? Math.max(0, Math.floor(c.communityQnaMessageCount))
         : undefined,
     previewOnly: c.previewOnly === true,
+    registrationLinkLocked: c.registrationLinkLocked === true,
+    deadlineLocked,
   };
 }
 
@@ -237,15 +259,16 @@ export async function fetchContestAnnouncements(
     const headers = authHeaders(options?.accessToken);
     const res = await httpGetJson<ListResponse>(url, headers ? { headers } : undefined);
     if (!res.success || !Array.isArray(res.data)) {
-      return { items: [], inscriptionsFullAccess: false };
+      return { items: [], inscriptionsFullAccess: false, inscriptionsPartialAccess: false };
     }
+    const access = parseInscriptionsAccessMeta(res.meta);
     return {
       items: res.data.map(normalize),
-      inscriptionsFullAccess: res.meta?.inscriptionsFullAccess === true,
+      ...access,
     };
   } catch (e) {
     if (options?.throwOnError) throw e;
-    return { items: [], inscriptionsFullAccess: false };
+    return { items: [], inscriptionsFullAccess: false, inscriptionsPartialAccess: false };
   }
 }
 
@@ -254,6 +277,7 @@ let contestAnnouncementsListCache: {
   cacheKey: string;
   data: ContestAnnouncementCard[];
   inscriptionsFullAccess: boolean;
+  inscriptionsPartialAccess: boolean;
 } | null = null;
 const CONTEST_ANNOUNCEMENTS_LIST_CACHE_MS = 90_000;
 
@@ -276,6 +300,7 @@ export async function fetchContestAnnouncementsCached(
     return {
       items: contestAnnouncementsListCache.data,
       inscriptionsFullAccess: contestAnnouncementsListCache.inscriptionsFullAccess,
+      inscriptionsPartialAccess: contestAnnouncementsListCache.inscriptionsPartialAccess,
     };
   }
   const result = await fetchContestAnnouncements({ accessToken });
@@ -284,8 +309,54 @@ export async function fetchContestAnnouncementsCached(
     cacheKey,
     data: result.items,
     inscriptionsFullAccess: result.inscriptionsFullAccess,
+    inscriptionsPartialAccess: result.inscriptionsPartialAccess,
   };
   return result;
+}
+
+/** Aligne une annonce timeline / suivi école sur la forme « carte liste ». */
+export function announcementBriefToListCard(b: AnnouncementBrief): ContestAnnouncementCard {
+  const deadlineLocked = b.deadlineLocked === true;
+  const days = deadlineLocked
+    ? null
+    : b.daysUntilClose ?? computeDaysUntilClose(b.dateEnd);
+  return {
+    id: b.id,
+    title: b.title,
+    titleAr: b.titleAr ?? null,
+    announcementType: b.announcementType,
+    dateStart: b.dateStart,
+    dateEnd: b.dateEnd,
+    isOpen: b.isOpen,
+    isExpire: b.isExpire,
+    daysUntilClose: days,
+    registrationUrl: b.registrationUrl ?? '',
+    registrationUrlLabel: b.registrationUrlLabel ?? null,
+    ogImage: b.ogImage ?? null,
+    liensUtiles: b.liensUtiles ?? [],
+    filieresAcceptees: b.filieresAcceptees ?? [],
+    specialitesBacMissionAcceptees: b.specialitesBacMissionAcceptees ?? [],
+    anneesBacAcceptees: b.anneesBacAcceptees ?? [],
+    availableStatuses: b.availableStatuses ?? [],
+    establishment: b.establishment
+      ? {
+          id: b.establishment.id,
+          nom: b.establishment.nom,
+          nomArabe: b.establishment.nomArabe ?? null,
+          sigle: b.establishment.sigle ?? null,
+          slug: b.establishment.slug ?? null,
+          logo: b.establishment.logo ?? null,
+          ville: b.establishment.ville ?? null,
+          villes: b.establishment.villes ?? [],
+          type: b.establishment.type ?? null,
+          isServiceTassjil: b.establishment.isServiceTassjil === true,
+        }
+      : null,
+    communityQnaMessageCount: b.communityQnaMessageCount,
+    previewOnly: b.previewOnly === true,
+    registrationLinkLocked: b.registrationLinkLocked === true,
+    deadlineLocked,
+  };
 }
 
 /** Aligne une fiche détail sur la forme « carte liste » pour les mini-cards chat. */
@@ -324,6 +395,8 @@ export function contestDetailToListCard(d: ContestAnnouncementDetail): ContestAn
       : null,
     communityQnaMessageCount: undefined,
     previewOnly: d.previewOnly === true,
+    registrationLinkLocked: d.registrationLinkLocked === true,
+    deadlineLocked: d.deadlineLocked === true,
   };
 }
 
@@ -336,21 +409,22 @@ export async function fetchContestAnnouncementsByEstablishment(
   options?: { accessToken?: string | null },
 ): Promise<ContestAnnouncementsListResult> {
   if (!Number.isFinite(establishmentId) || establishmentId <= 0) {
-    return { items: [], inscriptionsFullAccess: false };
+    return { items: [], inscriptionsFullAccess: false, inscriptionsPartialAccess: false };
   }
   try {
     const url = buildApiUrl(`/api/contest-announcements/by-establishment/${establishmentId}`);
     const headers = authHeaders(options?.accessToken);
     const res = await httpGetJson<ListResponse>(url, headers ? { headers } : undefined);
     if (!res.success || !Array.isArray(res.data)) {
-      return { items: [], inscriptionsFullAccess: false };
+      return { items: [], inscriptionsFullAccess: false, inscriptionsPartialAccess: false };
     }
+    const access = parseInscriptionsAccessMeta(res.meta);
     return {
       items: res.data.map(normalize),
-      inscriptionsFullAccess: res.meta?.inscriptionsFullAccess === true,
+      ...access,
     };
   } catch {
-    return { items: [], inscriptionsFullAccess: false };
+    return { items: [], inscriptionsFullAccess: false, inscriptionsPartialAccess: false };
   }
 }
 
@@ -369,7 +443,7 @@ export type ContestAnnouncementDetail = {
   isOpen: boolean;
   isExpire: boolean;
   isNouveau: boolean;
-  daysUntilClose: number;
+  daysUntilClose: number | null;
   description: string;
   descriptionAr: string | null;
   registrationUrl: string;
@@ -407,6 +481,8 @@ export type ContestAnnouncementDetail = {
     isServiceTassjil?: boolean;
   };
   previewOnly?: boolean;
+  registrationLinkLocked?: boolean;
+  deadlineLocked?: boolean;
 };
 
 type RawDetail = {
@@ -459,6 +535,8 @@ type RawDetail = {
     is_service_tassjil?: boolean;
   } | null;
   previewOnly?: boolean;
+  registrationLinkLocked?: boolean;
+  deadlineLocked?: boolean;
 };
 
 function normalizeLinks(raw?: { titre?: string; url?: string }[]): CustomLink[] {
@@ -541,8 +619,10 @@ export function ensureContestDetailEstablishment(
 }
 
 function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
-  const days =
-    d.daysUntilClose ?? computeDaysUntilClose(d.dateFermeture);
+  const deadlineLocked = d.deadlineLocked === true;
+  const days = deadlineLocked
+    ? null
+    : d.daysUntilClose ?? computeDaysUntilClose(d.dateFermeture);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const start = new Date(d.dateOuverture);
@@ -590,12 +670,13 @@ function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
     availableStatuses: normalizeAvailableStatuses(d.availableStatuses),
     establishment: normalizeDetailEstablishment(etab),
     previewOnly: d.previewOnly === true,
+    registrationLinkLocked: d.registrationLinkLocked === true,
+    deadlineLocked,
   };
 }
 
-export type ContestAnnouncementDetailResult = {
+export type ContestAnnouncementDetailResult = InscriptionsAccessMeta & {
   detail: ContestAnnouncementDetail;
-  inscriptionsFullAccess: boolean;
 };
 
 export async function fetchContestAnnouncementDetail(
@@ -608,7 +689,7 @@ export async function fetchContestAnnouncementDetail(
     const res = await httpGetJson<{
       success: boolean;
       data: RawDetail;
-      meta?: { inscriptionsFullAccess?: boolean };
+      meta?: { inscriptionsFullAccess?: boolean; inscriptionsPartialAccess?: boolean };
     }>(url, headers ? { headers } : undefined);
     if (!res.success || !res.data) return null;
     const raw = res.data;
@@ -620,13 +701,10 @@ export async function fetchContestAnnouncementDetail(
       typeof raw.detail === 'object'
         ? (raw.detail as RawDetail)
         : raw;
-    const meta =
-      raw && typeof raw === 'object' && 'inscriptionsFullAccess' in raw
-        ? (raw as { inscriptionsFullAccess?: boolean }).inscriptionsFullAccess
-        : res.meta?.inscriptionsFullAccess;
+    const access = parseInscriptionsAccessMeta(res.meta);
     return {
       detail: ensureContestDetailEstablishment(normalizeDetail(payload)),
-      inscriptionsFullAccess: meta === true || res.meta?.inscriptionsFullAccess === true,
+      ...access,
     };
   } catch (e) {
     if (options?.throwOnError) throw e;

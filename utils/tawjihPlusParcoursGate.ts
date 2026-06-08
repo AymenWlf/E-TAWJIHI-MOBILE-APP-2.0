@@ -29,6 +29,13 @@ export function promptTawjihPlusParcoursLock(gate: TawjihPlusParcoursGate): void
   ]);
 }
 
+export function promptTawjihPlusPartialFeatureLock(gate: TawjihPlusParcoursGate): void {
+  Alert.alert(gate.t('inscTawjihPlusLockTitle'), gate.t('inscPartialFeatureLockedHint'), [
+    { text: gate.t('closeOverlayA11y'), style: 'cancel' },
+    { text: gate.t('inscTawjihPlusUpgradeCta'), onPress: gate.openProduct },
+  ]);
+}
+
 export function guardTawjihPlusParcoursStep(
   stepId: string,
   gate: TawjihPlusParcoursGate | undefined,

@@ -6,6 +6,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Linking,
   Platform,
   Pressable,
   StyleSheet,
@@ -29,6 +30,7 @@ import {
 } from '@/constants/establishmentMedia';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { announcementBriefToListCard } from '@/services/contestAnnouncements';
 import {
   deleteEstablishmentFollow,
   fetchEstablishmentFollowTimeline,
@@ -85,7 +87,10 @@ export default function FollowedSchoolDetailScreen() {
         const anns = result.timeline.announcements ?? [];
         const inferredFromPayload =
           anns.length > 0 && anns.every((a) => !a.previewOnly);
-        applyServerInscriptionsAccess(result.inscriptionsFullAccess || inferredFromPayload);
+        applyServerInscriptionsAccess(
+          result.inscriptionsFullAccess || inferredFromPayload,
+          result.inscriptionsPartialAccess,
+        );
         setData(result.timeline);
       }
     } catch {
@@ -468,41 +473,36 @@ export default function FollowedSchoolDetailScreen() {
         }
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item, index }) => {
+          const card = announcementBriefToListCard(item);
           const lockedVariant = resolveAnnouncementLockedVariant(
-            showInscriptionsPaywall || Boolean(item.previewOnly),
+            Boolean(card.previewOnly) || showInscriptionsPaywall,
             index,
           );
           const cardLocked = lockedVariant !== 'none';
           return (
           <View style={{ paddingHorizontal: spacing.lg }}>
             <AnnouncementCard
-              item={{
-                id: item.id,
-                title: item.title,
-                titleAr: item.titleAr ?? null,
-                announcementType: item.announcementType,
-                dateStart: item.dateStart,
-                dateEnd: item.dateEnd,
-                isOpen: item.isOpen,
-                isExpire: item.isExpire,
-                daysUntilClose: item.daysUntilClose ?? 0,
-                registrationUrl: item.registrationUrl,
-                registrationUrlLabel: item.registrationUrlLabel ?? null,
-                ogImage: item.ogImage ?? null,
-                liensUtiles: item.liensUtiles ?? [],
-                filieresAcceptees: item.filieresAcceptees ?? [],
-                specialitesBacMissionAcceptees: item.specialitesBacMissionAcceptees ?? [],
-                anneesBacAcceptees: item.anneesBacAcceptees ?? [],
-                availableStatuses: item.availableStatuses ?? [],
-                establishment: item.establishment ?? null,
-              }}
+              item={card}
+              lockedVariant={lockedVariant}
               isFollowed
+              busy={statusBusy}
+              currentStatus={follow.status}
               onToggleFollow={() => undefined}
               onOpenLink={() => {
-                if (showInscriptionsPaywall) openTawjihPlusProduct();
+                if (cardLocked) {
+                  openTawjihPlusProduct();
+                  return;
+                }
+                if (card.registrationUrl) {
+                  void Linking.openURL(card.registrationUrl).catch(() => undefined);
+                }
               }}
               onUpdateStatus={() => {
-                if (showInscriptionsPaywall) openTawjihPlusProduct();
+                if (cardLocked) {
+                  openTawjihPlusProduct();
+                  return;
+                }
+                setStatusSheetOpen(true);
               }}
               onPress={() => {
                 if (cardLocked) {
@@ -512,7 +512,6 @@ export default function FollowedSchoolDetailScreen() {
                 void updateLatestSeenOnDisk(followId, item.id);
                 router.push(`/inscriptions/${item.id}` as never);
               }}
-              lockedVariant={lockedVariant}
             />
           </View>
           );

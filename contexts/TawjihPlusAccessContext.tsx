@@ -19,7 +19,7 @@ type TawjihPlusAccessContextValue = {
   loading: boolean;
   refresh: () => Promise<void>;
   /** Droit inscriptions renvoyé par l’API annonces (prioritaire sur le client seul). */
-  applyServerInscriptionsAccess: (fullAccess: boolean) => void;
+  applyServerInscriptionsAccess: (fullAccess: boolean, partialAccess?: boolean) => void;
   /** Si le fetch annonces échoue : débloquer l’UI en retombant sur les services client. */
   resolveInscriptionsAccessWithoutServer: () => void;
   /**
@@ -29,6 +29,8 @@ type TawjihPlusAccessContextValue = {
   isInscriptionsAccessPending: boolean;
   /** Contenu inscriptions verrouillé (uniquement après résolution de l’accès). */
   isInscriptionsLocked: boolean;
+  /** Annonces visibles ; lien inscription + délai verrouillés (accès partiel global). */
+  isInscriptionsPartialAccess: boolean;
   openTawjihPlusProduct: () => void;
 };
 
@@ -39,11 +41,13 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
   const { user } = useAuth();
   const { hasAccess, loading, refresh } = useTawjihPlusAccess();
   const [serverFullAccess, setServerFullAccess] = useState<boolean | null>(null);
+  const [serverPartialAccess, setServerPartialAccess] = useState<boolean | null>(null);
   /** Meta `inscriptionsFullAccess` reçue (ou repli client après échec fetch annonces). */
   const [serverMetaReady, setServerMetaReady] = useState(false);
 
-  const applyServerInscriptionsAccess = useCallback((fullAccess: boolean) => {
+  const applyServerInscriptionsAccess = useCallback((fullAccess: boolean, partialAccess = false) => {
     setServerFullAccess(fullAccess);
+    setServerPartialAccess(partialAccess);
     setServerMetaReady(true);
   }, []);
 
@@ -53,6 +57,7 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
 
   useEffect(() => {
     setServerFullAccess(null);
+    setServerPartialAccess(null);
     setServerMetaReady(false);
   }, [user?.id]);
 
@@ -62,11 +67,19 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
 
   const isInscriptionsAccessPending = loading || !serverMetaReady;
 
+  const isInscriptionsPartialAccess = useMemo(() => {
+    if (isInscriptionsAccessPending) return false;
+    if (serverPartialAccess !== null) return serverPartialAccess;
+    return false;
+  }, [isInscriptionsAccessPending, serverPartialAccess]);
+
   const isInscriptionsLocked = useMemo(() => {
     if (isInscriptionsAccessPending) return false;
-    if (serverFullAccess !== null) return !serverFullAccess;
+    if (serverFullAccess !== null || serverPartialAccess !== null) {
+      return !serverFullAccess && !serverPartialAccess;
+    }
     return !hasAccess;
-  }, [hasAccess, isInscriptionsAccessPending, serverFullAccess]);
+  }, [hasAccess, isInscriptionsAccessPending, serverFullAccess, serverPartialAccess]);
 
   const value = useMemo(
     () => ({
@@ -77,6 +90,7 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
       resolveInscriptionsAccessWithoutServer,
       isInscriptionsAccessPending,
       isInscriptionsLocked,
+      isInscriptionsPartialAccess,
       openTawjihPlusProduct,
     }),
     [
@@ -85,6 +99,7 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
       hasAccess,
       isInscriptionsAccessPending,
       isInscriptionsLocked,
+      isInscriptionsPartialAccess,
       loading,
       openTawjihPlusProduct,
       refresh,
