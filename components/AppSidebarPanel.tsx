@@ -32,7 +32,10 @@ import { useShopCart } from '@/contexts/ShopCartContext';
 import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
 import { navigateToSchoolDiagnosticWizard } from '@/utils/navigateToSchoolDiagnosticEntry';
 import { hasLegacyTassjilAccess } from '@/utils/tassjilPracticalLinkLock';
-import type { TawjihPlusParcoursGate } from '@/utils/tawjihPlusParcoursGate';
+import {
+  guardDailyChallengeAccess,
+  type TawjihPlusParcoursGate,
+} from '@/utils/tawjihPlusParcoursGate';
 import { CAIRO } from '@/theme/arabicTypography';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -333,6 +336,15 @@ export function AppSidebarPanel() {
     }
     if (link.id === 'diagnostic') {
       void navigateToSchoolDiagnosticWizard(diagnosticNavAuth, (href) => router.push(href as Href), tawjihPlusGate);
+      return;
+    }
+    if (link.id === 'daily') {
+      guardDailyChallengeAccess(
+        tawjihPlusGate,
+        Boolean(user),
+        () => router.push('/daily-challenge' as Href),
+        () => router.push('/login' as Href),
+      );
       return;
     }
     if (link.href) router.push(link.href as Href);

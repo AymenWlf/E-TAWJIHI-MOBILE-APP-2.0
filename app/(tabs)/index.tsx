@@ -72,6 +72,7 @@ import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
 import {
   guardTawjihPlusParcoursStep,
   type TawjihPlusParcoursGate,
+  guardDailyChallengeAccess,
 } from '@/utils/tawjihPlusParcoursGate';
 import { httpGetJson } from '@/services/http';
 import { buildHomePlanParcoursData } from '@/utils/orientationParcoursTasks';
@@ -931,7 +932,14 @@ export default function IndexScreen() {
         <HomeStackedPackCards
           cards={stackCards}
           width={stackCardW}
-          onPressDailyGame={() => router.push('/daily-challenge')}
+          onPressDailyGame={() =>
+            guardDailyChallengeAccess(
+              tawjihPlusGate,
+              Boolean(user),
+              () => router.push('/daily-challenge'),
+              () => router.push('/login'),
+            )
+          }
           onPressTassjilTrack={() => router.push('/tassjil-school-choices')}
           onPressOrientation1Bac={onPressOrientation1Bac}
           onPressPracticalLink={onPressPracticalItem}

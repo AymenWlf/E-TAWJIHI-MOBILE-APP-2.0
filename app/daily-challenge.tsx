@@ -45,6 +45,7 @@ import {
 import { getZipGridPrefixIssue, getZipSnakeNextHintCellIndex, scoreZipGridPath } from '@/constants/zipPuzzleVariants';
 import { isDevApiBaseUrl } from '@/constants/api';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
+import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
 import { useShopFlowSystemBars } from '@/hooks/useShopFlowSystemBars';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -358,6 +359,7 @@ function leaderboardDataToVm(d: DailyChallengeLeaderboardData): LeaderboardVm {
 export default function DailyChallengeScreen() {
   const { t, isRTL, locale } = useLocale();
   const { getValidAccessToken, user } = useAuth();
+  const { hasAccess: tawjihPlusAccess, loading: tawjihPlusAccessLoading } = useTawjihPlusAccess();
   const { width, height } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const headerPadTop = insets.top + spacing.sm;
@@ -417,7 +419,10 @@ export default function DailyChallengeScreen() {
 
   const playedAnyGameToday = useMemo(() => games.some((g) => g.played), [games]);
 
-  const playLocked = Boolean(user && today?.requiresTawjihPlusForPlay);
+  const playLocked =
+    tawjihPlusAccessLoading ||
+    !tawjihPlusAccess ||
+    Boolean(user && today?.requiresTawjihPlusForPlay);
 
   const openTawjihPlus = useCallback(() => {
     router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
@@ -593,6 +598,13 @@ export default function DailyChallengeScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    if (playLocked && step === 'quiz') {
+      setStep('hub');
+      setActiveGame(null);
+    }
+  }, [playLocked, step]);
 
   useEffect(() => {
     if (step !== 'hub' || !user) return;

@@ -59,3 +59,22 @@ export function guardTawjihPlusPracticalLink(
   }
   run();
 }
+
+/** Défi du jour : client TAWJIH PLUS / TASSJIL requis. */
+export function guardDailyChallengeAccess(
+  gate: TawjihPlusParcoursGate,
+  isLoggedIn: boolean,
+  run: () => void,
+  onNeedLogin: () => void,
+): void {
+  if (!isLoggedIn) {
+    onNeedLogin();
+    return;
+  }
+  if (gate.loading) return;
+  if (!gate.hasAccess) {
+    promptTawjihPlusParcoursLock(gate);
+    return;
+  }
+  run();
+}

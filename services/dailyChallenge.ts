@@ -55,7 +55,7 @@ export type DailyChallengeTodayData = {
   allGamesPlayed?: boolean;
   /** Client TAWJIH PLUS / TASSJIL actif. */
   tawjihPlusAccess?: boolean;
-  /** Non-client ayant déjà joué aujourd’hui : prochaine partie = paywall. */
+  /** Utilisateur connecté sans TAWJIH PLUS / TASSJIL actif : jeu verrouillé. */
   requiresTawjihPlusForPlay?: boolean;
   games?: DailyChallengeGameEntry[];
   streak?: {

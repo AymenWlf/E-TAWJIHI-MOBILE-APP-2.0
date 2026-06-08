@@ -1753,9 +1753,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     dailyChallengeSeeScore: 'Classement (ce jeu)',
     dailyChallengeBackToGames: 'Retour aux jeux',
     dailyChallengeAllDone: 'Bravo, tu as fini tous les jeux du jour !',
-    dailyChallengeTawjihPlusTitle: 'Partie gratuite utilisée',
+    dailyChallengeTawjihPlusTitle: 'Défi du jour réservé',
     dailyChallengeTawjihPlusHint:
-      'En tant qu’invité, vous pouvez jouer une fois par jour. Passez à TAWJIH PLUS pour jouer chaque jour sans limite et débloquer tout le contenu.',
+      'Le jeu quotidien est accessible aux clients TAWJIH PLUS ou TASSJIL. Passez à TAWJIH PLUS pour jouer chaque jour et suivre votre progression.',
     dailyChallengeZipHint:
       'Glisser pour tracer ; touche une case déjà sur le tracé pour raccourcir (pas en plein glissé).',
     dailyChallengeZipValidate: 'Valider l’ordre',
@@ -3602,9 +3602,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     dailyChallengeSeeScore: 'التصنيف (هذه اللعبة)',
     dailyChallengeBackToGames: 'العودة إلى الألعاب',
     dailyChallengeAllDone: 'أحسنت، أنهيت كل ألعاب اليوم!',
-    dailyChallengeTawjihPlusTitle: 'تم استخدام المحاولة المجانية',
+    dailyChallengeTawjihPlusTitle: 'تحدي اليوم محجوز',
     dailyChallengeTawjihPlusHint:
-      'كضيف يمكنك اللعب مرة واحدة في اليوم. انتقل إلى TAWJIH PLUS للعب كل يوم دون حدود وفتح كل المحتوى.',
+      'لعبة اليوم متاحة لعملاء TAWJIH PLUS أو TASSJIL. انتقل إلى TAWJIH PLUS للعب كل يوم ومتابعة تقدّمك.',
     dailyChallengeZipHint:
       'اسحب لرسم المسار؛ المس خلية على المسار لتقصيره (ليس أثناء السحب).',
     dailyChallengeZipValidate: 'تأكيد الترتيب',
