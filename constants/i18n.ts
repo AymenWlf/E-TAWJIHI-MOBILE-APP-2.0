@@ -1378,6 +1378,7 @@ export type HomeCopyKey =
   | 'tassjilSchoolsEmptyTitle'
   | 'tassjilSchoolsEmptyBody'
   | 'tassjilFilterTitle'
+  | 'tassjilFilterEligible'
   | 'tassjilFilterAll'
   | 'tassjilFilterReset'
   | 'tassjilFilterResults'
@@ -3194,14 +3195,15 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       'Nous n’avons pas trouvé de dossier TASSJIL actif pour votre numéro. Contactez le support si vous êtes déjà inscrit.',
     tassjilSchoolsTitle: 'Mes écoles TASSJIL',
     tassjilSchoolsHeroEyebrow: 'Service TASSJIL',
-    tassjilSchoolsCount: '{count} école(s) suivie(s)',
+    tassjilSchoolsCount: '{count} école(s) TASSJIL',
     tassjilSupportWhatsapp: 'Support WhatsApp',
     tassjilStatInscription: "Statut d'inscription",
     tassjilStatSuivi: 'Statut de suivi',
     tassjilAcceptanceTitle: "Détails d'acceptation",
     tassjilLearnMore: 'Voir la fiche école',
     tassjilRegistrationWindow: 'Inscriptions : {start} → {end}',
-    tassjilSchoolsSubtitle: 'Suivi de vos inscriptions synchronisé avec l’équipe E-Tawjihi',
+    tassjilSchoolsSubtitle:
+      'Toutes les écoles TASSJIL du système, y compris celles dont les inscriptions ne sont pas encore ouvertes',
     tassjilSchoolsLoading: 'Chargement de vos écoles…',
     tassjilSchoolsErrGeneric: 'Impossible de charger vos écoles. Réessayez.',
     tassjilSchoolsSupportMessage:
@@ -3210,6 +3212,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     tassjilSchoolsEmptyBody:
       'Vos écoles d’inscription apparaîtront ici dès qu’elles seront configurées dans votre dossier TASSJIL.',
     tassjilFilterTitle: 'Filtres rapides',
+    tassjilFilterEligible: 'Éligibles',
     tassjilFilterAll: 'Tous',
     tassjilFilterReset: 'Réinitialiser',
     tassjilFilterResults: '{shown} / {total} affiché(s)',
@@ -5023,6 +5026,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     tassjilSchoolsEmptyTitle: 'لا توجد مدارس مختارة',
     tassjilSchoolsEmptyBody: 'ستظهر مدارس التسجيل هنا عند إعدادها في ملف TASSJIL.',
     tassjilFilterTitle: 'فلاتر سريعة',
+    tassjilFilterEligible: 'مؤهلون',
     tassjilFilterAll: 'الكل',
     tassjilFilterReset: 'إعادة التعيين',
     tassjilFilterResults: '{shown} / {total} معروض',

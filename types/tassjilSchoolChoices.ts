@@ -32,6 +32,9 @@ export type TassjilSchool = {
   dateFinInscription?: string | null;
   schoolId?: number | string;
   etablissementId?: number | string;
+  /** Critères éligibilité (enrichis apinew) — filtrage client si besoin. */
+  filieresAcceptees?: string[] | null;
+  specialitesBacMissionAcceptees?: string[] | null;
 };
 
 export type TassjilPanierEcolesResponse = {

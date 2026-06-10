@@ -11,11 +11,17 @@ import {
   TASSJIL_STATUT_NONE,
 } from '@/constants/tassjilInscriptionStatus';
 import { useLocale } from '@/contexts/LocaleContext';
+import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { TassjilSchool } from '@/types/tassjilSchoolChoices';
+import type { EligibilityProfile } from '@/utils/eligibility';
+import { isTassjilSchoolEligible } from '@/utils/tassjilDisplaySchools';
 
 type Props = {
   schools: TassjilSchool[];
+  eligibleOnly: boolean;
+  onEligibleOnlyChange: (value: boolean) => void;
+  eligibilityProfile: EligibilityProfile | null | undefined;
   inscriptionFilter: string;
   suiviFilter: string;
   onInscriptionFilterChange: (value: string) => void;
@@ -127,6 +133,9 @@ function FilterRow({
 
 export function TassjilSchoolQuickFilters({
   schools,
+  eligibleOnly,
+  onEligibleOnlyChange,
+  eligibilityProfile,
   inscriptionFilter,
   suiviFilter,
   onInscriptionFilterChange,
@@ -135,6 +144,11 @@ export function TassjilSchoolQuickFilters({
 }: Props) {
   const { t, isRTL, locale } = useLocale();
   const isArabic = locale === 'ar';
+
+  const eligibleCount = useMemo(
+    () => schools.filter((school) => isTassjilSchoolEligible(school, eligibilityProfile)).length,
+    [schools, eligibilityProfile],
+  );
 
   const inscriptionOptions = useMemo(
     () => buildTassjilStatutFilterOptions(schools, 'statut_inscription'),
@@ -145,13 +159,17 @@ export function TassjilSchoolQuickFilters({
     [schools],
   );
 
-  const hasActiveFilter = Boolean(inscriptionFilter || suiviFilter);
+  const hasActiveFilter = !eligibleOnly || Boolean(inscriptionFilter || suiviFilter);
   const showPanel =
-    inscriptionOptions.length > 1 || suiviOptions.length > 1 || hasActiveFilter;
+    schools.length > 0 ||
+    inscriptionOptions.length > 1 ||
+    suiviOptions.length > 1 ||
+    hasActiveFilter;
 
   if (!showPanel) return null;
 
-  const clearAll = () => {
+  const resetDefaults = () => {
+    onEligibleOnlyChange(true);
     onInscriptionFilterChange('');
     onSuiviFilterChange('');
   };
@@ -175,7 +193,7 @@ export function TassjilSchoolQuickFilters({
             <Pressable
               accessibilityRole="button"
               accessibilityLabel={t('tassjilFilterReset')}
-              onPress={clearAll}
+              onPress={resetDefaults}
               style={({ pressed }) => [styles.resetBtn, isRTL && styles.rowRtl, pressed && { opacity: 0.88 }]}
             >
               <FontAwesome name="times-circle" size={12} color={brand.textMuted} />
@@ -185,6 +203,77 @@ export function TassjilSchoolQuickFilters({
             </Pressable>
           ) : null}
         </View>
+      </View>
+
+      <View style={styles.rowBlock}>
+        <Text style={[styles.rowLabel, isRTL && styles.rtlText]}>{t('tassjilFilterEligible')}</Text>
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={[styles.chipsRow, isRTL && styles.chipsRowRtl]}
+        >
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: !eligibleOnly }}
+            onPress={() => onEligibleOnlyChange(false)}
+            style={({ pressed }) => [
+              styles.chip,
+              {
+                backgroundColor: !eligibleOnly ? brand.white : brand.backgroundSoft,
+                borderColor: !eligibleOnly ? brand.border : brand.textMuted,
+              },
+              pressed && { opacity: 0.88 },
+            ]}
+          >
+            <Text
+              style={[
+                styles.chipTxt,
+                { color: !eligibleOnly ? brand.text : brand.textMuted },
+                isRTL && styles.rtlText,
+              ]}
+            >
+              {t('tassjilFilterAll')}
+            </Text>
+          </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityState={{ selected: eligibleOnly }}
+            onPress={() => onEligibleOnlyChange(true)}
+            style={({ pressed }) => [
+              styles.chip,
+              {
+                backgroundColor: eligibleOnly ? homeShell.greenSurface : brand.white,
+                borderColor: eligibleOnly ? homeShell.greenDark : brand.border,
+              },
+              pressed && { opacity: 0.88 },
+            ]}
+          >
+            <Text
+              style={[
+                styles.chipTxt,
+                { color: eligibleOnly ? homeShell.greenDark : brand.textMuted },
+                isRTL && styles.rtlText,
+              ]}
+            >
+              {t('tassjilFilterEligible')}
+            </Text>
+            <View
+              style={[
+                styles.chipBadge,
+                { backgroundColor: eligibleOnly ? 'rgba(255,255,255,0.55)' : brand.backgroundSoft },
+              ]}
+            >
+              <Text
+                style={[
+                  styles.chipBadgeTxt,
+                  { color: eligibleOnly ? homeShell.greenDark : brand.textMuted },
+                ]}
+              >
+                {eligibleCount}
+              </Text>
+            </View>
+          </Pressable>
+        </ScrollView>
       </View>
 
       <FilterRow

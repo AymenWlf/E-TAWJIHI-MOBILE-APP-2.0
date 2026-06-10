@@ -26,11 +26,16 @@ import {
 } from '@/constants/tassjilInscriptionStatus';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import { fetchTassjilPanierEcoles } from '@/services/tassjilInscriptions';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { TassjilSchool } from '@/types/tassjilSchoolChoices';
 import { getUserFacingApiError } from '@/utils/apiError';
+import {
+  filterTassjilSchoolsByEligibility,
+  mergeAllTassjilSchools,
+} from '@/utils/tassjilDisplaySchools';
 
 const H_PAD = spacing.lg;
 
@@ -121,6 +126,7 @@ export default function TassjilSchoolChoicesScreen() {
   const router = useRouter();
   const { getValidAccessToken } = useAuth();
   const { t, isRTL } = useLocale();
+  const { profile: eligibilityProfile } = useEligibilityProfile();
 
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -129,6 +135,7 @@ export default function TassjilSchoolChoicesScreen() {
   const [noTassjilDossier, setNoTassjilDossier] = useState(false);
   const [inscriptionFilter, setInscriptionFilter] = useState('');
   const [suiviFilter, setSuiviFilter] = useState('');
+  const [eligibleOnlyFilter, setEligibleOnlyFilter] = useState(true);
 
   const onBack = useCallback(() => {
     if (router.canGoBack()) {
@@ -157,7 +164,9 @@ export default function TassjilSchoolChoicesScreen() {
         }
         throw new Error(res.message ?? t('tassjilSchoolsErrGeneric'));
       }
-      const list = sortSchoolsByDateFin(res.data?.selectedSchools ?? []);
+      const list = sortSchoolsByDateFin(
+        mergeAllTassjilSchools(res.data?.selectedSchools ?? [], res.data?.availableSchools),
+      );
       setSchools(list);
     } catch (e) {
       setError(getUserFacingApiError(e, t, { context: 'generic' }) ?? t('tassjilSchoolsErrGeneric'));
@@ -184,10 +193,14 @@ export default function TassjilSchoolChoicesScreen() {
     [schools.length, t],
   );
 
-  const filteredSchools = useMemo(
-    () => filterTassjilSchoolsByStatuts(schools, inscriptionFilter, suiviFilter),
-    [schools, inscriptionFilter, suiviFilter],
-  );
+  const filteredSchools = useMemo(() => {
+    const byEligibility = filterTassjilSchoolsByEligibility(
+      schools,
+      eligibleOnlyFilter,
+      eligibilityProfile,
+    );
+    return filterTassjilSchoolsByStatuts(byEligibility, inscriptionFilter, suiviFilter);
+  }, [schools, eligibleOnlyFilter, eligibilityProfile, inscriptionFilter, suiviFilter]);
 
   const renderBody = () => {
     if (loading && !refreshing) {
@@ -254,6 +267,9 @@ export default function TassjilSchoolChoicesScreen() {
 
             <TassjilSchoolQuickFilters
               schools={schools}
+              eligibleOnly={eligibleOnlyFilter}
+              onEligibleOnlyChange={setEligibleOnlyFilter}
+              eligibilityProfile={eligibilityProfile}
               inscriptionFilter={inscriptionFilter}
               suiviFilter={suiviFilter}
               onInscriptionFilterChange={setInscriptionFilter}
@@ -268,6 +284,7 @@ export default function TassjilSchoolChoicesScreen() {
                 body={t('tassjilFilterEmptyBody')}
                 actionLabel={t('tassjilFilterReset')}
                 onAction={() => {
+                  setEligibleOnlyFilter(true);
                   setInscriptionFilter('');
                   setSuiviFilter('');
                 }}

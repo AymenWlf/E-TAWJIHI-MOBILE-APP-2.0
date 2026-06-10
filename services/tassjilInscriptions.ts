@@ -104,6 +104,12 @@ function normalizeTassjilSchool(raw: Record<string, unknown>): TassjilSchool {
     dateFinInscription: typeof raw.dateFinInscription === 'string' ? raw.dateFinInscription : null,
     schoolId: typeof eid === 'number' || typeof eid === 'string' ? eid : undefined,
     etablissementId: typeof eid === 'number' || typeof eid === 'string' ? eid : undefined,
+    filieresAcceptees: Array.isArray(raw.filieresAcceptees)
+      ? raw.filieresAcceptees.filter((v): v is string => typeof v === 'string')
+      : null,
+    specialitesBacMissionAcceptees: Array.isArray(raw.specialitesBacMissionAcceptees)
+      ? raw.specialitesBacMissionAcceptees.filter((v): v is string => typeof v === 'string')
+      : null,
   };
 }
 
@@ -122,11 +128,18 @@ export async function fetchTassjilPanierEcoles(accessToken: string): Promise<Tas
       )
     : [];
 
+  const available = Array.isArray(res.data.availableSchools)
+    ? res.data.availableSchools.map((row) =>
+        normalizeTassjilSchool((row ?? {}) as Record<string, unknown>),
+      )
+    : [];
+
   return {
     ...res,
     data: {
       ...res.data,
       selectedSchools: selected,
+      availableSchools: available,
     },
   };
 }
