@@ -1,14 +1,14 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, ScrollView, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, View } from 'react-native';
 
 import { AuthHeroSheetLayout, authSheetStyles } from '@/components/auth/AuthHeroSheetLayout';
 import { Text } from '@/components/ui/Text';
 import {
   ETAWJIHI_TRANSFER_SUPPORT_PHONE,
   buildDeviceTransferSecurityWhatsAppMessage,
-  buildSupportWhatsAppUrl,
+  supportPhoneWaDigits,
   formatSupportPhoneDisplay,
 } from '@/constants/etawjihiSupport';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -17,6 +17,7 @@ import type { DeviceTransferSession } from '@/services/deviceTransfer';
 import { brand, spacing } from '@/theme/tokens';
 import { formatMoroccoPhoneDisplay } from '@/constants/etawjihiWhatsApp';
 import { getUserFacingApiError } from '@/utils/apiError';
+import { openWhatsAppChat } from '@/utils/openWhatsApp';
 
 const s = authSheetStyles;
 const WA_GREEN = '#25D366';
@@ -201,7 +202,12 @@ export default function DeviceTransferScreen() {
 
       <Pressable
         accessibilityRole="button"
-        onPress={() => void Linking.openURL(buildSupportWhatsAppUrl(supportMessage, supportPhone))}
+        onPress={() =>
+          void openWhatsAppChat({
+            message: supportMessage,
+            phoneWaDigits: supportPhoneWaDigits(supportPhone),
+          })
+        }
         style={({ pressed }) => [
           s.cta,
           { backgroundColor: WA_GREEN, marginTop: spacing.sm },

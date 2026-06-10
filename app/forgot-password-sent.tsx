@@ -1,18 +1,18 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useMemo } from 'react';
-import { Alert, Clipboard, Linking, Pressable, View } from 'react-native';
+import { Alert, Clipboard, Pressable, View } from 'react-native';
 
 import { AuthHeroSheetLayout, authSheetStyles } from '@/components/auth/AuthHeroSheetLayout';
 import { Text } from '@/components/ui/Text';
 import {
-  buildEtawjihiWhatsAppNativeUrl,
-  buildEtawjihiWhatsAppUrl,
+  ETAWJIHI_OFFICIAL_WHATSAPP_WA_DIGITS,
   formatEtawjihiOfficialWhatsAppDisplay,
   formatMoroccoPhoneDisplay,
 } from '@/constants/etawjihiWhatsApp';
 import { useLocale } from '@/contexts/LocaleContext';
 import { brand, spacing } from '@/theme/tokens';
+import { openWhatsAppChat } from '@/utils/openWhatsApp';
 
 const s = authSheetStyles;
 const WA_GREEN = '#25D366';
@@ -31,7 +31,6 @@ export default function ForgotPasswordSentScreen() {
     [t, phoneDisplay],
   );
 
-  const whatsappHref = useMemo(() => buildEtawjihiWhatsAppUrl(whatsappMessage), [whatsappMessage]);
   const officialWhatsappDisplay = useMemo(() => formatEtawjihiOfficialWhatsAppDisplay(), []);
 
   const copyMessage = () => {
@@ -40,11 +39,10 @@ export default function ForgotPasswordSentScreen() {
   };
 
   const openWhatsApp = () => {
-    const native = buildEtawjihiWhatsAppNativeUrl(whatsappMessage);
-    void Linking.canOpenURL(native).then((ok) => {
-      void Linking.openURL(ok ? native : whatsappHref).catch(() => {
-        void Linking.openURL(whatsappHref);
-      });
+    void openWhatsAppChat({
+      message: whatsappMessage,
+      phoneWaDigits: ETAWJIHI_OFFICIAL_WHATSAPP_WA_DIGITS,
+      failureMessage: t('forgotWhatsappNotSent'),
     });
   };
 

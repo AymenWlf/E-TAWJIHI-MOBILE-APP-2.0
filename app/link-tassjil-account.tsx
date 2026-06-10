@@ -1,16 +1,17 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 
 import { AuthHeroSheetLayout, authSheetStyles } from '@/components/auth/AuthHeroSheetLayout';
 import { Text } from '@/components/ui/Text';
-import { buildSupportWhatsAppUrl, ETAWJIHI_TRANSFER_SUPPORT_PHONE } from '@/constants/etawjihiSupport';
+import { ETAWJIHI_TRANSFER_SUPPORT_PHONE, supportPhoneWaDigits } from '@/constants/etawjihiSupport';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { initiateLegacyLink } from '@/services/tassjilInscriptions';
 import { brand } from '@/theme/tokens';
 import { getUserFacingApiError } from '@/utils/apiError';
+import { openWhatsAppChat } from '@/utils/openWhatsApp';
 
 const s = authSheetStyles;
 
@@ -55,7 +56,10 @@ export default function LinkTassjilAccountScreen() {
   }, [runAutoLink]);
 
   const openSupport = () => {
-    void Linking.openURL(buildSupportWhatsAppUrl(t('tassjilLinkSupportMessage'), ETAWJIHI_TRANSFER_SUPPORT_PHONE));
+    void openWhatsAppChat({
+      message: t('tassjilLinkSupportMessage'),
+      phoneWaDigits: supportPhoneWaDigits(ETAWJIHI_TRANSFER_SUPPORT_PHONE),
+    });
   };
 
   return (

@@ -4,7 +4,6 @@ import { StatusBar } from 'expo-status-bar';
 import { useCallback, useMemo, useState, type ComponentProps } from 'react';
 import {
   ActivityIndicator,
-  Linking,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -19,7 +18,7 @@ import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { TassjilSchoolCard } from '@/components/tassjil/TassjilSchoolCard';
 import { TassjilSchoolQuickFilters } from '@/components/tassjil/TassjilSchoolQuickFilters';
-import { buildSupportWhatsAppUrl, ETAWJIHI_TRANSFER_SUPPORT_PHONE } from '@/constants/etawjihiSupport';
+import { ETAWJIHI_TRANSFER_SUPPORT_PHONE, supportPhoneWaDigits } from '@/constants/etawjihiSupport';
 import {
   filterTassjilSchoolsByStatuts,
   sortSchoolsByDateFin,
@@ -32,6 +31,7 @@ import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { TassjilSchool } from '@/types/tassjilSchoolChoices';
 import { getUserFacingApiError } from '@/utils/apiError';
+import { openWhatsAppChat } from '@/utils/openWhatsApp';
 import {
   buildTassjilDisplaySchools,
   filterTassjilSchoolsByEligibility,
@@ -187,9 +187,10 @@ export default function TassjilSchoolChoicesScreen() {
   );
 
   const openSupport = () => {
-    void Linking.openURL(
-      buildSupportWhatsAppUrl(t('tassjilSchoolsSupportMessage'), ETAWJIHI_TRANSFER_SUPPORT_PHONE),
-    );
+    void openWhatsAppChat({
+      message: t('tassjilSchoolsSupportMessage'),
+      phoneWaDigits: supportPhoneWaDigits(ETAWJIHI_TRANSFER_SUPPORT_PHONE),
+    });
   };
 
   const countLabel = useMemo(

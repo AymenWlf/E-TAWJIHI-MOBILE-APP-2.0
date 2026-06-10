@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { Alert, Clipboard, Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Clipboard, Pressable, StyleSheet, View } from 'react-native';
 
 import { ReferralReferredDiscountBanner } from '@/components/account/ReferralReferredDiscountBanner';
 import { Text } from '@/components/ui/Text';
@@ -8,6 +8,7 @@ import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { useAuth } from '@/contexts/AuthContext';
 import { recordReferralProgramCodeCopy } from '@/services/referralProgramAnalytics';
+import { openWhatsAppChat } from '@/utils/openWhatsApp';
 import { fillReferralPercentPlaceholder } from '@/utils/referralDiscountDisplay';
 
 type Props = {
@@ -55,11 +56,7 @@ export function ReferralShareCodeBlock({
       discountPct,
       rtl,
     );
-    const url = `whatsapp://send?text=${encodeURIComponent(message)}`;
-    const web = `https://wa.me/?text=${encodeURIComponent(message)}`;
-    void Linking.canOpenURL(url).then((ok) => {
-      void Linking.openURL(ok ? url : web);
-    });
+    void openWhatsAppChat({ message });
   };
 
   return (

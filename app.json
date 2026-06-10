@@ -25,12 +25,20 @@
         "NSMicrophoneUsageDescription": "Cette application a besoin du micro pour les enregistrements audio.",
         "ITSAppUsesNonExemptEncryption": false,
         "UIBackgroundModes": ["remote-notification"],
-        "NSUserNotificationUsageDescription": "Cette application utilise les notifications pour vous informer des nouveautés importantes concernant l'orientation scolaire."
+        "NSUserNotificationUsageDescription": "Cette application utilise les notifications pour vous informer des nouveautés importantes concernant l'orientation scolaire.",
+        "LSApplicationQueriesSchemes": ["whatsapp", "whatsapp-business", "https", "http"]
       }
     },
     "android": {
       "package": "com.educalogy.etawjihi",
       "versionCode": 63,
+      "queries": [
+        { "package": "com.whatsapp" },
+        { "package": "com.whatsapp.w4b" },
+        { "scheme": "https", "host": "wa.me" },
+        { "scheme": "https", "host": "api.whatsapp.com" },
+        { "scheme": "whatsapp" }
+      ],
       "icon": "./assets/images/logo-carre-coul-android.png",
       "permissions": [
         "INTERNET",

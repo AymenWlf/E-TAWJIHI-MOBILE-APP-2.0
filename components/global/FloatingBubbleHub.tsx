@@ -1,12 +1,11 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useSegments } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Linking, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
-  buildEtawjihiSupportWhatsAppUrl,
-  buildEtawjihiSupportWhatsAppNativeUrl,
+  ETAWJIHI_SUPPORT_WHATSAPP_WA_DIGITS,
 } from '@/constants/etawjihiWhatsApp';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -18,6 +17,7 @@ import {
   formatUserFullName,
   pickPrimaryContractNumber,
 } from '@/utils/buildHubWhatsAppPrefill';
+import { openWhatsAppChat } from '@/utils/openWhatsApp';
 
 /** Hauteur approx barre d’onglets. */
 const TAB_BAR_EXTRA = 56;
@@ -106,14 +106,10 @@ export function FloatingBubbleHub() {
   }, [contractNumber, fullName, t]);
 
   const openWhatsApp = useCallback(() => {
-    const message = buildPrefillMessage();
-    const nativeUrl = buildEtawjihiSupportWhatsAppNativeUrl(message);
-    const webUrl = buildEtawjihiSupportWhatsAppUrl(message);
-    void Linking.canOpenURL(nativeUrl)
-      .then((ok) => Linking.openURL(ok ? nativeUrl : webUrl))
-      .catch(() => {
-        void Linking.openURL(webUrl);
-      });
+    void openWhatsAppChat({
+      message: buildPrefillMessage(),
+      phoneWaDigits: ETAWJIHI_SUPPORT_WHATSAPP_WA_DIGITS,
+    });
   }, [buildPrefillMessage]);
 
   if (hidden) {

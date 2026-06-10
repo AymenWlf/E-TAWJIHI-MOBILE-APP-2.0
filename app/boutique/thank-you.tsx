@@ -23,6 +23,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useShopFlowSystemBars } from '@/hooks/useShopFlowSystemBars';
 import { fetchShopOrder, uploadShopOrderBankTransferReceipt } from '@/services/shop';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { openWhatsAppHref } from '@/utils/openWhatsApp';
 import type { AppLocale, HomeCopyKey } from '@/constants/i18n';
 import type { ShopOrderPayload, ShopOrderServicePaymentFollowUp } from '@/types/shop';
 import {
@@ -412,7 +413,7 @@ export default function BoutiqueThankYouScreen() {
                 {t('shopThankBankWhatsappHint').replace('{phone}', waDisplay)}
               </Text>
               <Pressable
-                onPress={() => void Linking.openURL(whatsappHref)}
+                onPress={() => void openWhatsAppHref(whatsappHref)}
                 style={({ pressed }) => [styles.waBtn, isRTL && styles.rowRtl, pressed && { opacity: 0.9 }]}
               >
                 <FontAwesome name="whatsapp" size={18} color={brand.white} />
@@ -833,7 +834,7 @@ function PaymentHelpWhatsApp({
         {t('shopThankWhatsappHintHelp').replace('{phone}', waDisplay)}
       </Text>
       <Pressable
-        onPress={() => void Linking.openURL(whatsappHref)}
+        onPress={() => void openWhatsAppHref(whatsappHref)}
         style={({ pressed }) => [styles.waBtn, isRtl && styles.rowRtl, pressed && { opacity: 0.9 }]}
       >
         <FontAwesome name="whatsapp" size={18} color={brand.white} />
