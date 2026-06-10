@@ -95,6 +95,18 @@ export function mergeAllTassjilSchools(
   return Array.from(byId.values());
 }
 
+/** TOP : écoles sélectionnées ; PLUS : panier + catalogue Mes étudiants. */
+export function buildTassjilDisplaySchools(
+  selected: TassjilSchool[],
+  available: TassjilSchool[] | undefined,
+  displayMode: 'full_catalog' | 'selected_only' = 'full_catalog',
+): TassjilSchool[] {
+  if (displayMode === 'selected_only') {
+    return [...selected];
+  }
+  return mergeAllTassjilSchools(selected, available);
+}
+
 /** @deprecated Utiliser mergeAllTassjilSchools + filtre éligibilité côté UI. */
 export function mergeTassjilDisplaySchools(
   selected: TassjilSchool[],

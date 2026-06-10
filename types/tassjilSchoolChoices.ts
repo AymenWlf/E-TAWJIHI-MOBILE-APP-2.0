@@ -37,12 +37,16 @@ export type TassjilSchool = {
   specialitesBacMissionAcceptees?: string[] | null;
 };
 
+export type TassjilDisplayMode = 'full_catalog' | 'selected_only';
+
 export type TassjilPanierEcolesResponse = {
   success: boolean;
   data?: {
     selectedSchools: TassjilSchool[];
     availableSchools?: TassjilSchool[];
     totalCount?: number;
+    /** TOP : écoles sélectionnées seulement ; PLUS : catalogue complet. */
+    displayMode?: TassjilDisplayMode;
     userInfo?: {
       id: number;
       nom?: string;

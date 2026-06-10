@@ -33,8 +33,8 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { TassjilSchool } from '@/types/tassjilSchoolChoices';
 import { getUserFacingApiError } from '@/utils/apiError';
 import {
+  buildTassjilDisplaySchools,
   filterTassjilSchoolsByEligibility,
-  mergeAllTassjilSchools,
 } from '@/utils/tassjilDisplaySchools';
 
 const H_PAD = spacing.lg;
@@ -165,7 +165,11 @@ export default function TassjilSchoolChoicesScreen() {
         throw new Error(res.message ?? t('tassjilSchoolsErrGeneric'));
       }
       const list = sortSchoolsByDateFin(
-        mergeAllTassjilSchools(res.data?.selectedSchools ?? [], res.data?.availableSchools),
+        buildTassjilDisplaySchools(
+          res.data?.selectedSchools ?? [],
+          res.data?.availableSchools,
+          res.data?.displayMode ?? 'full_catalog',
+        ),
       );
       setSchools(list);
     } catch (e) {
