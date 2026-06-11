@@ -1459,6 +1459,8 @@ export type HomeCopyKey =
   | 'inscTassjilTrackCta'
   | 'inscTassjilTrackHint'
   | 'inscTassjilServiceIncluded'
+  | 'inscTassjilServiceIncludedBadge'
+  | 'inscTassjilServiceNotIncludedBadge'
   | 'inscTabNotifications'
   | 'inscTabCandidacies'
   | 'inscCandidaciesTabLockedHint'
@@ -3296,6 +3298,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscTassjilTrackHint: 'Vos écoles TASSJIL synchronisées avec E-Tawjihi',
     inscTassjilServiceIncluded:
       "Inclus dans le service d'inscription (Voir avec votre chargée d'inscription)",
+    inscTassjilServiceIncludedBadge: 'Inclus service TASSJIL',
+    inscTassjilServiceNotIncludedBadge: 'Non inclus service TASSJIL',
     inscTabNotifications: 'Notifications',
     inscTabCandidacies: 'Candidatures',
     inscCandidaciesTabLockedHint:
@@ -5110,6 +5114,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscTassjilTrackHint: 'مدارس TASSJIL المتزامنة مع E-Tawjihi',
     inscTassjilServiceIncluded:
       'مشمول في خدمة التسجيل (راجع مسؤولة التسجيل لديك)',
+    inscTassjilServiceIncludedBadge: 'مشمول TASSJIL',
+    inscTassjilServiceNotIncludedBadge: 'غير مشمول TASSJIL',
     inscTabNotifications: 'الإشعارات',
     inscTabCandidacies: 'الترشيحات',
     inscCandidaciesTabLockedHint:

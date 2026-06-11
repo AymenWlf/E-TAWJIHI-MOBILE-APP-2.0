@@ -222,6 +222,8 @@ export interface CreateShopOrderInput {
   trafficSource?: string;
   analyticsVisitorId?: string;
   analyticsViewport?: 'mobile' | 'desktop';
+  /** Canal explicite : application native uniquement (sinon web par défaut côté API). */
+  orderChannel?: 'mobile_app';
   /** Profil / service (requis si le panier contient un service). */
   studyLevel?: string;
   bacType?: string;

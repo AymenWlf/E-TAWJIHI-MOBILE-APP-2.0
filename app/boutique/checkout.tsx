@@ -6,6 +6,7 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -456,16 +457,18 @@ export default function BoutiqueCheckoutScreen() {
     if (servicePayment === 'pay_on_delivery' && !hasPhysicalProducts) {
       setServicePayment('');
     }
+    if (servicePayment === 'office') {
+      setServicePayment('');
+    }
   }, [hasPhysicalProducts, servicePayment]);
 
   const servicePaymentOptions = useMemo(() => {
     const ids: ServicePaymentChoice[] = hasPhysicalProducts
-      ? ['bank_transfer', 'cashplus', 'office', 'pay_on_delivery']
-      : ['bank_transfer', 'cashplus', 'office'];
+      ? ['bank_transfer', 'cashplus', 'pay_on_delivery']
+      : ['bank_transfer', 'cashplus'];
     const labelForId = (id: ServicePaymentChoice): string => {
       if (id === 'bank_transfer') return t('shopCheckoutPayBank');
       if (id === 'cashplus') return t('shopCheckoutPayCashplus');
-      if (id === 'office') return t('shopCheckoutPayOffice');
       return t('shopCheckoutPayOnDelivery');
     };
     return ids.map((id) => ({
@@ -833,6 +836,7 @@ export default function BoutiqueCheckoutScreen() {
         notes: notes.trim() || undefined,
         analyticsVisitorId,
         analyticsViewport: 'mobile',
+        orderChannel: 'mobile_app',
         ...(hasAnyService
           ? {
               studyLevel: studyLevel.trim(),
@@ -1012,7 +1016,10 @@ export default function BoutiqueCheckoutScreen() {
                 ) : null}
                 <Field isRtl={isRTL} label={t('shopCheckoutLblStudentCity')} required>
                   <Pressable
-                    onPress={() => setShowStudentVilleModal(true)}
+                    onPress={() => {
+                      Keyboard.dismiss();
+                      setShowStudentVilleModal(true);
+                    }}
                     style={[
                       styles.input,
                       styles.selectLike,
@@ -1082,6 +1089,7 @@ export default function BoutiqueCheckoutScreen() {
               <Field isRtl={isRTL} label={t('shopCheckoutLblCityShip')} required>
                 <Pressable
                   onPress={() => {
+                    Keyboard.dismiss();
                     setShowDeliveryVilleModal(true);
                   }}
                   style={[
@@ -1324,6 +1332,10 @@ export default function BoutiqueCheckoutScreen() {
       <ShopVillePickerSheet
         visible={showDeliveryVilleModal}
         sheetTitle={t('shopCheckoutSheetCityShip')}
+        searchPlaceholder={t('setupCitySearchPlaceholder')}
+        emptyLabel={t('setupCityNoResults')}
+        allLabel={t('shopCheckoutPickCity')}
+        rtl={isRTL}
         selectedCheckCode={selectedVilleCheckCode}
         onClose={() => setShowDeliveryVilleModal(false)}
         onSelect={(v) => {
@@ -1336,6 +1348,10 @@ export default function BoutiqueCheckoutScreen() {
       <ShopVillePickerSheet
         visible={showStudentVilleModal}
         sheetTitle={t('shopCheckoutSheetCityResidence')}
+        searchPlaceholder={t('setupCitySearchPlaceholder')}
+        emptyLabel={t('setupCityNoResults')}
+        allLabel={t('shopCheckoutPickCity')}
+        rtl={isRTL}
         selectedCheckCode={studentVilleCheckCode}
         onClose={() => setShowStudentVilleModal(false)}
         onSelect={(v) => {

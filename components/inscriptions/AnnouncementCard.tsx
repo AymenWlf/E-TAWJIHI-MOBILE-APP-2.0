@@ -14,7 +14,7 @@ import {
 
 import { promptTawjihPlusPartialFeatureLock } from '@/utils/tawjihPlusParcoursGate';
 
-import { TassjilServiceIncludedNotice } from '@/components/inscriptions/TassjilServiceIncludedNotice';
+import { TassjilServiceBadge } from '@/components/inscriptions/TassjilServiceBadge';
 import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlusPaywall';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
@@ -28,7 +28,6 @@ import {
   getEstablishmentLogoUrl,
 } from '@/constants/establishmentMedia';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
-import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useTawjihPlusAccessContextOptional } from '@/contexts/TawjihPlusAccessContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
@@ -47,7 +46,7 @@ import {
 } from '@/utils/candidacyStatus';
 import { isPremiereBacNiveau } from '@/utils/academicFiliere';
 import { evaluateEligibility } from '@/utils/eligibility';
-import { shouldShowTassjilServiceIncludedNotice } from '@/utils/tassjilServiceIncludedNotice';
+import { shouldShowTassjilServiceBadge } from '@/utils/tassjilServiceIncludedNotice';
 import type { AnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 
 type Props = {
@@ -270,7 +269,6 @@ export function AnnouncementCard({
   const showOgCoverLocked = Boolean(item.ogImage) && contentLocked;
   const showHeaderRow = !contentLocked || !item.ogImage;
   const { t, locale, isRTL } = useLocale();
-  const { user } = useAuth();
   const router = useRouter();
   const tawjihPlusAccess = useTawjihPlusAccessContextOptional();
   const openTawjihPlusProduct = useCallback(() => {
@@ -330,11 +328,7 @@ export function AnnouncementCard({
     locale,
     item.registrationUrlLabelAr,
   );
-  const showTassjilServiceNotice = shouldShowTassjilServiceIncludedNotice(
-    est,
-    item.announcementType,
-    user?.legacyLink,
-  );
+  const showTassjilServiceBadge = shouldShowTassjilServiceBadge(est);
 
   const followInteractionEnabled = !tourGate || tourGate === 'follow';
   const statusInteractionEnabled = !tourGate || tourGate === 'status';
@@ -671,7 +665,9 @@ export function AnnouncementCard({
           {pickAnnouncementTitle(item, locale) || item.title}
         </Text>
 
-        {showTassjilServiceNotice ? <TassjilServiceIncludedNotice isRTL={isRTL} /> : null}
+        {showTassjilServiceBadge ? (
+          <TassjilServiceBadge included={est?.isServiceTassjil === true} isRTL={isRTL} />
+        ) : null}
 
         {/* Dates, lieu — panneau structuré */}
         {hasMetaPanel ? (

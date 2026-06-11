@@ -19,7 +19,7 @@ import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
-import { TassjilServiceIncludedNotice } from '@/components/inscriptions/TassjilServiceIncludedNotice';
+import { TassjilServiceBadge } from '@/components/inscriptions/TassjilServiceBadge';
 import { ContestYoutubeTutorial } from '@/components/inscriptions/ContestYoutubeTutorial';
 import {
   EligibilityBadge,
@@ -82,7 +82,7 @@ import {
 import { splitSiblingsAroundCurrent } from '@/utils/contestAnnouncementSiblings';
 import { downloadDocument, pickDocumentIcon, viewDocument } from '@/utils/documents';
 import { evaluateEligibility } from '@/utils/eligibility';
-import { shouldShowTassjilServiceIncludedNotice } from '@/utils/tassjilServiceIncludedNotice';
+import { shouldShowTassjilServiceBadge } from '@/utils/tassjilServiceIncludedNotice';
 import { fireAndForget } from '@/utils/fireAndForget';
 import { promptTawjihPlusPartialFeatureLock } from '@/utils/tawjihPlusParcoursGate';
 import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
@@ -446,11 +446,7 @@ export default function InscriptionDetailScreen() {
     fallbackEstablishmentAvatarName(est?.nom, est?.sigle);
 
   const deadline = formatDaysUntilClose(data.daysUntilClose, locale);
-  const showTassjilServiceNotice = shouldShowTassjilServiceIncludedNotice(
-    est,
-    data.announcementType,
-    user?.legacyLink,
-  );
+  const showTassjilServiceBadge = shouldShowTassjilServiceBadge(est);
   const noEligibility =
     data.filieresAcceptees.length === 0 &&
     data.specialitesBacMissionAcceptees.length === 0 &&
@@ -656,7 +652,9 @@ export default function InscriptionDetailScreen() {
             isRTL={isRTL}
           />
           <Text style={[styles.title, isRTL && styles.rtl]}>{title}</Text>
-          {showTassjilServiceNotice ? <TassjilServiceIncludedNotice isRTL={isRTL} /> : null}
+          {showTassjilServiceBadge ? (
+            <TassjilServiceBadge included={est?.isServiceTassjil === true} isRTL={isRTL} />
+          ) : null}
           {deadlineLockedPartial ? (
             <Pressable
               onPress={() =>

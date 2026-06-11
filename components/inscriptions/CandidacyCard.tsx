@@ -11,14 +11,13 @@ import {
   InscriptionCardUsefulLinks,
   inscriptionCardStyles,
 } from '@/components/inscriptions/InscriptionAnnouncementCardParts';
-import { TassjilServiceIncludedNotice } from '@/components/inscriptions/TassjilServiceIncludedNotice';
+import { TassjilServiceBadge } from '@/components/inscriptions/TassjilServiceBadge';
 import { StatusBadge } from '@/components/inscriptions/StatusBadge';
 import { Text } from '@/components/ui/Text';
 import {
   fallbackEstablishmentAvatarName,
   getEstablishmentLogoUrl,
 } from '@/constants/establishmentMedia';
-import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { brand } from '@/theme/tokens';
 import type { Candidacy } from '@/types/inscriptions';
@@ -29,7 +28,7 @@ import {
   pickEstablishmentNamesPair,
   pickRegistrationUrlLabel,
 } from '@/utils/candidacyStatus';
-import { shouldShowTassjilServiceIncludedNotice } from '@/utils/tassjilServiceIncludedNotice';
+import { shouldShowTassjilServiceBadge } from '@/utils/tassjilServiceIncludedNotice';
 
 type Props = {
   candidacy: Candidacy;
@@ -41,7 +40,6 @@ type Props = {
 
 export function CandidacyCard({ candidacy, onPress, onUpdateStatus, onOpenLink, onOpenTimeline }: Props) {
   const { t, locale, isRTL } = useLocale();
-  const { user } = useAuth();
   const a = candidacy.announcement;
   const est = a?.establishment;
 
@@ -61,11 +59,7 @@ export function CandidacyCard({ candidacy, onPress, onUpdateStatus, onOpenLink, 
   const accentColor = status?.colorFg ?? brand.primary;
   const hasUpdateAction = (a?.availableStatuses?.length ?? 0) > 0;
   const hasMetaPanel = Boolean(villesShort || a?.dateStart || a?.dateEnd);
-  const showTassjilServiceNotice = shouldShowTassjilServiceIncludedNotice(
-    est,
-    a?.announcementType,
-    user?.legacyLink,
-  );
+  const showTassjilServiceBadge = shouldShowTassjilServiceBadge(est);
 
   return (
     <Pressable
@@ -100,7 +94,9 @@ export function CandidacyCard({ candidacy, onPress, onUpdateStatus, onOpenLink, 
           {pickAnnouncementTitle(a, locale) || '—'}
         </Text>
 
-        {showTassjilServiceNotice ? <TassjilServiceIncludedNotice isRTL={isRTL} /> : null}
+        {showTassjilServiceBadge ? (
+          <TassjilServiceBadge included={est?.isServiceTassjil === true} isRTL={isRTL} />
+        ) : null}
 
         {hasMetaPanel ? (
           <InscriptionCardMetaPanel>
