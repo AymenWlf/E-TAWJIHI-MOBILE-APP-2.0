@@ -257,17 +257,13 @@ export async function getStoredUser(): Promise<AuthUserSnapshot | null> {
   }
 }
 
-/** Persiste la session (remember me activé par défaut sur mobile). */
+/** Persiste la session localement (durée API : 1 an). Le toggle remember me n’efface plus les jetons. */
 export async function persistAuthSession(
   accessToken: string,
   refreshToken: string | null | undefined,
   user: AuthUserSnapshot | null | undefined,
-  rememberMe = true,
+  _rememberMe = true,
 ): Promise<void> {
-  if (!rememberMe) {
-    await clearAuthToken();
-    return;
-  }
   await setAuthToken(accessToken);
   if (refreshToken) {
     await setRefreshToken(refreshToken);
