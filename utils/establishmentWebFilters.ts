@@ -89,6 +89,18 @@ export function applyEstablishmentWebClientFilters(
   return out;
 }
 
+/** Garde la première occurrence de chaque établissement (évite clés FlatList dupliquées). */
+export function dedupeEstablishmentsById<T extends { id: number }>(items: T[]): T[] {
+  const seen = new Set<number>();
+  const out: T[] = [];
+  for (const it of items) {
+    if (!Number.isFinite(it.id) || it.id <= 0 || seen.has(it.id)) continue;
+    seen.add(it.id);
+    out.push(it);
+  }
+  return out;
+}
+
 /** Tri : sponsorisés en premier, puis ordre stable par id (aligné listing web). */
 export function sortSponsoredFirst(items: EstablishmentNormalized[]): EstablishmentNormalized[] {
   return [...items].sort((a, b) => {

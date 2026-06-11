@@ -181,6 +181,9 @@ export type HomeCopyKey =
   | 'schoolsFilters'
   | 'schoolsFiltersA11y'
   | 'schoolsFollowedOnlyA11y'
+  | 'schoolsEligibleQuickFilter'
+  | 'schoolsEligibleQuickAll'
+  | 'schoolsEligibleQuickA11y'
   | 'schoolsSearchPlaceholder'
   | 'schoolsSearchPlaceholderLocked'
   | 'schoolsSearchFiltersLockedHint'
@@ -721,6 +724,8 @@ export type HomeCopyKey =
   | 'estDetailContact'
   | 'estDetailAnnouncements'
   | 'estDetailAnnouncementsEmpty'
+  | 'estDetailInscriptionCta'
+  | 'estDetailInscriptionCtaA11y'
   | 'estLabelSectors'
   | 'estLabelTuition'
   | 'estLabelSchoolType'
@@ -1903,6 +1908,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsFilters: 'Filtres',
     schoolsFiltersA11y: 'Filtres détaillés',
     schoolsFollowedOnlyA11y: 'Uniquement les écoles que je suis',
+    schoolsEligibleQuickFilter: 'Éligibles',
+    schoolsEligibleQuickAll: 'Toutes',
+    schoolsEligibleQuickA11y:
+      'Afficher uniquement les écoles compatibles avec mon profil, hors écoles déjà suivies',
     schoolsSearchPlaceholder: 'Rechercher (nom, ville, université...)',
     schoolsSearchPlaceholderLocked: 'Recherche réservée aux clients TAWJIH PLUS',
     schoolsSearchFiltersLockedHint:
@@ -2495,6 +2504,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailContact: 'Contact',
     estDetailAnnouncements: 'Annonces de l\'école',
     estDetailAnnouncementsEmpty: 'Aucune annonce publiée pour cette école pour le moment.',
+    estDetailInscriptionCta: 'Inscription',
+    estDetailInscriptionCtaA11y: 'Voir les annonces d\'inscription de l\'école',
     estLabelSectors: 'Secteurs',
     estLabelTuition: 'Scolarité',
     estLabelSchoolType: 'Type',
@@ -3756,6 +3767,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsFilters: 'التصفية',
     schoolsFiltersA11y: 'فلاتر مفصلة',
     schoolsFollowedOnlyA11y: 'المدارس التي أتابعها فقط',
+    schoolsEligibleQuickFilter: 'مؤهلة',
+    schoolsEligibleQuickAll: 'الكل',
+    schoolsEligibleQuickA11y:
+      'عرض المدارس المتوافقة مع ملفي فقط، باستثناء المدارس التي أتابعها بالفعل',
     schoolsSearchPlaceholder: 'بحث (الاسم، المدينة، الجامعة...)',
     schoolsSearchPlaceholderLocked: 'البحث مخصّص لعملاء TAWJIH PLUS',
     schoolsSearchFiltersLockedHint: 'البحث والفلاتر التفصيلية مخصّصة لعملاء TAWJIH PLUS.',
@@ -4335,6 +4350,8 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailContact: 'التواصل',
     estDetailAnnouncements: 'إعلانات المؤسسة',
     estDetailAnnouncementsEmpty: 'لا توجد إعلانات منشورة لهذه المؤسسة حاليًا.',
+    estDetailInscriptionCta: 'التسجيل',
+    estDetailInscriptionCtaA11y: 'عرض إعلانات التسجيل الخاصة بالمؤسسة',
     estLabelSectors: 'القطاعات',
     estLabelTuition: 'الدراسة',
     estLabelSchoolType: 'النوع',

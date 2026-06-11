@@ -18,6 +18,7 @@ import { SchoolsSearchFiltersSkeleton } from '@/components/schools/SchoolsSearch
 import { SidebarMenuIconButton } from '@/components/SidebarMenuIconButton';
 import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
 import { EstablishmentCard } from '@/components/schools/EstablishmentCard';
+import { EstablishmentEligibleQuickFilter } from '@/components/schools/EstablishmentEligibleQuickFilter';
 import {
   countActiveEstablishmentFilters,
   defaultEstablishmentFilters,
@@ -25,16 +26,12 @@ import {
   type EstablishmentFiltersValue,
 } from '@/components/schools/EstablishmentFiltersModal';
 import { AppRefreshControl } from '@/components/ui/AppRefreshControl';
-import {
-  EstablishmentCardSkeleton,
-  EstablishmentCardSkeletonStack,
-} from '@/components/schools/EstablishmentCardSkeleton';
+import { EstablishmentCardSkeletonStack } from '@/components/schools/EstablishmentCardSkeleton';
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { getApiBaseUrl } from '@/constants/api';
-import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useAppliedTextSearch } from '@/hooks/useAppliedTextSearch';
@@ -49,7 +46,11 @@ import {
   recordEstablishmentClick,
   recordEstablishmentListingImpressionsBatch,
 } from '@/services/establishmentTracking';
-import { evaluateEligibilityByFiliere, matchesAcceptedStudyPathFilter } from '@/utils/eligibility';
+import {
+  evaluateEligibilityByFiliere,
+  hasEligibilityFiliereProfile,
+  matchesAcceptedStudyPathFilter,
+} from '@/utils/eligibility';
 import { fireAndForget } from '@/utils/fireAndForget';
 import {
   fetchListingPlacementsByEstablishment,
@@ -61,12 +62,18 @@ import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
   applyEstablishmentWebClientFilters,
+  dedupeEstablishmentsById,
   getListingWebOrderContentSig,
   sortEstablishmentsLikeEcolesSuperieuresWeb,
   sortSponsoredFirst,
 } from '@/utils/establishmentWebFilters';
 import { resolveEstablishmentLockedVariant } from '@/utils/establishmentLockDisplay';
+
 const PAGE_SIZE = 18;
+/** Bannière `mid` : une seule fois, après la 3e fiche (index 0-based = 2). */
+const MID_BANNER_AFTER_CARD_INDEX = 2;
+/** Alias conservé — évite crash si le bundle Metro est en retard sur le hot-reload. */
+const MID_BANNER_AFTER_EVERY_N_CARDS = MID_BANNER_AFTER_CARD_INDEX;
 
 export default function EcolesScreen() {
   const router = useRouter();
@@ -84,6 +91,8 @@ export default function EcolesScreen() {
 
   const [clientMode, setClientMode] = useState(false);
   const [filteredPool, setFilteredPool] = useState<EstablishmentNormalized[] | null>(null);
+  /** Catalogue complet (toutes pages API) pour compteur / filtre « Éligibles » hors pagination. */
+  const [fullCatalogPool, setFullCatalogPool] = useState<EstablishmentNormalized[] | null>(null);
   const [visibleEnd, setVisibleEnd] = useState(PAGE_SIZE);
 
   const {
@@ -96,8 +105,18 @@ export default function EcolesScreen() {
   } = useAppliedTextSearch();
 
   /** Même modale que l’onglet Inscriptions › Annonces (`EstablishmentFiltersModal`). */
-  const [filtersValue, setFiltersValue] = useState<EstablishmentFiltersValue>(() => defaultEstablishmentFilters());
+  const [filtersValue, setFiltersValue] = useState<EstablishmentFiltersValue>(() => ({
+    ...defaultEstablishmentFilters(),
+    /** Pas de filtre éligibilité auto-activé — toggle rapide dédié ci-dessous. */
+    eligibilityFilter: 'all',
+  }));
   const [filtersOpen, setFiltersOpen] = useState(false);
+
+  /**
+   * Filtre rapide « Éligibles » : écoles compatibles profil, hors écoles déjà
+   * suivies (candidature pas encore « activée » via le cœur).
+   */
+  const [eligibleDiscoveryFilter, setEligibleDiscoveryFilter] = useState(false);
 
   /** Afficher uniquement les établissements déjà suivis (cœur). */
   const [followedOnly, setFollowedOnly] = useState(false);
@@ -109,6 +128,18 @@ export default function EcolesScreen() {
   const listingWebOrderContentSigRef = useRef<string>('');
   /** Ordre mélangé (client mode) — ne pas réécrire `filteredPool` pour éviter boucles de re-render. */
   const orderedClientPoolRef = useRef<EstablishmentNormalized[] | null>(null);
+  /** Catalogue complet ordonné (filtre « Éligibles ») — évite reshuffle à chaque scroll / placement. */
+  const catalogListingContentSigRef = useRef<string>('');
+  const orderedCatalogPoolRef = useRef<EstablishmentNormalized[] | null>(null);
+  /** Évite les appels `onEndReached` en rafale (skeleton / fetch en boucle). */
+  const loadMoreInFlightRef = useRef(false);
+  /** Ignore le premier `onEndReached` au montage (liste courte). */
+  const endReachedEnabledRef = useRef(false);
+  /** Révision du listing client ordonné (ref seule ne déclenche pas de re-render). */
+  const [clientListingRevision, setClientListingRevision] = useState(0);
+  /** Listing serveur : ordre stable à l’append (évite de revoir les mêmes écoles au load more). */
+  const stableServerListingRef = useRef<EstablishmentNormalized[]>([]);
+  const serverListingNeedsResetRef = useRef(true);
 
   /* Suivi d'écoles : Set des IDs suivis + IDs en cours de toggle */
   const { user, getValidAccessToken, isLoading: authLoading } = useAuth();
@@ -118,16 +149,20 @@ export default function EcolesScreen() {
     loading: eligibilityProfileLoading,
     refetch: refetchEligibilityProfile,
   } = useEligibilityProfile();
-  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading } = useTawjihPlusAccess();
-  /** Skeleton recherche/filtres tant que la session ou les droits TAWJIH PLUS ne sont pas connus. */
-  const searchFiltersAccessLoading = authLoading || tawjihPlusLoading;
-  const searchFiltersLocked = !searchFiltersAccessLoading && !hasTawjihPlusAccess;
-  /** Catalogue écoles : 3 premières fiches complètes, le reste réservé TAWJIH PLUS. */
+  const {
+    hasSchoolsCatalogAccess,
+    loading: schoolsCatalogAccessLoading,
+    openTawjihPlusProduct: openTawjihPlusFromContext,
+  } = useTawjihPlusAccessContext();
+  /** Skeleton recherche/filtres tant que la session ou les droits client ne sont pas connus. */
+  const searchFiltersAccessLoading = authLoading || schoolsCatalogAccessLoading;
+  const searchFiltersLocked = !searchFiltersAccessLoading && !hasSchoolsCatalogAccess;
+  /** Catalogue écoles : 3 premières fiches complètes sans service actif ; listing complet pour clients. */
   const schoolsCatalogLocked = searchFiltersLocked;
 
   const openTawjihPlusProduct = useCallback(() => {
-    router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
-  }, [router]);
+    openTawjihPlusFromContext();
+  }, [openTawjihPlusFromContext]);
 
   const showTawjihPlusUpgradeAlert = useCallback(() => {
     Alert.alert(t('inscTawjihPlusLockTitle'), t('schoolsSearchFiltersLockedHint'), [
@@ -144,8 +179,15 @@ export default function EcolesScreen() {
     if (!isLoggedIn) {
       setFollowsReady(true);
       setFollowedOnly(false);
+      setEligibleDiscoveryFilter(false);
     } else setFollowsReady(false);
   }, [isLoggedIn, user?.id]);
+
+  useEffect(() => {
+    if (!eligibleDiscoveryFilter) return;
+    setPage(1);
+    setVisibleEnd(PAGE_SIZE);
+  }, [eligibleDiscoveryFilter]);
 
   /** Recharge la liste des écoles suivies (un seul appel partagé pour toute la liste). */
   const reloadFollows = useCallback(async () => {
@@ -188,31 +230,15 @@ export default function EcolesScreen() {
     const merged = mergeEstablishmentsWithListingPlacements(filteredPool, placementByEid);
     const contentSig = getListingWebOrderContentSig(merged, placementByEid);
     if (contentSig === listingWebOrderContentSigRef.current && orderedClientPoolRef.current) {
-      setItems(
-        orderedClientPoolRef.current.slice(
-          0,
-          Math.min(visibleEnd, orderedClientPoolRef.current.length),
-        ),
-      );
       return;
     }
     listingWebOrderContentSigRef.current = contentSig;
-    const ordered = sortEstablishmentsLikeEcolesSuperieuresWeb(merged, placementByEid);
-    orderedClientPoolRef.current = ordered;
-    setItems(ordered.slice(0, Math.min(visibleEnd, ordered.length)));
-  }, [clientMode, filteredPool, placementByEid, visibleEnd]);
-
-  // Tracking « impression card » : best-effort, dédupliqué côté service par
-  // session pour éviter d'envoyer N hits par item à chaque rerender de la
-  // FlatList (typiquement scroll, refresh, retour sur l'onglet).
-  useEffect(() => {
-    if (!Array.isArray(items) || items.length === 0) return;
-    recordEstablishmentListingImpressionsBatch(
-      items
-        .filter((it) => typeof it.id === 'number')
-        .map((it) => ({ id: it.id as number })),
+    const ordered = dedupeEstablishmentsById(
+      sortEstablishmentsLikeEcolesSuperieuresWeb(merged, placementByEid),
     );
-  }, [items]);
+    orderedClientPoolRef.current = ordered;
+    setClientListingRevision((v) => v + 1);
+  }, [clientMode, filteredPool, placementByEid]);
 
   /** Toggle Suivre/Ne plus suivre — mise à jour optimiste, revert si l'API échoue. */
   const handleToggleFollow = useCallback(
@@ -318,7 +344,6 @@ export default function EcolesScreen() {
         filtersValue.diplome,
         filtersValue.fraisMin,
         filtersValue.fraisMax,
-        filtersValue.eligibilityFilter,
         needsClientScan ? 1 : 0,
       ].join('__'),
     [appliedQ, filtersValue, needsClientScan],
@@ -334,15 +359,40 @@ export default function EcolesScreen() {
     [appliedQ, filtersValue],
   );
 
+  const catalogPool = filteredPool ?? fullCatalogPool;
+
+  useEffect(() => {
+    if (filteredPool) {
+      setFullCatalogPool(null);
+      return;
+    }
+    let cancelled = false;
+    void listAllEstablishments(apiQueryBase())
+      .then((all) => {
+        if (!cancelled) setFullCatalogPool(dedupeEstablishmentsById(all));
+      })
+      .catch(() => {
+        if (!cancelled) setFullCatalogPool(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [apiQueryBase, filteredPool, queryKey]);
+
   useEffect(() => {
     let cancelled = false;
     setErr(null);
     setPage(1);
     setVisibleEnd(PAGE_SIZE);
+    endReachedEnabledRef.current = false;
     setClientMode(needsClientScan);
     setFilteredPool(null);
     listingWebOrderContentSigRef.current = '';
     orderedClientPoolRef.current = null;
+    catalogListingContentSigRef.current = '';
+    orderedCatalogPoolRef.current = null;
+    stableServerListingRef.current = [];
+    serverListingNeedsResetRef.current = true;
 
     if (needsClientScan) {
       if (needsCitiesForRegion && cities.length === 0) {
@@ -373,7 +423,7 @@ export default function EcolesScreen() {
             fraisMax: filtersValue.fraisMax,
           });
           setFilteredPool(f);
-          setItems(f.slice(0, PAGE_SIZE));
+          setItems([]);
           setVisibleEnd(PAGE_SIZE);
           setPages(Math.max(1, Math.ceil(f.length / PAGE_SIZE)));
         })
@@ -419,6 +469,10 @@ export default function EcolesScreen() {
     setClientMode(needsClientScan);
     listingWebOrderContentSigRef.current = '';
     orderedClientPoolRef.current = null;
+    catalogListingContentSigRef.current = '';
+    orderedCatalogPoolRef.current = null;
+    stableServerListingRef.current = [];
+    serverListingNeedsResetRef.current = true;
 
     try {
       const rt = filtersValue.regionTitle.trim();
@@ -458,14 +512,18 @@ export default function EcolesScreen() {
           fraisMax: filtersValue.fraisMax,
         });
         setFilteredPool(f);
-        setItems(f.slice(0, PAGE_SIZE));
+        setItems([]);
         setVisibleEnd(PAGE_SIZE);
         setPages(Math.max(1, Math.ceil(f.length / PAGE_SIZE)));
       } else {
         setFilteredPool(null);
-        const res = await listEstablishments({ ...apiQueryBase(), page: 1, limit: PAGE_SIZE });
+        const [res, all] = await Promise.all([
+          listEstablishments({ ...apiQueryBase(), page: 1, limit: PAGE_SIZE }),
+          listAllEstablishments(apiQueryBase()),
+        ]);
         setItems(res.data);
         setPages(res.pagination.pages);
+        setFullCatalogPool(dedupeEstablishmentsById(all));
       }
     } catch (e: unknown) {
       const msg =
@@ -485,62 +543,109 @@ export default function EcolesScreen() {
     apiQueryBase,
   ]);
 
-  async function loadMore() {
-    if (loadingMore || loading || refreshing) return;
-
-    if (clientMode && filteredPool) {
-      const orderedPool = orderedClientPoolRef.current ?? filteredPool;
-      if (visibleEnd >= orderedPool.length) return;
-      setLoadingMore(true);
-      try {
-        const next = Math.min(orderedPool.length, visibleEnd + PAGE_SIZE);
-        setVisibleEnd(next);
-        setItems(orderedPool.slice(0, next));
-      } finally {
-        setLoadingMore(false);
+  const buildListingFromPool = useCallback(
+    (pool: EstablishmentNormalized[]) => {
+      if (!pool.length) return [];
+      const merged = dedupeEstablishmentsById(
+        mergeEstablishmentsWithListingPlacements(pool, placementByEid),
+      );
+      const contentSig = getListingWebOrderContentSig(merged, placementByEid);
+      if (contentSig === catalogListingContentSigRef.current && orderedCatalogPoolRef.current) {
+        return orderedCatalogPoolRef.current;
       }
-      return;
-    }
+      catalogListingContentSigRef.current = contentSig;
+      const ordered = clientMode
+        ? dedupeEstablishmentsById(sortEstablishmentsLikeEcolesSuperieuresWeb(merged, placementByEid))
+        : sortSponsoredFirst(merged);
+      orderedCatalogPoolRef.current = ordered;
+      return ordered;
+    },
+    [clientMode, placementByEid],
+  );
 
-    if (page >= pages) return;
-    setLoadingMore(true);
-    setErr(null);
-    try {
-      const nextPage = page + 1;
-      const res = await listEstablishments({ ...apiQueryBase(), page: nextPage, limit: PAGE_SIZE });
-      setItems((prev) => [...prev, ...res.data]);
-      setPage(nextPage);
-      setPages(res.pagination.pages);
-    } catch (e: unknown) {
-      const msg =
-        typeof e === 'object' && e && 'message' in e ? String((e as { message: string }).message) : 'Erreur réseau';
-      setErr(msg);
-    } finally {
-      setLoadingMore(false);
-    }
-  }
+  const usesFullCatalogEligibleListing =
+    eligibleDiscoveryFilter && hasEligibilityFiliereProfile(eligibilityProfile) && !!catalogPool?.length;
 
   const activeFiltersCount = countActiveEstablishmentFilters(filtersValue);
 
   const mergedEstablishments = useMemo(() => {
-    const merged = mergeEstablishmentsWithListingPlacements(items, placementByEid);
-    /** En mode client l’ordre « web » est déjà appliqué sur `filteredPool` puis `items` (tranche). */
-    if (clientMode) return merged;
-    return sortSponsoredFirst(merged);
+    if (clientMode) {
+      return dedupeEstablishmentsById(
+        mergeEstablishmentsWithListingPlacements(items, placementByEid),
+      );
+    }
+    const merged = dedupeEstablishmentsById(
+      mergeEstablishmentsWithListingPlacements(items, placementByEid),
+    );
+    if (serverListingNeedsResetRef.current || stableServerListingRef.current.length === 0) {
+      const sorted = sortSponsoredFirst(merged);
+      stableServerListingRef.current = sorted;
+      serverListingNeedsResetRef.current = false;
+      return sorted;
+    }
+    const mergedById = new Map(merged.map((e) => [e.id, e]));
+    const prevIds = new Set(stableServerListingRef.current.map((e) => e.id));
+    const next: EstablishmentNormalized[] = [];
+    for (const e of stableServerListingRef.current) {
+      const updated = mergedById.get(e.id);
+      if (updated) next.push(updated);
+    }
+    for (const e of merged) {
+      if (!prevIds.has(e.id)) next.push(e);
+    }
+    stableServerListingRef.current = next;
+    return next;
   }, [items, placementByEid, clientMode]);
 
+  const matchesEligibleDiscovery = useCallback(
+    (it: EstablishmentNormalized) => {
+      if (!hasEligibilityFiliereProfile(eligibilityProfile)) return false;
+      const verdict = evaluateEligibilityByFiliere(
+        { filieresAcceptees: it.filieresAcceptees ?? null },
+        eligibilityProfile,
+      );
+      if (verdict !== 'eligible') return false;
+      if (isLoggedIn && followedIds.has(it.id)) return false;
+      return true;
+    },
+    [eligibilityProfile, followedIds, isLoggedIn],
+  );
+
+  const listingBase = useMemo(() => {
+    if (usesFullCatalogEligibleListing && catalogPool) {
+      return buildListingFromPool(catalogPool);
+    }
+    if (clientMode && filteredPool?.length) {
+      if (orderedClientPoolRef.current?.length) {
+        return orderedClientPoolRef.current;
+      }
+      return dedupeEstablishmentsById(
+        mergeEstablishmentsWithListingPlacements(filteredPool, placementByEid),
+      );
+    }
+    return mergedEstablishments;
+  }, [
+    usesFullCatalogEligibleListing,
+    catalogPool,
+    buildListingFromPool,
+    mergedEstablishments,
+    clientMode,
+    clientListingRevision,
+    filteredPool,
+    placementByEid,
+  ]);
+
+  const eligibleDiscoveryCount = useMemo(() => {
+    if (!hasEligibilityFiliereProfile(eligibilityProfile) || !catalogPool?.length) return 0;
+    return buildListingFromPool(catalogPool).filter(matchesEligibleDiscovery).length;
+  }, [catalogPool, eligibilityProfile, buildListingFromPool, matchesEligibleDiscovery]);
+
   /**
-   * Items effectivement affichés : on applique le filtre éligibilité (non
-   * supporté côté serveur) après tous les autres filtres déjà appliqués
-   * dans `items`. Le filtre est silencieusement ignoré quand l'utilisateur
-   * n'est pas connecté ou n'a pas renseigné son profil — on évite ainsi
-   * de cacher toutes les écoles à un visiteur qui ne pourrait pas le
-   * désactiver depuis l'UI.
-   * Le filtre « écoles suivies » s’applique en dernier (bouton cœur).
+   * Filtres client sur la base listing (pagination serveur ou catalogue complet).
    */
-  const visibleItems = useMemo(() => {
+  const filteredListingBeforeSlice = useMemo(() => {
     const elig = filtersValue.eligibilityFilter;
-    let list = mergedEstablishments;
+    let list = listingBase;
     const studyBac = filtersValue.acceptedStudyBacType;
     const studyVal = filtersValue.acceptedStudyValue.trim();
     if ((studyBac === 'normal' || studyBac === 'mission') && studyVal) {
@@ -554,13 +659,12 @@ export default function EcolesScreen() {
         ),
       );
     }
-    if (elig !== 'all' && eligibilityProfile) {
+    if (eligibleDiscoveryFilter && hasEligibilityFiliereProfile(eligibilityProfile)) {
+      list = list.filter(matchesEligibleDiscovery);
+    } else if (elig !== 'all' && hasEligibilityFiliereProfile(eligibilityProfile)) {
       list = list.filter((it) => {
         const verdict = evaluateEligibilityByFiliere(
-          {
-            filieresAcceptees: it.filieresAcceptees ?? null,
-            specialitesBacMissionAcceptees: it.specialitesBacMissionAcceptees ?? null,
-          },
+          { filieresAcceptees: it.filieresAcceptees ?? null },
           eligibilityProfile,
         );
         if (verdict === 'unknown') return true;
@@ -570,9 +674,11 @@ export default function EcolesScreen() {
     if (followedOnly && isLoggedIn) {
       list = list.filter((it) => followedIds.has(it.id));
     }
-    return list;
+    return dedupeEstablishmentsById(list);
   }, [
-    mergedEstablishments,
+    listingBase,
+    eligibleDiscoveryFilter,
+    matchesEligibleDiscovery,
     filtersValue.eligibilityFilter,
     filtersValue.acceptedStudyBacType,
     filtersValue.acceptedStudyValue,
@@ -580,6 +686,100 @@ export default function EcolesScreen() {
     followedOnly,
     isLoggedIn,
     followedIds,
+  ]);
+
+  const visibleItems = useMemo(
+    () => filteredListingBeforeSlice.slice(0, visibleEnd),
+    [filteredListingBeforeSlice, visibleEnd],
+  );
+
+  const hasMoreToShow = visibleEnd < filteredListingBeforeSlice.length;
+  const canFetchMoreFromServer =
+    !clientMode && !usesFullCatalogEligibleListing && page < pages;
+
+  useEffect(() => {
+    setVisibleEnd((prev) => {
+      const total = filteredListingBeforeSlice.length;
+      if (total === 0) return PAGE_SIZE;
+      if (prev > total) return total;
+      return prev;
+    });
+  }, [filteredListingBeforeSlice.length]);
+
+  useEffect(() => {
+    if (!visibleItems.length) return;
+    recordEstablishmentListingImpressionsBatch(
+      visibleItems
+        .filter((it) => typeof it.id === 'number')
+        .map((it) => ({ id: it.id as number })),
+    );
+  }, [visibleItems]);
+
+  const loadMore = useCallback(async () => {
+    if (loadMoreInFlightRef.current || loadingMore || loading || refreshing) return;
+
+    if (hasMoreToShow) {
+      setLoadingMore(true);
+      try {
+        setVisibleEnd((prev) =>
+          Math.min(filteredListingBeforeSlice.length, prev + PAGE_SIZE),
+        );
+      } finally {
+        setLoadingMore(false);
+      }
+      return;
+    }
+
+    if (!canFetchMoreFromServer) return;
+
+    loadMoreInFlightRef.current = true;
+    setLoadingMore(true);
+    setErr(null);
+    try {
+      const MAX_DUPLICATE_PAGE_SKIPS = 5;
+      let nextPage = page + 1;
+      let totalPages = pages;
+      let grewAny = false;
+      let addedCount = 0;
+
+      for (let attempt = 0; attempt < MAX_DUPLICATE_PAGE_SKIPS && nextPage <= totalPages; attempt++) {
+        const res = await listEstablishments({ ...apiQueryBase(), page: nextPage, limit: PAGE_SIZE });
+        totalPages = res.pagination.pages;
+        let grew = false;
+        setItems((prev) => {
+          const merged = dedupeEstablishmentsById([...prev, ...res.data]);
+          grew = merged.length > prev.length;
+          addedCount += merged.length - prev.length;
+          return merged;
+        });
+        setPage(nextPage);
+        setPages(totalPages);
+        if (grew) grewAny = true;
+        if (res.data.length === 0 || grew) break;
+        nextPage++;
+      }
+
+      if (grewAny && addedCount > 0) {
+        setVisibleEnd((prev) => prev + addedCount);
+      }
+    } catch (e: unknown) {
+      const msg =
+        typeof e === 'object' && e && 'message' in e ? String((e as { message: string }).message) : 'Erreur réseau';
+      setErr(msg);
+    } finally {
+      setLoadingMore(false);
+      loadMoreInFlightRef.current = false;
+    }
+  }, [
+    apiQueryBase,
+    canFetchMoreFromServer,
+    filteredListingBeforeSlice.length,
+    hasMoreToShow,
+    loading,
+    loadingMore,
+    page,
+    pages,
+    refreshing,
   ]);
 
   const onPressFollowedOnlyToggle = useCallback(() => {
@@ -592,6 +792,35 @@ export default function EcolesScreen() {
     }
     setFollowedOnly((v) => !v);
   }, [isLoggedIn, router, t]);
+
+  const onEligibleDiscoveryFilterChange = useCallback(
+    (next: boolean) => {
+      if (searchFiltersLocked) {
+        showTawjihPlusUpgradeAlert();
+        return;
+      }
+      if (next && !isLoggedIn) {
+        Alert.alert(t('inscRequireLogin'), undefined, [
+          { text: t('accountLogoutCancel'), style: 'cancel' },
+          { text: t('accountLoginCta'), onPress: () => router.push('/login' as never) },
+        ]);
+        return;
+      }
+      if (next && !hasEligibilityFiliereProfile(eligibilityProfile)) {
+        Alert.alert(t('eligibilityProfileIncomplete'), t('eligibilityProfileIncompleteCta'), [
+          { text: t('accountLogoutCancel'), style: 'cancel' },
+          {
+            text: t('eligibilityProfileIncompleteCta'),
+            onPress: () => router.push('/account-setup' as never),
+          },
+        ]);
+        return;
+      }
+      if (next) setFollowedOnly(false);
+      setEligibleDiscoveryFilter(next);
+    },
+    [eligibilityProfile, isLoggedIn, router, searchFiltersLocked, showTawjihPlusUpgradeAlert, t],
+  );
 
   return (
     <View style={[styles.root, isRTL ? styles.rtl : styles.ltr]}>
@@ -720,37 +949,83 @@ export default function EcolesScreen() {
         <View style={styles.scrollFill}>
         <FlatList
           data={visibleItems}
-          keyExtractor={(it) => String(it.id)}
+          keyExtractor={(it) => `school-${it.id}`}
+          extraData={visibleEnd}
           style={styles.scrollFill}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}
           refreshControl={
             <AppRefreshControl refreshing={refreshing} onRefresh={() => void refreshEstablishments()} />
           }
-          onEndReachedThreshold={0.35}
-          onEndReached={loadMore}
+          initialNumToRender={PAGE_SIZE}
+          maxToRenderPerBatch={PAGE_SIZE}
+          windowSize={7}
+          removeClippedSubviews={false}
+          onMomentumScrollBegin={() => {
+            endReachedEnabledRef.current = true;
+          }}
+          onEndReachedThreshold={0.25}
+          onEndReached={() => {
+            if (!endReachedEnabledRef.current) return;
+            void loadMore();
+          }}
           ListHeaderComponent={
-            <AppBannerSlot zone="top" analyticsPage="/mobile/ecoles" style={{ marginTop: spacing.sm }} />
+            <View>
+              <AppBannerSlot zone="top" analyticsPage="/mobile/ecoles" style={{ marginTop: spacing.sm }} />
+              {!searchFiltersAccessLoading ? (
+                <View style={styles.listEligibleFilter}>
+                  <EstablishmentEligibleQuickFilter
+                    active={eligibleDiscoveryFilter}
+                    onChange={onEligibleDiscoveryFilterChange}
+                    eligibleCount={eligibleDiscoveryCount}
+                    disabled={
+                      searchFiltersLocked ||
+                      !isLoggedIn ||
+                      !hasEligibilityFiliereProfile(eligibilityProfile)
+                    }
+                    onDisabledPress={
+                      searchFiltersLocked
+                        ? showTawjihPlusUpgradeAlert
+                        : !isLoggedIn
+                          ? () =>
+                              Alert.alert(t('inscRequireLogin'), undefined, [
+                                { text: t('accountLogoutCancel'), style: 'cancel' },
+                                {
+                                  text: t('accountLoginCta'),
+                                  onPress: () => router.push('/login' as never),
+                                },
+                              ])
+                          : () =>
+                              Alert.alert(
+                                t('eligibilityProfileIncomplete'),
+                                t('eligibilityProfileIncompleteCta'),
+                                [
+                                  { text: t('accountLogoutCancel'), style: 'cancel' },
+                                  {
+                                    text: t('eligibilityProfileIncompleteCta'),
+                                    onPress: () => router.push('/account-setup' as never),
+                                  },
+                                ],
+                              )
+                    }
+                  />
+                </View>
+              ) : null}
+            </View>
           }
           ListFooterComponent={
-            loadingMore ? (
+            loadingMore && (hasMoreToShow || canFetchMoreFromServer) ? (
               <View style={styles.footer}>
-                <EstablishmentCardSkeleton isRTL={isRTL} />
+                <ActivityIndicator size="small" color={homeShell.blue} />
               </View>
             ) : null
           }
           renderItem={({ item, index }) => {
             const lockedVariant = resolveEstablishmentLockedVariant(schoolsCatalogLocked, index);
             const cardLocked = lockedVariant === 'compact';
+            const showMidBanner = index === MID_BANNER_AFTER_CARD_INDEX;
             return (
             <View>
-              {index > 0 && index % 3 === 0 ? (
-                <AppBannerSlot
-                  key={`banner-mid-${Math.floor(index / 3)}`}
-                  zone="mid"
-                  analyticsPage="/mobile/ecoles"
-                />
-              ) : null}
               <EstablishmentCard
                 item={item}
                 lockedVariant={lockedVariant}
@@ -777,6 +1052,9 @@ export default function EcolesScreen() {
                   void handleToggleFollow(item.id);
                 }}
               />
+              {showMidBanner ? (
+                <AppBannerSlot zone="mid" analyticsPage="/mobile/ecoles" />
+              ) : null}
             </View>
             );
           }}
@@ -961,6 +1239,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.xl,
     paddingTop: spacing.lg,
     paddingBottom: spacing.section,
+  },
+  listEligibleFilter: {
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
   },
   center: {
     flexGrow: 1,

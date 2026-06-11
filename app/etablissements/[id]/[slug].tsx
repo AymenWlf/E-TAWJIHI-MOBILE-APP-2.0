@@ -83,8 +83,11 @@ export default function EstablishmentDetailScreen() {
   const { presentShare } = useSharePreview();
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
+  const announcementsSectionYRef = useRef(0);
   const { user, getValidAccessToken } = useAuth();
   const {
+    hasSchoolsCatalogAccess,
+    loading: schoolsCatalogAccessLoading,
     isInscriptionsLocked,
     isInscriptionsAccessPending,
     openTawjihPlusProduct,
@@ -93,8 +96,9 @@ export default function EstablishmentDetailScreen() {
   } = useTawjihPlusAccessContext();
   const showInscriptionsPaywall =
     !isInscriptionsAccessPending && isInscriptionsLocked;
+  const schoolsCatalogAccessPending = schoolsCatalogAccessLoading;
   const schoolsCatalogLocked =
-    !isInscriptionsAccessPending && isInscriptionsLocked;
+    !schoolsCatalogAccessPending && !hasSchoolsCatalogAccess;
   const { profile: eligibilityProfile, loading: eligibilityProfileLoading } = useEligibilityProfile();
   const isLoggedIn = Boolean(user);
   const params = useLocalSearchParams<{ id?: string; slug?: string; listIdx?: string }>();
@@ -131,7 +135,7 @@ export default function EstablishmentDetailScreen() {
   }, [schoolsCatalogLocked, listingIndex]);
 
   const canLoadEstablishmentDetail = useMemo(() => {
-    if (isInscriptionsAccessPending) return null;
+    if (schoolsCatalogAccessPending) return null;
     if (!schoolsCatalogLocked) return true;
     if (!freePreviewReady) return null;
     if (isEstablishmentDetailAllowed(true, listingIndex)) return true;
@@ -141,8 +145,8 @@ export default function EstablishmentDetailScreen() {
     freePreviewIds,
     freePreviewReady,
     id,
-    isInscriptionsAccessPending,
     listingIndex,
+    schoolsCatalogAccessPending,
     schoolsCatalogLocked,
   ]);
   const establishmentDetailBlocked = canLoadEstablishmentDetail === false;
@@ -363,11 +367,7 @@ export default function EstablishmentDetailScreen() {
   const eligibility = useMemo(
     () =>
       evaluateEligibility(
-        {
-          filieresAcceptees: data?.filieresAcceptees ?? null,
-          specialitesBacMissionAcceptees: data?.specialitesBacMissionAcceptees ?? null,
-          anneesBacAcceptees: data?.anneesBacAcceptees ?? null,
-        },
+        { filieresAcceptees: data?.filieresAcceptees ?? null },
         eligibilityProfile,
       ),
     [data, eligibilityProfile],
@@ -381,9 +381,7 @@ export default function EstablishmentDetailScreen() {
   const showEligibilitySection =
     eligibility.verdict !== 'unknown' &&
     !!data &&
-    ((data.filieresAcceptees?.length ?? 0) > 0 ||
-      (data.specialitesBacMissionAcceptees?.length ?? 0) > 0 ||
-      (data.anneesBacAcceptees?.length ?? 0) > 0);
+    (data.filieresAcceptees?.length ?? 0) > 0;
 
   const schoolMedia = useMemo(() => {
     if (!data) {
@@ -404,6 +402,14 @@ export default function EstablishmentDetailScreen() {
     const brochureUrl = brochureDoc?.url ? getEstablishmentFileUrl(brochureDoc.url) : null;
     return { photoUris, videoRaw, brochureUrl };
   }, [data]);
+
+  const inscriptionFooterBarHeight = 80;
+  const scrollPaddingBottom = inscriptionFooterBarHeight + insets.bottom + spacing.lg;
+
+  const scrollToAnnouncementsSection = useCallback(() => {
+    const y = Math.max(0, announcementsSectionYRef.current - spacing.md);
+    scrollRef.current?.scrollTo({ y, animated: true });
+  }, []);
 
   const renderTopBar = () => (
     <View style={[styles.topBar, { paddingTop: insets.top + 6 }, isRTL && styles.rowRtl]}>
@@ -465,10 +471,11 @@ export default function EstablishmentDetailScreen() {
           <Text style={[styles.errTxt, isRTL && styles.txtRtl]}>{t('estNotFound')}</Text>
         </View>
       ) : (
+        <>
         <ScrollView
           ref={scrollRef}
           style={styles.scroll}
-          contentContainerStyle={[styles.content, { paddingBottom: spacing.section + insets.bottom + spacing.xl }]}
+          contentContainerStyle={[styles.content, { paddingBottom: scrollPaddingBottom }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
@@ -686,56 +693,62 @@ export default function EstablishmentDetailScreen() {
           ) : null}
 
           {/* Annonces de l'école (concours, résultats, bourses…). */}
-          <Section title={t('estDetailAnnouncements')} rtl={isRTL}>
-            {announcementsLoading || isInscriptionsAccessPending ? (
-              <AnnouncementCardSkeletonStack count={2} isRTL={isRTL} />
-            ) : announcements.length === 0 ? (
-              <Text style={[styles.body, isRTL && styles.txtRtl]}>
-                {t('estDetailAnnouncementsEmpty')}
-              </Text>
-            ) : (
-              <View style={styles.announcementsList}>
-                {announcements.map((a, annIndex) => {
-                  const lockedVariant = resolveAnnouncementLockedVariant(
-                    Boolean(a.previewOnly) || showInscriptionsPaywall,
-                    annIndex,
-                  );
-                  const cardLocked = lockedVariant !== 'none';
-                  return (
-                  <AnnouncementCard
-                    key={`ann-${a.id}`}
-                    item={a}
-                    lockedVariant={lockedVariant}
-                    isFollowed={isFollowing}
-                    followStateLoading={isLoggedIn && !followProbeDone}
-                    eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
-                    busy={followBusy}
-                    onToggleFollow={onToggleFollow}
-                    onOpenLink={() => {
-                      if (cardLocked) {
-                        openTawjihPlusProduct();
-                        return;
-                      }
-                      if (a.registrationUrl) {
-                        void Linking.openURL(a.registrationUrl).catch(() => undefined);
-                      }
-                    }}
-                    onUpdateStatus={() => {
-                      if (cardLocked) openTawjihPlusProduct();
-                    }}
-                    onPress={() => {
-                      if (cardLocked) {
-                        openTawjihPlusProduct();
-                        return;
-                      }
-                      router.push(`/inscriptions/${a.id}` as never);
-                    }}
-                  />
-                  );
-                })}
-              </View>
-            )}
-          </Section>
+          <View
+            onLayout={(e) => {
+              announcementsSectionYRef.current = e.nativeEvent.layout.y;
+            }}
+          >
+            <Section title={t('estDetailAnnouncements')} rtl={isRTL}>
+              {announcementsLoading || isInscriptionsAccessPending ? (
+                <AnnouncementCardSkeletonStack count={2} isRTL={isRTL} />
+              ) : announcements.length === 0 ? (
+                <Text style={[styles.body, isRTL && styles.txtRtl]}>
+                  {t('estDetailAnnouncementsEmpty')}
+                </Text>
+              ) : (
+                <View style={styles.announcementsList}>
+                  {announcements.map((a, annIndex) => {
+                    const lockedVariant = resolveAnnouncementLockedVariant(
+                      Boolean(a.previewOnly) || showInscriptionsPaywall,
+                      annIndex,
+                    );
+                    const cardLocked = lockedVariant !== 'none';
+                    return (
+                    <AnnouncementCard
+                      key={`ann-${a.id}`}
+                      item={a}
+                      lockedVariant={lockedVariant}
+                      isFollowed={isFollowing}
+                      followStateLoading={isLoggedIn && !followProbeDone}
+                      eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
+                      busy={followBusy}
+                      onToggleFollow={onToggleFollow}
+                      onOpenLink={() => {
+                        if (cardLocked) {
+                          openTawjihPlusProduct();
+                          return;
+                        }
+                        if (a.registrationUrl) {
+                          void Linking.openURL(a.registrationUrl).catch(() => undefined);
+                        }
+                      }}
+                      onUpdateStatus={() => {
+                        if (cardLocked) openTawjihPlusProduct();
+                      }}
+                      onPress={() => {
+                        if (cardLocked) {
+                          openTawjihPlusProduct();
+                          return;
+                        }
+                        router.push(`/inscriptions/${a.id}` as never);
+                      }}
+                    />
+                    );
+                  })}
+                </View>
+              )}
+            </Section>
+          </View>
 
           {data.mergedDiplomes.length > 0 ? (
             <Section title={t('estDetailDegrees')} rtl={isRTL}>
@@ -815,6 +828,28 @@ export default function EstablishmentDetailScreen() {
           ) : null}
 
         </ScrollView>
+        <View
+          style={[
+            styles.inscriptionFooter,
+            { paddingBottom: insets.bottom + spacing.md },
+            Platform.OS === 'android' && { elevation: 8 },
+          ]}
+        >
+          <Pressable
+            onPress={scrollToAnnouncementsSection}
+            accessibilityRole="button"
+            accessibilityLabel={t('estDetailInscriptionCtaA11y')}
+            style={({ pressed }) => [
+              styles.inscriptionCta,
+              isRTL && styles.rowRtl,
+              pressed && { opacity: 0.9 },
+            ]}
+          >
+            <FontAwesome name="pencil" size={14} color={brand.white} />
+            <Text style={styles.inscriptionCtaTxt}>{t('estDetailInscriptionCta')}</Text>
+          </Pressable>
+        </View>
+        </>
       )}
       </View>
     </View>
@@ -1008,6 +1043,35 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingBottom: spacing.section,
+  },
+  inscriptionFooter: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    backgroundColor: brand.white,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: brand.border,
+    shadowColor: '#0F172A',
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: -4 },
+  },
+  inscriptionCta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    paddingVertical: 14,
+    borderRadius: radius.md,
+    backgroundColor: brand.primary,
+  },
+  inscriptionCtaTxt: {
+    color: brand.white,
+    fontSize: fontSize.md,
+    fontWeight: '800',
   },
   heroCard: {
     marginHorizontal: spacing.xl,

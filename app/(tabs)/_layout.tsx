@@ -7,6 +7,7 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text';
+import { TawjihPlusAccessProvider } from '@/contexts/TawjihPlusAccessContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
@@ -158,6 +159,7 @@ export default function TabLayout() {
     );
 
   return (
+    <TawjihPlusAccessProvider>
     <Tabs
       screenOptions={{
         headerShown: false,
@@ -257,6 +259,7 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
+    </TawjihPlusAccessProvider>
   );
 }
 

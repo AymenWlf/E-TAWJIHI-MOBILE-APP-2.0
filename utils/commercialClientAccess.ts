@@ -4,3 +4,10 @@ import type { UserActiveCommercialService } from '@/services/userActiveServices'
 export function userIsCommercialClient(services: UserActiveCommercialService[]): boolean {
   return services.length > 0;
 }
+
+/** Filtres + listing écoles sup complets : tout client avec au moins un service actif. */
+export function activeServicesGrantSchoolsCatalogAccess(
+  services: UserActiveCommercialService[],
+): boolean {
+  return userIsCommercialClient(services);
+}

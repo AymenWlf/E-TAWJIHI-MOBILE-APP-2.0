@@ -17,7 +17,7 @@ import {
 } from '@/constants/establishmentMedia';
 import { FREE_ESTABLISHMENT_PREVIEW_COUNT, TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useLocale } from '@/contexts/LocaleContext';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import type { MostVisitedEstablishment } from '@/services/establishments';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -204,8 +204,9 @@ export function HomeMostVisitedSchoolsSection({
 }: Props) {
   const { t, isRTL, locale } = useLocale();
   const router = useRouter();
-  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading } = useTawjihPlusAccess();
-  const schoolsCatalogLocked = !tawjihPlusLoading && !hasTawjihPlusAccess;
+  const { hasSchoolsCatalogAccess, loading: schoolsCatalogAccessLoading } =
+    useTawjihPlusAccessContext();
+  const schoolsCatalogLocked = !schoolsCatalogAccessLoading && !hasSchoolsCatalogAccess;
   const preview = items.slice(0, PREVIEW_LIMIT);
 
   return (

@@ -29,7 +29,7 @@ export function TassjilServiceBadge({ included, isRTL }: Props) {
       <FontAwesome
         name={included ? 'check-circle' : 'minus-circle'}
         size={9}
-        color={included ? '#1E40AF' : '#64748B'}
+        color={included ? '#1E40AF' : '#B91C1C'}
       />
       <Text
         style={[styles.text, included ? styles.textIncluded : styles.textNotIncluded, isRTL && styles.rtlText]}
@@ -60,8 +60,8 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(51, 62, 143, 0.18)',
   },
   notIncluded: {
-    backgroundColor: '#F8FAFC',
-    borderColor: '#E2E8F0',
+    backgroundColor: '#FEE2E2',
+    borderColor: '#FECACA',
   },
   text: {
     fontSize: fontSize.xs - 1,
@@ -72,7 +72,7 @@ const styles = StyleSheet.create({
     color: '#1E40AF',
   },
   textNotIncluded: {
-    color: '#64748B',
+    color: '#B91C1C',
   },
   rtlText: {
     textAlign: 'right',

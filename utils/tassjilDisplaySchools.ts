@@ -22,20 +22,11 @@ export function isTassjilSchoolEligible(
   profile: EligibilityProfile | null | undefined,
 ): boolean {
   const filieres = school.filieresAcceptees ?? [];
-  const specialites = school.specialitesBacMissionAcceptees ?? [];
-  const hasCriteria = filieres.length > 0 || specialites.length > 0;
-
-  if (!hasCriteria) {
+  if (filieres.length === 0) {
     return true;
   }
 
-  const verdict = evaluateEligibilityByFiliere(
-    {
-      filieresAcceptees: filieres,
-      specialitesBacMissionAcceptees: specialites,
-    },
-    profile,
-  );
+  const verdict = evaluateEligibilityByFiliere({ filieresAcceptees: filieres }, profile);
 
   return verdict !== 'not_eligible';
 }

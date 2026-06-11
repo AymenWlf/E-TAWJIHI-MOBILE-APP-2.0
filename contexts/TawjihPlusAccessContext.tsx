@@ -16,6 +16,8 @@ import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
 type TawjihPlusAccessContextValue = {
   /** Client avec TAWJIH PLUS ou pack TASSJIL actif (services actifs). */
   hasAccess: boolean;
+  /** Filtres + listing écoles sup : au moins un service commercial actif. */
+  hasSchoolsCatalogAccess: boolean;
   loading: boolean;
   refresh: () => Promise<void>;
   /** Droit inscriptions renvoyé par l’API annonces (prioritaire sur le client seul). */
@@ -39,7 +41,13 @@ const TawjihPlusAccessContext = createContext<TawjihPlusAccessContextValue | nul
 export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) {
   const router = useRouter();
   const { user } = useAuth();
-  const { hasAccess, loading, refresh } = useTawjihPlusAccess();
+  const {
+    hasAccess,
+    hasSchoolsCatalogAccess,
+    globalPartialAccessEnabled,
+    loading,
+    refresh,
+  } = useTawjihPlusAccess();
   const [serverFullAccess, setServerFullAccess] = useState<boolean | null>(null);
   const [serverPartialAccess, setServerPartialAccess] = useState<boolean | null>(null);
   /** Meta `inscriptionsFullAccess` reçue (ou repli client après échec fetch annonces). */
@@ -65,25 +73,42 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
     router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
   }, [router]);
 
-  const isInscriptionsAccessPending = loading || !serverMetaReady;
+  const isInscriptionsAccessPending =
+    loading || (!serverMetaReady && !globalPartialAccessEnabled);
 
   const isInscriptionsPartialAccess = useMemo(() => {
-    if (isInscriptionsAccessPending) return false;
-    if (serverPartialAccess !== null) return serverPartialAccess;
-    return false;
-  }, [isInscriptionsAccessPending, serverPartialAccess]);
+    if (loading) return false;
+    if (globalPartialAccessEnabled) return true;
+    if (!serverMetaReady) return false;
+    return serverPartialAccess === true;
+  }, [globalPartialAccessEnabled, loading, serverMetaReady, serverPartialAccess]);
 
   const isInscriptionsLocked = useMemo(() => {
     if (isInscriptionsAccessPending) return false;
-    if (serverFullAccess !== null || serverPartialAccess !== null) {
-      return !serverFullAccess && !serverPartialAccess;
-    }
+    if (serverFullAccess === true) return false;
+    if (globalPartialAccessEnabled || serverPartialAccess === true) return false;
+    if (serverFullAccess === false && serverPartialAccess === false) return true;
     return !hasAccess;
-  }, [hasAccess, isInscriptionsAccessPending, serverFullAccess, serverPartialAccess]);
+  }, [
+    globalPartialAccessEnabled,
+    hasAccess,
+    isInscriptionsAccessPending,
+    serverFullAccess,
+    serverPartialAccess,
+  ]);
+
+  const effectiveSchoolsCatalogAccess = useMemo(
+    () =>
+      hasSchoolsCatalogAccess ||
+      globalPartialAccessEnabled ||
+      (serverPartialAccess === true && serverMetaReady),
+    [globalPartialAccessEnabled, hasSchoolsCatalogAccess, serverMetaReady, serverPartialAccess],
+  );
 
   const value = useMemo(
     () => ({
       hasAccess: serverFullAccess ?? hasAccess,
+      hasSchoolsCatalogAccess: effectiveSchoolsCatalogAccess,
       loading,
       refresh,
       applyServerInscriptionsAccess,
@@ -96,6 +121,7 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
     [
       applyServerInscriptionsAccess,
       resolveInscriptionsAccessWithoutServer,
+      effectiveSchoolsCatalogAccess,
       hasAccess,
       isInscriptionsAccessPending,
       isInscriptionsLocked,

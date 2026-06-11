@@ -1,29 +1,13 @@
 /**
  * Évaluation locale (côté client) de l'éligibilité d'un étudiant à une annonce
- * ou à une école, à partir des critères publiés (`filieresAcceptees`,
- * `specialitesBacMissionAcceptees`, `anneesBacAcceptees`) et du profil utilisateur
- * (`bacType`, `filiere`, `specialite1/2/3`, `bacAnnee`).
+ * ou à une école, à partir des filières acceptées publiées (`filieresAcceptees`)
+ * et de la filière du bac renseignée dans le profil (`filiere`).
  *
  * Règles métier :
- *  - Si l'école/annonce ne définit AUCUN critère ⇒ statut « unknown » (ouvert à tous,
- *    on ne se prononce pas).
- *  - Si l'utilisateur n'a pas (encore) renseigné les infos correspondantes
- *    ⇒ statut « profileMissing ».
- *  - Sinon on calcule chaque critère présent (filière OU spécialité OU année).
- *    L'éligibilité globale est `true` UNIQUEMENT si l'utilisateur passe TOUS les
- *    critères évaluables. Un critère défini mais non couvert par le profil bloque.
- *  - **Cohérence Bac Normal vs Bac Mission** : selon le type de bac de
- *    l'utilisateur, on n'évalue (et on n'affiche) que le critère pertinent :
- *      • `bacType === 'normal'`  ⇒ uniquement le critère « filière », on ignore
- *        complètement les spécialités du bac mission (si l'école définit les 2,
- *        c'est la filière qui prime pour cet étudiant).
- *      • `bacType === 'mission'` ⇒ uniquement le critère « spécialités »,
- *        on ignore les filières du bac normal.
- *      • `bacType` non défini ⇒ on garde les 2 critères (l'étudiant verra un
- *        statut « profil incomplet » l'invitant à renseigner son type de bac).
- *
- * On ne fait PAS d'inférence sur les combinaisons bac mission (mode simple « OU »
- * uniquement, conformément à la décision produit).
+ *  - Seule la **filière du bac** est prise en compte (spécialités mission, année
+ *    du bac et type de bac sont ignorés).
+ *  - Si l'école/annonce ne définit aucune filière acceptée ⇒ « unknown ».
+ *  - Si l'utilisateur n'a pas renseigné sa filière ⇒ « profile_missing ».
  */
 
 export type EligibilityVerdict =
@@ -118,146 +102,47 @@ function nonEmpty(arr: unknown): string[] {
  * Évalue l'éligibilité d'un utilisateur (`profile`) face à des critères (`criteria`).
  * Si `profile` est `null`/`undefined`, le verdict est 'no_user' (pas affichable).
  */
+/** Profil utilisable pour l'éligibilité filière (filière du bac renseignée). */
+export function hasEligibilityFiliereProfile(
+  profile: EligibilityProfile | null | undefined,
+): boolean {
+  return Boolean((profile?.filiere ?? '').trim());
+}
+
 export function evaluateEligibility(
   criteria: EligibilityCriteria,
   profile: EligibilityProfile | null | undefined,
 ): EligibilityResult {
   const filieres = nonEmpty(criteria.filieresAcceptees);
-  const specialites = nonEmpty(criteria.specialitesBacMissionAcceptees);
-  const annees = nonEmpty(criteria.anneesBacAcceptees);
-
-  const hasAnyCriteria = filieres.length > 0 || specialites.length > 0 || annees.length > 0;
-  if (!hasAnyCriteria) return { verdict: 'unknown', checks: [] };
+  if (filieres.length === 0) return { verdict: 'unknown', checks: [] };
 
   if (!profile) return { verdict: 'no_user', checks: [] };
 
-  const bacType = norm(profile.bacType);
   const userFiliere = (profile.filiere ?? '').trim();
-  const userSpecialites = [profile.specialite1, profile.specialite2, profile.specialite3]
-    .map((s) => (s ?? '').trim())
-    .filter((s) => s !== '');
-  const userAnnee = (profile.bacAnnee ?? '').trim();
+  if (userFiliere === '') {
+    return {
+      verdict: 'profile_missing',
+      checks: [{ key: 'filiere', ok: null, userValues: [], acceptedValues: filieres }],
+    };
+  }
 
-  const checks: EligibilityCheck[] = [];
-
-  /**
-   * Détermine quels critères "type de bac" sont pertinents pour l'utilisateur.
-   * - bac normal  → filières uniquement (on ignore les spécialités).
-   * - bac mission → spécialités uniquement (on ignore les filières).
-   * - non renseigné → on garde les 2 critères (afficher "profil incomplet").
-   */
-  const evaluateFiliere = bacType !== 'mission';
-  const evaluateSpecialite = bacType !== 'normal';
-
-  // Filière (Bac Normal)
-  if (filieres.length > 0 && evaluateFiliere) {
-    if (bacType !== 'normal' || userFiliere === '') {
-      checks.push({ key: 'filiere', ok: null, userValues: [], acceptedValues: filieres });
-    } else {
-      checks.push({
+  const ok = intersects([userFiliere], filieres);
+  return {
+    verdict: ok ? 'eligible' : 'not_eligible',
+    checks: [
+      {
         key: 'filiere',
-        ok: intersects([userFiliere], filieres),
+        ok,
         userValues: [userFiliere],
         acceptedValues: filieres,
-      });
-    }
-  }
-
-  // Spécialités Bac Mission (mode OU simple)
-  if (specialites.length > 0 && evaluateSpecialite) {
-    if (bacType !== 'mission' || userSpecialites.length === 0) {
-      checks.push({
-        key: 'specialiteBacMission',
-        ok: null,
-        userValues: [],
-        acceptedValues: specialites,
-      });
-    } else {
-      checks.push({
-        key: 'specialiteBacMission',
-        ok: intersects(userSpecialites, specialites),
-        userValues: userSpecialites,
-        acceptedValues: specialites,
-      });
-    }
-  }
-
-  /**
-   * Cas particulier — l'école n'accepte QUE le type de bac opposé à celui de
-   * l'utilisateur (ex. spécialités définies, pas de filières, étudiant en bac
-   * normal). On ajoute un méta-check `bacTypeMismatch` pour signaler clairement
-   * « cette annonce s'adresse aux Bac Mission/Normal » plutôt qu'un faux check
-   * filière/spécialité.
-   */
-  if (bacType === 'normal' && filieres.length === 0 && specialites.length > 0) {
-    checks.push({
-      key: 'bacTypeMismatch',
-      ok: false,
-      userValues: [],
-      acceptedValues: [],
-      acceptedBacType: 'mission',
-    });
-  } else if (bacType === 'mission' && specialites.length === 0 && filieres.length > 0) {
-    checks.push({
-      key: 'bacTypeMismatch',
-      ok: false,
-      userValues: [],
-      acceptedValues: [],
-      acceptedBacType: 'normal',
-    });
-  }
-
-  // Année du bac
-  if (annees.length > 0) {
-    if (userAnnee === '') {
-      checks.push({ key: 'anneeBac', ok: null, userValues: [], acceptedValues: annees });
-    } else {
-      checks.push({
-        key: 'anneeBac',
-        ok: intersects([userAnnee], annees),
-        userValues: [userAnnee],
-        acceptedValues: annees,
-      });
-    }
-  }
-
-  // Si tous les critères sont non évaluables (profil incomplet) → profile_missing
-  const evaluable = checks.filter((c) => c.ok !== null);
-  if (evaluable.length === 0) {
-    return { verdict: 'profile_missing', checks };
-  }
-
-  // Si AU MOINS un critère évaluable est faux → not_eligible.
-  // Si AU MOINS un critère reste non évaluable mais les autres passent →
-  // on reste 'profile_missing' (l'utilisateur peut compléter pour confirmer).
-  const anyKo = evaluable.some((c) => c.ok === false);
-  if (anyKo) return { verdict: 'not_eligible', checks };
-
-  const anyMissing = checks.some((c) => c.ok === null);
-  if (anyMissing) return { verdict: 'profile_missing', checks };
-
-  return { verdict: 'eligible', checks };
+      },
+    ],
+  };
 }
 
 /**
- * Variante simplifiée d'`evaluateEligibility` qui n'évalue **que** les
- * critères liés à la filière du Bac (filière Bac Normal + spécialités Bac
- * Mission), en ignorant volontairement le critère « année du bac ».
- *
- * Utilité : sur les listings où l'utilisateur applique un filtre rapide
- * « éligible / non éligible » (ex. liste écoles), on ne veut pas exclure
- * une école juste parce que l'année scolaire renseignée n'apparaît pas
- * dans les années acceptées (souvent un détail administratif et pas un
- * critère d'orientation).
- *
- * Retourne :
- *   - `'eligible'`     : tous les critères filière/spécialités pertinents
- *     pour le type de bac de l'utilisateur sont satisfaits.
- *   - `'not_eligible'` : au moins un critère évaluable échoue, ou le
- *     type de bac de l'utilisateur ne correspond pas aux critères
- *     proposés.
- *   - `'unknown'`      : pas de critère défini OU profil incomplet OU
- *     utilisateur non connecté → on ne peut pas trancher.
+ * Verdict filière pour les filtres listing (écoles sup, annonces, TASSJIL).
+ * Compare uniquement `profile.filiere` aux `filieresAcceptees`.
  */
 export type FiliereEligibilityVerdict = 'eligible' | 'not_eligible' | 'unknown';
 
@@ -266,38 +151,10 @@ export function evaluateEligibilityByFiliere(
   profile: EligibilityProfile | null | undefined,
 ): FiliereEligibilityVerdict {
   const filieres = nonEmpty(criteria.filieresAcceptees);
-  const specialites = nonEmpty(criteria.specialitesBacMissionAcceptees);
-
-  // Aucun critère filière/spécialité défini ⇒ on ne se prononce pas.
-  if (filieres.length === 0 && specialites.length === 0) return 'unknown';
-
-  // Pas d'utilisateur ⇒ pas de verdict possible (même comportement que
-  // `evaluateEligibility` qui retourne `no_user`).
-  if (!profile) return 'unknown';
-
-  const bacType = norm(profile.bacType);
-  const userFiliere = (profile.filiere ?? '').trim();
-  const userSpecialites = [profile.specialite1, profile.specialite2, profile.specialite3]
-    .map((s) => (s ?? '').trim())
-    .filter((s) => s !== '');
-
-  // Bac normal : on regarde la filière. Si l'école n'accepte que des
-  // spécialités Mission, c'est un mismatch (non éligible).
-  if (bacType === 'normal') {
-    if (filieres.length === 0) return 'not_eligible';
-    if (userFiliere === '') return 'unknown';
-    return intersects([userFiliere], filieres) ? 'eligible' : 'not_eligible';
-  }
-
-  // Bac mission : symétrique — on regarde les spécialités.
-  if (bacType === 'mission') {
-    if (specialites.length === 0) return 'not_eligible';
-    if (userSpecialites.length === 0) return 'unknown';
-    return intersects(userSpecialites, specialites) ? 'eligible' : 'not_eligible';
-  }
-
-  // Type de bac non renseigné : on ne peut pas trancher.
-  return 'unknown';
+  if (filieres.length === 0) return 'unknown';
+  if (!hasEligibilityFiliereProfile(profile)) return 'unknown';
+  const userFiliere = (profile!.filiere ?? '').trim();
+  return intersects([userFiliere], filieres) ? 'eligible' : 'not_eligible';
 }
 
 /** Critères annonce + repli établissement si l’annonce ne précise pas la filière / spécialités. */
