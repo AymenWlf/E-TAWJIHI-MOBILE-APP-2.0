@@ -115,6 +115,9 @@ export type AnnouncementBrief = {
   registrationLinkLocked?: boolean;
   /** Countdown / dernier délai masqués (accès partiel annonces). */
   deadlineLocked?: boolean;
+  registrationUrlPending?: boolean;
+  registrationUrlPendingMessageFr?: string | null;
+  registrationUrlPendingMessageAr?: string | null;
 };
 
 export type CandidacyEventType =

@@ -50,6 +50,8 @@ import { shouldShowTassjilServiceBadge } from '@/utils/tassjilServiceIncludedNot
 import type { AnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 import {
   effectiveRegistrationMethods,
+  isOnlineRegistrationPending,
+  pickRegistrationUrlPendingMessage,
   registrationMailto,
 } from '@/utils/contestRegistrationMethods';
 import { AnnouncementRegistrationMethodsSummary } from '@/components/inscriptions/AnnouncementRegistrationMethods';
@@ -344,10 +346,14 @@ export function AnnouncementCard({
     physicalDepositAddressFr: item.physicalDepositAddressFr,
     physicalDepositAddressAr: item.physicalDepositAddressAr,
     registrationUrl: item.registrationUrl,
+    registrationUrlPending: item.registrationUrlPending,
+    registrationUrlPendingMessageFr: item.registrationUrlPendingMessageFr,
+    registrationUrlPendingMessageAr: item.registrationUrlPendingMessageAr,
   };
   const registrationMethods = effectiveRegistrationMethods(registrationMethodsData);
   const hasOnlineUrl =
     registrationMethods.includes('online') && Boolean(item.registrationUrl?.trim());
+  const hasOnlinePending = isOnlineRegistrationPending(registrationMethodsData);
   const hasEmailOnly =
     registrationMethods.includes('email') &&
     Boolean(item.registrationEmail?.trim()) &&
@@ -846,6 +852,18 @@ export function AnnouncementCard({
             registrationLocked={registrationLocked && !contentLocked}
             onLockedPress={promptPartialLock}
           />
+        ) : null}
+
+        {!contentLocked && hasOnlinePending ? (
+          <View style={styles.pendingBanner}>
+            <FontAwesome name="clock-o" size={12} color="#B45309" />
+            <Text style={[styles.pendingBannerTxt, isRTL && styles.rtlText]} numberOfLines={3}>
+              {pickRegistrationUrlPendingMessage(
+                registrationMethodsData,
+                locale === 'ar' ? 'ar' : 'fr',
+              )}
+            </Text>
+          </View>
         ) : null}
 
         {/* Statut candidature */}
@@ -1406,6 +1424,24 @@ const styles = StyleSheet.create({
     backgroundColor: brand.white,
   },
   btnLinkTxt: { color: brand.primary, fontSize: fontSize.sm, fontWeight: '700', flexShrink: 1 },
+  pendingBanner: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  pendingBannerTxt: {
+    flex: 1,
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    color: '#92400E',
+    lineHeight: 18,
+  },
   btnDisabled: { opacity: 0.4 },
   tourActionDisabled: { opacity: 0.38 },
   rtlText: {

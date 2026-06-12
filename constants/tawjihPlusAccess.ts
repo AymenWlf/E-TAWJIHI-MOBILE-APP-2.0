@@ -33,3 +33,20 @@ export function activeServicesGrantTawjihPlusAccess(
 ): boolean {
   return services.some(serviceGrantsTawjihPlusAccess);
 }
+
+export type TawjihPlusUserFlags = {
+  tassjilAccess?: boolean;
+  legacyLink?: { linked?: boolean; hasTassjilCandidate?: boolean } | null;
+};
+
+/** Services Dev2 actifs + client TASSJIL legacy (dossier / compte lié). */
+export function userGrantsTawjihPlusInscriptionsAccess(
+  user: TawjihPlusUserFlags | null | undefined,
+  services: UserActiveCommercialService[] = [],
+): boolean {
+  if (activeServicesGrantTawjihPlusAccess(services)) return true;
+  if (!user) return false;
+  if (user.tassjilAccess === true) return true;
+  if (user.legacyLink?.linked || user.legacyLink?.hasTassjilCandidate) return true;
+  return false;
+}

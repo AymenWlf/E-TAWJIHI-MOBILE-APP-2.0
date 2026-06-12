@@ -78,17 +78,20 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
 
   const isInscriptionsPartialAccess = useMemo(() => {
     if (loading) return false;
+    /** Client payant TAWJIH PLUS / TASSJIL : pas de limite « aperçu partiel ». */
+    if (hasAccess) return false;
     if (globalPartialAccessEnabled) return true;
     if (!serverMetaReady) return false;
     return serverPartialAccess === true;
-  }, [globalPartialAccessEnabled, loading, serverMetaReady, serverPartialAccess]);
+  }, [globalPartialAccessEnabled, hasAccess, loading, serverMetaReady, serverPartialAccess]);
 
   const isInscriptionsLocked = useMemo(() => {
     if (isInscriptionsAccessPending) return false;
+    /** Priorité aux services client / TASSJIL legacy sur la meta liste annonces. */
+    if (hasAccess) return false;
     if (serverFullAccess === true) return false;
     if (globalPartialAccessEnabled || serverPartialAccess === true) return false;
-    if (serverFullAccess === false && serverPartialAccess === false) return true;
-    return !hasAccess;
+    return true;
   }, [
     globalPartialAccessEnabled,
     hasAccess,
@@ -107,7 +110,7 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
 
   const value = useMemo(
     () => ({
-      hasAccess: serverFullAccess ?? hasAccess,
+      hasAccess: hasAccess || serverFullAccess === true,
       hasSchoolsCatalogAccess: effectiveSchoolsCatalogAccess,
       loading,
       refresh,

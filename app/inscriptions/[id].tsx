@@ -90,6 +90,8 @@ import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
 import {
   effectiveRegistrationMethods,
   hasAnyRegistrationModality,
+  isOnlineRegistrationPending,
+  pickRegistrationUrlPendingMessage,
   primaryRegistrationUrl,
   registrationMailto,
 } from '@/utils/contestRegistrationMethods';
@@ -524,11 +526,13 @@ export default function InscriptionDetailScreen() {
   const hasDocuments = data.documentsUtiles.length > 0 || contentLocked;
   const hasOnlineAction =
     registrationMethods.includes('online') && Boolean(primaryRegistrationUrl(data));
+  const hasOnlinePending = isOnlineRegistrationPending(data);
   const hasEmailAction =
     registrationMethods.includes('email') && Boolean(data.registrationEmail?.trim());
   const showRegistrationFooter =
     registrationLocked ||
     hasOnlineAction ||
+    hasOnlinePending ||
     hasEmailAction ||
     (registrationMethods.length === 0 && Boolean(data.registrationUrl?.trim()));
   /** Hauteur barre sticky (padding + CTA, hors safe area du footer). */
@@ -1155,44 +1159,53 @@ export default function InscriptionDetailScreen() {
             Platform.OS === 'android' && { elevation: 8 },
           ]}
         >
-          <Pressable
-            onPress={onPressOpenLink}
-            style={({ pressed }) => [
-              styles.cta,
-              registrationLocked && styles.ctaLocked,
-              isRTL && styles.rowRtl,
-              pressed && { opacity: 0.9 },
-            ]}
-          >
-            <FontAwesome
-              name={
-                registrationLocked
-                  ? 'lock'
-                  : hasEmailAction && !hasOnlineAction
-                    ? 'envelope'
-                    : 'external-link'
-              }
-              size={14}
-              color={registrationLocked ? '#64748B' : brand.white}
-            />
-            <Text
-              style={registrationLocked ? styles.ctaTxtLocked : styles.ctaTxt}
-              numberOfLines={2}
+          {hasOnlinePending && !registrationLocked ? (
+            <View style={[styles.ctaPending, isRTL && styles.rowRtl]}>
+              <FontAwesome name="clock-o" size={14} color="#B45309" />
+              <Text style={[styles.ctaPendingTxt, isRTL && styles.rtl]} numberOfLines={3}>
+                {pickRegistrationUrlPendingMessage(data, locale === 'ar' ? 'ar' : 'fr')}
+              </Text>
+            </View>
+          ) : (
+            <Pressable
+              onPress={onPressOpenLink}
+              style={({ pressed }) => [
+                styles.cta,
+                registrationLocked && styles.ctaLocked,
+                isRTL && styles.rowRtl,
+                pressed && { opacity: 0.9 },
+              ]}
             >
-              {registrationLocked
-                ? registrationLinkLabel
-                : hasEmailAction && !hasOnlineAction
-                  ? locale === 'ar'
-                    ? 'إرسال بريد إلكتروني'
-                    : 'Envoyer un e-mail'
-                  : pickRegistrationUrlLabel(
-                      data.registrationUrlLabel,
-                      data.announcementType || data.type,
-                      t,
-                      locale,
-                    )}
-            </Text>
-          </Pressable>
+              <FontAwesome
+                name={
+                  registrationLocked
+                    ? 'lock'
+                    : hasEmailAction && !hasOnlineAction
+                      ? 'envelope'
+                      : 'external-link'
+                }
+                size={14}
+                color={registrationLocked ? '#64748B' : brand.white}
+              />
+              <Text
+                style={registrationLocked ? styles.ctaTxtLocked : styles.ctaTxt}
+                numberOfLines={2}
+              >
+                {registrationLocked
+                  ? registrationLinkLabel
+                  : hasEmailAction && !hasOnlineAction
+                    ? locale === 'ar'
+                      ? 'إرسال بريد إلكتروني'
+                      : 'Envoyer un e-mail'
+                    : pickRegistrationUrlLabel(
+                        data.registrationUrlLabel,
+                        data.announcementType || data.type,
+                        t,
+                        locale,
+                      )}
+              </Text>
+            </Pressable>
+          )}
         </View>
       ) : null}
 
@@ -1886,6 +1899,24 @@ const styles = StyleSheet.create({
     backgroundColor: brand.primary,
   },
   ctaTxt: { color: brand.white, fontSize: fontSize.md, fontWeight: '800' },
+  ctaPending: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    paddingVertical: 14,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#FDE68A',
+    backgroundColor: '#FFFBEB',
+  },
+  ctaPendingTxt: {
+    flex: 1,
+    color: '#92400E',
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    lineHeight: 20,
+  },
   ctaLocked: {
     backgroundColor: '#F1F5F9',
     borderWidth: StyleSheet.hairlineWidth,

@@ -42,6 +42,9 @@ export type ContestAnnouncementCard = {
   registrationEmail: string | null;
   physicalDepositAddressFr: string | null;
   physicalDepositAddressAr: string | null;
+  registrationUrlPending?: boolean;
+  registrationUrlPendingMessageFr?: string | null;
+  registrationUrlPendingMessageAr?: string | null;
   ogImage: string | null;
   /** Liens utiles personnalisés (label + URL). */
   liensUtiles: CustomLink[];
@@ -80,6 +83,9 @@ type RawCard = {
   registrationEmail?: string | null;
   physicalDepositAddressFr?: string | null;
   physicalDepositAddressAr?: string | null;
+  registrationUrlPending?: boolean;
+  registrationUrlPendingMessageFr?: string | null;
+  registrationUrlPendingMessageAr?: string | null;
   ogImage?: string | null;
   isOpen?: boolean;
   isExpire?: boolean;
@@ -232,6 +238,15 @@ function normalize(c: RawCard): ContestAnnouncementCard {
       typeof c.physicalDepositAddressAr === 'string' && c.physicalDepositAddressAr.trim() !== ''
         ? c.physicalDepositAddressAr.trim()
         : null,
+    registrationUrlPending: c.registrationUrlPending === true,
+    registrationUrlPendingMessageFr:
+      typeof c.registrationUrlPendingMessageFr === 'string' && c.registrationUrlPendingMessageFr.trim() !== ''
+        ? c.registrationUrlPendingMessageFr.trim()
+        : null,
+    registrationUrlPendingMessageAr:
+      typeof c.registrationUrlPendingMessageAr === 'string' && c.registrationUrlPendingMessageAr.trim() !== ''
+        ? c.registrationUrlPendingMessageAr.trim()
+        : null,
     ogImage: c.ogImage ?? null,
     liensUtiles: liens,
     filieresAcceptees: Array.isArray(c.filieresAcceptees) ? c.filieresAcceptees : [],
@@ -361,6 +376,9 @@ export function announcementBriefToListCard(b: AnnouncementBrief): ContestAnnoun
     registrationEmail: b.registrationEmail ?? null,
     physicalDepositAddressFr: b.physicalDepositAddressFr ?? null,
     physicalDepositAddressAr: b.physicalDepositAddressAr ?? null,
+    registrationUrlPending: b.registrationUrlPending === true,
+    registrationUrlPendingMessageFr: b.registrationUrlPendingMessageFr ?? null,
+    registrationUrlPendingMessageAr: b.registrationUrlPendingMessageAr ?? null,
     ogImage: b.ogImage ?? null,
     liensUtiles: b.liensUtiles ?? [],
     filieresAcceptees: b.filieresAcceptees ?? [],
@@ -406,6 +424,9 @@ export function contestDetailToListCard(d: ContestAnnouncementDetail): ContestAn
     registrationEmail: d.registrationEmail,
     physicalDepositAddressFr: d.physicalDepositAddressFr,
     physicalDepositAddressAr: d.physicalDepositAddressAr,
+    registrationUrlPending: d.registrationUrlPending === true,
+    registrationUrlPendingMessageFr: d.registrationUrlPendingMessageFr ?? null,
+    registrationUrlPendingMessageAr: d.registrationUrlPendingMessageAr ?? null,
     ogImage: d.ogImage,
     liensUtiles: d.liensUtiles,
     filieresAcceptees: d.filieresAcceptees,
@@ -486,6 +507,9 @@ export type ContestAnnouncementDetail = {
   registrationEmail: string | null;
   physicalDepositAddressFr: string | null;
   physicalDepositAddressAr: string | null;
+  registrationUrlPending?: boolean;
+  registrationUrlPendingMessageFr?: string | null;
+  registrationUrlPendingMessageAr?: string | null;
   preRegistrationFee: string | null;
   ogImage: string | null;
   descriptionLeadImage: string | null;
@@ -545,6 +569,9 @@ type RawDetail = {
   registrationEmail?: string | null;
   physicalDepositAddressFr?: string | null;
   physicalDepositAddressAr?: string | null;
+  registrationUrlPending?: boolean;
+  registrationUrlPendingMessageFr?: string | null;
+  registrationUrlPendingMessageAr?: string | null;
   fraisPreinscription?: string | null;
   ogImage?: string | null;
   descriptionLeadImage?: string | null;
@@ -703,6 +730,15 @@ function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
     physicalDepositAddressAr:
       typeof d.physicalDepositAddressAr === 'string' && d.physicalDepositAddressAr.trim() !== ''
         ? d.physicalDepositAddressAr.trim()
+        : null,
+    registrationUrlPending: d.registrationUrlPending === true,
+    registrationUrlPendingMessageFr:
+      typeof d.registrationUrlPendingMessageFr === 'string' && d.registrationUrlPendingMessageFr.trim() !== ''
+        ? d.registrationUrlPendingMessageFr.trim()
+        : null,
+    registrationUrlPendingMessageAr:
+      typeof d.registrationUrlPendingMessageAr === 'string' && d.registrationUrlPendingMessageAr.trim() !== ''
+        ? d.registrationUrlPendingMessageAr.trim()
         : null,
     preRegistrationFee: d.fraisPreinscription ?? null,
     ogImage: d.ogImage ?? null,

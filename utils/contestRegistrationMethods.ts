@@ -1,13 +1,24 @@
 /** Modalités d'inscription d'une annonce concours (multi-sélection). */
 export type ContestRegistrationMethod = 'online' | 'physical' | 'email';
 
-export type ContestRegistrationMethodsData = {
+export type ContestRegistrationUrlPendingData = {
+  registrationUrlPending?: boolean | null;
+  registrationUrlPendingMessageFr?: string | null;
+  registrationUrlPendingMessageAr?: string | null;
+};
+
+export type ContestRegistrationMethodsData = ContestRegistrationUrlPendingData & {
   registrationMethods?: ContestRegistrationMethod[] | null;
   registrationEmail?: string | null;
   physicalDepositAddressFr?: string | null;
   physicalDepositAddressAr?: string | null;
   registrationUrl?: string | null;
 };
+
+export const DEFAULT_REGISTRATION_URL_PENDING_MESSAGE_FR =
+  "Le lien d'inscription en ligne sera publié prochainement.";
+export const DEFAULT_REGISTRATION_URL_PENDING_MESSAGE_AR =
+  'سيتم نشر رابط التسجيل عبر الإنترنت قريباً.';
 
 export const CONTEST_REGISTRATION_METHOD_OPTIONS: {
   value: ContestRegistrationMethod;
@@ -85,13 +96,39 @@ export function pickPhysicalDepositAddress(
   return ar;
 }
 
+export function isOnlineRegistrationPending(data: ContestRegistrationMethodsData): boolean {
+  const methods = effectiveRegistrationMethods(data);
+  if (!methods.includes('online')) return false;
+  if (primaryRegistrationUrl(data)) return false;
+  return data.registrationUrlPending === true;
+}
+
+export function pickRegistrationUrlPendingMessage(
+  data: ContestRegistrationUrlPendingData,
+  locale: 'fr' | 'ar' = 'fr',
+): string {
+  const primary =
+    locale === 'ar'
+      ? (data.registrationUrlPendingMessageAr ?? '').trim()
+      : (data.registrationUrlPendingMessageFr ?? '').trim();
+  if (primary) return primary;
+  const fallback =
+    locale === 'ar'
+      ? (data.registrationUrlPendingMessageFr ?? '').trim()
+      : (data.registrationUrlPendingMessageAr ?? '').trim();
+  if (fallback) return fallback;
+  return locale === 'ar'
+    ? DEFAULT_REGISTRATION_URL_PENDING_MESSAGE_AR
+    : DEFAULT_REGISTRATION_URL_PENDING_MESSAGE_FR;
+}
+
 export function hasAnyRegistrationModality(
   data: ContestRegistrationMethodsData,
 ): boolean {
   const methods = effectiveRegistrationMethods(data);
   if (methods.length === 0) return false;
   const url = (data.registrationUrl ?? '').trim();
-  if (methods.includes('online') && url) return true;
+  if (methods.includes('online') && (url || isOnlineRegistrationPending(data))) return true;
   if (methods.includes('email') && (data.registrationEmail ?? '').trim()) return true;
   if (
     methods.includes('physical') &&

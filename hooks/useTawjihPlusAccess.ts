@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 
-import { activeServicesGrantTawjihPlusAccess } from '@/constants/tawjihPlusAccess';
+import { userGrantsTawjihPlusInscriptionsAccess } from '@/constants/tawjihPlusAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import { fetchTawjihPlusPublicSettings } from '@/services/tawjihPlusSettings';
 import { fetchUserActiveServices } from '@/services/userActiveServices';
@@ -50,18 +50,18 @@ export function useTawjihPlusAccess() {
       const services = await fetchUserActiveServices(token);
       if (gen === loadGenRef.current) {
         const clientSchools = activeServicesGrantSchoolsCatalogAccess(services);
-        setHasAccess(activeServicesGrantTawjihPlusAccess(services));
+        setHasAccess(userGrantsTawjihPlusInscriptionsAccess(user, services));
         setHasSchoolsCatalogAccess(partialGlobal || clientSchools);
         setLoading(false);
       }
     } catch {
       if (gen === loadGenRef.current) {
-        setHasAccess(false);
+        setHasAccess(userGrantsTawjihPlusInscriptionsAccess(user, []));
         setHasSchoolsCatalogAccess(partialGlobal);
         setLoading(false);
       }
     }
-  }, [getValidAccessToken, user?.id]);
+  }, [getValidAccessToken, user]);
 
   useEffect(() => {
     void refresh();

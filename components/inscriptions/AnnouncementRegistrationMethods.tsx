@@ -6,7 +6,9 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
   effectiveRegistrationMethods,
   formatRegistrationMethodsList,
+  isOnlineRegistrationPending,
   pickPhysicalDepositAddress,
+  pickRegistrationUrlPendingMessage,
   primaryRegistrationUrl,
   registrationMailto,
   registrationMethodLabel,
@@ -160,16 +162,23 @@ export function AnnouncementRegistrationMethodsPanel({
             );
           }
           if (!url) {
+            const pending = isOnlineRegistrationPending(data);
             return (
-              <View key={method} style={styles.block}>
+              <View key={method} style={[styles.block, pending && styles.blockPending]}>
                 <View style={[styles.row, isRTL && styles.rowRtl]}>
                   <FontAwesome name="globe" size={14} color={brand.primary} />
                   <Text style={[styles.blockTitle, isRTL && styles.rtl]}>
                     {registrationMethodLabel(method, locale)}
                   </Text>
                 </View>
-                <Text style={[styles.muted, isRTL && styles.rtl]}>
-                  {locale === 'ar' ? 'الرابط غير متوفر' : 'Lien non renseigné'}
+                <Text
+                  style={[pending ? styles.pendingTxt : styles.muted, isRTL && styles.rtl]}
+                  dir={locale === 'ar' ? 'rtl' : 'ltr'}>
+                  {pending
+                    ? pickRegistrationUrlPendingMessage(data, locale)
+                    : locale === 'ar'
+                      ? 'الرابط غير متوفر'
+                      : 'Lien non renseigné'}
                 </Text>
               </View>
             );
@@ -358,4 +367,14 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   muted: { fontSize: fontSize.xs, color: '#64748B' },
+  blockPending: {
+    backgroundColor: '#FFFBEB',
+    borderColor: '#FDE68A',
+  },
+  pendingTxt: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: '#92400E',
+    lineHeight: 20,
+  },
 });
