@@ -21,6 +21,7 @@ import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnost
 import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
 import { TassjilServiceBadge } from '@/components/inscriptions/TassjilServiceBadge';
 import { ContestYoutubeTutorial } from '@/components/inscriptions/ContestYoutubeTutorial';
+import { AnnouncementRegistrationMethodsPanel } from '@/components/inscriptions/AnnouncementRegistrationMethods';
 import {
   EligibilityBadge,
   EligibilitySummary,
@@ -80,12 +81,18 @@ import {
   pickRegistrationUrlLabel,
 } from '@/utils/candidacyStatus';
 import { splitSiblingsAroundCurrent } from '@/utils/contestAnnouncementSiblings';
-import { downloadDocument, pickDocumentIcon, viewDocument } from '@/utils/documents';
+import { downloadDocument, pickDocumentIcon, resolveDocumentUrl, viewDocument } from '@/utils/documents';
 import { evaluateEligibility } from '@/utils/eligibility';
 import { shouldShowTassjilServiceBadge } from '@/utils/tassjilServiceIncludedNotice';
 import { fireAndForget } from '@/utils/fireAndForget';
 import { promptTawjihPlusPartialFeatureLock } from '@/utils/tawjihPlusParcoursGate';
 import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
+import {
+  effectiveRegistrationMethods,
+  hasAnyRegistrationModality,
+  primaryRegistrationUrl,
+  registrationMailto,
+} from '@/utils/contestRegistrationMethods';
 
 export default function InscriptionDetailScreen() {
   const router = useRouter();
@@ -130,6 +137,7 @@ export default function InscriptionDetailScreen() {
   const contentLocked = !isInscriptionsAccessPending && (data?.previewOnly ?? isInscriptionsLocked);
   const registrationLocked =
     contentLocked || (data?.registrationLinkLocked === true && !contentLocked);
+  const documentsLocked = registrationLocked;
   const deadlineLockedPartial =
     !contentLocked && data?.deadlineLocked === true;
   const pageLoading = loading || isInscriptionsAccessPending;
@@ -389,12 +397,37 @@ export default function InscriptionDetailScreen() {
       }
       return;
     }
-    if (!data?.registrationUrl) return;
-    fireAndForget(recordContestClick(data.id, 'detail'));
-    void Linking.openURL(data.registrationUrl).catch(() =>
-      Alert.alert('Erreur', "Impossible d'ouvrir le lien."),
-    );
+    if (!data) return;
+    const methods = effectiveRegistrationMethods(data);
+    const onlineUrl = primaryRegistrationUrl(data);
+    const email = (data.registrationEmail ?? '').trim();
+    if (methods.includes('online') && onlineUrl) {
+      fireAndForget(recordContestClick(data.id, 'detail'));
+      void Linking.openURL(onlineUrl).catch(() =>
+        Alert.alert('Erreur', "Impossible d'ouvrir le lien."),
+      );
+      return;
+    }
+    if (methods.includes('email') && email) {
+      fireAndForget(recordContestClick(data.id, 'detail'));
+      void Linking.openURL(registrationMailto(email)).catch(() =>
+        Alert.alert('Erreur', "Impossible d'ouvrir l'e-mail."),
+      );
+    }
   }, [contentLocked, data, openTawjihPlusProduct, registrationLocked, t]);
+
+  const onDocumentsLockedPress = useCallback(() => {
+    if (contentLocked) {
+      openTawjihPlusProduct();
+      return;
+    }
+    promptTawjihPlusPartialFeatureLock({
+      hasAccess: false,
+      loading: false,
+      openProduct: openTawjihPlusProduct,
+      t,
+    });
+  }, [contentLocked, openTawjihPlusProduct, t]);
 
   /* ───────── Render ───────── */
 
@@ -487,8 +520,17 @@ export default function InscriptionDetailScreen() {
     locale,
   );
 
+  const registrationMethods = effectiveRegistrationMethods(data);
+  const hasDocuments = data.documentsUtiles.length > 0 || contentLocked;
+  const hasOnlineAction =
+    registrationMethods.includes('online') && Boolean(primaryRegistrationUrl(data));
+  const hasEmailAction =
+    registrationMethods.includes('email') && Boolean(data.registrationEmail?.trim());
   const showRegistrationFooter =
-    registrationLocked || Boolean(data.registrationUrl?.trim());
+    registrationLocked ||
+    hasOnlineAction ||
+    hasEmailAction ||
+    (registrationMethods.length === 0 && Boolean(data.registrationUrl?.trim()));
   /** Hauteur barre sticky (padding + CTA, hors safe area du footer). */
   const registrationFooterBarHeight = 80;
   const scrollPaddingBottom = showRegistrationFooter
@@ -850,6 +892,78 @@ export default function InscriptionDetailScreen() {
           </DetailSection>
         ) : null}
 
+        {(hasAnyRegistrationModality(data) || registrationLocked || hasDocuments) ? (
+          <DetailSection
+            title={locale === 'ar' ? 'طرق التسجيل' : "Modalités d'inscription"}
+            icon="edit"
+            rtl={isRTL}
+            locked={contentLocked && !registrationLocked && !hasDocuments}>
+            {(hasAnyRegistrationModality(data) || registrationLocked) ? (
+              <AnnouncementRegistrationMethodsPanel
+                data={data}
+                locale={locale}
+                isRTL={isRTL}
+                registrationLocked={registrationLocked}
+                onOnlinePress={onPressOpenLink}
+                onLockedPress={() => {
+                  if (contentLocked) openTawjihPlusProduct();
+                  else
+                    promptTawjihPlusPartialFeatureLock({
+                      hasAccess: false,
+                      loading: false,
+                      openProduct: openTawjihPlusProduct,
+                      t,
+                    });
+                }}
+              />
+            ) : null}
+
+            {hasDocuments ? (
+              <View
+                style={[
+                  styles.documentsInInscriptionBlock,
+                  (hasAnyRegistrationModality(data) || registrationLocked) && styles.documentsInInscriptionBlockSpaced,
+                ]}>
+                <View style={[styles.documentsSubheading, isRTL && styles.rowRtl]}>
+                  <FontAwesome name="file-text-o" size={13} color={brand.primary} />
+                  <Text style={[styles.documentsSubheadingTxt, isRTL && styles.rtl]}>
+                    {t('inscDetailDocuments')}
+                  </Text>
+                  {documentsLocked ? (
+                    <View style={[styles.documentsPlusBadge, isRTL && styles.rowRtl]}>
+                      <FontAwesome name="lock" size={9} color={brand.primary} />
+                      <Text style={styles.documentsPlusBadgeTxt}>TAWJIH PLUS</Text>
+                    </View>
+                  ) : null}
+                </View>
+                {data.documentsUtiles.length > 0 ? (
+                  <View style={{ gap: spacing.sm }}>
+                    {data.documentsUtiles.map((d, i) => (
+                      <DocumentRow
+                        key={`${d.url}-${i}`}
+                        url={d.url}
+                        title={d.titre || d.url}
+                        rtl={isRTL}
+                        locked={documentsLocked}
+                        onLockedPress={onDocumentsLockedPress}
+                        viewLabel={t('inscDetailDocumentView')}
+                        downloadLabel={t('inscDetailDocumentDownload')}
+                        downloadingLabel={t('inscDetailDocumentDownloading')}
+                        errorTitle={t('inscDetailDocumentDownloadErrorTitle')}
+                        errorMsg={t('inscDetailDocumentDownloadErrorMsg')}
+                        sharingUnavailableTitle={t('inscDetailDocumentSharingUnavailableTitle')}
+                        sharingUnavailableMsg={t('inscDetailDocumentSharingUnavailableMsg')}
+                      />
+                    ))}
+                  </View>
+                ) : (
+                  <Text style={[styles.muted, isRTL && styles.rtl]}>—</Text>
+                )}
+              </View>
+            ) : null}
+          </DetailSection>
+        ) : null}
+
         {/* ── Tutoriel vidéo (YouTube) ── */}
         {data.inscriptionTutorialYoutubeUrl &&
         parseYoutubeVideoId(data.inscriptionTutorialYoutubeUrl) ? (
@@ -1030,33 +1144,6 @@ export default function InscriptionDetailScreen() {
           </DetailSection>
         ) : null}
 
-        {/* ── Documents utiles (aperçu in-app + téléchargement) ── */}
-        {data.documentsUtiles.length > 0 || contentLocked ? (
-          <DetailSection title={t('inscDetailDocuments')} icon="file-text-o" rtl={isRTL} locked={contentLocked}>
-            {data.documentsUtiles.length > 0 ? (
-              <View style={{ gap: spacing.sm }}>
-                {data.documentsUtiles.map((d, i) => (
-                  <DocumentRow
-                    key={`${d.url}-${i}`}
-                    url={d.url}
-                    title={d.titre || d.url}
-                    rtl={isRTL}
-                    viewLabel={t('inscDetailDocumentView')}
-                    downloadLabel={t('inscDetailDocumentDownload')}
-                    downloadingLabel={t('inscDetailDocumentDownloading')}
-                    errorTitle={t('inscDetailDocumentDownloadErrorTitle')}
-                    errorMsg={t('inscDetailDocumentDownloadErrorMsg')}
-                    sharingUnavailableTitle={t('inscDetailDocumentSharingUnavailableTitle')}
-                    sharingUnavailableMsg={t('inscDetailDocumentSharingUnavailableMsg')}
-                  />
-                ))}
-              </View>
-            ) : (
-              <Text style={[styles.muted, isRTL && styles.rtl]}>—</Text>
-            )}
-          </DetailSection>
-        ) : null}
-
       </ScrollView>
 
       {/* ── Footer sticky : lien d'inscription (padding scroll pour ne pas masquer la dernière section) ── */}
@@ -1078,7 +1165,13 @@ export default function InscriptionDetailScreen() {
             ]}
           >
             <FontAwesome
-              name={registrationLocked ? 'lock' : 'external-link'}
+              name={
+                registrationLocked
+                  ? 'lock'
+                  : hasEmailAction && !hasOnlineAction
+                    ? 'envelope'
+                    : 'external-link'
+              }
               size={14}
               color={registrationLocked ? '#64748B' : brand.white}
             />
@@ -1088,12 +1181,16 @@ export default function InscriptionDetailScreen() {
             >
               {registrationLocked
                 ? registrationLinkLabel
-                : pickRegistrationUrlLabel(
-                    data.registrationUrlLabel,
-                    data.announcementType || data.type,
-                    t,
-                    locale,
-                  )}
+                : hasEmailAction && !hasOnlineAction
+                  ? locale === 'ar'
+                    ? 'إرسال بريد إلكتروني'
+                    : 'Envoyer un e-mail'
+                  : pickRegistrationUrlLabel(
+                      data.registrationUrlLabel,
+                      data.announcementType || data.type,
+                      t,
+                      locale,
+                    )}
             </Text>
           </Pressable>
         </View>
@@ -1184,6 +1281,8 @@ function DocumentRow({
   url,
   title,
   rtl,
+  locked,
+  onLockedPress,
   viewLabel,
   downloadLabel,
   downloadingLabel,
@@ -1195,6 +1294,8 @@ function DocumentRow({
   url: string;
   title: string;
   rtl: boolean;
+  locked: boolean;
+  onLockedPress: () => void;
   viewLabel: string;
   downloadLabel: string;
   downloadingLabel: string;
@@ -1207,14 +1308,23 @@ function DocumentRow({
   const icon = pickDocumentIcon(url);
 
   const onView = useCallback(async () => {
-    const ok = await viewDocument(url);
-    if (!ok) {
-      // Fallback ultime : ouvrir le navigateur système.
-      void Linking.openURL(url).catch(() => undefined);
+    if (locked) {
+      onLockedPress();
+      return;
     }
-  }, [url]);
+    const absoluteUrl = resolveDocumentUrl(url);
+    const ok = await viewDocument(url);
+    if (!ok && absoluteUrl) {
+      // Fallback ultime : ouvrir le navigateur système.
+      void Linking.openURL(absoluteUrl).catch(() => undefined);
+    }
+  }, [locked, onLockedPress, url]);
 
   const onDownload = useCallback(async () => {
+    if (locked) {
+      onLockedPress();
+      return;
+    }
     if (downloading) return;
     setDownloading(true);
     const result = await downloadDocument(url, title);
@@ -1228,6 +1338,8 @@ function DocumentRow({
     }
   }, [
     downloading,
+    locked,
+    onLockedPress,
     url,
     title,
     sharingUnavailableTitle,
@@ -1237,8 +1349,7 @@ function DocumentRow({
   ]);
 
   return (
-    <View style={styles.docCard}>
-      {/* Bandeau titre — appui = aperçu in-app. */}
+    <View style={[styles.docCard, locked && styles.docCardLocked]}>
       <Pressable
         onPress={onView}
         style={({ pressed }) => [
@@ -1250,45 +1361,57 @@ function DocumentRow({
         accessibilityRole="button"
       >
         <View style={styles.docIconWrap}>
-          <FontAwesome name={icon} size={20} color={brand.primary} />
+          <FontAwesome name={icon} size={20} color={locked ? brand.textMuted : brand.primary} />
         </View>
-        <Text style={[styles.docTitle, rtl && styles.rtl]} numberOfLines={3}>
-          {title}
-        </Text>
+        <View style={styles.docTitleCol}>
+          <Text style={[styles.docTitle, rtl && styles.rtl]} numberOfLines={3}>
+            {title}
+          </Text>
+          {locked ? (
+            <View style={[styles.lockedValueRow, rtl && styles.rowRtl]}>
+              <Text style={styles.datePillLockedPlaceholder} aria-hidden importantForAccessibility="no-hide-descendants">
+                ——————
+              </Text>
+              <FontAwesome name="lock" size={10} color="#64748B" />
+            </View>
+          ) : null}
+        </View>
       </Pressable>
 
       <View style={[styles.docActions, rtl && styles.rowRtl]}>
         <Pressable
           onPress={onView}
-          disabled={downloading}
+          disabled={downloading && !locked}
           style={({ pressed }) => [
             styles.docActionGhost,
+            locked && styles.docActionLocked,
             rtl && styles.rowRtl,
             pressed && { opacity: 0.85 },
-            downloading && { opacity: 0.5 },
+            downloading && !locked && { opacity: 0.5 },
           ]}
         >
-          <FontAwesome name="eye" size={12} color={brand.primary} />
-          <Text style={styles.docActionGhostTxt}>{viewLabel}</Text>
+          <FontAwesome name={locked ? 'lock' : 'eye'} size={12} color={locked ? brand.textMuted : brand.primary} />
+          <Text style={[styles.docActionGhostTxt, locked && styles.docActionLockedTxt]}>{viewLabel}</Text>
         </Pressable>
         <Pressable
           onPress={onDownload}
-          disabled={downloading}
-          accessibilityState={{ busy: downloading, disabled: downloading }}
+          disabled={downloading && !locked}
+          accessibilityState={{ busy: downloading && !locked, disabled: downloading && !locked }}
           style={({ pressed }) => [
             styles.docActionPrimary,
+            locked && styles.docActionPrimaryLocked,
             rtl && styles.rowRtl,
-            pressed && !downloading && { opacity: 0.9 },
-            downloading && { opacity: 0.85 },
+            pressed && !downloading && !locked && { opacity: 0.9 },
+            downloading && !locked && { opacity: 0.85 },
           ]}
         >
-          {downloading ? (
+          {downloading && !locked ? (
             <ActivityIndicator size="small" color={brand.white} />
           ) : (
-            <FontAwesome name="download" size={12} color={brand.white} />
+            <FontAwesome name={locked ? 'lock' : 'download'} size={12} color={locked ? brand.primary : brand.white} />
           )}
-          <Text style={styles.docActionPrimaryTxt} numberOfLines={1}>
-            {downloading ? downloadingLabel : downloadLabel}
+          <Text style={[styles.docActionPrimaryTxt, locked && styles.docActionLockedTxt]} numberOfLines={1}>
+            {downloading && !locked ? downloadingLabel : downloadLabel}
           </Text>
         </Pressable>
       </View>
@@ -1637,11 +1760,21 @@ const styles = StyleSheet.create({
     borderColor: brand.border,
     overflow: 'hidden',
   },
+  docCardLocked: {
+    backgroundColor: '#F8FAFC',
+    borderColor: '#E2E8F0',
+  },
   docHeader: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
     padding: spacing.md,
+  },
+  docTitleCol: { flex: 1, gap: 4 },
+  lockedValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
   },
   docIconWrap: {
     width: 38,
@@ -1652,6 +1785,39 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   docTitle: { flex: 1, color: brand.text, fontSize: fontSize.sm, fontWeight: '700' },
+  documentsInInscriptionBlock: { gap: spacing.sm },
+  documentsInInscriptionBlockSpaced: {
+    marginTop: spacing.md,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: 'rgba(148,163,184,0.35)',
+  },
+  documentsSubheading: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flexWrap: 'wrap',
+  },
+  documentsSubheadingTxt: {
+    color: brand.text,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+  },
+  documentsPlusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(51,62,143,0.08)',
+  },
+  documentsPlusBadgeTxt: {
+    color: brand.primary,
+    fontSize: 10,
+    fontWeight: '800',
+    letterSpacing: 0.3,
+  },
   docActions: {
     flexDirection: 'row',
     alignItems: 'stretch',
@@ -1672,6 +1838,11 @@ const styles = StyleSheet.create({
     backgroundColor: brand.white,
   },
   docActionGhostTxt: { color: brand.primary, fontSize: fontSize.xs, fontWeight: '800' },
+  docActionLocked: {
+    borderColor: 'rgba(148,163,184,0.55)',
+    backgroundColor: '#F8FAFC',
+  },
+  docActionLockedTxt: { color: brand.textMuted },
   docActionPrimary: {
     flex: 1,
     flexDirection: 'row',
@@ -1683,6 +1854,11 @@ const styles = StyleSheet.create({
     backgroundColor: brand.primary,
   },
   docActionPrimaryTxt: { color: brand.white, fontSize: fontSize.xs, fontWeight: '800' },
+  docActionPrimaryLocked: {
+    backgroundColor: '#E2E8F0',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(148,163,184,0.55)',
+  },
 
   /* Sticky footer */
   footer: {

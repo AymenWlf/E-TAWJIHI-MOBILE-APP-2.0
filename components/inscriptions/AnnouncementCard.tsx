@@ -48,6 +48,11 @@ import { isPremiereBacNiveau } from '@/utils/academicFiliere';
 import { evaluateEligibility } from '@/utils/eligibility';
 import { shouldShowTassjilServiceBadge } from '@/utils/tassjilServiceIncludedNotice';
 import type { AnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
+import {
+  effectiveRegistrationMethods,
+  registrationMailto,
+} from '@/utils/contestRegistrationMethods';
+import { AnnouncementRegistrationMethodsSummary } from '@/components/inscriptions/AnnouncementRegistrationMethods';
 
 type Props = {
   item: ContestAnnouncementCard;
@@ -333,11 +338,27 @@ export function AnnouncementCard({
   const followInteractionEnabled = !tourGate || tourGate === 'follow';
   const statusInteractionEnabled = !tourGate || tourGate === 'status';
   const linkInteractionEnabled = !tourGate || tourGate === 'link';
-  const hasRegistrationUrl = Boolean(item.registrationUrl?.trim());
+  const registrationMethodsData = {
+    registrationMethods: item.registrationMethods,
+    registrationEmail: item.registrationEmail,
+    physicalDepositAddressFr: item.physicalDepositAddressFr,
+    physicalDepositAddressAr: item.physicalDepositAddressAr,
+    registrationUrl: item.registrationUrl,
+  };
+  const registrationMethods = effectiveRegistrationMethods(registrationMethodsData);
+  const hasOnlineUrl =
+    registrationMethods.includes('online') && Boolean(item.registrationUrl?.trim());
+  const hasEmailOnly =
+    registrationMethods.includes('email') &&
+    Boolean(item.registrationEmail?.trim()) &&
+    !hasOnlineUrl;
+  const hasRegistrationUrl = hasOnlineUrl;
   /** Tutoriel « lien d'inscription » : le tap doit rester actif même sans URL API. */
   const canPressRegistrationLink =
     linkInteractionEnabled &&
-    (registrationLocked || hasRegistrationUrl || tourGate === 'link');
+    (registrationLocked || hasOnlineUrl || hasEmailOnly || tourGate === 'link');
+  const showRegistrationLinkBtn =
+    registrationLocked || hasOnlineUrl || hasEmailOnly || tourGate === 'link';
 
   const hasMetaPanel =
     Boolean(villesShort) ||
@@ -447,6 +468,10 @@ export function AnnouncementCard({
             return;
           }
           if (!linkInteractionEnabled) return;
+          if (hasEmailOnly && item.registrationEmail?.trim()) {
+            void Linking.openURL(registrationMailto(item.registrationEmail)).catch(() => undefined);
+            return;
+          }
           onOpenLink();
         }}
         disabled={!locked && !canPressRegistrationLink}
@@ -463,7 +488,7 @@ export function AnnouncementCard({
           tourFocusActive('link') && styles.btnLinkFocus,
         ]}>
         <FontAwesome
-          name={locked ? 'lock' : 'external-link'}
+          name={locked ? 'lock' : hasEmailOnly ? 'envelope' : 'external-link'}
           size={11}
           color={locked ? '#64748B' : brand.primary}
         />
@@ -474,7 +499,13 @@ export function AnnouncementCard({
             isRTL && styles.rtlText,
           ]}
           numberOfLines={2}>
-          {registrationLinkLabel}
+          {locked
+            ? t('inscTawjihPlusUpgradeCta')
+            : hasEmailOnly
+              ? locale === 'ar'
+                ? 'إرسال بريد إلكتروني'
+                : 'Envoyer un e-mail'
+              : registrationLinkLabel}
         </Text>
       </Pressable>
     </TourFocusWrap>
@@ -807,6 +838,16 @@ export function AnnouncementCard({
           </View>
         ) : null}
 
+        {!contentLocked && (registrationMethods.length > 0 || registrationLocked) ? (
+          <AnnouncementRegistrationMethodsSummary
+            data={registrationMethodsData}
+            locale={locale}
+            isRTL={isRTL}
+            registrationLocked={registrationLocked && !contentLocked}
+            onLockedPress={promptPartialLock}
+          />
+        ) : null}
+
         {/* Statut candidature */}
         {showStatusAction ? (
           <TourFocusWrap
@@ -827,7 +868,9 @@ export function AnnouncementCard({
         <View style={styles.actionsCol}>
           <View style={styles.actionsRow}>
             {followBtn(false)}
-            {registrationLinkBtn(false, registrationLocked && !contentLocked)}
+            {showRegistrationLinkBtn
+              ? registrationLinkBtn(false, registrationLocked && !contentLocked)
+              : null}
           </View>
         </View>
           </>

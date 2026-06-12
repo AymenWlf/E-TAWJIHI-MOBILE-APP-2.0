@@ -8,6 +8,10 @@ import type {
 } from '@/types/inscriptions';
 import { fireAndForget } from '@/utils/fireAndForget';
 import type { ContestSiblingBrief } from '@/utils/contestAnnouncementSiblings';
+import {
+  sanitizeRegistrationMethods,
+  type ContestRegistrationMethod,
+} from '@/utils/contestRegistrationMethods';
 import { getMobileVisitorId } from '@/utils/visitorId';
 
 /**
@@ -34,6 +38,10 @@ export type ContestAnnouncementCard = {
   registrationUrlLabel: string | null;
   /** Libellé arabe du bouton CTA (optionnel, ex. tutoriel / données enrichies). */
   registrationUrlLabelAr?: string | null;
+  registrationMethods: ContestRegistrationMethod[];
+  registrationEmail: string | null;
+  physicalDepositAddressFr: string | null;
+  physicalDepositAddressAr: string | null;
   ogImage: string | null;
   /** Liens utiles personnalisés (label + URL). */
   liensUtiles: CustomLink[];
@@ -68,6 +76,10 @@ type RawCard = {
   dateFin: string;
   lienInscription?: string | null;
   registrationUrlLabel?: string | null;
+  registrationMethods?: string[];
+  registrationEmail?: string | null;
+  physicalDepositAddressFr?: string | null;
+  physicalDepositAddressAr?: string | null;
   ogImage?: string | null;
   isOpen?: boolean;
   isExpire?: boolean;
@@ -207,6 +219,19 @@ function normalize(c: RawCard): ContestAnnouncementCard {
       typeof c.registrationUrlLabel === 'string' && c.registrationUrlLabel.trim() !== ''
         ? c.registrationUrlLabel.trim()
         : null,
+    registrationMethods: sanitizeRegistrationMethods(c.registrationMethods),
+    registrationEmail:
+      typeof c.registrationEmail === 'string' && c.registrationEmail.trim() !== ''
+        ? c.registrationEmail.trim()
+        : null,
+    physicalDepositAddressFr:
+      typeof c.physicalDepositAddressFr === 'string' && c.physicalDepositAddressFr.trim() !== ''
+        ? c.physicalDepositAddressFr.trim()
+        : null,
+    physicalDepositAddressAr:
+      typeof c.physicalDepositAddressAr === 'string' && c.physicalDepositAddressAr.trim() !== ''
+        ? c.physicalDepositAddressAr.trim()
+        : null,
     ogImage: c.ogImage ?? null,
     liensUtiles: liens,
     filieresAcceptees: Array.isArray(c.filieresAcceptees) ? c.filieresAcceptees : [],
@@ -332,6 +357,10 @@ export function announcementBriefToListCard(b: AnnouncementBrief): ContestAnnoun
     daysUntilClose: days,
     registrationUrl: b.registrationUrl ?? '',
     registrationUrlLabel: b.registrationUrlLabel ?? null,
+    registrationMethods: sanitizeRegistrationMethods(b.registrationMethods),
+    registrationEmail: b.registrationEmail ?? null,
+    physicalDepositAddressFr: b.physicalDepositAddressFr ?? null,
+    physicalDepositAddressAr: b.physicalDepositAddressAr ?? null,
     ogImage: b.ogImage ?? null,
     liensUtiles: b.liensUtiles ?? [],
     filieresAcceptees: b.filieresAcceptees ?? [],
@@ -373,6 +402,10 @@ export function contestDetailToListCard(d: ContestAnnouncementDetail): ContestAn
     daysUntilClose: d.daysUntilClose,
     registrationUrl: d.registrationUrl,
     registrationUrlLabel: d.registrationUrlLabel,
+    registrationMethods: d.registrationMethods,
+    registrationEmail: d.registrationEmail,
+    physicalDepositAddressFr: d.physicalDepositAddressFr,
+    physicalDepositAddressAr: d.physicalDepositAddressAr,
     ogImage: d.ogImage,
     liensUtiles: d.liensUtiles,
     filieresAcceptees: d.filieresAcceptees,
@@ -449,6 +482,10 @@ export type ContestAnnouncementDetail = {
   registrationUrl: string;
   /** Libellé personnalisé du bouton CTA (vide ⇒ libellé par défaut selon le type). */
   registrationUrlLabel: string | null;
+  registrationMethods: ContestRegistrationMethod[];
+  registrationEmail: string | null;
+  physicalDepositAddressFr: string | null;
+  physicalDepositAddressAr: string | null;
   preRegistrationFee: string | null;
   ogImage: string | null;
   descriptionLeadImage: string | null;
@@ -504,6 +541,10 @@ type RawDetail = {
   descriptionAr?: string | null;
   lienOfficiel?: string;
   registrationUrlLabel?: string | null;
+  registrationMethods?: string[];
+  registrationEmail?: string | null;
+  physicalDepositAddressFr?: string | null;
+  physicalDepositAddressAr?: string | null;
   fraisPreinscription?: string | null;
   ogImage?: string | null;
   descriptionLeadImage?: string | null;
@@ -649,6 +690,19 @@ function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
     registrationUrlLabel:
       typeof d.registrationUrlLabel === 'string' && d.registrationUrlLabel.trim() !== ''
         ? d.registrationUrlLabel.trim()
+        : null,
+    registrationMethods: sanitizeRegistrationMethods(d.registrationMethods),
+    registrationEmail:
+      typeof d.registrationEmail === 'string' && d.registrationEmail.trim() !== ''
+        ? d.registrationEmail.trim()
+        : null,
+    physicalDepositAddressFr:
+      typeof d.physicalDepositAddressFr === 'string' && d.physicalDepositAddressFr.trim() !== ''
+        ? d.physicalDepositAddressFr.trim()
+        : null,
+    physicalDepositAddressAr:
+      typeof d.physicalDepositAddressAr === 'string' && d.physicalDepositAddressAr.trim() !== ''
+        ? d.physicalDepositAddressAr.trim()
         : null,
     preRegistrationFee: d.fraisPreinscription ?? null,
     ogImage: d.ogImage ?? null,

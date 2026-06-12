@@ -15,12 +15,21 @@
 import * as WebBrowser from 'expo-web-browser';
 import * as Sharing from 'expo-sharing';
 import { Directory, File, Paths } from 'expo-file-system';
+import { getEstablishmentFileUrl } from '@/constants/establishmentMedia';
+
+/** Chemins `/uploads/...` → URL absolue API ; URLs http(s) inchangées. */
+export function resolveDocumentUrl(url: string): string {
+  const trimmed = url.trim();
+  if (!trimmed) return '';
+  return getEstablishmentFileUrl(trimmed) ?? trimmed;
+}
 
 /** Ouvre le document dans un navigateur in-app (Safari View / Custom Tab). */
 export async function viewDocument(url: string): Promise<boolean> {
   try {
-    if (!url) return false;
-    await WebBrowser.openBrowserAsync(url, {
+    const absoluteUrl = resolveDocumentUrl(url);
+    if (!absoluteUrl) return false;
+    await WebBrowser.openBrowserAsync(absoluteUrl, {
       presentationStyle: WebBrowser.WebBrowserPresentationStyle.OVER_FULL_SCREEN,
       readerMode: false,
       showTitle: true,
@@ -43,18 +52,19 @@ export async function downloadDocument(
   url: string,
   suggestedName?: string,
 ): Promise<{ ok: boolean; reason?: 'invalid-url' | 'download-failed' | 'sharing-unavailable' }> {
-  if (!url) return { ok: false, reason: 'invalid-url' };
+  const absoluteUrl = resolveDocumentUrl(url);
+  if (!absoluteUrl) return { ok: false, reason: 'invalid-url' };
   try {
     // Dossier dédié dans le cache : nettoyé automatiquement par l'OS si la
     // place vient à manquer, mais accessible le temps de la session.
     const dir = new Directory(Paths.cache, 'documents');
     if (!dir.exists) dir.create({ intermediates: true });
 
-    const filename = buildLocalFilename(url, suggestedName);
+    const filename = buildLocalFilename(absoluteUrl, suggestedName);
     const target = new File(dir, filename);
     if (target.exists) target.delete();
 
-    await File.downloadFileAsync(url, target);
+    await File.downloadFileAsync(absoluteUrl, target);
 
     const sharingAvailable = await Sharing.isAvailableAsync();
     if (!sharingAvailable) {
@@ -62,9 +72,9 @@ export async function downloadDocument(
     }
 
     await Sharing.shareAsync(target.uri, {
-      mimeType: guessMimeType(url),
+      mimeType: guessMimeType(absoluteUrl),
       dialogTitle: filename,
-      UTI: guessUti(url),
+      UTI: guessUti(absoluteUrl),
     });
     return { ok: true };
   } catch {
