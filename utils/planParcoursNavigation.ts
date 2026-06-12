@@ -1,7 +1,7 @@
 import { router } from 'expo-router';
 
 import { PLAN_PARCOURS_STEP_IDS, type PlanParcoursStepId } from '@/constants/orientationParcours';
-import { triggerAppFeedback } from '@/contexts/AppFeedbackContext';
+import { triggerParcoursFeedback } from '@/contexts/ParcoursFeedbackContext';
 import { openApplyToSchoolsTour } from '@/utils/applyToSchoolsTourNavigation';
 import {
   navigateToSchoolDiagnosticEntry,
@@ -57,7 +57,7 @@ function navigatePlanParcoursStepUnlocked(
       );
       return;
     case PLAN_PARCOURS_STEP_IDS.feedback:
-      triggerAppFeedback({ markParcoursStep: true });
+      triggerParcoursFeedback();
       return;
     case PLAN_PARCOURS_STEP_IDS.applyToSchools:
       openApplyToSchoolsTour(tawjihPlusGate);

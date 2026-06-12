@@ -42,7 +42,7 @@ import {
 import { PLAN_PARCOURS_MOBILE_STEP_KEYS } from '@/constants/orientationParcours';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
-import { submitAppFeedback } from '@/services/appFeedback';
+import { submitParcoursAppFeedback } from '@/services/parcoursAppFeedback';
 import { completePlanParcoursStep } from '@/services/planParcoursStepComplete';
 import { getUserFacingApiError } from '@/utils/apiError';
 import { homeShell } from '@/theme/homeShell';
@@ -277,7 +277,7 @@ export function AppFeedbackModal({
         {} as Record<AppFeedbackRatingKey, number>,
       );
 
-      await submitAppFeedback(token, {
+      await submitParcoursAppFeedback(token, {
         ratings: ratingsPayload,
         texts: {
           improve: texts.improve.trim(),

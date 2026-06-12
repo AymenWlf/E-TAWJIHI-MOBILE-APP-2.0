@@ -31,7 +31,9 @@ type AuthUser = {
   firstName?: string | null;
   lastName?: string | null;
   is_setup?: boolean;
+  setupCompletedAt?: string | null;
   roles?: string[];
+  createdAt?: string | null;
   tassjilAccess?: boolean;
   legacyLink?: {
     linked?: boolean;

@@ -52,7 +52,7 @@ import { anneesBacOptionsForLocale } from '@/utils/bacSchoolYearLabels';
 import { deleteMyAccount } from '@/services/auth';
 import { getApiBaseUrl } from '@/constants/api';
 import type { HomeCopyKey } from '@/constants/i18n';
-import { useAppFeedback } from '@/contexts/AppFeedbackContext';
+import { useSimpleAppFeedback } from '@/contexts/SimpleAppFeedbackContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { invalidateEligibilityProfileCache } from '@/hooks/useEligibilityProfile';
@@ -67,6 +67,7 @@ import { useUserReferral } from '@/hooks/useUserReferral';
 import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { getReferralRequiredServiceName, isReferralProgramUnlocked } from '@/services/userReferral';
+import { userIsCommercialClient } from '@/utils/commercialClientAccess';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { homeShell } from '@/theme/homeShell';
 import { formatOrderCreatedAtShort } from '@/utils/dateParis';
@@ -79,7 +80,7 @@ import { countOpenShopOrders, isShopOrderClosed, shopOrderStatusUi } from '@/uti
 
 export default function CompteTabScreen() {
   const router = useRouter();
-  const { openAppFeedback } = useAppFeedback();
+  const { openSimpleAppFeedback } = useSimpleAppFeedback();
   const { user, isLoading: authLoading, getValidAccessToken, reloadMe, logout } = useAuth();
   const { t, isRTL, locale } = useLocale();
   const insets = useSafeAreaInsets();
@@ -802,17 +803,21 @@ export default function CompteTabScreen() {
               onOrderPress={(publicId) => router.push(`/compte/commande/${publicId}`)}
             />
 
-            <View style={styles.profileStackItem}>
-              <AppFeedbackAccountCard
-                rtl={isRTL}
-                t={t}
-                services={activeServices}
-                servicesLoaded={activeServicesLoaded}
-                servicesLoading={activeServicesLoading}
-                onOpenFeedback={() => openAppFeedback()}
-                onLockedPress={() => router.push(TAWJIH_PLUS_PRODUCT_PATH as never)}
-              />
-            </View>
+            {Platform.OS !== 'web' ? (
+              <View style={styles.profileStackItem}>
+                <AppFeedbackAccountCard
+                  rtl={isRTL}
+                  t={t}
+                  onOpenFeedback={() =>
+                    openSimpleAppFeedback({
+                      isCommercialClient: activeServicesLoaded
+                        ? userIsCommercialClient(activeServices)
+                        : undefined,
+                    })
+                  }
+                />
+              </View>
+            ) : null}
 
             <View style={[styles.card, styles.profileStackItem]}>
               <View style={styles.sectionHead}>

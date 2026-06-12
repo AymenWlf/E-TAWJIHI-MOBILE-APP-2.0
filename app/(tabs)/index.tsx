@@ -65,7 +65,7 @@ import {
 } from '@/constants/orientationParcours';
 import { fetchPlanParcoursCompletion } from '@/services/planParcours';
 import { resetPlanParcoursStepDev } from '@/services/planReussiteSteps';
-import { useAppFeedback } from '@/contexts/AppFeedbackContext';
+import { useParcoursFeedback } from '@/contexts/ParcoursFeedbackContext';
 import { navigatePlanParcoursStep, type PlanParcoursNavigationAuth } from '@/utils/planParcoursNavigation';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
@@ -114,7 +114,7 @@ export default function IndexScreen() {
   const { open: openSidebar } = useAppSidebar();
   const { unreadCount: notifUnreadCount, openDrawer, refreshUnread } = useNotificationsDrawer();
   const { user, isLoading, getValidAccessToken, reloadMe } = useAuth();
-  const { openAppFeedback } = useAppFeedback();
+  const { openParcoursFeedback } = useParcoursFeedback();
   const {
     hasAccess: hasTawjihPlusAccess,
     loading: tawjihPlusLoading,
@@ -472,8 +472,7 @@ export default function IndexScreen() {
       closeOrientationOverview();
       if (stepId === PLAN_PARCOURS_STEP_IDS.feedback) {
         guardTawjihPlusParcoursStep(stepId, tawjihPlusGate, () => {
-          openAppFeedback({
-            markParcoursStep: true,
+          openParcoursFeedback({
             onSubmitted: () => void refreshPlanParcours(),
           });
         });
@@ -483,7 +482,7 @@ export default function IndexScreen() {
     },
     [
       closeOrientationOverview,
-      openAppFeedback,
+      openParcoursFeedback,
       planParcoursNavAuth,
       refreshPlanParcours,
       tawjihPlusGate,

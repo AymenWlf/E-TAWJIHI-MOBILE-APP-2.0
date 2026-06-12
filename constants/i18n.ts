@@ -424,6 +424,23 @@ export type HomeCopyKey =
   | 'appFeedbackLockedBody'
   | 'appFeedbackLockedCta'
   | 'appFeedbackClientRequired'
+  | 'appFeedbackSimpleTitle'
+  | 'appFeedbackSimpleEyebrow'
+  | 'appFeedbackSimpleIntroClient'
+  | 'appFeedbackSimpleIntroGuest'
+  | 'appFeedbackSimpleStarsLabel'
+  | 'appFeedbackSimpleCommentLabel'
+  | 'appFeedbackSimpleCommentPh'
+  | 'appFeedbackSimpleSubmit'
+  | 'appFeedbackSimpleLater'
+  | 'appFeedbackSimpleThanks'
+  | 'appFeedbackSimpleThanksSub'
+  | 'appFeedbackSimpleRatingRequired'
+  | 'appFeedbackSimpleAccountHint'
+  | 'appFeedbackSimpleStoreTitle'
+  | 'appFeedbackSimpleStoreSub'
+  | 'appFeedbackSimpleStoreCtaIos'
+  | 'appFeedbackSimpleStoreCtaAndroid'
   | 'appUpdateEyebrow'
   | 'appUpdateTitleRequired'
   | 'appUpdateTitleRecommended'
@@ -2166,6 +2183,26 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       'Pour partager votre retour sur l’application, vous devez disposer d’un service E-Tawjihi actif (Tawjih Plus, Tassjil…).',
     appFeedbackLockedCta: 'Découvrir nos services',
     appFeedbackClientRequired: 'Cette fonctionnalité est réservée aux clients avec un service actif.',
+    appFeedbackSimpleTitle: 'Votre avis compte',
+    appFeedbackSimpleEyebrow: 'Retour utilisateur',
+    appFeedbackSimpleIntroClient:
+      'En tant que client E-Tawjihi, dites-nous en une note et quelques mots ce que vous pensez de l’application.',
+    appFeedbackSimpleIntroGuest:
+      'Dites-nous en une note et quelques mots ce que vous pensez de l’application E-Tawjihi.',
+    appFeedbackSimpleStarsLabel: 'Note globale',
+    appFeedbackSimpleCommentLabel: 'Commentaire (optionnel)',
+    appFeedbackSimpleCommentPh: 'Ce que vous aimez, ce qui pourrait être amélioré…',
+    appFeedbackSimpleSubmit: 'Envoyer',
+    appFeedbackSimpleLater: 'Plus tard',
+    appFeedbackSimpleThanks: 'Merci !',
+    appFeedbackSimpleThanksSub: 'Votre avis nous aide à améliorer E-Tawjihi pour tous les lycéens.',
+    appFeedbackSimpleRatingRequired: 'Merci de choisir une note entre 1 et 5 étoiles.',
+    appFeedbackSimpleAccountHint: 'Partagez votre expérience en quelques secondes.',
+    appFeedbackSimpleStoreTitle: 'Merci pour les 5 étoiles !',
+    appFeedbackSimpleStoreSub:
+      'Votre avis public sur l’App Store ou Google Play nous aide énormément à faire connaître E-Tawjihi aux lycéens.',
+    appFeedbackSimpleStoreCtaIos: 'Noter sur l’App Store',
+    appFeedbackSimpleStoreCtaAndroid: 'Noter sur Google Play',
     appUpdateEyebrow: 'Mise à jour',
     appUpdateTitleRequired: 'Mise à jour obligatoire',
     appUpdateTitleRecommended: 'Nouvelle version disponible',
@@ -4020,6 +4057,25 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       'لمشاركة ملاحظاتك على التطبيق، يلزم امتلاك خدمة E-Tawjihi نشطة (Tawjih Plus، Tassjil…).',
     appFeedbackLockedCta: 'اكتشف خدماتنا',
     appFeedbackClientRequired: 'هذه الميزة مخصّصة للعملاء الذين لديهم خدمة نشطة.',
+    appFeedbackSimpleTitle: 'رأيك يهمّنا',
+    appFeedbackSimpleEyebrow: 'ملاحظات المستخدمين',
+    appFeedbackSimpleIntroClient:
+      'بصفتك عميل E-Tawjihi، أخبرنا بتقييمك وملاحظاتك القصيرة عن التطبيق.',
+    appFeedbackSimpleIntroGuest: 'أخبرنا بتقييمك وملاحظاتك القصيرة عن تطبيق E-Tawjihi.',
+    appFeedbackSimpleStarsLabel: 'التقييم العام',
+    appFeedbackSimpleCommentLabel: 'تعليق (اختياري)',
+    appFeedbackSimpleCommentPh: 'ما يعجبك، ما يمكن تحسينه…',
+    appFeedbackSimpleSubmit: 'إرسال',
+    appFeedbackSimpleLater: 'لاحقاً',
+    appFeedbackSimpleThanks: 'شكراً!',
+    appFeedbackSimpleThanksSub: 'رأيك يساعدنا على تحسين E-Tawjihi لجميع التلاميذ.',
+    appFeedbackSimpleRatingRequired: 'يُرجى اختيار تقييم من 1 إلى 5 نجوم.',
+    appFeedbackSimpleAccountHint: 'شارك تجربتك في ثوانٍ.',
+    appFeedbackSimpleStoreTitle: 'شكراً على 5 نجوم!',
+    appFeedbackSimpleStoreSub:
+      'تقييمك العلني على App Store أو Google Play يساعدنا كثيراً في التعريف بـ E-Tawjihi بين التلاميذ.',
+    appFeedbackSimpleStoreCtaIos: 'التقييم على App Store',
+    appFeedbackSimpleStoreCtaAndroid: 'التقييم على Google Play',
     appUpdateEyebrow: 'تحديث',
     appUpdateTitleRequired: 'تحديث إلزامي',
     appUpdateTitleRecommended: 'إصدار جديد متوفر',
