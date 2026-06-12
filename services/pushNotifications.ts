@@ -482,6 +482,35 @@ async function handleNotificationTap(
     return;
   }
 
+  if (data.type === 'admin_campaign') {
+    const linkKind = String(data.link_kind ?? data.linkKind ?? 'mobile');
+    const webUrl =
+      typeof data.web_url === 'string'
+        ? data.web_url.trim()
+        : typeof data.webUrl === 'string'
+          ? data.webUrl.trim()
+          : '';
+    if (linkKind === 'web' && webUrl !== '') {
+      try {
+        await Linking.openURL(webUrl);
+      } catch {
+        /* noop */
+      }
+      return;
+    }
+    const route =
+      typeof data.route === 'string' && data.route.trim() !== '' ? data.route.trim() : '/(tabs)';
+    if (isGlobalWallMobileRoute(route)) {
+      return;
+    }
+    try {
+      router.push(route as Parameters<typeof router.push>[0]);
+    } catch {
+      /* noop */
+    }
+    return;
+  }
+
   if (data.type === 'platform_event' || data.type === 'follow_school_new_platform_event') {
     const idRaw = data.platformEventId ?? data.platform_event_id;
     const id = typeof idRaw === 'string' ? Number(idRaw) : idRaw;

@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import { Linking } from 'react-native';
 
 import { GLOBAL_WALL_MOBILE_ENABLED, isGlobalWallMobileRoute } from '@/constants/mobileFeatureFlags';
 import type { AppNotification } from '@/types/inscriptions';
@@ -28,6 +29,20 @@ export function canNavigateFromAppNotification(n: AppNotification): boolean {
   }
 
   if (type === 'welcome') {
+    return true;
+  }
+
+  if (type === 'admin_campaign') {
+    const linkKind = String(meta.link_kind ?? meta.linkKind ?? 'mobile');
+    if (linkKind === 'web') {
+      const webUrl =
+        typeof meta.web_url === 'string'
+          ? meta.web_url.trim()
+          : typeof meta.webUrl === 'string'
+            ? meta.webUrl.trim()
+            : '';
+      return webUrl !== '';
+    }
     return true;
   }
 
@@ -129,6 +144,26 @@ export function navigateFromAppNotification(n: AppNotification): boolean {
 
   if (type === 'welcome') {
     router.push('/(tabs)' as never);
+    return true;
+  }
+
+  if (type === 'admin_campaign') {
+    const linkKind = String(meta.link_kind ?? meta.linkKind ?? 'mobile');
+    if (linkKind === 'web') {
+      const webUrl =
+        typeof meta.web_url === 'string'
+          ? meta.web_url.trim()
+          : typeof meta.webUrl === 'string'
+            ? meta.webUrl.trim()
+            : '';
+      if (webUrl !== '') {
+        void Linking.openURL(webUrl);
+        return true;
+      }
+    }
+    const route =
+      typeof meta.route === 'string' && meta.route.trim() !== '' ? meta.route.trim() : '/(tabs)';
+    router.push(route as never);
     return true;
   }
 
