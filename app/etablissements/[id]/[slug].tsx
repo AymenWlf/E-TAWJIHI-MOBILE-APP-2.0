@@ -50,7 +50,10 @@ import {
   type ContestAnnouncementCard,
 } from '@/services/contestAnnouncements';
 import {
+  establishmentBlocksPartnerBanners,
+  fetchListingPlacementsByEstablishment,
   recordReferencingPageViewNative,
+  type ListingPlacementInfo,
 } from '@/services/referencingAds';
 import {
   recordEstablishmentDetailImpressionOnce,
@@ -153,6 +156,8 @@ export default function EstablishmentDetailScreen() {
   const [data, setData] = useState<EstablishmentNormalized | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
+  const [listingPlacement, setListingPlacement] = useState<ListingPlacementInfo | null>(null);
+  const [listingPlacementResolved, setListingPlacementResolved] = useState(false);
 
   /* Annonces publiées de cet établissement (concours, résultats, bourses…). */
   const [announcements, setAnnouncements] = useState<ContestAnnouncementCard[]>([]);
@@ -282,6 +287,38 @@ export default function EstablishmentDetailScreen() {
       cancelled = true;
     };
   }, [canLoadEstablishmentDetail, id, slug, t]);
+
+  useEffect(() => {
+    if (!Number.isFinite(id) || id <= 0) {
+      setListingPlacement(null);
+      setListingPlacementResolved(false);
+      return;
+    }
+    if (loading) return;
+
+    let cancelled = false;
+    setListingPlacementResolved(false);
+    void fetchListingPlacementsByEstablishment()
+      .then((map) => {
+        if (cancelled) return;
+        setListingPlacement(map[id] ?? null);
+      })
+      .catch(() => {
+        if (!cancelled) setListingPlacement(null);
+      })
+      .finally(() => {
+        if (!cancelled) setListingPlacementResolved(true);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [id, loading]);
+
+  const showPartnerBannersOnDetail = useMemo(() => {
+    if (!listingPlacementResolved) return false;
+    return !establishmentBlocksPartnerBanners(listingPlacement ?? data);
+  }, [listingPlacement, listingPlacementResolved, data]);
 
   /* Tracking analytique : impression « detail » (1 fois par session pour
      éviter de gonfler les chiffres si l'utilisateur ouvre/ferme la même
@@ -591,7 +628,9 @@ export default function EstablishmentDetailScreen() {
             </Section>
           ) : null}
 
-          <AppBannerSlot zone="mid_square" analyticsPage="/mobile/ecoles/detail" style={{ marginHorizontal: spacing.md }} />
+          {showPartnerBannersOnDetail ? (
+            <AppBannerSlot zone="mid_square" analyticsPage="/mobile/ecoles/detail" style={{ marginHorizontal: spacing.md }} />
+          ) : null}
 
           <Section title={t('estDetailPresentation')} rtl={isRTL}>
             <View style={[styles.presentationBody, isRTL && styles.presentationBodyRtl]}>

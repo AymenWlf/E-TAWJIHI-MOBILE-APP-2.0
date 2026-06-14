@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -9,6 +10,8 @@ import {
   View,
   type ViewStyle,
 } from 'react-native';
+import { Gesture, GestureDetector } from 'react-native-gesture-handler';
+import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 
 import { Text } from '@/components/ui/Text';
 import {
@@ -29,6 +32,10 @@ import { fireAndForget } from '@/utils/fireAndForget';
 
 /** Déduplication session (survit aux remontages FlatList). */
 const recordedBannerImpressions = new Set<string>();
+
+const SLIDE_DURATION_MS = 10_000;
+const SLIDE_ANIM_MS = 300;
+const SWIPE_THRESHOLD_PX = 48;
 
 function bannerImpressionKey(
   slotId: number,
@@ -57,8 +64,7 @@ const HORIZONTAL_SAFE = spacing.lg * 2;
 
 /**
  * Bandeau publicitaire — créatives API, KPI comptés comme **app mobile native**
- * (`clientSurface: native_app`). Téléphone : 320×100 ; tablette (≥768px) zones `top` / `mid` :
- * 728×90 desktop (aligné web `md:`).
+ * (`clientSurface: native_app`). Rotation 10 s, swipe / flèches après la 1ʳᵉ bannière (aligné web).
  */
 export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
   const isSquare = zone === 'mid_square';
@@ -80,16 +86,98 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
     return { wideW, wideH, squareSide: PARTNER_BANNER_SQUARE.size };
   }, [isSquare, screenWidth, viewport]);
 
+  const slideWidth = isSquare ? layout.squareSide : layout.wideW;
+  const slideHeight = isSquare ? layout.squareSide : layout.wideH;
+
   const [creatives, setCreatives] = useState<BannerCreativePublic[]>([]);
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
+  const [navigationUnlocked, setNavigationUnlocked] = useState(false);
+  /** Chrono 1ʳᵉ bannière (10 s avant swipe). */
+  const [initialCountdown, setInitialCountdown] = useState(10);
+  /** Chrono par slide après déverrouillage navigation. */
+  const [countdown, setCountdown] = useState(10);
+
+  const autoTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const countdownTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const navigationUnlockedRef = useRef(false);
+  const translateX = useSharedValue(0);
+
+  useEffect(() => {
+    navigationUnlockedRef.current = navigationUnlocked;
+  }, [navigationUnlocked]);
+
+  const clearAutoTimer = useCallback(() => {
+    if (autoTimerRef.current) {
+      clearTimeout(autoTimerRef.current);
+      autoTimerRef.current = null;
+    }
+  }, []);
+
+  const clearCountdownTimer = useCallback(() => {
+    if (countdownTimerRef.current) {
+      clearInterval(countdownTimerRef.current);
+      countdownTimerRef.current = null;
+    }
+  }, []);
+
+  const goToIndex = useCallback(
+    (next: number) => {
+      if (creatives.length <= 1) return;
+      const clamped = ((next % creatives.length) + creatives.length) % creatives.length;
+      setIndex(clamped);
+      translateX.value = withTiming(-clamped * slideWidth, { duration: SLIDE_ANIM_MS });
+      setCountdown(10);
+    },
+    [creatives.length, slideWidth, translateX],
+  );
+
+  const goNext = useCallback(() => {
+    if (!navigationUnlocked || creatives.length <= 1) return;
+    goToIndex(index + 1);
+  }, [creatives.length, goToIndex, index, navigationUnlocked]);
+
+  const goPrev = useCallback(() => {
+    if (!navigationUnlocked || creatives.length <= 1) return;
+    goToIndex(index - 1);
+  }, [creatives.length, goToIndex, index, navigationUnlocked]);
+
+  const scheduleAutoAdvance = useCallback(() => {
+    clearAutoTimer();
+    if (creatives.length <= 1) return;
+    autoTimerRef.current = setTimeout(() => {
+      if (!navigationUnlockedRef.current) {
+        setNavigationUnlocked(true);
+        if (creatives.length > 1) {
+          goToIndex(1);
+        }
+        return;
+      }
+      setIndex((current) => {
+        const next = (current + 1) % creatives.length;
+        translateX.value = withTiming(-next * slideWidth, { duration: SLIDE_ANIM_MS });
+        return next;
+      });
+      setCountdown(10);
+    }, SLIDE_DURATION_MS);
+  }, [clearAutoTimer, creatives.length, goToIndex, slideWidth, translateX]);
 
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    setNavigationUnlocked(false);
+    setInitialCountdown(10);
+    setCountdown(10);
     void fetchBannersByZone(zone)
       .then((list) => {
-        if (!cancelled) setCreatives(Array.isArray(list) ? list : []);
+        if (!cancelled) {
+          const filtered = (Array.isArray(list) ? list : []).filter(
+            (c) => pickBannerCreativeImageUrl(c, viewport).trim() !== '',
+          );
+          setCreatives(filtered);
+          setIndex(0);
+          translateX.value = 0;
+        }
       })
       .catch(() => {
         if (!cancelled) setCreatives([]);
@@ -100,14 +188,14 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [zone]);
+  }, [zone, translateX, viewport]);
+
+  useEffect(() => {
+    translateX.value = withTiming(-index * slideWidth, { duration: SLIDE_ANIM_MS });
+  }, [index, slideWidth, translateX]);
 
   const creative = creatives[index] ?? null;
   const creativeId = creative?.id ?? 0;
-  const imgUrl = useMemo(
-    () => (creative ? pickBannerCreativeImageUrl(creative, viewport) : ''),
-    [creative, viewport],
-  );
 
   useEffect(() => {
     if (!creativeId) return;
@@ -126,25 +214,65 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
 
   useEffect(() => {
     if (creatives.length <= 1) return;
-    const t = setInterval(() => {
-      setIndex((i) => (i + 1) % creatives.length);
-    }, 10_000);
-    return () => clearInterval(t);
-  }, [creatives.length]);
+    scheduleAutoAdvance();
+    return clearAutoTimer;
+  }, [creatives.length, index, navigationUnlocked, scheduleAutoAdvance, clearAutoTimer]);
 
-  const onPress = useCallback(() => {
-    if (!creative?.id) return;
-    fireAndForget(
-      recordBannerClickNative({
-        slotId: creative.id,
-        page: analyticsPage,
-        position: index + 1,
-        viewport,
-      }),
-    );
-    const url = resolveClickUrl(creative);
-    if (url) void Linking.openURL(url);
-  }, [creative, analyticsPage, index, viewport]);
+  useEffect(() => {
+    if (creatives.length <= 1 || navigationUnlocked) return;
+    clearCountdownTimer();
+    setInitialCountdown(10);
+    countdownTimerRef.current = setInterval(() => {
+      setInitialCountdown((prev) => (prev > 1 ? prev - 1 : 1));
+    }, 1000);
+    return clearCountdownTimer;
+  }, [creatives.length, navigationUnlocked, clearCountdownTimer, zone]);
+
+  useEffect(() => {
+    if (creatives.length <= 1 || !navigationUnlocked) return;
+    clearCountdownTimer();
+    setCountdown(10);
+    countdownTimerRef.current = setInterval(() => {
+      setCountdown((prev) => (prev > 1 ? prev - 1 : 1));
+    }, 1000);
+    return clearCountdownTimer;
+  }, [creatives.length, index, navigationUnlocked, clearCountdownTimer]);
+
+  const panGesture = useMemo(
+    () =>
+      Gesture.Pan()
+        .enabled(navigationUnlocked && creatives.length > 1)
+        .activeOffsetX([-14, 14])
+        .onEnd((e) => {
+          if (e.translationX <= -SWIPE_THRESHOLD_PX) {
+            runOnJS(goNext)();
+          } else if (e.translationX >= SWIPE_THRESHOLD_PX) {
+            runOnJS(goPrev)();
+          }
+        }),
+    [creatives.length, goNext, goPrev, navigationUnlocked],
+  );
+
+  const trackStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: translateX.value }],
+  }));
+
+  const onPressCreative = useCallback(
+    (c: BannerCreativePublic, position: number) => {
+      if (!c.id) return;
+      fireAndForget(
+        recordBannerClickNative({
+          slotId: c.id,
+          page: analyticsPage,
+          position,
+          viewport,
+        }),
+      );
+      const url = resolveClickUrl(c);
+      if (url) void Linking.openURL(url);
+    },
+    [analyticsPage, viewport],
+  );
 
   const shellStyle = useMemo(
     () => [
@@ -158,22 +286,21 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
     [isMiddleZone, isSquare, layout.squareSide, layout.wideW, style],
   );
 
-  const imgWrapStyle = useMemo(
-    () =>
-      isSquare
-        ? { width: layout.squareSide, height: layout.squareSide }
-        : { width: layout.wideW, height: layout.wideH },
-    [isSquare, layout.squareSide, layout.wideH, layout.wideW],
+  const viewportStyle = useMemo(
+    () => ({
+      width: slideWidth,
+      height: slideHeight,
+      overflow: 'hidden' as const,
+    }),
+    [slideHeight, slideWidth],
   );
 
   const loadingBoxStyle = useMemo(
     () => [
       styles.loadingBox,
-      isSquare
-        ? { width: layout.squareSide, height: layout.squareSide }
-        : { width: layout.wideW, height: layout.wideH },
+      { width: slideWidth, height: slideHeight },
     ],
-    [isSquare, layout.squareSide, layout.wideH, layout.wideW],
+    [slideHeight, slideWidth],
   );
 
   if (loading) {
@@ -186,26 +313,79 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
     );
   }
 
-  if (!creative || !imgUrl) {
+  if (creatives.length === 0) {
     return null;
   }
+
+  const showControls = creatives.length > 1;
+  const countdownLabel = navigationUnlocked ? countdown : initialCountdown;
 
   return (
     <View style={shellStyle} accessibilityRole="summary">
       <View style={styles.partnerRow}>
         <Text style={styles.partnerTxt}>Publicité partenaire</Text>
       </View>
-      <Pressable
-        onPress={onPress}
-        style={({ pressed }) => [styles.imgWrap, imgWrapStyle, pressed && { opacity: 0.92 }]}
-      >
-        <Image
-          source={{ uri: imgUrl }}
-          style={styles.img}
-          resizeMode="contain"
-          accessibilityLabel={creative.label || 'Publicité'}
-        />
-      </Pressable>
+      <GestureDetector gesture={panGesture}>
+        <View style={[styles.carouselViewport, viewportStyle]}>
+          <Animated.View
+            style={[
+              styles.carouselTrack,
+              { width: slideWidth * creatives.length, height: slideHeight },
+              trackStyle,
+            ]}
+          >
+            {creatives.map((c, i) => {
+              const url = pickBannerCreativeImageUrl(c, viewport);
+              return (
+                <Pressable
+                  key={c.id}
+                  onPress={() => onPressCreative(c, i + 1)}
+                  style={({ pressed }) => [
+                    styles.slide,
+                    { width: slideWidth, height: slideHeight },
+                    pressed && { opacity: 0.92 },
+                  ]}
+                >
+                  <Image
+                    source={{ uri: url }}
+                    style={styles.img}
+                    resizeMode={isSquare ? 'cover' : 'contain'}
+                    accessibilityLabel={c.label || 'Publicité'}
+                  />
+                </Pressable>
+              );
+            })}
+          </Animated.View>
+
+          {showControls ? (
+            <View style={styles.countdownBadge} pointerEvents="none">
+              <Text style={styles.countdownTxt}>{countdownLabel}</Text>
+              <Text style={styles.countdownUnit}>s</Text>
+            </View>
+          ) : null}
+
+          {showControls && navigationUnlocked ? (
+            <>
+              <Pressable
+                onPress={goPrev}
+                accessibilityRole="button"
+                accessibilityLabel="Bannière précédente"
+                style={({ pressed }) => [styles.navBtn, styles.navBtnLeft, pressed && styles.navBtnPressed]}
+              >
+                <FontAwesome name="chevron-left" size={14} color="#fff" />
+              </Pressable>
+              <Pressable
+                onPress={goNext}
+                accessibilityRole="button"
+                accessibilityLabel="Bannière suivante"
+                style={({ pressed }) => [styles.navBtn, styles.navBtnRight, pressed && styles.navBtnPressed]}
+              >
+                <FontAwesome name="chevron-right" size={14} color="#fff" />
+              </Pressable>
+            </>
+          ) : null}
+        </View>
+      </GestureDetector>
     </View>
   );
 }
@@ -235,8 +415,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: '#6b7280',
   },
-  imgWrap: {
+  carouselViewport: {
     alignSelf: 'center',
+    backgroundColor: '#f1f5f9',
+    position: 'relative',
+  },
+  carouselTrack: {
+    flexDirection: 'row',
+  },
+  slide: {
     backgroundColor: '#f1f5f9',
     overflow: 'hidden',
   },
@@ -249,5 +436,53 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: '#f1f5f9',
+  },
+  countdownBadge: {
+    position: 'absolute',
+    right: spacing.sm,
+    bottom: spacing.sm,
+    zIndex: 20,
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    gap: 2,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 4,
+    borderRadius: radius.md,
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
+  },
+  countdownTxt: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: '#fff',
+    fontVariant: ['tabular-nums'],
+  },
+  countdownUnit: {
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    color: 'rgba(255, 255, 255, 0.92)',
+  },
+  navBtn: {
+    position: 'absolute',
+    top: '50%',
+    marginTop: -18,
+    zIndex: 20,
+    width: 32,
+    height: 36,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+  },
+  navBtnLeft: {
+    left: 0,
+    borderTopRightRadius: radius.md,
+    borderBottomRightRadius: radius.md,
+  },
+  navBtnRight: {
+    right: 0,
+    borderTopLeftRadius: radius.md,
+    borderBottomLeftRadius: radius.md,
+  },
+  navBtnPressed: {
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
   },
 });

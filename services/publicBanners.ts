@@ -40,11 +40,22 @@ export function pickBannerCreativeImageUrl(
   return absoluteMediaUrl(c.imageUrl ?? '');
 }
 
+function shuffleCreatives<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = copy[i];
+    copy[i] = copy[j]!;
+    copy[j] = tmp!;
+  }
+  return copy;
+}
+
 export async function fetchBannersByZone(zoneCode: BannerZoneCode): Promise<BannerCreativePublic[]> {
   const url = buildApiUrl(`/api/banners/by-zone/${encodeURIComponent(zoneCode)}`);
   const res = await httpGetJson<{ success: boolean; data?: { creatives?: BannerCreativePublic[] } }>(url);
   if (!res.success || !Array.isArray(res.data?.creatives)) return [];
-  return res.data!.creatives!;
+  return shuffleCreatives(res.data!.creatives!);
 }
 
 export async function recordBannerImpressionNative(opts: {

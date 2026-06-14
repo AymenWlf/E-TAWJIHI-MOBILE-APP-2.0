@@ -45,6 +45,25 @@ export function mergeEstablishmentsWithListingPlacements<
   });
 }
 
+/** Établissement client référencement / sponsorisation : pas de bannières « Publicité partenaire » (aligné web). */
+export function establishmentBlocksPartnerBanners(
+  item:
+    | Pick<EstablishmentListItem, 'isSponsored' | 'referencingPlacementId'>
+    | ListingPlacementInfo
+    | null
+    | undefined,
+): boolean {
+  if (!item) return false;
+  if ('placementId' in item && item.placementId > 0) {
+    return true;
+  }
+  const placementId = item.referencingPlacementId;
+  if (typeof placementId === 'number' && placementId > 0) {
+    return true;
+  }
+  return Boolean(item.isSponsored);
+}
+
 export async function recordReferencingImpressionNative(opts: {
   placementId: number;
   source: 'referencing' | 'sponsorship';
