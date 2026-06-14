@@ -38,6 +38,7 @@ import { getMobileVisitorId } from '@/utils/visitorId';
 import { ensureAndroidNotificationChannels } from '@/services/pushNotificationChannels';
 import { navigateToContestAnnouncement } from '@/utils/contestAnnouncementNavigation';
 import { navigateFromAppNotification } from '@/utils/notificationNavigation';
+import { getResolvedAppLaunchIntent } from '@/utils/appLaunchIntent';
 import type { AppNotification } from '@/types/inscriptions';
 
 export type NotificationPermissionStatus = 'granted' | 'denied' | 'undetermined';
@@ -552,6 +553,22 @@ async function handleNotificationTap(
 }
 
 /**
+ * Navigation push au cold start (une seule fois, pendant le splash).
+ */
+export async function processColdStartPushIfNeeded(
+  getAuthToken: AuthTokenGetter,
+  content?: Notifications.NotificationContent,
+): Promise<void> {
+  if (IS_WEB) return;
+
+  const intent = getResolvedAppLaunchIntent();
+  const payload = content ?? (intent?.kind === 'push' ? intent.content : undefined);
+  if (!payload) return;
+
+  await handleNotificationTap(payload, getAuthToken);
+}
+
+/**
  * Branche les listeners de notifications. Appelé une fois après le mount
  * de l'app. Idempotent : un seul jeu de listeners actifs en simultané.
  *
@@ -572,12 +589,7 @@ export function attachNotificationListeners(getAuthToken: AuthTokenGetter): () =
   }
   listenersAttached = true;
 
-  // Cas 1 : app ouverte par un tap depuis la notif (cold start)
-  void Notifications.getLastNotificationResponseAsync().then((resp) => {
-    if (resp) {
-      void handleNotificationTap(resp.notification.request.content, getAuthToken);
-    }
-  });
+  // Cas 1 : cold start push — traité par `AppLaunchBootstrap` + `processColdStartPushIfNeeded`.
 
   // Cas 2 : app déjà running, user reçoit une notif → on garde le hook
   // (utile si on veut afficher un toast / mettre à jour un badge).

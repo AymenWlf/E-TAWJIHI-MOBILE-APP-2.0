@@ -720,7 +720,6 @@ export default function EstablishmentDetailScreen() {
                       lockedVariant={lockedVariant}
                       isFollowed={isFollowing}
                       followStateLoading={isLoggedIn && !followProbeDone}
-                      eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
                       busy={followBusy}
                       onToggleFollow={onToggleFollow}
                       onOpenLink={() => {

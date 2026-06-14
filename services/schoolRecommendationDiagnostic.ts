@@ -228,6 +228,28 @@ export async function generateSchoolDiagnosticRecommendations(
   return mapSubmit(data.data);
 }
 
+export type SchoolDiagnosticGrokDelivery = 'sync' | 'async';
+
+/** Enrichissement Grok IA : sync sur l'écran de chargement, async si l'utilisateur quitte. */
+export async function enrichSchoolDiagnosticGrok(
+  diagnosticId: number,
+  token: string | null,
+  delivery: SchoolDiagnosticGrokDelivery = 'sync',
+): Promise<SchoolDiagnosticFullResult | null> {
+  const data = await httpPostJson<
+    { success: boolean; message?: string; data?: SchoolDiagnosticFullResult & { status?: string } },
+    { delivery: SchoolDiagnosticGrokDelivery }
+  >(
+    buildApiUrl(`/api/school-recommendation-diagnostic/${diagnosticId}/enrich-grok`),
+    { delivery },
+    { headers: authHeaders(token) },
+  );
+  if (!data.success || !data.data?.id) {
+    throw new Error(data.message || 'Enrichissement IA impossible');
+  }
+  return mapFullDiagnostic(data.data);
+}
+
 export async function fetchSchoolRecommendationDiagnostic(
   diagnosticId: number,
   token: string | null,

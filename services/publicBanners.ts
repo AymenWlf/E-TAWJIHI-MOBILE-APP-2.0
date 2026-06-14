@@ -23,8 +23,18 @@ function absoluteMediaUrl(raw: string): string {
   return s.startsWith('/') ? `${base}${s}` : `${base}/${s}`;
 }
 
-/** Image affichée dans l’app : priorité à la créative mobile. */
-export function pickBannerCreativeImageUrl(c: BannerCreativePublic): string {
+/** Image affichée : mobile par défaut ; desktop = `imageUrl` (fallback mobile). */
+export function pickBannerCreativeImageUrl(
+  c: BannerCreativePublic,
+  viewport: 'mobile' | 'desktop' = 'mobile',
+): string {
+  if (viewport === 'desktop') {
+    const d = (c.imageUrl ?? '').trim();
+    if (d) return absoluteMediaUrl(d);
+    const m = (c.imageUrlMobile ?? '').trim();
+    if (m) return absoluteMediaUrl(m);
+    return '';
+  }
   const m = (c.imageUrlMobile ?? '').trim();
   if (m) return absoluteMediaUrl(m);
   return absoluteMediaUrl(c.imageUrl ?? '');
@@ -41,12 +51,13 @@ export async function recordBannerImpressionNative(opts: {
   slotId: number;
   page?: string;
   position?: number;
+  viewport?: 'mobile' | 'desktop';
 }): Promise<void> {
   const visitorId = await getMobileVisitorId();
   const body: Record<string, unknown> = {
     slotId: opts.slotId,
     visitorId,
-    viewport: 'mobile',
+    viewport: opts.viewport ?? 'mobile',
     clientSurface: 'native_app',
   };
   if (opts.page) body.page = opts.page;
@@ -61,10 +72,11 @@ export async function recordBannerClickNative(opts: {
   slotId: number;
   page?: string;
   position?: number;
+  viewport?: 'mobile' | 'desktop';
 }): Promise<void> {
   const body: Record<string, unknown> = {
     slotId: opts.slotId,
-    viewport: 'mobile',
+    viewport: opts.viewport ?? 'mobile',
     clientSurface: 'native_app',
   };
   if (opts.page) body.page = opts.page;

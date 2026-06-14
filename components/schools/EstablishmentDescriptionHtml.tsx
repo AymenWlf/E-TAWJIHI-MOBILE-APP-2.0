@@ -25,6 +25,8 @@ type Props = {
   contentWidth?: number;
   /** Force RTL + Cairo même si le conteneur parent est LTR (défaut : locale ar). */
   forceRtl?: boolean;
+  /** Limite la hauteur (aperçu verrouillé) — indispensable pour la WebView RTL. */
+  maxHeight?: number;
 };
 
 const MIN_RTL_WEBVIEW_HEIGHT = 120;
@@ -34,6 +36,7 @@ export function EstablishmentDescriptionHtml({
   emptyLabel = 'Aucune description publiée pour cet établissement.',
   contentWidth: contentWidthProp,
   forceRtl,
+  maxHeight,
 }: Props) {
   const { isRTL: localeRtl } = useLocale();
   const rtl = forceRtl ?? localeRtl;
@@ -57,19 +60,28 @@ export function EstablishmentDescriptionHtml({
   );
 
   useEffect(() => {
-    setWebViewHeight(MIN_RTL_WEBVIEW_HEIGHT);
-  }, [htmlDocument]);
+    setWebViewHeight(maxHeight != null ? maxHeight : MIN_RTL_WEBVIEW_HEIGHT);
+  }, [htmlDocument, maxHeight]);
 
-  const onWebViewMessage = useCallback((raw: string) => {
-    try {
-      const msg = JSON.parse(raw) as { type?: string; value?: number };
-      if (msg.type === 'height' && typeof msg.value === 'number' && msg.value > 0) {
-        setWebViewHeight(Math.max(MIN_RTL_WEBVIEW_HEIGHT, Math.ceil(msg.value)));
+  const onWebViewMessage = useCallback(
+    (raw: string) => {
+      try {
+        const msg = JSON.parse(raw) as { type?: string; value?: number };
+        if (msg.type === 'height' && typeof msg.value === 'number' && msg.value > 0) {
+          const measured = Math.max(MIN_RTL_WEBVIEW_HEIGHT, Math.ceil(msg.value));
+          setWebViewHeight(
+            maxHeight != null ? Math.min(measured, maxHeight) : measured,
+          );
+        }
+      } catch {
+        /* ignore */
       }
-    } catch {
-      /* ignore */
-    }
-  }, []);
+    },
+    [maxHeight],
+  );
+
+  const resolvedWebViewHeight =
+    maxHeight != null ? Math.min(webViewHeight, maxHeight) : webViewHeight;
 
   const defaultTextProps = useMemo(
     () => ({
@@ -264,12 +276,18 @@ export function EstablishmentDescriptionHtml({
 
   if (rtl) {
     return (
-      <View style={[styles.wrap, styles.wrapRtl]}>
+      <View
+        style={[
+          styles.wrap,
+          styles.wrapRtl,
+          maxHeight != null && { maxHeight, overflow: 'hidden' as const },
+        ]}
+      >
         <WebView
           key={htmlDocument.slice(0, 120)}
           originWhitelist={['*']}
           source={{ html: htmlDocument, baseUrl: RTL_DESCRIPTION_WEBVIEW_BASE_URL }}
-          style={[styles.webView, { height: webViewHeight }]}
+          style={[styles.webView, { height: resolvedWebViewHeight }]}
           scrollEnabled={false}
           nestedScrollEnabled={false}
           showsVerticalScrollIndicator={false}
@@ -296,7 +314,7 @@ export function EstablishmentDescriptionHtml({
   }
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, maxHeight != null && { maxHeight, overflow: 'hidden' as const }]}>
       <RenderHTML
         contentWidth={contentWidth}
         source={source}

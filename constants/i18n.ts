@@ -436,6 +436,7 @@ export type HomeCopyKey =
   | 'appFeedbackSimpleThanks'
   | 'appFeedbackSimpleThanksSub'
   | 'appFeedbackSimpleRatingRequired'
+  | 'appFeedbackSimpleCommentRequired'
   | 'appFeedbackSimpleAccountHint'
   | 'appFeedbackSimpleStoreTitle'
   | 'appFeedbackSimpleStoreSub'
@@ -2190,13 +2191,14 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     appFeedbackSimpleIntroGuest:
       'Dites-nous en une note et quelques mots ce que vous pensez de l’application E-Tawjihi.',
     appFeedbackSimpleStarsLabel: 'Note globale',
-    appFeedbackSimpleCommentLabel: 'Commentaire (optionnel)',
+    appFeedbackSimpleCommentLabel: 'Commentaire',
     appFeedbackSimpleCommentPh: 'Ce que vous aimez, ce qui pourrait être amélioré…',
     appFeedbackSimpleSubmit: 'Envoyer',
     appFeedbackSimpleLater: 'Plus tard',
     appFeedbackSimpleThanks: 'Merci !',
     appFeedbackSimpleThanksSub: 'Votre avis nous aide à améliorer E-Tawjihi pour tous les lycéens.',
     appFeedbackSimpleRatingRequired: 'Merci de choisir une note entre 1 et 5 étoiles.',
+    appFeedbackSimpleCommentRequired: 'Merci de saisir un commentaire avant d’envoyer votre avis.',
     appFeedbackSimpleAccountHint: 'Partagez votre expérience en quelques secondes.',
     appFeedbackSimpleStoreTitle: 'Merci pour les 5 étoiles !',
     appFeedbackSimpleStoreSub:
@@ -4063,13 +4065,14 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       'بصفتك عميل E-Tawjihi، أخبرنا بتقييمك وملاحظاتك القصيرة عن التطبيق.',
     appFeedbackSimpleIntroGuest: 'أخبرنا بتقييمك وملاحظاتك القصيرة عن تطبيق E-Tawjihi.',
     appFeedbackSimpleStarsLabel: 'التقييم العام',
-    appFeedbackSimpleCommentLabel: 'تعليق (اختياري)',
+    appFeedbackSimpleCommentLabel: 'تعليق',
     appFeedbackSimpleCommentPh: 'ما يعجبك، ما يمكن تحسينه…',
     appFeedbackSimpleSubmit: 'إرسال',
     appFeedbackSimpleLater: 'لاحقاً',
     appFeedbackSimpleThanks: 'شكراً!',
     appFeedbackSimpleThanksSub: 'رأيك يساعدنا على تحسين E-Tawjihi لجميع التلاميذ.',
     appFeedbackSimpleRatingRequired: 'يُرجى اختيار تقييم من 1 إلى 5 نجوم.',
+    appFeedbackSimpleCommentRequired: 'يُرجى كتابة تعليق قبل إرسال رأيك.',
     appFeedbackSimpleAccountHint: 'شارك تجربتك في ثوانٍ.',
     appFeedbackSimpleStoreTitle: 'شكراً على 5 نجوم!',
     appFeedbackSimpleStoreSub:

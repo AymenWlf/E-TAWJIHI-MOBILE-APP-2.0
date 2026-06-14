@@ -517,7 +517,6 @@ export function ApplyToSchoolsTourScreen() {
                   onOpenLink={handleDemoOpenRegistrationLink}
                   currentStatus={demoStatus ?? (demoFollowed ? tourDefaultStatus : null)}
                   onUpdateStatus={handleDemoUpdateStatus}
-                  showDiagnosticBadge={false}
                   tourGate={announcementTourGate}
                   tourFocus={announcementCardTourFocus}
                   tourFocusLabel={

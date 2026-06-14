@@ -17,6 +17,7 @@ import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 
 import { AnimatedSplash } from '@/components/AnimatedSplash';
+import { AppLaunchBootstrap } from '@/components/AppLaunchBootstrap';
 import { FloatingBubbleHub } from '@/components/global/FloatingBubbleHub';
 import { AppUpdateGate } from '@/components/appUpdate/AppUpdateGate';
 import { MaintenanceGate } from '@/components/maintenance/MaintenanceGate';
@@ -38,6 +39,7 @@ import {
   GLOBAL_WALL_MOBILE_ENABLED,
   ORIENTATION_1BAC_MOBILE_ENABLED,
 } from '@/constants/mobileFeatureFlags';
+import { DEFAULT_TAB_ROUTE, isDefaultTabHomeRoute } from '@/constants/mobileTabRoutes';
 import { NotificationPermissionModal } from '@/components/notifications/NotificationPermissionModal';
 import {
   attachNotificationListeners,
@@ -46,6 +48,7 @@ import {
   registerForPushAndSubmit,
 } from '@/services/pushNotifications';
 import { appNavigationTheme } from '@/theme/navigation';
+import { resolveAppLaunchIntent, isNormalAppLaunchIntent, wasDefaultTabLaunchRedirectApplied, markDefaultTabLaunchRedirectApplied } from '@/utils/appLaunchIntent';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -72,7 +75,9 @@ export default function RootLayout() {
     if (error) throw error;
   }, [error]);
 
-  const [showAnimatedSplash, setShowAnimatedSplash] = useState(true);
+  const [showSplashOverlay, setShowSplashOverlay] = useState(true);
+  const [splashAnimDone, setSplashAnimDone] = useState(false);
+  const [bootstrapDone, setBootstrapDone] = useState(false);
   const nativeSplashHiddenRef = useRef(false);
 
   const hideNativeSplashOnce = useCallback(async () => {
@@ -88,21 +93,17 @@ export default function RootLayout() {
   useEffect(() => {
     if (!loaded) return;
     void hideNativeSplashOnce();
+    void resolveAppLaunchIntent();
   }, [loaded, hideNativeSplashOnce]);
+
+  useEffect(() => {
+    if (splashAnimDone && bootstrapDone) {
+      setShowSplashOverlay(false);
+    }
+  }, [splashAnimDone, bootstrapDone]);
 
   if (!loaded) {
     return <View style={splashStyles.bootPlaceholder} />;
-  }
-
-  if (showAnimatedSplash) {
-    return (
-      <AnimatedSplash
-        onReadyForHideNativeSplash={() => {
-          void hideNativeSplashOnce();
-        }}
-        onDone={() => setShowAnimatedSplash(false)}
-      />
-    );
   }
 
   return (
@@ -117,7 +118,7 @@ export default function RootLayout() {
                   <SchoolDiagnosticRecommendationsProvider>
                     <GlobalWallUnreadProvider>
                       <ShopCartProvider>
-                        <RootLayoutNav />
+                        <RootLayoutNav onBootstrapComplete={() => setBootstrapDone(true)} />
                       </ShopCartProvider>
                     </GlobalWallUnreadProvider>
                   </SchoolDiagnosticRecommendationsProvider>
@@ -128,6 +129,16 @@ export default function RootLayout() {
           </SharePreviewProvider>
         </LocaleProvider>
       </SafeAreaProvider>
+      {showSplashOverlay ? (
+        <View style={splashStyles.splashOverlay} pointerEvents="auto">
+          <AnimatedSplash
+            onReadyForHideNativeSplash={() => {
+              void hideNativeSplashOnce();
+            }}
+            onDone={() => setSplashAnimDone(true)}
+          />
+        </View>
+      ) : null}
     </GestureHandlerRootView>
   );
 }
@@ -137,9 +148,15 @@ const splashStyles = StyleSheet.create({
     flex: 1,
     backgroundColor: SPLASH_BG,
   },
+  splashOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 9999,
+    elevation: 9999,
+    backgroundColor: SPLASH_BG,
+  },
 });
 
-function RootLayoutNav() {
+function RootLayoutNav({ onBootstrapComplete }: { onBootstrapComplete: () => void }) {
   const colorScheme = useColorScheme() ?? 'light';
   const navTheme = useMemo(
     () => appNavigationTheme(colorScheme === 'dark' ? 'dark' : 'light'),
@@ -151,6 +168,7 @@ function RootLayoutNav() {
 
   return (
     <ThemeProvider value={navTheme}>
+      <AppLaunchBootstrap onBootstrapComplete={onBootstrapComplete} />
       <AppSidebarProvider>
         <NotificationsDrawerProvider>
           <MobileAnalyticsTracker />
@@ -280,7 +298,7 @@ function useSetupRedirectGate() {
       route === 'reset-password';
     const isOnLogout = route === 'logout';
     const isOnSetup = route === 'account-setup';
-    const isOnTabs = route === '(tabs)' || route.startsWith('(tabs)/');
+    const isOnInscriptionsTab = route === '(tabs)/inscriptions';
     const isPublicDailyChallenge = route === 'daily-challenge';
     const isCommunauteRoute = route === 'communaute' || route.startsWith('communaute/');
     const isOrientation1BacRoute =
@@ -290,17 +308,17 @@ function useSetupRedirectGate() {
     const navigate = (dest: string) => {
       if (dest === '/login' && isOnAuth) return;
       if (dest === '/account-setup' && isOnSetup) return;
-      if (dest === '/(tabs)' && isOnTabs) return;
+      if (dest === DEFAULT_TAB_ROUTE && isOnInscriptionsTab) return;
       setTimeout(() => router.replace(dest as Parameters<typeof router.replace>[0]), 10);
     };
 
     if (isCommunauteRoute && !GLOBAL_WALL_MOBILE_ENABLED) {
-      navigate('/(tabs)');
+      navigate(DEFAULT_TAB_ROUTE);
       return;
     }
 
     if (isOrientation1BacRoute && (!ORIENTATION_1BAC_MOBILE_ENABLED || !isOrientation1BacUnlocked())) {
-      navigate('/(tabs)');
+      navigate(DEFAULT_TAB_ROUTE);
       return;
     }
 
@@ -324,9 +342,26 @@ function useSetupRedirectGate() {
       return;
     }
 
-    // Logged in + setup done → home (escape auth/setup screens)
+    // Lancement normal : rediriger vers Annonces une seule fois (pas à chaque visite Accueil).
+    if (
+      isNormalAppLaunchIntent() &&
+      !wasDefaultTabLaunchRedirectApplied() &&
+      user.is_setup
+    ) {
+      const isOnTabsGroup = route === '(tabs)' || route.startsWith('(tabs)/');
+      if (isDefaultTabHomeRoute(route)) {
+        markDefaultTabLaunchRedirectApplied();
+        navigate(DEFAULT_TAB_ROUTE);
+        return;
+      }
+      if (isOnTabsGroup) {
+        markDefaultTabLaunchRedirectApplied();
+      }
+    }
+
+    // Logged in + setup done → escape auth/setup screens
     if (user.is_setup && (isOnSetup || isOnAuth)) {
-      navigate('/(tabs)');
+      navigate(DEFAULT_TAB_ROUTE);
     }
   }, [isLoading, sessionReady, accessToken, refreshToken, routeKey, user]);
 }

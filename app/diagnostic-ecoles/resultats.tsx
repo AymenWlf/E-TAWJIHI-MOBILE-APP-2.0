@@ -28,7 +28,7 @@ import {
 import { resolveUserDiagnosticPublicCode } from '@/utils/resolveSchoolDiagnosticNavigation';
 import { RECOMMENDATION_FOLLOW_MIN_COUNT } from '@/constants/recommendationParcours';
 import { RecommendationFollowProgress } from '@/components/diagnostic/RecommendationFollowProgress';
-import { pollSchoolDiagnosticGrokUntilReady } from '@/utils/pollSchoolDiagnosticGrok';
+import { useSchoolDiagnosticGrokEnrichment } from '@/hooks/useSchoolDiagnosticGrokEnrichment';
 import { tryCompleteRecommendationParcoursStep } from '@/utils/recommendationParcoursFollowStep';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -359,26 +359,17 @@ export default function DiagnosticResultatsScreen() {
     tawjihPlusLoading,
   ]);
 
-  useEffect(() => {
-    const code = publicCode?.trim().toLowerCase() ?? '';
-    if (!/^[a-f0-9]{32}$/.test(code) || !grokPending || recommendationsDeferred) return;
-    let alive = true;
-    void (async () => {
-      const token = await getValidAccessToken();
-      await pollSchoolDiagnosticGrokUntilReady(
-        async () =>
-          fetchSchoolRecommendationDiagnosticByPublicCode(code, token),
-        {
-          onUpdate: (d) => {
-            if (alive && d) applyDiagnostic(d);
-          },
-        },
-      );
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [publicCode, grokPending, recommendationsDeferred, getValidAccessToken, applyDiagnostic]);
+  useSchoolDiagnosticGrokEnrichment({
+    diagnosticId,
+    grokPending,
+    recommendationsDeferred,
+    enabled: !loading && !tawjihPlusLoading && hasTawjihPlusAccess,
+    getValidAccessToken,
+    onComplete: applyDiagnostic,
+    onError: (error) => {
+      setErr(getUserFacingApiError(error, t, { context: 'diagnostic' }));
+    },
+  });
 
   useEffect(() => {
     if (!grokPending) {

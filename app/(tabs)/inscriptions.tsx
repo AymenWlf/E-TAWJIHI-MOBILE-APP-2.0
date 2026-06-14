@@ -1962,7 +1962,6 @@ function InscriptionsTabScreenInner() {
             isUnread={unreadAnnouncementIds.has(item.id)}
             isUnseen={isAnnouncementUnseen(item.id, seenAnnouncementIds)}
             followStateLoading={isLoggedIn && !followsReady}
-            eligibilityLoading={isLoggedIn && eligibilityProfileLoading}
             busy={followBusyId === item.id}
             lockedVariant={lockedVariant}
             onPress={() => {

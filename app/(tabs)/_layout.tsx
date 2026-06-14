@@ -14,7 +14,12 @@ import { useShopCart } from '@/contexts/ShopCartContext';
 import { CAIRO } from '@/theme/arabicTypography';
 import { countBadgeTextStyle } from '@/theme/countBadge';
 import { buildTabBarStyle, centerTabBarItemStyle, defaultTabBarItemStyle } from '@/theme/tabBar';
+import { DEFAULT_TAB_SCREEN } from '@/constants/mobileTabRoutes';
 import { brand } from '@/theme/tokens';
+
+export const unstable_settings = {
+  initialRouteName: DEFAULT_TAB_SCREEN,
+};
 
 const INACTIVE = '#64748B';
 const CENTER_TAB_SIZE = 54;
@@ -161,6 +166,7 @@ export default function TabLayout() {
   return (
     <TawjihPlusAccessProvider>
     <Tabs
+      initialRouteName={DEFAULT_TAB_SCREEN}
       screenOptions={{
         headerShown: false,
         tabBar: (props) => <RtlAwareTabBar {...props} />,

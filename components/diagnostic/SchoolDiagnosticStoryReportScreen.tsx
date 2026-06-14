@@ -24,6 +24,7 @@ import {
 } from '@/services/schoolRecommendationDiagnostic';
 import { listCities, listAllSecteursActive } from '@/services/referenceData';
 import { postPlanReussiteStep } from '@/services/planReussiteSteps';
+import { emitNotificationsRefresh } from '@/services/notifications';
 import { brand, fontSize, spacing } from '@/theme/tokens';
 import { buildSchoolDiagnosticStoryReport } from '@/utils/buildSchoolDiagnosticStoryReport';
 import {
@@ -31,7 +32,7 @@ import {
   resolveDiagnosticReportLocale,
   type DiagnosticReportLocale,
 } from '@/utils/schoolDiagnosticPayloadDisplayContext';
-import { pollSchoolDiagnosticGrokUntilReady } from '@/utils/pollSchoolDiagnosticGrok';
+import { useSchoolDiagnosticGrokEnrichment } from '@/hooks/useSchoolDiagnosticGrokEnrichment';
 import { persistSchoolDiagnosticResult } from '@/utils/schoolDiagnosticStorage';
 import { sortSchoolDiagnosticRecommendationsWithSeuil } from '@/utils/schoolDiagnosticSeuilCompatibility';
 import { computeDiagnosticBacComparisonNote } from '@/utils/diagnosticBacComparisonNote';
@@ -112,6 +113,9 @@ export function SchoolDiagnosticStoryReportScreen() {
       setRecommendationsDeferred(deferred);
       if (deferred) generateStartedRef.current = false;
       setGrokPending(Boolean(d.grokPending));
+      if (!d.grokPending) {
+        emitNotificationsRefresh({ force: true });
+      }
       setProfileSummary(d.profileSummary ?? null);
       setGlobalComment(d.globalComment ?? null);
       setAcademicYearLabel(d.academicYearLabel ?? null);
@@ -202,25 +206,17 @@ export function SchoolDiagnosticStoryReportScreen() {
     tawjihPlusLoading,
   ]);
 
-  useEffect(() => {
-    if (!/^[a-f0-9]{32}$/.test(publicCode) || !grokPending || recommendationsDeferred) return;
-    let alive = true;
-    void (async () => {
-      const token = await getValidAccessToken();
-      await pollSchoolDiagnosticGrokUntilReady(
-        () =>
-          fetchSchoolRecommendationDiagnosticByPublicCode(publicCode, token),
-        {
-          onUpdate: (d) => {
-            if (alive && d) applyFromServer(d);
-          },
-        },
-      );
-    })();
-    return () => {
-      alive = false;
-    };
-  }, [publicCode, grokPending, recommendationsDeferred, getValidAccessToken, applyFromServer]);
+  useSchoolDiagnosticGrokEnrichment({
+    diagnosticId,
+    grokPending,
+    recommendationsDeferred,
+    enabled: !loading && !tawjihPlusLoading && hasTawjihPlusAccess,
+    getValidAccessToken,
+    onComplete: applyFromServer,
+    onError: (error) => {
+      setError(getUserFacingApiError(error, t, { context: 'diagnostic' }));
+    },
+  });
 
   const showRecommendationsPaywall =
     !tawjihPlusLoading && !hasTawjihPlusAccess && Boolean(publicCode);

@@ -184,6 +184,17 @@ export function formatDaysUntilClose(
   };
 }
 
+/** Libellés autour du nombre masqué (countdown verrouillé TAWJIH PLUS). */
+export function getLockedDaysUntilCloseUi(locale: 'fr' | 'ar' = 'fr'): {
+  prefix: string;
+  suffix: string;
+} {
+  if (locale === 'ar') {
+    return { prefix: 'يتبقى ', suffix: ' يومًا' };
+  }
+  return { prefix: '', suffix: ' jours restants' };
+}
+
 /** "Il y a X jours / heures…" (FR/AR très simple). */
 export function formatTimeAgo(iso: string | null | undefined, locale: 'fr' | 'ar' = 'fr'): string {
   if (!iso) return '';

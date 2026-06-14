@@ -1,11 +1,14 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import type { ReactNode } from 'react';
-import { Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Alert, Pressable, StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
+import type { HomeCopyKey } from '@/constants/i18n';
+import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useTawjihPlusAccessContextOptional } from '@/contexts/TawjihPlusAccessContext';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { router } from 'expo-router';
 
 type PaywallCtx = {
   isInscriptionsAccessPending: boolean;
@@ -161,6 +164,98 @@ export function PaywallCardReservedOverlay({ isRTL = false, compact = false }: P
           {t('paywallCardReservedLabel')}
         </Text>
       </View>
+    </View>
+  );
+}
+
+/** Hauteur d’aperçu (~10 lignes, lineHeight `EstablishmentDescriptionHtml`). */
+export const DESCRIPTION_PREVIEW_READABLE_HEIGHT = 10 * 23;
+
+const DESCRIPTION_PREVIEW_FADE_HEIGHT = 56;
+
+/** Dégradé blanc en bas de l’aperçu : transparent → blanc opaque. */
+function DescriptionPreviewBottomFade() {
+  const steps = 16;
+  return (
+    <View style={styles.descPreviewBottomFade} pointerEvents="none">
+      {Array.from({ length: steps }, (_, i) => {
+        const t = i / (steps - 1);
+        const eased = t * t * (3 - 2 * t);
+        return (
+          <View
+            key={i}
+            style={[
+              styles.descPreviewBottomFadeStep,
+              { backgroundColor: `rgba(255, 255, 255, ${eased})` },
+            ]}
+          />
+        );
+      })}
+    </View>
+  );
+}
+
+function showDescriptionReservedAlert(t: (key: HomeCopyKey) => string, openUpgrade: () => void) {
+  Alert.alert(t('inscTawjihPlusLockTitle'), t('inscTawjihPlusLockHint'), [
+    { text: t('closeOverlayA11y'), style: 'cancel' },
+    { text: t('inscTawjihPlusUpgradeCta'), onPress: openUpgrade },
+  ]);
+}
+
+type DescriptionPreviewLockProps = {
+  locked: boolean;
+  children: ReactNode;
+  style?: StyleProp<ViewStyle>;
+};
+
+/**
+ * Description verrouillée : aperçu tronqué + bouton « Voir plus » → alerte TAWJIH PLUS.
+ */
+export function TawjihPlusDescriptionPreviewLock({
+  locked,
+  children,
+  style,
+}: DescriptionPreviewLockProps) {
+  const { t, isRTL } = useLocale();
+  const paywall = usePaywall();
+
+  if (!locked) {
+    return <>{children}</>;
+  }
+
+  const openUpgrade =
+    paywall?.openTawjihPlusProduct ??
+    (() => {
+      router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
+    });
+
+  const onPressSeeMore = () => {
+    showDescriptionReservedAlert(t, openUpgrade);
+  };
+
+  return (
+    <View style={[styles.descPreviewWrap, style]}>
+      <View style={styles.descPreviewClip}>
+        {children}
+        <DescriptionPreviewBottomFade />
+      </View>
+      <Pressable
+        onPress={onPressSeeMore}
+        accessibilityRole="button"
+        accessibilityLabel={t('homeSeeMore')}
+        style={({ pressed }) => [
+          styles.descPreviewSeeMoreBtn,
+          isRTL && styles.descPreviewSeeMoreBtnRtl,
+          pressed && styles.descPreviewSeeMoreBtnPressed,
+        ]}
+      >
+        <Text style={[styles.descPreviewSeeMoreTxt, isRTL && styles.rtl]}>{t('homeSeeMore')}</Text>
+        <FontAwesome
+          name={isRTL ? 'chevron-left' : 'chevron-right'}
+          size={12}
+          color={brand.primary}
+        />
+      </Pressable>
     </View>
   );
 }
@@ -396,6 +491,48 @@ const styles = StyleSheet.create({
     color: brand.textSecondary,
     textAlign: 'center',
     lineHeight: 16,
+  },
+  descPreviewWrap: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  descPreviewClip: {
+    position: 'relative',
+    alignSelf: 'stretch',
+    overflow: 'hidden',
+    borderRadius: radius.lg,
+  },
+  descPreviewBottomFade: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    bottom: 0,
+    height: DESCRIPTION_PREVIEW_FADE_HEIGHT,
+    flexDirection: 'column',
+  },
+  descPreviewBottomFadeStep: {
+    flex: 1,
+  },
+  descPreviewSeeMoreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    alignSelf: 'center',
+    gap: spacing.xs,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.md,
+  },
+  descPreviewSeeMoreBtnRtl: {
+    flexDirection: 'row-reverse',
+  },
+  descPreviewSeeMoreBtnPressed: {
+    opacity: 0.75,
+  },
+  descPreviewSeeMoreTxt: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: brand.primary,
   },
   cardReservedOverlay: {
     ...StyleSheet.absoluteFillObject,

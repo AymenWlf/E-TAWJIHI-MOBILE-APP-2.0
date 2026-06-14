@@ -16,10 +16,8 @@ import { promptTawjihPlusPartialFeatureLock } from '@/utils/tawjihPlusParcoursGa
 
 import { TassjilServiceBadge } from '@/components/inscriptions/TassjilServiceBadge';
 import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlusPaywall';
-import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
 import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
 import { TourFocusWrap } from '@/components/inscriptions/TourFocusWrap';
-import { EligibilityBadge } from '@/components/inscriptions/EligibilityViews';
 import { StatusBadge } from '@/components/inscriptions/StatusBadge';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
@@ -30,7 +28,6 @@ import {
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useTawjihPlusAccessContextOptional } from '@/contexts/TawjihPlusAccessContext';
-import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import type { ContestAnnouncementCard } from '@/services/contestAnnouncements';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -40,13 +37,10 @@ import { getAnnouncementTypeStyle } from '@/utils/announcementTypeStyle';
 import {
   formatDaysUntilClose,
   formatShortDate,
-  pickAnnouncementTitle,
+  getLockedDaysUntilCloseUi,
   pickEstablishmentNamesPair,
   pickRegistrationUrlLabel,
 } from '@/utils/candidacyStatus';
-import { isPremiereBacNiveau } from '@/utils/academicFiliere';
-import { evaluateEligibility } from '@/utils/eligibility';
-import { shouldShowTassjilServiceBadge } from '@/utils/tassjilServiceIncludedNotice';
 import type { AnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 import {
   effectiveRegistrationMethods,
@@ -54,20 +48,18 @@ import {
   pickRegistrationUrlPendingMessage,
   registrationMailto,
 } from '@/utils/contestRegistrationMethods';
-import { AnnouncementRegistrationMethodsSummary } from '@/components/inscriptions/AnnouncementRegistrationMethods';
+import { shouldShowTassjilServiceBadge } from '@/utils/tassjilServiceIncludedNotice';
 
 type Props = {
   item: ContestAnnouncementCard;
   isFollowed: boolean;
   followStateLoading?: boolean;
-  eligibilityLoading?: boolean;
   busy?: boolean;
   onToggleFollow: () => void;
   onOpenLink: () => void;
   onPress?: () => void;
   currentStatus?: CandidacyStatusType | null;
   onUpdateStatus?: () => void;
-  showDiagnosticBadge?: boolean;
   tourFocus?: null | 'type' | 'follow' | 'status' | 'link' | 'all';
   tourFocusLabel?: string;
   tourFocusPulse?: boolean;
@@ -134,11 +126,21 @@ function InfoLine({
       <View style={styles.infoIconWrap}>
         <FontAwesome name={icon} size={11} color={iconColor} />
       </View>
-      <View style={styles.infoTextCol}>
-        <Text style={[styles.infoLabel, isRTL && styles.rtlText]} numberOfLines={1}>
+      <View style={[styles.infoTextCol, isRTL && styles.infoTextColRtl]}>
+        <Text
+          style={[
+            styles.infoLabel,
+            isRTL && styles.infoLabelRtl,
+            isRTL && styles.rtlTextCard,
+            isRTL && styles.infoTextRtl,
+          ]}
+          numberOfLines={1}>
           {label}
         </Text>
-        <Text style={[styles.infoValue, isRTL && styles.rtlText]} numberOfLines={2} latinDigits>
+        <Text
+          style={[styles.infoValue, isRTL && styles.rtlTextCard, isRTL && styles.infoTextRtl]}
+          numberOfLines={2}
+          latinDigits>
           {value}
         </Text>
       </View>
@@ -172,11 +174,18 @@ function InfoLineLocked({
       <View style={styles.infoIconWrap}>
         <FontAwesome name={icon} size={11} color={iconColor} />
       </View>
-      <View style={styles.infoTextCol}>
-        <Text style={[styles.infoLabel, isRTL && styles.rtlText]} numberOfLines={1}>
+      <View style={[styles.infoTextCol, isRTL && styles.infoTextColLockedRtl]}>
+        <Text
+          style={[
+            styles.infoLabel,
+            isRTL && styles.infoLabelRtl,
+            isRTL && styles.rtlText,
+            isRTL && styles.infoTextRtl,
+          ]}
+          numberOfLines={1}>
           {label}
         </Text>
-        <View style={[styles.infoValueLockedRow, isRTL && styles.rowRtl]}>
+        <View style={[styles.infoValueLockedRow, isRTL && styles.infoValueLockedRowRtl]}>
           <Text
             style={[styles.infoValueLockedPlaceholder, isRTL && styles.rtlText]}
             aria-hidden
@@ -206,8 +215,15 @@ function InfoLineHidden({
       <View style={styles.infoIconWrap}>
         <FontAwesome name={icon} size={11} color={iconColor} />
       </View>
-      <View style={styles.infoTextCol}>
-        <Text style={[styles.infoLabel, isRTL && styles.rtlText]} numberOfLines={1}>
+      <View style={[styles.infoTextCol, isRTL && styles.infoTextColRtl]}>
+        <Text
+          style={[
+            styles.infoLabel,
+            isRTL && styles.infoLabelRtl,
+            isRTL && styles.rtlTextCard,
+            isRTL && styles.infoTextRtl,
+          ]}
+          numberOfLines={1}>
           {label}
         </Text>
         <HiddenBar width="78%" height={12} isRTL={isRTL} />
@@ -246,14 +262,12 @@ export function AnnouncementCard({
   item,
   isFollowed,
   followStateLoading,
-  eligibilityLoading,
   busy,
   onToggleFollow,
   onOpenLink,
   onPress,
   currentStatus = null,
   onUpdateStatus,
-  showDiagnosticBadge = true,
   tourFocus = null,
   tourFocusLabel,
   tourFocusPulse = true,
@@ -285,23 +299,8 @@ export function AnnouncementCard({
     }
     router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
   }, [router, tawjihPlusAccess]);
-  const { profile: eligibilityProfile } = useEligibilityProfile();
   const typeVisual = getAnnouncementTypeStyle(item.announcementType);
 
-  const eligibility = evaluateEligibility(
-    {
-      filieresAcceptees: item.filieresAcceptees,
-      specialitesBacMissionAcceptees: item.specialitesBacMissionAcceptees,
-      anneesBacAcceptees: item.anneesBacAcceptees,
-    },
-    eligibilityProfile,
-  );
-  const niveauBlocksInscriptions = Boolean(
-    eligibilityProfile?.niveau && isPremiereBacNiveau(eligibilityProfile.niveau),
-  );
-  const effectiveEligibility = niveauBlocksInscriptions
-    ? { verdict: 'not_eligible' as const, checks: eligibility.checks }
-    : eligibility;
   const est = item.establishment;
   const { primary: estNamePrimary, secondary: estNameSecondary } = pickEstablishmentNamesPair(
     est,
@@ -373,6 +372,12 @@ export function AnnouncementCard({
   const usefulLinks = Array.isArray(item.liensUtiles)
     ? item.liensUtiles.filter((l) => Boolean(l?.url?.trim())).slice(0, 6)
     : [];
+
+  const registrationLinkDisplayLabel = hasEmailOnly
+    ? locale === 'ar'
+      ? 'إرسال بريد إلكتروني'
+      : 'Envoyer un e-mail'
+    : registrationLinkLabel;
 
   const followBtn = (locked = false) => (
     <TourFocusWrap
@@ -482,7 +487,7 @@ export function AnnouncementCard({
         }}
         disabled={!locked && !canPressRegistrationLink}
         accessibilityRole="button"
-        accessibilityLabel={locked ? t('inscTawjihPlusUpgradeCta') : registrationLinkLabel}
+        accessibilityLabel={registrationLinkDisplayLabel}
         style={({ pressed }) => [
           styles.btn,
           fullWidth ? styles.btnLinkFull : styles.btnFlex,
@@ -502,16 +507,11 @@ export function AnnouncementCard({
           style={[
             styles.btnLinkTxt,
             locked && styles.btnLinkTxtLocked,
-            isRTL && styles.rtlText,
+            styles.textCenter,
+            isRTL && styles.rtlTextCenter,
           ]}
           numberOfLines={2}>
-          {locked
-            ? t('inscTawjihPlusUpgradeCta')
-            : hasEmailOnly
-              ? locale === 'ar'
-                ? 'إرسال بريد إلكتروني'
-                : 'Envoyer un e-mail'
-              : registrationLinkLabel}
+          {registrationLinkDisplayLabel}
         </Text>
       </Pressable>
     </TourFocusWrap>
@@ -644,11 +644,11 @@ export function AnnouncementCard({
                 ]}>
                 <FontAwesome name={typeVisual.icon} size={20} color={typeVisual.fg} />
               </View>
-              <View style={styles.estTexts}>
+              <View style={[styles.estTexts, isRTL && styles.estTextsRtl]}>
                 <HiddenBar width="92%" height={14} isRTL={isRTL} />
                 <HiddenBar width="68%" height={11} style={{ marginTop: 4 }} isRTL={isRTL} />
                 {est?.type ? (
-                  <View style={[styles.estMetaRow, isRTL && styles.rowRtl]}>
+                  <View style={[styles.estMetaRow, isRTL && styles.estMetaRowRtl]}>
                     <EstablishmentTypeBadge type={est.type} size="xs" />
                   </View>
                 ) : null}
@@ -662,17 +662,21 @@ export function AnnouncementCard({
                 resizeMode="contain"
                 accessibilityIgnoresInvertColors
               />
-              <View style={styles.estTexts}>
-                <Text style={[styles.estName, isRTL && styles.rtlText]} numberOfLines={3}>
+              <View style={[styles.estTexts, isRTL && styles.estTextsRtl]}>
+                <Text
+                  style={[styles.estName, isRTL && styles.rtlTextCard, isRTL && styles.infoTextRtl]}
+                  numberOfLines={3}>
                   {estNamePrimary}
                 </Text>
                 {estNameSecondary ? (
-                  <Text style={[styles.estNameAlt, isRTL && styles.rtlText]} numberOfLines={2}>
+                  <Text
+                    style={[styles.estNameAlt, isRTL && styles.rtlTextCard, isRTL && styles.infoTextRtl]}
+                    numberOfLines={2}>
                     {estNameSecondary}
                   </Text>
                 ) : null}
                 {(est?.sigle || est?.type) ? (
-                  <View style={styles.estMetaRow}>
+                  <View style={[styles.estMetaRow, isRTL && styles.estMetaRowRtl]}>
                     {est?.sigle ? (
                       <View style={styles.siglePill}>
                         <Text style={styles.siglePillTxt}>{est.sigle}</Text>
@@ -686,22 +690,8 @@ export function AnnouncementCard({
           )}
         </View>
 
-        {sensitiveHidden ? (
-          <View style={styles.titleHiddenWrap} pointerEvents="none">
-            <HiddenBar width="100%" height={14} isRTL={isRTL} />
-            <HiddenBar width="88%" height={14} style={{ marginTop: 6 }} isRTL={isRTL} />
-          </View>
-        ) : null}
-
         {!contentLocked ? (
           <>
-        {/* Titre de l'annonce */}
-        <Text
-          style={[styles.title, isUnread && styles.titleUnread, isRTL && styles.rtlText]}
-          numberOfLines={3}>
-          {pickAnnouncementTitle(item, locale) || item.title}
-        </Text>
-
         {showTassjilServiceBadge ? (
           <TassjilServiceBadge included={est?.isServiceTassjil === true} isRTL={isRTL} />
         ) : null}
@@ -757,11 +747,44 @@ export function AnnouncementCard({
               e.stopPropagation?.();
               promptPartialLock();
             }}
-            style={[styles.countdown, styles.countdownLocked]}>
-            <FontAwesome name="lock" size={11} color="#64748B" />
-            <Text style={[styles.countdownTxt, styles.countdownLockedTxt, isRTL && styles.rtlText]}>
-              {t('inscPartialFeatureLockedHint')}
-            </Text>
+            style={[styles.countdown, styles.countdownOpen]}>
+            <FontAwesome name="hourglass-half" size={11} color="#15803D" />
+            <View style={[styles.countdownValueRow, isRTL && styles.countdownValueRowRtl]}>
+              {(() => {
+                const lockedUi = getLockedDaysUntilCloseUi(locale === 'ar' ? 'ar' : 'fr');
+                return (
+                  <>
+                    {lockedUi.prefix ? (
+                      <Text
+                        style={[
+                          styles.countdownTxtInline,
+                          styles.countdownOpenTxt,
+                        isRTL && styles.rtlTextCenter,
+                      ]}>
+                        {lockedUi.prefix}
+                      </Text>
+                    ) : null}
+                    <Text
+                      style={[
+                        styles.countdownTxtInline,
+                        styles.countdownOpenTxt,
+                        isRTL && styles.rtlTextCenter,
+                      ]}>
+                      --
+                    </Text>
+                    <FontAwesome name="lock" size={10} color="#64748B" />
+                    <Text
+                      style={[
+                        styles.countdownTxtInline,
+                        styles.countdownOpenTxt,
+                        isRTL && styles.rtlTextCenter,
+                      ]}>
+                      {lockedUi.suffix}
+                    </Text>
+                  </>
+                );
+              })()}
+            </View>
           </Pressable>
         ) : deadline.label ? (
           <View
@@ -788,7 +811,8 @@ export function AnnouncementCard({
             <Text
               style={[
                 styles.countdownTxt,
-                isRTL && styles.rtlText,
+                styles.textCenter,
+                isRTL && styles.rtlTextCenter,
                 deadline.kind === 'closed' && styles.countdownClosedTxt,
                 deadline.kind === 'today' && styles.countdownTodayTxt,
                 deadline.kind === 'soon' && styles.countdownSoonTxt,
@@ -799,31 +823,12 @@ export function AnnouncementCard({
           </View>
         ) : null}
 
-        {/* Éligibilité */}
-        <View style={styles.badgeRow}>
-          {eligibilityLoading ? (
-            <View style={styles.eligibilityLoadingDot}>
-              <ActivityIndicator size="small" color={brand.primary} />
-            </View>
-          ) : (
-            <EligibilityBadge result={effectiveEligibility} size="xs" />
-          )}
-          {showDiagnosticBadge ? (
-            <DiagnosticEstablishmentCompatibilityBadge
-              establishmentId={est?.id ?? 0}
-              announcementId={item.id}
-              establishmentType={est?.type}
-              size="xs"
-              isRTL={isRTL}
-              locale={locale === 'ar' ? 'ar' : 'fr'}
-            />
-          ) : null}
-        </View>
-
         {/* Liens utiles */}
         {usefulLinks.length > 0 ? (
           <View style={styles.linksPanel}>
-            <Text style={[styles.linksPanelTitle, isRTL && styles.rtlText]}>
+            <Text
+              style={[styles.linksPanelTitle, isRTL && styles.rtlText, isRTL && styles.infoTextRtl]}
+              numberOfLines={1}>
               {t('inscDetailUsefulLinks')}
             </Text>
             <View style={styles.linksWrap}>
@@ -844,25 +849,23 @@ export function AnnouncementCard({
           </View>
         ) : null}
 
-        {!contentLocked && (registrationMethods.length > 0 || registrationLocked) ? (
-          <AnnouncementRegistrationMethodsSummary
-            data={registrationMethodsData}
-            locale={locale}
-            isRTL={isRTL}
-            registrationLocked={registrationLocked && !contentLocked}
-            onLockedPress={promptPartialLock}
-          />
-        ) : null}
-
         {!contentLocked && hasOnlinePending ? (
           <View style={styles.pendingBanner}>
-            <FontAwesome name="clock-o" size={12} color="#B45309" />
-            <Text style={[styles.pendingBannerTxt, isRTL && styles.rtlText]} numberOfLines={3}>
-              {pickRegistrationUrlPendingMessage(
-                registrationMethodsData,
-                locale === 'ar' ? 'ar' : 'fr',
-              )}
-            </Text>
+            <FontAwesome name="clock-o" size={11} color="#B45309" />
+            <View style={[styles.pendingBannerTextWrap, isRTL && styles.pendingBannerTextWrapRtl]}>
+              <Text
+                style={[
+                  styles.pendingBannerTxt,
+                  styles.textCenter,
+                  isRTL && styles.rtlTextCenter,
+                ]}
+                numberOfLines={3}>
+                {pickRegistrationUrlPendingMessage(
+                  registrationMethodsData,
+                  locale === 'ar' ? 'ar' : 'fr',
+                )}
+              </Text>
+            </View>
           </View>
         ) : null}
 
@@ -922,20 +925,13 @@ export function AnnouncementCard({
               <HiddenBar flex={1} height={12} isRTL={isRTL} />
             </View>
 
-            <View style={[styles.badgeRow, styles.sectionDisabled]} pointerEvents="none">
-              <View style={styles.badgeLocked}>
-                <FontAwesome name="lock" size={10} color="#64748B" />
-              </View>
-              <View style={styles.badgeLocked}>
-                <FontAwesome name="lock" size={10} color="#64748B" />
-              </View>
-            </View>
-
             <View style={[styles.linksPanel, styles.sectionDisabled]} pointerEvents="none">
-              <Text style={[styles.linksPanelTitle, isRTL && styles.rtlText]}>
+              <Text
+                style={[styles.linksPanelTitle, isRTL && styles.rtlText, isRTL && styles.infoTextRtl]}
+                numberOfLines={1}>
                 {t('inscDetailUsefulLinks')}
               </Text>
-              <View style={[styles.linksWrap, isRTL && styles.rowRtl]}>
+              <View style={styles.linksWrap}>
                 <View style={styles.linkChipLocked}>
                   <HiddenBar width={72} height={10} />
                 </View>
@@ -956,7 +952,7 @@ export function AnnouncementCard({
               </View>
             </View>
             <View style={styles.actionsCol}>
-              <View style={[styles.actionsRow, isRTL && styles.rowRtl]}>
+              <View style={styles.actionsRow}>
                 {followBtn(true)}
                 {registrationLinkBtn(false, true)}
               </View>
@@ -1003,12 +999,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     marginTop: spacing.xs,
   },
-  titleHiddenWrap: {
-    alignSelf: 'stretch',
-    width: '100%',
-    gap: spacing.xs,
-    marginTop: spacing.xs,
-  },
   btnLockedPaywall: {
     backgroundColor: '#F1F5F9',
     borderColor: '#CBD5E1',
@@ -1022,9 +1012,6 @@ const styles = StyleSheet.create({
   },
   statusEditBtnTxtLocked: {
     color: '#64748B',
-  },
-  rowRtl: {
-    flexDirection: 'row-reverse',
   },
   unseenDotAnchor: {
     position: 'absolute',
@@ -1144,6 +1131,10 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: 3,
   },
+  estTextsRtl: {
+    alignItems: 'flex-end',
+    alignSelf: 'stretch',
+  },
   estName: {
     fontWeight: '800',
     color: brand.text,
@@ -1163,6 +1154,9 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 2,
   },
+  estMetaRowRtl: {
+    alignSelf: 'flex-end',
+  },
   siglePill: {
     paddingHorizontal: 7,
     paddingVertical: 2,
@@ -1174,16 +1168,6 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     fontSize: fontSize.xs,
     letterSpacing: 0.4,
-  },
-  title: {
-    color: brand.text,
-    fontWeight: '700',
-    fontSize: fontSize.md,
-    lineHeight: 22,
-  },
-  titleUnread: {
-    fontWeight: '800',
-    color: brand.primary,
   },
   metaPanel: {
     gap: spacing.xs,
@@ -1215,12 +1199,28 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: 1,
   },
+  infoTextColRtl: {
+    alignItems: 'flex-end',
+    alignSelf: 'stretch',
+  },
+  infoTextColLockedRtl: {
+    alignItems: 'flex-start',
+    alignSelf: 'stretch',
+  },
+  infoTextRtl: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   infoLabel: {
     fontSize: 10,
     fontWeight: '700',
     color: brand.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+  },
+  infoLabelRtl: {
+    textTransform: 'none',
+    letterSpacing: 0,
   },
   infoValue: {
     fontSize: fontSize.sm,
@@ -1233,6 +1233,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
+  infoValueLockedRowRtl: {
+    alignSelf: 'flex-start',
+  },
   infoValueLockedPlaceholder: {
     fontSize: fontSize.sm,
     fontWeight: '700',
@@ -1244,6 +1247,7 @@ const styles = StyleSheet.create({
   countdown: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     gap: 6,
     paddingHorizontal: 10,
     paddingVertical: 7,
@@ -1254,8 +1258,25 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   countdownTxt: {
-    flex: 1,
+    flexShrink: 1,
     color: brand.primary,
+    fontWeight: '800',
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+  },
+  countdownValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
+    flexShrink: 1,
+    minWidth: 0,
+  },
+  countdownValueRowRtl: {
+    justifyContent: 'center',
+  },
+  countdownTxtInline: {
     fontWeight: '800',
     fontSize: fontSize.xs,
     lineHeight: 16,
@@ -1276,31 +1297,6 @@ const styles = StyleSheet.create({
     borderColor: '#E2E8F0',
   },
   countdownLockedTxt: { color: '#64748B' },
-  badgeLocked: {
-    minWidth: 28,
-    minHeight: 22,
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: radius.full,
-    backgroundColor: '#F1F5F9',
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: '#E2E8F0',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flexWrap: 'wrap',
-    gap: 6,
-    minHeight: 0,
-  },
-  eligibilityLoadingDot: {
-    minWidth: 28,
-    minHeight: 22,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   linksPanel: {
     gap: spacing.xs,
     paddingTop: 2,
@@ -1426,26 +1422,47 @@ const styles = StyleSheet.create({
   btnLinkTxt: { color: brand.primary, fontSize: fontSize.sm, fontWeight: '700', flexShrink: 1 },
   pendingBanner: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     borderWidth: 1,
     borderColor: '#FDE68A',
     backgroundColor: '#FFFBEB',
     borderRadius: radius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    alignSelf: 'stretch',
+  },
+  pendingBannerTextWrap: {
+    flexShrink: 1,
+    minWidth: 0,
+    alignItems: 'center',
+  },
+  pendingBannerTextWrapRtl: {
+    alignItems: 'center',
   },
   pendingBannerTxt: {
-    flex: 1,
     fontSize: fontSize.xs,
-    fontWeight: '600',
+    fontWeight: '800',
     color: '#92400E',
-    lineHeight: 18,
+    lineHeight: 16,
   },
   btnDisabled: { opacity: 0.4 },
   tourActionDisabled: { opacity: 0.38 },
   rtlText: {
     textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  /** Texte arabe dans les blocs info (nom école, ville, dates) : RTL, ancré à gauche. */
+  rtlTextCard: {
+    textAlign: 'left',
+    writingDirection: 'rtl',
+  },
+  textCenter: {
+    textAlign: 'center',
+  },
+  rtlTextCenter: {
+    textAlign: 'center',
     writingDirection: 'rtl',
   },
 });

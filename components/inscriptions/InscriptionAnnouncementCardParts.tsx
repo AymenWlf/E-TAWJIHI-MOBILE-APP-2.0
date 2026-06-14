@@ -74,6 +74,10 @@ export const inscriptionCardStyles = StyleSheet.create({
     minWidth: 0,
     gap: 3,
   },
+  estTextsRtl: {
+    alignItems: 'flex-end',
+    alignSelf: 'stretch',
+  },
   estName: {
     fontWeight: '800',
     color: brand.text,
@@ -92,6 +96,9 @@ export const inscriptionCardStyles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
     marginTop: 2,
+  },
+  estMetaRowRtl: {
+    alignSelf: 'flex-end',
   },
   siglePill: {
     paddingHorizontal: 7,
@@ -148,12 +155,24 @@ export const inscriptionCardStyles = StyleSheet.create({
     minWidth: 0,
     gap: 1,
   },
+  infoTextColRtl: {
+    alignItems: 'flex-end',
+    alignSelf: 'stretch',
+  },
+  infoTextRtl: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   infoLabel: {
     fontSize: 10,
     fontWeight: '700',
     color: brand.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.4,
+  },
+  infoLabelRtl: {
+    textTransform: 'none',
+    letterSpacing: 0,
   },
   infoValue: {
     fontSize: fontSize.sm,
@@ -296,8 +315,15 @@ export const inscriptionCardStyles = StyleSheet.create({
     borderColor: brand.border,
     backgroundColor: brand.white,
   },
+  rowRtl: {
+    flexDirection: 'row-reverse',
+  },
   rtlText: {
     textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  rtlTextCard: {
+    textAlign: 'left',
     writingDirection: 'rtl',
   },
 });
@@ -321,11 +347,25 @@ export function InscriptionCardInfoLine({
       <View style={inscriptionCardStyles.infoIconWrap}>
         <FontAwesome name={icon} size={11} color={iconColor} />
       </View>
-      <View style={inscriptionCardStyles.infoTextCol}>
-        <Text style={[inscriptionCardStyles.infoLabel, isRTL && inscriptionCardStyles.rtlText]} numberOfLines={1}>
+      <View style={[inscriptionCardStyles.infoTextCol, isRTL && inscriptionCardStyles.infoTextColRtl]}>
+        <Text
+          style={[
+            inscriptionCardStyles.infoLabel,
+            isRTL && inscriptionCardStyles.infoLabelRtl,
+            isRTL && inscriptionCardStyles.rtlTextCard,
+            isRTL && inscriptionCardStyles.infoTextRtl,
+          ]}
+          numberOfLines={1}>
           {label}
         </Text>
-        <Text style={[inscriptionCardStyles.infoValue, isRTL && inscriptionCardStyles.rtlText]} numberOfLines={2} latinDigits>
+        <Text
+          style={[
+            inscriptionCardStyles.infoValue,
+            isRTL && inscriptionCardStyles.rtlTextCard,
+            isRTL && inscriptionCardStyles.infoTextRtl,
+          ]}
+          numberOfLines={2}
+          latinDigits>
           {value}
         </Text>
       </View>
@@ -356,17 +396,21 @@ export function InscriptionCardSchoolBlock({
         resizeMode="contain"
         accessibilityIgnoresInvertColors
       />
-      <View style={inscriptionCardStyles.estTexts}>
-        <Text style={[inscriptionCardStyles.estName, isRTL && inscriptionCardStyles.rtlText]} numberOfLines={3}>
+      <View style={[inscriptionCardStyles.estTexts, isRTL && inscriptionCardStyles.estTextsRtl]}>
+        <Text
+          style={[inscriptionCardStyles.estName, isRTL && inscriptionCardStyles.rtlTextCard, isRTL && inscriptionCardStyles.infoTextRtl]}
+          numberOfLines={3}>
           {estNamePrimary}
         </Text>
         {estNameSecondary ? (
-          <Text style={[inscriptionCardStyles.estNameAlt, isRTL && inscriptionCardStyles.rtlText]} numberOfLines={2}>
+          <Text
+            style={[inscriptionCardStyles.estNameAlt, isRTL && inscriptionCardStyles.rtlTextCard, isRTL && inscriptionCardStyles.infoTextRtl]}
+            numberOfLines={2}>
             {estNameSecondary}
           </Text>
         ) : null}
         {(sigle || establishmentType) ? (
-          <View style={inscriptionCardStyles.estMetaRow}>
+          <View style={[inscriptionCardStyles.estMetaRow, isRTL && inscriptionCardStyles.estMetaRowRtl]}>
             {sigle ? (
               <View style={inscriptionCardStyles.siglePill}>
                 <Text style={inscriptionCardStyles.siglePillTxt}>{sigle}</Text>
@@ -389,7 +433,13 @@ export function InscriptionCardMetaPanel({
 }) {
   if (!children) return null;
   return (
-    <View style={[inscriptionCardStyles.metaPanel, inset && inscriptionCardStyles.metaPanelInset]}>{children}</View>
+    <View
+      style={[
+        inscriptionCardStyles.metaPanel,
+        inset && inscriptionCardStyles.metaPanelInset,
+      ]}>
+      {children}
+    </View>
   );
 }
 
@@ -426,7 +476,8 @@ export function InscriptionCardCountdown({
       <Text
         style={[
           inscriptionCardStyles.countdownTxt,
-          isRTL && inscriptionCardStyles.rtlText,
+          isRTL && inscriptionCardStyles.rtlTextCard,
+          isRTL && inscriptionCardStyles.infoTextRtl,
           deadline.kind === 'closed' && inscriptionCardStyles.countdownClosedTxt,
           deadline.kind === 'today' && inscriptionCardStyles.countdownTodayTxt,
           deadline.kind === 'soon' && inscriptionCardStyles.countdownSoonTxt,

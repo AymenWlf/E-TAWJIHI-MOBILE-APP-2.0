@@ -40,6 +40,7 @@ import {
   SPECIALITES_MISSION,
 } from '@/constants/academicSetup';
 import { isValidOrientation1BacFiliereId } from '@/constants/orientation1bacFilieres';
+import { DEFAULT_TAB_ROUTE } from '@/constants/mobileTabRoutes';
 import {
   filiereOptionsForNiveau,
   isPremiereBacNiveau,
@@ -368,7 +369,7 @@ export default function AccountSetupScreen() {
 
   useEffect(() => {
     if (user?.is_setup) {
-      router.replace('/(tabs)');
+      router.replace(DEFAULT_TAB_ROUTE);
     }
   }, [user?.is_setup]);
 
@@ -644,7 +645,7 @@ export default function AccountSetupScreen() {
       if (!res?.success) throw new Error(res?.message || 'Setup failed');
       await reloadMe();
       void promptNotificationPermissionAfterAuth(getValidAccessToken);
-      router.replace('/(tabs)');
+      router.replace(DEFAULT_TAB_ROUTE);
     } catch (e: unknown) {
       setServerError(errorMessage(e, t, 'auth'));
     } finally {

@@ -28,7 +28,11 @@ import {
 } from '@/components/inscriptions/EligibilityViews';
 import { StatusBadge } from '@/components/inscriptions/StatusBadge';
 import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
-import { TawjihPlusSectionLock } from '@/components/inscriptions/TawjihPlusPaywall';
+import {
+  DESCRIPTION_PREVIEW_READABLE_HEIGHT,
+  TawjihPlusDescriptionPreviewLock,
+  TawjihPlusSectionLock,
+} from '@/components/inscriptions/TawjihPlusPaywall';
 import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { EstablishmentDescriptionHtml } from '@/components/schools/EstablishmentDescriptionHtml';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
@@ -75,6 +79,7 @@ import { pickAnnouncementTypeLabel } from '@/utils/announcementTypeLabel';
 import {
   formatDaysUntilClose,
   formatShortDate,
+  getLockedDaysUntilCloseUi,
   pickAnnouncementDescriptionHtml,
   pickAnnouncementTitle,
   pickEstablishmentName,
@@ -124,6 +129,7 @@ export default function InscriptionDetailScreen() {
   const { user, getValidAccessToken } = useAuth();
   const isLoggedIn = Boolean(user);
   const {
+    hasAccess,
     isInscriptionsLocked,
     isInscriptionsAccessPending,
     openTawjihPlusProduct,
@@ -137,6 +143,9 @@ export default function InscriptionDetailScreen() {
   const [error, setError] = useState<string | null>(null);
   const showInscriptionsPaywall = !isInscriptionsAccessPending && isInscriptionsLocked;
   const contentLocked = !isInscriptionsAccessPending && (data?.previewOnly ?? isInscriptionsLocked);
+  /** Description : verrouillée pour tout non-client (y compris accès partiel annonces). */
+  const descriptionLocked =
+    !isInscriptionsAccessPending && (Boolean(data?.previewOnly) || !hasAccess);
   const registrationLocked =
     contentLocked || (data?.registrationLinkLocked === true && !contentLocked);
   const documentsLocked = registrationLocked;
@@ -711,12 +720,28 @@ export default function InscriptionDetailScreen() {
                   t,
                 })
               }
-              style={[styles.countdown, styles.countdownLocked, isRTL && styles.rowRtl]}
+              style={[styles.countdown, styles.countdownOpen, isRTL && styles.rowRtl]}
             >
-              <FontAwesome name="lock" size={12} color="#64748B" />
-              <Text style={[styles.countdownTxt, { color: '#64748B' }]}>
-                {t('inscPartialFeatureLockedHint')}
-              </Text>
+              <FontAwesome name="hourglass-half" size={12} color="#15803D" />
+              <View style={[styles.countdownValueRow, isRTL && styles.rowRtl]}>
+                {(() => {
+                  const lockedUi = getLockedDaysUntilCloseUi(locale === 'ar' ? 'ar' : 'fr');
+                  return (
+                    <>
+                      {lockedUi.prefix ? (
+                        <Text style={[styles.countdownTxtInline, styles.countdownOpenTxt]}>
+                          {lockedUi.prefix}
+                        </Text>
+                      ) : null}
+                      <Text style={[styles.countdownTxtInline, styles.countdownOpenTxt]}>--</Text>
+                      <FontAwesome name="lock" size={10} color="#64748B" />
+                      <Text style={[styles.countdownTxtInline, styles.countdownOpenTxt]}>
+                        {lockedUi.suffix}
+                      </Text>
+                    </>
+                  );
+                })()}
+              </View>
             </Pressable>
           ) : deadline.label ? (
             <View
@@ -849,7 +874,7 @@ export default function InscriptionDetailScreen() {
           <View style={[styles.datesRow, isRTL && styles.rowRtl]}>
             <View style={[styles.datePill, isRTL && styles.rowRtl]}>
               <FontAwesome name="play-circle" size={11} color={brand.success} />
-              <Text style={styles.datePillTxt}>
+              <Text style={[styles.datePillTxt, isRTL && styles.rtl]}>
                 {t('inscDateOpens')}: {formatShortDate(data.dateStart, locale)}
               </Text>
             </View>
@@ -864,19 +889,23 @@ export default function InscriptionDetailScreen() {
                       t,
                     })
                   }
-                  style={[styles.datePill, styles.datePillLocked, isRTL && styles.rowRtl]}
+                  style={[styles.datePill, styles.datePillLocked, isRTL && styles.datePillLockedRtl]}
                 >
                   <FontAwesome name="stop-circle" size={11} color={brand.textMuted} />
-                  <Text style={styles.datePillTxt}>{t('inscDateCloses')}:</Text>
-                  <Text style={styles.datePillLockedPlaceholder} aria-hidden>
-                    ——————
-                  </Text>
-                  <FontAwesome name="lock" size={10} color="#64748B" />
+                  <Text style={[styles.datePillTxt, isRTL && styles.rtl]}>{t('inscDateCloses')}:</Text>
+                  <View style={[styles.datePillLockedValueRow, isRTL && styles.datePillLockedValueRowRtl]}>
+                    <Text
+                      style={[styles.datePillLockedPlaceholder, isRTL && styles.rtl]}
+                      aria-hidden>
+                      ——————
+                    </Text>
+                    <FontAwesome name="lock" size={10} color="#64748B" />
+                  </View>
                 </Pressable>
               ) : (
                 <View style={[styles.datePill, isRTL && styles.rowRtl]}>
                   <FontAwesome name="stop-circle" size={11} color={brand.textMuted} />
-                  <Text style={styles.datePillTxt}>
+                  <Text style={[styles.datePillTxt, isRTL && styles.rtl]}>
                     {t('inscDateCloses')}: {formatShortDate(data.dateEnd, locale)}
                   </Text>
                 </View>
@@ -885,7 +914,45 @@ export default function InscriptionDetailScreen() {
           </View>
         </DetailSection>
 
+        {/* ── Eligibilité (avant modalités d'inscription) ── */}
+        <Section title={t('inscDetailEligibility')} icon="users" rtl={isRTL}>
+          {noEligibility ? (
+            <Text style={[styles.muted, isRTL && styles.rtl]}>
+              {t('inscDetailNoEligibilityCriteria')}
+            </Text>
+          ) : isLoggedIn && eligibilityProfileLoading ? (
+            <LoadingCardStack count={1} isRTL={isRTL} style={styles.eligibilitySectionLoading} />
+          ) : (
+            <EligibilitySummary
+              result={eligibility}
+              onCompleteProfile={() => router.push('/account-setup' as never)}
+              onLogin={() => router.push('/login' as never)}
+            />
+          )}
+        </Section>
+
         <AppBannerSlot zone="mid_square" analyticsPage="/mobile/inscriptions/annonce/detail" style={{ marginHorizontal: spacing.md }} />
+
+        {/* ── Description ── */}
+        <Section title={t('inscDetailAnnouncementDescription')} icon="info-circle" rtl={isRTL}>
+          {data.descriptionLeadImage ? (
+            <Image
+              source={{ uri: data.descriptionLeadImage }}
+              style={styles.leadImage}
+              resizeMode="cover"
+            />
+          ) : null}
+          <TawjihPlusDescriptionPreviewLock locked={descriptionLocked}>
+            <View style={[styles.presentationBody, isRTL && styles.presentationBodyRtl]}>
+              <EstablishmentDescriptionHtml
+                description={descriptionHtml}
+                forceRtl={isRTL}
+                emptyLabel={t('inscDetailAnnouncementDescription')}
+                maxHeight={descriptionLocked ? DESCRIPTION_PREVIEW_READABLE_HEIGHT : undefined}
+              />
+            </View>
+          </TawjihPlusDescriptionPreviewLock>
+        </Section>
 
         {/* ── Frais ── */}
         {fee || data.preRegistrationFee === '0' || contentLocked ? (
@@ -982,47 +1049,6 @@ export default function InscriptionDetailScreen() {
             />
           </Section>
         ) : null}
-
-        {/* ── Description ── */}
-        <DetailSection
-          title={t('inscDetailAnnouncementDescription')}
-          icon="info-circle"
-          rtl={isRTL}
-          locked={contentLocked}
-          minHeight={contentLocked ? 160 : undefined}
-        >
-          {data.descriptionLeadImage ? (
-            <Image
-              source={{ uri: data.descriptionLeadImage }}
-              style={styles.leadImage}
-              resizeMode="cover"
-            />
-          ) : null}
-          <View style={[styles.presentationBody, isRTL && styles.presentationBodyRtl]}>
-            <EstablishmentDescriptionHtml
-              description={descriptionHtml}
-              forceRtl={isRTL}
-              emptyLabel={t('inscDetailAnnouncementDescription')}
-            />
-          </View>
-        </DetailSection>
-
-        {/* ── Eligibilité ── */}
-        <Section title={t('inscDetailEligibility')} icon="users" rtl={isRTL}>
-          {noEligibility ? (
-            <Text style={[styles.muted, isRTL && styles.rtl]}>
-              {t('inscDetailNoEligibilityCriteria')}
-            </Text>
-          ) : isLoggedIn && eligibilityProfileLoading ? (
-            <LoadingCardStack count={1} isRTL={isRTL} style={styles.eligibilitySectionLoading} />
-          ) : (
-            <EligibilitySummary
-              result={eligibility}
-              onCompleteProfile={() => router.push('/account-setup' as never)}
-              onLogin={() => router.push('/login' as never)}
-            />
-          )}
-        </Section>
 
         {/* ── Liens utiles ── */}
         {data.liensUtiles.length > 0 || contentLocked ? (
@@ -1160,11 +1186,19 @@ export default function InscriptionDetailScreen() {
           ]}
         >
           {hasOnlinePending && !registrationLocked ? (
-            <View style={[styles.ctaPending, isRTL && styles.rowRtl]}>
-              <FontAwesome name="clock-o" size={14} color="#B45309" />
-              <Text style={[styles.ctaPendingTxt, isRTL && styles.rtl]} numberOfLines={3}>
-                {pickRegistrationUrlPendingMessage(data, locale === 'ar' ? 'ar' : 'fr')}
-              </Text>
+            <View style={[styles.ctaPending, isRTL && styles.ctaPendingRtl]}>
+              <FontAwesome name="clock-o" size={11} color="#B45309" />
+              <View style={[styles.ctaPendingTextWrap, isRTL && styles.ctaPendingTextWrapRtl]}>
+                <Text
+                  style={[
+                    styles.ctaPendingTxt,
+                    styles.ctaPendingTxtCenter,
+                    isRTL && styles.ctaPendingTxtRtl,
+                  ]}
+                  numberOfLines={3}>
+                  {pickRegistrationUrlPendingMessage(data, locale === 'ar' ? 'ar' : 'fr')}
+                </Text>
+              </View>
             </View>
           ) : (
             <Pressable
@@ -1244,12 +1278,12 @@ function Section({
   children: React.ReactNode;
 }) {
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, rtl && styles.sectionRtl]}>
       <View style={[styles.sectionHeader, rtl && styles.rowRtl]}>
         {icon ? <FontAwesome name={icon} size={14} color={brand.primary} /> : null}
         <Text style={[styles.sectionTitle, rtl && styles.rtl]}>{title}</Text>
       </View>
-      <View style={{ gap: spacing.sm }}>{children}</View>
+      <View style={[styles.sectionBody, rtl && styles.sectionBodyRtl]}>{children}</View>
     </View>
   );
 }
@@ -1638,6 +1672,20 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   countdownTxt: { fontWeight: '800', fontSize: fontSize.xs },
+  countdownValueRow: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    flexWrap: 'wrap',
+    gap: 4,
+    minWidth: 0,
+  },
+  countdownTxtInline: {
+    fontWeight: '800',
+    fontSize: fontSize.xs,
+    lineHeight: 16,
+  },
+  countdownOpenTxt: { color: '#15803D' },
   countdownLocked: {
     backgroundColor: '#F1F5F9',
     borderColor: '#E2E8F0',
@@ -1647,6 +1695,18 @@ const styles = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E2E8F0',
     gap: 6,
+  },
+  datePillLockedRtl: {
+    direction: 'rtl',
+    alignItems: 'center',
+  },
+  datePillLockedValueRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  datePillLockedValueRowRtl: {
+    alignSelf: 'flex-start',
   },
   datePillLockedPlaceholder: {
     fontSize: fontSize.xs,
@@ -1670,6 +1730,17 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: brand.border,
+  },
+  sectionRtl: {
+    direction: 'rtl',
+    alignItems: 'stretch',
+  },
+  sectionBody: {
+    gap: spacing.sm,
+  },
+  sectionBodyRtl: {
+    direction: 'rtl',
+    alignItems: 'stretch',
   },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   sectionTitle: { color: brand.text, fontSize: fontSize.md, fontWeight: '800' },
@@ -1901,8 +1972,9 @@ const styles = StyleSheet.create({
   ctaTxt: { color: brand.white, fontSize: fontSize.md, fontWeight: '800' },
   ctaPending: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
     paddingVertical: 14,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
@@ -1910,12 +1982,33 @@ const styles = StyleSheet.create({
     borderColor: '#FDE68A',
     backgroundColor: '#FFFBEB',
   },
+  ctaPendingRtl: {
+    direction: 'rtl',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  ctaPendingTextWrap: {
+    flexShrink: 1,
+    minWidth: 0,
+    alignItems: 'center',
+  },
+  ctaPendingTextWrapRtl: {
+    alignItems: 'center',
+  },
   ctaPendingTxt: {
-    flex: 1,
     color: '#92400E',
     fontSize: fontSize.sm,
-    fontWeight: '700',
-    lineHeight: 20,
+    fontWeight: '800',
+    lineHeight: 18,
+  },
+  ctaPendingTxtCenter: {
+    textAlign: 'center',
+  },
+  ctaPendingTxtRtl: {
+    textAlign: 'center',
+    writingDirection: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
   },
   ctaLocked: {
     backgroundColor: '#F1F5F9',

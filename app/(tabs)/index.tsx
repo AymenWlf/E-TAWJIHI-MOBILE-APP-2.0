@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useFocusEffect, router } from 'expo-router';
 import {
   Alert,
@@ -106,10 +106,13 @@ import { Text } from '@/components/ui/Text';
 import { homeShell } from '@/theme/homeShell';
 import { brand, radius, spacing } from '@/theme/tokens';
 import { isHomeHeroWideLayout } from '@/utils/homeTopBackdropLayout';
-
 const H_PAD = spacing.xl;
 
 export default function IndexScreen() {
+  return <HomeTabScreen />;
+}
+
+function HomeTabScreen() {
   const { t, isRTL, locale } = useLocale();
   const { open: openSidebar } = useAppSidebar();
   const { unreadCount: notifUnreadCount, openDrawer, refreshUnread } = useNotificationsDrawer();

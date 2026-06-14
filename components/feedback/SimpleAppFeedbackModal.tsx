@@ -144,6 +144,11 @@ export function SimpleAppFeedbackModal({
       Alert.alert(t('appFeedbackSimpleTitle'), t('appFeedbackSimpleRatingRequired'));
       return;
     }
+    const trimmedComment = comment.trim();
+    if (trimmedComment.length === 0) {
+      Alert.alert(t('appFeedbackSimpleTitle'), t('appFeedbackSimpleCommentRequired'));
+      return;
+    }
     const token = await getValidAccessToken();
     if (!token) {
       Alert.alert(t('appFeedbackSimpleTitle'), t('appFeedbackLoginRequired'));
@@ -154,7 +159,7 @@ export function SimpleAppFeedbackModal({
     try {
       await submitSimpleAppFeedback(token, {
         rating,
-        comment,
+        comment: trimmedComment,
         locale,
         audience: isCommercialClient ? 'client' : 'visitor',
       });
@@ -192,6 +197,7 @@ export function SimpleAppFeedbackModal({
   }, [onClose]);
 
   const showPostSubmit = thanks || storeReviewPrompt;
+  const canSubmit = rating != null && rating >= 1 && comment.trim().length > 0 && !submitting;
 
   const intro = isCommercialClient
     ? t('appFeedbackSimpleIntroClient')
@@ -294,11 +300,12 @@ export function SimpleAppFeedbackModal({
                 </Pressable>
                 <Pressable
                   onPress={() => void handleSubmit()}
-                  disabled={submitting}
+                  disabled={!canSubmit}
                   style={({ pressed }) => [
                     styles.submitBtn,
                     isRTL && styles.rowRtl,
-                    pressed && !submitting && { opacity: 0.9 },
+                    !canSubmit && styles.submitBtnDisabled,
+                    pressed && canSubmit && { opacity: 0.9 },
                   ]}>
                   {submitting ? (
                     <ActivityIndicator size="small" color={brand.white} />
@@ -384,6 +391,9 @@ const styles = StyleSheet.create({
     paddingVertical: 13,
     borderRadius: radius.lg,
     backgroundColor: brand.primary,
+  },
+  submitBtnDisabled: {
+    opacity: 0.45,
   },
   submitBtnTxt: { fontSize: fontSize.sm, fontWeight: '800', color: brand.white },
 });

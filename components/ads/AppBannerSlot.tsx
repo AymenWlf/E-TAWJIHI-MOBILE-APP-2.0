@@ -12,8 +12,9 @@ import {
 
 import { Text } from '@/components/ui/Text';
 import {
+  partnerBannerWideDimensions,
   PARTNER_BANNER_SQUARE,
-  PARTNER_BANNER_WIDE,
+  resolvePartnerBannerViewport,
 } from '@/constants/partnerBannerDimensions';
 import { fontSize, radius, spacing } from '@/theme/tokens';
 import {
@@ -29,8 +30,13 @@ import { fireAndForget } from '@/utils/fireAndForget';
 /** Déduplication session (survit aux remontages FlatList). */
 const recordedBannerImpressions = new Set<string>();
 
-function bannerImpressionKey(slotId: number, page: string, position: number): string {
-  return `${slotId}|${page}|${position}`;
+function bannerImpressionKey(
+  slotId: number,
+  page: string,
+  position: number,
+  viewport: 'mobile' | 'desktop',
+): string {
+  return `${slotId}|${page}|${position}|${viewport}`;
 }
 
 type Props = {
@@ -51,22 +57,28 @@ const HORIZONTAL_SAFE = spacing.lg * 2;
 
 /**
  * Bandeau publicitaire — créatives API, KPI comptés comme **app mobile native**
- * (`clientSurface: native_app`). Dimensions fixes (320×100 ou 300×300), centrées
- * sur iPad pour éviter l’étirement pleine largeur.
+ * (`clientSurface: native_app`). Téléphone : 320×100 ; tablette (≥768px) zones `top` / `mid` :
+ * 728×90 desktop (aligné web `md:`).
  */
 export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
   const isSquare = zone === 'mid_square';
+  const isMiddleZone = zone === 'mid' || isSquare;
   const { width: screenWidth } = useWindowDimensions();
+  const viewport = useMemo(
+    () => resolvePartnerBannerViewport(screenWidth, zone),
+    [screenWidth, zone],
+  );
   const layout = useMemo(() => {
     const maxUsable = Math.max(0, screenWidth - HORIZONTAL_SAFE);
     if (isSquare) {
       const side = Math.min(PARTNER_BANNER_SQUARE.size, maxUsable || PARTNER_BANNER_SQUARE.size);
       return { wideW: 0, wideH: 0, squareSide: side };
     }
-    const wideW = Math.min(PARTNER_BANNER_WIDE.width, maxUsable || PARTNER_BANNER_WIDE.width);
-    const wideH = Math.round((PARTNER_BANNER_WIDE.height * wideW) / PARTNER_BANNER_WIDE.width);
+    const dims = partnerBannerWideDimensions(viewport);
+    const wideW = Math.min(dims.width, maxUsable || dims.width);
+    const wideH = Math.round((dims.height * wideW) / dims.width);
     return { wideW, wideH, squareSide: PARTNER_BANNER_SQUARE.size };
-  }, [isSquare, screenWidth]);
+  }, [isSquare, screenWidth, viewport]);
 
   const [creatives, setCreatives] = useState<BannerCreativePublic[]>([]);
   const [loading, setLoading] = useState(true);
@@ -92,11 +104,14 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
 
   const creative = creatives[index] ?? null;
   const creativeId = creative?.id ?? 0;
-  const imgUrl = useMemo(() => (creative ? pickBannerCreativeImageUrl(creative) : ''), [creative]);
+  const imgUrl = useMemo(
+    () => (creative ? pickBannerCreativeImageUrl(creative, viewport) : ''),
+    [creative, viewport],
+  );
 
   useEffect(() => {
     if (!creativeId) return;
-    const key = bannerImpressionKey(creativeId, analyticsPage, index + 1);
+    const key = bannerImpressionKey(creativeId, analyticsPage, index + 1, viewport);
     if (recordedBannerImpressions.has(key)) return;
     recordedBannerImpressions.add(key);
     fireAndForget(
@@ -104,9 +119,10 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
         slotId: creativeId,
         page: analyticsPage,
         position: index + 1,
+        viewport,
       }),
     );
-  }, [creativeId, analyticsPage, index]);
+  }, [creativeId, analyticsPage, index, viewport]);
 
   useEffect(() => {
     if (creatives.length <= 1) return;
@@ -123,21 +139,23 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
         slotId: creative.id,
         page: analyticsPage,
         position: index + 1,
+        viewport,
       }),
     );
     const url = resolveClickUrl(creative);
     if (url) void Linking.openURL(url);
-  }, [creative, analyticsPage, index]);
+  }, [creative, analyticsPage, index, viewport]);
 
   const shellStyle = useMemo(
     () => [
       styles.shell,
+      isMiddleZone && styles.shellMiddle,
       isSquare
         ? { width: layout.squareSide, alignSelf: 'center' as const }
         : { width: layout.wideW, alignSelf: 'center' as const },
       style,
     ],
-    [isSquare, layout.squareSide, layout.wideW, style],
+    [isMiddleZone, isSquare, layout.squareSide, layout.wideW, style],
   );
 
   const imgWrapStyle = useMemo(
@@ -200,6 +218,10 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(15, 23, 42, 0.12)',
     backgroundColor: '#fff',
     marginBottom: spacing.md,
+  },
+  shellMiddle: {
+    marginTop: spacing.lg,
+    marginBottom: spacing.lg,
   },
   partnerRow: {
     paddingHorizontal: spacing.md,
