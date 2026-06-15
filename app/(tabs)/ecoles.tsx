@@ -53,7 +53,6 @@ import {
 } from '@/utils/eligibility';
 import { fireAndForget } from '@/utils/fireAndForget';
 import {
-  establishmentBlocksPartnerBanners,
   fetchListingPlacementsByEstablishment,
   mergeEstablishmentsWithListingPlacements,
   type ListingPlacementInfo,
@@ -72,7 +71,8 @@ import { resolveEstablishmentLockedVariant } from '@/utils/establishmentLockDisp
 
 const PAGE_SIZE = 18;
 /** Bannière `mid` : une seule fois, après la 3e fiche (index 0-based = 2). */
-const MID_BANNER_AFTER_CARD_INDEX = 2;
+/** Bannière milieu de liste — après la 6ᵉ fiche (aligné web EcolesSupérieures). */
+const MID_BANNER_AFTER_CARD_INDEX = 5;
 /** Alias conservé — évite crash si le bundle Metro est en retard sur le hot-reload. */
 const MID_BANNER_AFTER_EVERY_N_CARDS = MID_BANNER_AFTER_CARD_INDEX;
 
@@ -694,12 +694,6 @@ export default function EcolesScreen() {
     [filteredListingBeforeSlice, visibleEnd],
   );
 
-  /** Pas de bannières partenaires dans le bloc sponsorisé en tête de liste (aligné web). */
-  const showPartnerBannersInListing = useMemo(() => {
-    const topBlock = visibleItems.slice(0, MID_BANNER_AFTER_CARD_INDEX + 1);
-    return !topBlock.some(establishmentBlocksPartnerBanners);
-  }, [visibleItems]);
-
   const hasMoreToShow = visibleEnd < filteredListingBeforeSlice.length;
   const canFetchMoreFromServer =
     !clientMode && !usesFullCatalogEligibleListing && page < pages;
@@ -978,9 +972,7 @@ export default function EcolesScreen() {
           }}
           ListHeaderComponent={
             <View>
-              {showPartnerBannersInListing ? (
-                <AppBannerSlot zone="top" analyticsPage="/mobile/ecoles" style={{ marginTop: spacing.sm }} />
-              ) : null}
+              <AppBannerSlot zone="top" analyticsPage="/mobile/ecoles" style={{ marginTop: spacing.sm }} />
               {!searchFiltersAccessLoading ? (
                 <View style={styles.listEligibleFilter}>
                   <EstablishmentEligibleQuickFilter
@@ -1032,10 +1024,7 @@ export default function EcolesScreen() {
           renderItem={({ item, index }) => {
             const lockedVariant = resolveEstablishmentLockedVariant(schoolsCatalogLocked, index);
             const cardLocked = lockedVariant === 'compact';
-            const showMidBanner =
-              showPartnerBannersInListing &&
-              index === MID_BANNER_AFTER_CARD_INDEX &&
-              !establishmentBlocksPartnerBanners(item);
+            const showMidBanner = index === MID_BANNER_AFTER_CARD_INDEX;
             return (
             <View>
               <EstablishmentCard

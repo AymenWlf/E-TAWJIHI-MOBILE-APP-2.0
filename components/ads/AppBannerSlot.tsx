@@ -257,22 +257,20 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
     transform: [{ translateX: translateX.value }],
   }));
 
-  const onPressCreative = useCallback(
-    (c: BannerCreativePublic, position: number) => {
-      if (!c.id) return;
-      fireAndForget(
-        recordBannerClickNative({
-          slotId: c.id,
-          page: analyticsPage,
-          position,
-          viewport,
-        }),
-      );
-      const url = resolveClickUrl(c);
-      if (url) void Linking.openURL(url);
-    },
-    [analyticsPage, viewport],
-  );
+  const onPressCurrentCreative = useCallback(() => {
+    const c = creatives[index];
+    if (!c?.id) return;
+    fireAndForget(
+      recordBannerClickNative({
+        slotId: c.id,
+        page: analyticsPage,
+        position: index + 1,
+        viewport,
+      }),
+    );
+    const url = resolveClickUrl(c);
+    if (url) void Linking.openURL(url);
+  }, [analyticsPage, creatives, index, viewport]);
 
   const shellStyle = useMemo(
     () => [
@@ -337,14 +335,10 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
             {creatives.map((c, i) => {
               const url = pickBannerCreativeImageUrl(c, viewport);
               return (
-                <Pressable
+                <View
                   key={c.id}
-                  onPress={() => onPressCreative(c, i + 1)}
-                  style={({ pressed }) => [
-                    styles.slide,
-                    { width: slideWidth, height: slideHeight },
-                    pressed && { opacity: 0.92 },
-                  ]}
+                  pointerEvents="none"
+                  style={[styles.slide, { width: slideWidth, height: slideHeight }]}
                 >
                   <Image
                     source={{ uri: url }}
@@ -352,10 +346,19 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
                     resizeMode={isSquare ? 'cover' : 'contain'}
                     accessibilityLabel={c.label || 'Publicité'}
                   />
-                </Pressable>
+                </View>
               );
             })}
           </Animated.View>
+
+          {resolveClickUrl(creatives[index]) ? (
+            <Pressable
+              onPress={onPressCurrentCreative}
+              accessibilityRole="link"
+              accessibilityLabel={creatives[index]?.label || 'Publicité partenaire'}
+              style={({ pressed }) => [styles.clickOverlay, pressed && { opacity: 0.92 }]}
+            />
+          ) : null}
 
           {showControls ? (
             <View style={styles.countdownBadge} pointerEvents="none">
@@ -422,6 +425,10 @@ const styles = StyleSheet.create({
   },
   carouselTrack: {
     flexDirection: 'row',
+  },
+  clickOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    zIndex: 10,
   },
   slide: {
     backgroundColor: '#f1f5f9',
