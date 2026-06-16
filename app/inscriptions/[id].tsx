@@ -149,6 +149,7 @@ export default function InscriptionDetailScreen() {
   const registrationLocked =
     contentLocked || (data?.registrationLinkLocked === true && !contentLocked);
   const documentsLocked = registrationLocked;
+  const usefulLinksLocked = descriptionLocked;
   const deadlineLockedPartial =
     !contentLocked && data?.deadlineLocked === true;
   const pageLoading = loading || isInscriptionsAccessPending;
@@ -428,6 +429,19 @@ export default function InscriptionDetailScreen() {
   }, [contentLocked, data, openTawjihPlusProduct, registrationLocked, t]);
 
   const onDocumentsLockedPress = useCallback(() => {
+    if (contentLocked) {
+      openTawjihPlusProduct();
+      return;
+    }
+    promptTawjihPlusPartialFeatureLock({
+      hasAccess: false,
+      loading: false,
+      openProduct: openTawjihPlusProduct,
+      t,
+    });
+  }, [contentLocked, openTawjihPlusProduct, t]);
+
+  const onUsefulLinksLockedPress = useCallback(() => {
     if (contentLocked) {
       openTawjihPlusProduct();
       return;
@@ -1059,20 +1073,31 @@ export default function InscriptionDetailScreen() {
                   <Pressable
                     key={`${l.url}-${i}`}
                     onPress={() => {
-                      if (contentLocked) {
-                        openTawjihPlusProduct();
+                      if (usefulLinksLocked) {
+                        onUsefulLinksLockedPress();
                         return;
                       }
                       void Linking.openURL(l.url).catch(() => undefined);
                     }}
                     style={({ pressed }) => [
                       styles.linkChip,
+                      usefulLinksLocked && styles.linkChipLocked,
                       isRTL && styles.rowRtl,
                       pressed && { opacity: 0.85 },
                     ]}
                   >
-                    <FontAwesome name="external-link" size={11} color={brand.primary} />
-                    <Text style={[styles.linkChipTxt, isRTL && styles.rtl]} numberOfLines={1}>
+                    <FontAwesome
+                      name={usefulLinksLocked ? 'lock' : 'external-link'}
+                      size={11}
+                      color={usefulLinksLocked ? '#64748B' : brand.primary}
+                    />
+                    <Text
+                      style={[
+                        styles.linkChipTxt,
+                        usefulLinksLocked && styles.linkChipTxtLocked,
+                        isRTL && styles.rtl,
+                      ]}
+                      numberOfLines={1}>
                       {l.titre || l.url}
                     </Text>
                   </Pressable>
@@ -1835,6 +1860,13 @@ const styles = StyleSheet.create({
     maxWidth: 240,
   },
   linkChipTxt: { color: brand.primary, fontSize: fontSize.xs, fontWeight: '700', flexShrink: 1 },
+  linkChipLocked: {
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F1F5F9',
+  },
+  linkChipTxtLocked: {
+    color: '#64748B',
+  },
 
   /* Documents */
   docCard: {

@@ -28,18 +28,98 @@ function parseDateOnlyInput(raw: string | null | undefined): Date | null {
 }
 
 function formatTimeRemaining(now: Date, target: Date): string {
+  return formatPromotionTimeRemaining(now, target, 'fr', false);
+}
+
+function pad2(n: number): string {
+  return String(n).padStart(2, '0');
+}
+
+/** Date limite promotion renseignée explicitement (champ admin). */
+export function hasExplicitPromotionDeadline(promotionDeadlineAt: string | null | undefined): boolean {
+  return parseDateOnlyInput(promotionDeadlineAt) !== null;
+}
+
+/** Libellé du compte à rebours (compact = badge card, sinon phrase complète). */
+export function formatPromotionTimeRemaining(
+  now: Date,
+  target: Date,
+  locale: 'fr' | 'ar',
+  compact: boolean,
+): string {
   const ms = target.getTime() - now.getTime();
   if (ms <= 0) return '';
+
+  if (compact && ms < 86_400_000) {
+    const totalSec = Math.floor(ms / 1000);
+    const h = Math.floor(totalSec / 3600);
+    const m = Math.floor((totalSec % 3600) / 60);
+    const s = totalSec % 60;
+    return `${pad2(h)}:${pad2(m)}:${pad2(s)}`;
+  }
+
   const hoursRemaining = Math.ceil(ms / (1000 * 60 * 60));
   const daysRemaining = Math.floor(hoursRemaining / 24);
   const hours = hoursRemaining % 24;
+
+  if (locale === 'ar') {
+    if (daysRemaining > 0) {
+      if (hours > 0) {
+        return compact
+          ? `${daysRemaining}ي ${hours}س`
+          : `${daysRemaining} ${daysRemaining > 1 ? 'أيام' : 'يوم'} و ${hours} ${hours > 1 ? 'ساعات' : 'ساعة'} متبقية`;
+      }
+      return compact
+        ? `${daysRemaining}ي`
+        : `${daysRemaining} ${daysRemaining > 1 ? 'أيام' : 'يوم'} متبقية`;
+    }
+    return compact
+      ? `${hoursRemaining}س`
+      : `${hoursRemaining} ${hoursRemaining > 1 ? 'ساعات' : 'ساعة'} متبقية`;
+  }
+
   if (daysRemaining > 0) {
     if (hours > 0) {
-      return `${daysRemaining} jour${daysRemaining > 1 ? 's' : ''} et ${hours} heure${hours > 1 ? 's' : ''} restante${hours > 1 ? 's' : ''}`;
+      return compact
+        ? `${daysRemaining}j ${hours}h`
+        : `${daysRemaining} jour${daysRemaining > 1 ? 's' : ''} et ${hours} heure${hours > 1 ? 's' : ''} restante${hours > 1 ? 's' : ''}`;
     }
-    return `${daysRemaining} jour${daysRemaining > 1 ? 's' : ''} restant${daysRemaining > 1 ? 's' : ''}`;
+    return compact
+      ? `${daysRemaining}j`
+      : `${daysRemaining} jour${daysRemaining > 1 ? 's' : ''} restant${daysRemaining > 1 ? 's' : ''}`;
   }
-  return `${hoursRemaining} heure${hoursRemaining > 1 ? 's' : ''} restante${hoursRemaining > 1 ? 's' : ''}`;
+  return compact
+    ? `${hoursRemaining}h`
+    : `${hoursRemaining} heure${hoursRemaining > 1 ? 's' : ''} restante${hoursRemaining > 1 ? 's' : ''}`;
+}
+
+export function formatPromotionDisplayDate(target: Date, locale: 'fr' | 'ar'): string {
+  return target.toLocaleDateString(locale === 'ar' ? 'ar-MA' : 'fr-FR', {
+    day: 'numeric',
+    month: 'long',
+    year: 'numeric',
+  });
+}
+
+/** Compte à rebours uniquement si une date limite custom est définie (pas le cycle mer/sam auto). */
+export function resolveExplicitPromotionDeadline(
+  promotionDeadlineAt: string | null | undefined,
+  hasPromotionalPrice: boolean,
+  now = new Date(),
+): Pick<ResolvedPromotionDeadline, 'targetDate' | 'source' | 'isActive'> | null {
+  if (!hasPromotionalPrice || !hasExplicitPromotionDeadline(promotionDeadlineAt)) return null;
+
+  const custom = parseDateOnlyInput(promotionDeadlineAt);
+  if (!custom) return null;
+
+  const customEnd = endOfLocalDay(custom);
+  if (now.getTime() > customEnd.getTime()) return null;
+
+  return {
+    targetDate: customEnd,
+    source: 'custom',
+    isActive: true,
+  };
 }
 
 export function computeWednesdaySaturdayPromoDeadline(now = new Date()): ResolvedPromotionDeadline {

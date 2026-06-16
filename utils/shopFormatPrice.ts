@@ -50,36 +50,51 @@ export function shopIntlCurrencyCode(currency?: string): string {
   return c || 'MAD';
 }
 
-function manualFormat(n: number, currency: string, intl?: ShopPriceIntlOptions): string {
+function manualFormatAmount(n: number, intl?: ShopPriceIntlOptions): string {
   const min = intl?.minimumFractionDigits ?? 2;
   const max = intl?.maximumFractionDigits ?? 2;
   const fixed = n.toFixed(Math.max(min, max));
-  // Sépare la partie entière par un espace insécable tous les 3 chiffres (style fr-FR).
   const [intPart, decPart] = fixed.split('.');
   const grouped = intPart.replace(/\B(?=(\d{3})+(?!\d))/g, '\u00A0');
-  const body = decPart && max > 0 ? `${grouped},${decPart.slice(0, max)}` : grouped;
-  return `${body}\u00A0${currency}`;
+  return decPart && max > 0 ? `${grouped},${decPart.slice(0, max)}` : grouped;
 }
 
-export function formatShopPrice(amount: string | number, currency = 'MAD', intl?: ShopPriceIntlOptions): string {
+function formatShopAmountValue(amount: string | number, intl?: ShopPriceIntlOptions): string {
   const n = typeof amount === 'number' ? amount : shopParseAmountString(amount);
-  const displayCur = shopDisplayCurrency(currency);
-  const intlCode = shopIntlCurrencyCode(currency);
-  if (Number.isNaN(n)) return `${amount} ${displayCur}`;
+  if (Number.isNaN(n)) return String(amount).trim();
   try {
     if (typeof Intl !== 'undefined' && typeof Intl.NumberFormat === 'function') {
-      const formatted = new Intl.NumberFormat('fr-FR', {
-        style: 'currency',
-        currency: intlCode,
+      return new Intl.NumberFormat('fr-FR', {
+        style: 'decimal',
         minimumFractionDigits: intl?.minimumFractionDigits ?? 2,
         maximumFractionDigits: intl?.maximumFractionDigits ?? 2,
       }).format(n);
-      return formatted.replace(/\s*MAD\s*$/i, `\u00A0${displayCur}`);
     }
   } catch {
     /* fallback manuel ci-dessous */
   }
-  return manualFormat(n, displayCur, intl);
+  return manualFormatAmount(n, intl);
+}
+
+function manualFormat(n: number, currency: string, intl?: ShopPriceIntlOptions): string {
+  return `${manualFormatAmount(n, intl)}\u00A0${currency}`;
+}
+
+/** Montant seul (sans suffixe devise), pour affichage LTR « 299 Dhs » en RTL. */
+export function formatShopPriceAmount(
+  amount: string | number,
+  _currency = 'MAD',
+  intl?: ShopPriceIntlOptions,
+): string {
+  return formatShopAmountValue(amount, intl);
+}
+
+export function formatShopPrice(amount: string | number, currency = 'MAD', intl?: ShopPriceIntlOptions): string {
+  const displayCur = shopDisplayCurrency(currency);
+  if (Number.isNaN(typeof amount === 'number' ? amount : shopParseAmountString(amount))) {
+    return `${amount} ${displayCur}`;
+  }
+  return `${formatShopPriceAmount(amount, currency, intl)}\u00A0${displayCur}`;
 }
 
 export function shopHasPromotionalPrice(price: string, compareAtPrice: string | null | undefined): boolean {

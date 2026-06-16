@@ -245,6 +245,13 @@ export const inscriptionCardStyles = StyleSheet.create({
     fontWeight: '700',
     flexShrink: 1,
   },
+  linkChipLocked: {
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F1F5F9',
+  },
+  linkChipTxtLocked: {
+    color: '#64748B',
+  },
   statusPanel: {
     padding: spacing.sm,
     borderRadius: radius.md,
@@ -493,10 +500,14 @@ export function InscriptionCardUsefulLinks({
   links,
   title,
   isRTL,
+  locked = false,
+  onLockedPress,
 }: {
   links: CustomLink[];
   title: string;
   isRTL: boolean;
+  locked?: boolean;
+  onLockedPress?: () => void;
 }) {
   const rows = links.filter((l) => Boolean(l?.url?.trim())).slice(0, 6);
   if (rows.length === 0) return null;
@@ -508,11 +519,25 @@ export function InscriptionCardUsefulLinks({
           <Pressable
             key={`${l.url}-${i}`}
             onPress={() => {
+              if (locked) {
+                onLockedPress?.();
+                return;
+              }
               void Linking.openURL(l.url).catch(() => undefined);
             }}
-            style={({ pressed }) => [inscriptionCardStyles.linkChip, pressed && { opacity: 0.85 }]}>
-            <FontAwesome name="link" size={10} color={brand.primary} />
-            <Text style={[inscriptionCardStyles.linkChipTxt, isRTL && inscriptionCardStyles.rtlText]} numberOfLines={1}>
+            style={({ pressed }) => [
+              inscriptionCardStyles.linkChip,
+              locked && inscriptionCardStyles.linkChipLocked,
+              pressed && { opacity: 0.85 },
+            ]}>
+            <FontAwesome name={locked ? 'lock' : 'link'} size={10} color={locked ? '#64748B' : brand.primary} />
+            <Text
+              style={[
+                inscriptionCardStyles.linkChipTxt,
+                locked && inscriptionCardStyles.linkChipTxtLocked,
+                isRTL && inscriptionCardStyles.rtlText,
+              ]}
+              numberOfLines={1}>
               {l.titre || l.url}
             </Text>
           </Pressable>

@@ -15,9 +15,9 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import RenderHtml from 'react-native-render-html';
-
 import { EstablishmentRowLogoThumb } from '@/components/shop/EstablishmentRowLogoThumb';
+import { ShopLocalizedDescription } from '@/components/shop/ShopLocalizedDescription';
+import { ShopPriceAmount } from '@/components/shop/ShopPriceAmount';
 import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { ShopDetailScreenSkeleton } from '@/components/shop/ShopDetailScreenSkeleton';
 import { Text } from '@/components/ui/Text';
@@ -28,7 +28,6 @@ import { fetchShopProductBySlug } from '@/services/shop';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { ShopProductDetail } from '@/types/shop';
-import { sanitizeRichHtml } from '@/utils/sanitizeRichHtml';
 import { getShopPathAfterBuyNow } from '@/utils/shopCartStorage';
 import {
   formatShopPrice,
@@ -39,6 +38,11 @@ import {
 } from '@/utils/shopFormatPrice';
 import { shopProductGalleryUrls, resolveShopImageUrl } from '@/utils/shopImageUrl';
 import { sharePayloadBoutiqueProductDetail } from '@/utils/sharePagePayloads';
+import {
+  shopProductLocalizedDescription,
+  shopProductLocalizedShortDescription,
+  shopProductLocalizedTitle,
+} from '@/utils/shopProductLocale';
 import {
   establishmentSectionTitleKey,
   splitEstablishmentsByDisplayCategory,
@@ -93,6 +97,19 @@ export default function ProductDetailScreen() {
     return splitEstablishmentsByDisplayCategory(product.establishments);
   }, [product?.establishments]);
 
+  const localizedTitle = useMemo(
+    () => (product ? shopProductLocalizedTitle(product, locale) : ''),
+    [product, locale],
+  );
+  const localizedShortDescription = useMemo(
+    () => (product ? shopProductLocalizedShortDescription(product, locale) : null),
+    [product, locale],
+  );
+  const localizedDescription = useMemo(
+    () => (product ? shopProductLocalizedDescription(product, locale) : null),
+    [product, locale],
+  );
+
   const handleAdd = useCallback(async () => {
     if (!product || isOut) return;
     setAddingToCart(true);
@@ -104,7 +121,7 @@ export default function ProductDetailScreen() {
       await addLine({
         productId: product.id,
         slug: product.slug,
-        title: product.title,
+        title: shopProductLocalizedTitle(product, locale),
         price: product.price,
         currency: product.currency,
         quantity: 1,
@@ -117,7 +134,7 @@ export default function ProductDetailScreen() {
     } finally {
       setAddingToCart(false);
     }
-  }, [product, isOut, inCart, addLine, removeLine]);
+  }, [product, isOut, inCart, addLine, removeLine, locale]);
 
   const handleBuyNow = useCallback(async () => {
     if (!product || isOut) return;
@@ -127,7 +144,7 @@ export default function ProductDetailScreen() {
         await addLine({
           productId: product.id,
           slug: product.slug,
-          title: product.title,
+          title: shopProductLocalizedTitle(product, locale),
           price: product.price,
           currency: product.currency,
           quantity: 1,
@@ -143,7 +160,7 @@ export default function ProductDetailScreen() {
     } finally {
       setAddingToCart(false);
     }
-  }, [product, isOut, inCart, addLine, router]);
+  }, [product, isOut, inCart, addLine, router, locale]);
 
   const onGalleryScroll = useCallback(
     (e: NativeSyntheticEvent<NativeScrollEvent>) => {
@@ -203,9 +220,7 @@ export default function ProductDetailScreen() {
     );
   }
 
-  const htmlSource = product.description?.trim()
-    ? { html: sanitizeRichHtml(product.description) }
-    : null;
+  const htmlSource = localizedDescription;
 
   return (
     <View style={styles.root}>
@@ -237,7 +252,7 @@ export default function ProductDetailScreen() {
               presentShare(
                 sharePayloadBoutiqueProductDetail({
                   slug: product.slug,
-                  title: product.title,
+                  title: localizedTitle,
                   subtitle: formatShopPrice(product.price, product.currency, priceOpts),
                   thumbUrl: thumb,
                 }),
@@ -330,10 +345,10 @@ export default function ProductDetailScreen() {
         </View>
 
         {/* ── Content card ── */}
-        <View style={styles.content}>
+        <View style={[styles.content, isRTL && styles.contentRtl]}>
 
           {/* Badges row */}
-          <View style={styles.badgeRow}>
+          <View style={[styles.badgeRow, isRTL && styles.badgeRowRtl]}>
             <View style={[styles.badge, styles.badgeType]}>
               <FontAwesome
                 name={product.type === 'pack' ? 'cubes' : 'cube'}
@@ -368,11 +383,11 @@ export default function ProductDetailScreen() {
           </View>
 
           {/* Title */}
-          <Text style={styles.title}>{product.title}</Text>
+          <Text style={[styles.title, isRTL && styles.titleRtl]}>{localizedTitle}</Text>
 
           {/* Rating */}
           {(product.ratingCount > 0 || product.ratingAverage != null) ? (
-            <View style={styles.ratingRow}>
+            <View style={[styles.ratingRow, isRTL && styles.ratingRowRtl]}>
               {[1, 2, 3, 4, 5].map((s) => (
                 <FontAwesome
                   key={s}
@@ -389,20 +404,44 @@ export default function ProductDetailScreen() {
           ) : null}
 
           {/* Short description */}
-          {product.shortDescription ? (
-            <Text style={styles.shortDesc}>{product.shortDescription}</Text>
+          {localizedShortDescription ? (
+            <ShopLocalizedDescription
+              value={localizedShortDescription}
+              isRTL={isRTL}
+              style={styles.shortDesc}
+              containerStyle={isRTL ? styles.descWrapRtl : styles.descWrap}
+              htmlFontSize={14}
+              htmlLineHeight={21}
+              htmlColor={brand.textSecondary}
+            />
           ) : null}
 
           {/* Price card */}
           <View style={styles.priceCard}>
-            <View style={styles.priceRow}>
-              <Text style={[styles.price, hasPromo && styles.priceSale]}>
-                {formatShopPrice(product.price, product.currency, priceOpts)}
-              </Text>
-              {hasPromo && product.compareAtPrice ? (
-                <Text style={styles.priceCompare}>
-                  {formatShopPrice(product.compareAtPrice, product.currency)}
-                </Text>
+            <View style={[styles.priceRow, isRTL && styles.priceRowRtl]}>
+              {isRTL && hasPromo && product.compareAtPrice ? (
+                <ShopPriceAmount
+                  amount={product.compareAtPrice}
+                  currency={product.currency}
+                  intl={priceOpts}
+                  amountStyle={styles.priceCompare}
+                  currencyStyle={styles.priceCompare}
+                />
+              ) : null}
+              <ShopPriceAmount
+                amount={product.price}
+                currency={product.currency}
+                intl={priceOpts}
+                amountStyle={[styles.price, hasPromo && styles.priceSale]}
+              />
+              {!isRTL && hasPromo && product.compareAtPrice ? (
+                <ShopPriceAmount
+                  amount={product.compareAtPrice}
+                  currency={product.currency}
+                  intl={priceOpts}
+                  amountStyle={styles.priceCompare}
+                  currencyStyle={styles.priceCompare}
+                />
               ) : null}
               {hasPromo && promoPct != null ? (
                 <View style={styles.promoChip}>
@@ -430,40 +469,18 @@ export default function ProductDetailScreen() {
           {htmlSource ? (
             <>
               <View style={styles.divider} />
-              <Text style={styles.sectionTitle}>Description</Text>
-              <View style={styles.descWrap}>
-                <RenderHtml
-                  contentWidth={width - spacing.lg * 2}
-                  source={htmlSource}
-                  tagsStyles={{
-                    body: {
-                      color: brand.textSecondary,
-                      fontSize: 14,
-                      lineHeight: 22,
-                    },
-                    p: { marginTop: 0, marginBottom: 10 },
-                    ul: { paddingLeft: 18 },
-                    ol: { paddingLeft: 18 },
-                    li: { marginBottom: 5, color: brand.textSecondary },
-                    strong: { color: brand.text },
-                    b: { color: brand.text },
-                    h2: {
-                      color: brand.text,
-                      fontSize: 16,
-                      fontWeight: '700',
-                      marginTop: 4,
-                      marginBottom: 4,
-                    },
-                    h3: {
-                      color: brand.text,
-                      fontSize: 14,
-                      fontWeight: '700',
-                      marginBottom: 4,
-                    },
-                    a: { color: brand.primary },
-                  }}
-                />
-              </View>
+              <Text style={[styles.sectionTitle, isRTL && styles.sectionTitleRtl]}>
+                {locale === 'ar' ? 'الوصف' : 'Description'}
+              </Text>
+              <ShopLocalizedDescription
+                value={htmlSource}
+                isRTL={isRTL}
+                contentWidth={width - spacing.lg * 2}
+                containerStyle={isRTL ? styles.descWrapRtl : styles.descWrap}
+                htmlFontSize={14}
+                htmlLineHeight={22}
+                htmlColor={brand.textSecondary}
+              />
             </>
           ) : null}
 
@@ -471,9 +488,10 @@ export default function ProductDetailScreen() {
           {product.type === 'pack' && product.packLines.length > 0 ? (
             <>
               <View style={styles.divider} />
-              <Text style={styles.sectionTitle}>
-                Contenu du pack · {product.packLines.length} produit
-                {product.packLines.length > 1 ? 's' : ''}
+              <Text style={[styles.sectionTitle, isRTL && styles.sectionTitleRtl]}>
+                {locale === 'ar'
+                  ? `محتوى الحزمة · ${product.packLines.length} منتج`
+                  : `Contenu du pack · ${product.packLines.length} produit${product.packLines.length > 1 ? 's' : ''}`}
               </Text>
               <View style={styles.packList}>
                 {product.packLines.map((line, idx) => {
@@ -481,7 +499,7 @@ export default function ProductDetailScreen() {
                     ? resolveShopImageUrl(line.childProduct.images[0])
                     : null;
                   return (
-                    <View key={idx} style={styles.packLine}>
+                    <View key={idx} style={[styles.packLine, isRTL && styles.packLineRtl]}>
                       {thumbUri ? (
                         <Image
                           source={{ uri: thumbUri }}
@@ -494,8 +512,8 @@ export default function ProductDetailScreen() {
                         </View>
                       )}
                       <View style={{ flex: 1 }}>
-                        <Text style={styles.packLineTitle} numberOfLines={2}>
-                          {line.childProduct.title}
+                        <Text style={[styles.packLineTitle, isRTL && styles.packLineTitleRtl]} numberOfLines={2}>
+                          {shopProductLocalizedTitle(line.childProduct, locale)}
                         </Text>
                         <Text style={styles.packLinePrice}>
                           {formatShopPrice(line.childProduct.price, line.childProduct.currency)}
@@ -515,10 +533,10 @@ export default function ProductDetailScreen() {
           {product.establishments && product.establishments.length > 0 ? (
             <>
               <View style={styles.divider} />
-              <Text style={styles.sectionTitle}>
+              <Text style={[styles.sectionTitle, isRTL && styles.sectionTitleRtl]}>
                 {locale === 'ar' ? 'المؤسسات المعنية' : 'Établissements concernés'}
               </Text>
-              <Text style={styles.establishmentsCount}>
+              <Text style={[styles.establishmentsCount, isRTL && styles.txtRtl]}>
                 {locale === 'ar'
                   ? `${product.establishments.length} مؤسسة`
                   : `${product.establishments.length} établissement${product.establishments.length > 1 ? 's' : ''}`}
@@ -833,6 +851,9 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -3 },
     elevation: 3,
   },
+  contentRtl: {
+    alignItems: 'stretch',
+  },
 
   /* Badges */
   badgeRow: {
@@ -840,6 +861,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
     gap: 7,
     marginBottom: spacing.md,
+  },
+  badgeRowRtl: {
+    justifyContent: 'flex-end',
   },
   badge: {
     flexDirection: 'row',
@@ -889,6 +913,12 @@ const styles = StyleSheet.create({
     letterSpacing: -0.3,
     marginBottom: spacing.sm,
   },
+  titleRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
+  },
 
   /* Rating */
   ratingRow: {
@@ -896,6 +926,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 3,
     marginBottom: spacing.sm,
+  },
+  ratingRowRtl: {
+    flexDirection: 'row-reverse',
+    justifyContent: 'flex-end',
+    alignSelf: 'stretch',
   },
   ratingVal: {
     fontSize: 13,
@@ -911,6 +946,10 @@ const styles = StyleSheet.create({
     color: brand.textSecondary,
     lineHeight: 21,
     marginBottom: spacing.md,
+  },
+  shortDescRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
 
   /* Price card */
@@ -928,6 +967,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 10,
     flexWrap: 'wrap',
+  },
+  priceRowRtl: {
+    justifyContent: 'flex-end',
   },
   price: {
     fontSize: 30,
@@ -974,9 +1016,22 @@ const styles = StyleSheet.create({
     color: brand.text,
     marginBottom: spacing.md,
   },
+  sectionTitleRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
+  },
 
   /* Description */
-  descWrap: {},
+  descWrap: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  descWrapRtl: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
 
   /* Pack lines */
   packList: { gap: spacing.sm },
@@ -989,6 +1044,10 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: brand.border,
+  },
+  packLineRtl: {
+    flexDirection: 'row-reverse',
+    direction: 'ltr',
   },
   packThumb: {
     width: 54,
@@ -1007,6 +1066,12 @@ const styles = StyleSheet.create({
     color: brand.text,
     lineHeight: 18,
   },
+  packLineTitleRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   packLinePrice: {
     marginTop: 3,
     fontSize: 12,
@@ -1024,6 +1089,8 @@ const styles = StyleSheet.create({
   txtRtl: {
     textAlign: 'right',
     writingDirection: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
   },
 
   /* Establishments (fiche produit — groupés par type) */

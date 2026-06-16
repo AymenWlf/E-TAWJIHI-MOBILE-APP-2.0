@@ -3,9 +3,16 @@ import { useEffect, useMemo } from 'react';
 import { Platform, Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 
 import { PlatformServiceEntitlementStatus } from '@/components/shop/PlatformServiceEntitlementStatus';
+import { PlatformServiceCatalogPriceBlock } from '@/components/shop/PlatformServiceCatalogPriceBlock';
+import { ShopLocalizedDescription } from '@/components/shop/ShopLocalizedDescription';
 import { Text } from '@/components/ui/Text';
 import type { AppLocale, HomeCopyKey } from '@/constants/i18n';
 import type { PlatformServiceCatalogEntitlement, PlatformServiceItem } from '@/services/platformServices';
+import {
+  platformServiceLocalizedDescription,
+  platformServiceLocalizedFeatures,
+  platformServiceLocalizedMiniDescription,
+} from '@/services/platformServices';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { EligibilityProfile } from '@/utils/eligibility';
@@ -21,9 +28,7 @@ import {
   platformServiceActivePromotionalPrice,
   platformServiceCurrency,
 } from '@/utils/platformServicePrice';
-import { resolvePlatformServicePromotionDeadline } from '@/utils/platformServicePromotionDeadline';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
-import { formatShopPrice } from '@/utils/shopFormatPrice';
 import {
   normalizePlatformServiceBrandColor,
   platformServiceFaIcon,
@@ -76,9 +81,6 @@ export function ShopServiceCatalogCard({
   const sale = s.promotionalPrice;
   const list = s.price;
   const hasPromo = Boolean(platformServiceActivePromotionalPrice(list, sale, s.promotionDeadlineAt));
-  const promoDeadline = hasPromo
-    ? resolvePlatformServicePromotionDeadline(s.promotionDeadlineAt, true)
-    : null;
   const inactive = platformServiceCatalogCardInactive(entitlement, entitlementsLoading);
   const brandHex = normalizePlatformServiceBrandColor(s.brandColor, inactive);
   const priceMode = platformServiceCatalogPriceMode(entitlement, entitlementsLoading, hasPromo);
@@ -93,13 +95,10 @@ export function ShopServiceCatalogCard({
   const purchasable = platformServiceCatalogPurchasable(entitlement, entitlementsLoading);
 
   const localizedDesc =
-    locale === 'ar'
-      ? (s.descriptionAr?.trim() || s.descriptionFr?.trim() || s.description?.trim() || '')
-      : (s.descriptionFr?.trim() || s.descriptionAr?.trim() || s.description?.trim() || '');
-  const feats =
-    locale === 'ar'
-      ? (s.featuresAr?.length ? s.featuresAr : s.features).slice(0, 3)
-      : (s.features?.length ? s.features : s.featuresAr).slice(0, 3);
+    platformServiceLocalizedMiniDescription(s, locale) ??
+    platformServiceLocalizedDescription(s, locale) ??
+    '';
+  const feats = platformServiceLocalizedFeatures(s, locale).slice(0, 3);
 
   const isEligible = useMemo(
     () =>
@@ -117,6 +116,7 @@ export function ShopServiceCatalogCard({
     <View
       style={[
         styles.outer,
+        isRTL && styles.outerRtl,
         inactive && styles.outerInactive,
         isStack
           ? styles.outerStack
@@ -135,26 +135,30 @@ export function ShopServiceCatalogCard({
         <View style={[styles.header, { backgroundColor: brandHex }, inactive && styles.headerInactive]}>
           <View style={[styles.headerOrb, { backgroundColor: withAlpha('#FFFFFF', 0.18) }]} pointerEvents="none" />
           <View style={[styles.headerOrb2, { backgroundColor: withAlpha(homeShell.green, 0.35) }]} pointerEvents="none" />
-          <View style={[styles.headerRow, isRTL && styles.headerRowRtl]}>
+          <View style={styles.headerRow}>
             <View style={[styles.iconWrap, { borderColor: withAlpha('#FFFFFF', 0.35) }]}>
               <FontAwesome name={platformServiceFaIcon(s.brandIcon)} size={22} color={brand.white} />
             </View>
-            <View style={styles.headerTexts}>
-              <View style={[styles.titleRow, isRTL && styles.titleRowRtl]}>
+            <View style={[styles.headerTexts, isRTL && styles.headerTextsRtl]}>
+              <View style={styles.titleRow}>
                 <Text style={[styles.name, isRTL && styles.txtRtl]} numberOfLines={isStack ? 3 : 2}>
                   {s.name}
                 </Text>
               </View>
               <View style={[styles.badgesRow, isRTL && styles.badgesRowRtl]}>
                 {!inactive && s.popular ? (
-                  <View style={styles.badgePopular}>
+                  <View style={[styles.badgePopular, isRTL && styles.badgePopularRtl]}>
                     <FontAwesome name="star" size={8} color="#B45309" />
-                    <Text style={styles.badgePopularTxt}>{t('shopServicesPopular')}</Text>
+                    <Text style={[styles.badgePopularTxt, isRTL && styles.tagTxtRtl]}>
+                      {t('shopServicesPopular')}
+                    </Text>
                   </View>
                 ) : null}
                 {!inactive && s.isBestseller ? (
                   <View style={styles.badgeBest}>
-                    <Text style={styles.badgeBestTxt}>{t('shopBadgeBestseller')}</Text>
+                    <Text style={[styles.badgeBestTxt, isRTL && styles.tagTxtRtl]}>
+                      {t('shopBadgeBestseller')}
+                    </Text>
                   </View>
                 ) : null}
               </View>
@@ -180,7 +184,7 @@ export function ShopServiceCatalogCard({
                 style={[
                   styles.eligibilityTxt,
                   isEligible ? styles.eligibilityTxtOk : styles.eligibilityTxtKo,
-                  isRTL && styles.txtRtl,
+                  isRTL && styles.tagTxtRtl,
                 ]}
                 numberOfLines={1}
               >
@@ -200,9 +204,15 @@ export function ShopServiceCatalogCard({
           />
 
           {localizedDesc ? (
-            <Text style={[styles.desc, isRTL && styles.txtRtl]} numberOfLines={isStack ? 4 : 3}>
-              {localizedDesc}
-            </Text>
+            <ShopLocalizedDescription
+              value={localizedDesc}
+              isRTL={isRTL}
+              style={styles.desc}
+              numberOfLines={isStack ? 4 : 3}
+              htmlFontSize={12}
+              htmlLineHeight={17}
+              htmlColor={brand.textSecondary}
+            />
           ) : null}
 
           {feats.length > 0 ? (
@@ -212,7 +222,7 @@ export function ShopServiceCatalogCard({
                   <View style={styles.featCheck}>
                     <FontAwesome name="check" size={7} color={homeShell.greenDark} />
                   </View>
-                  <Text style={[styles.featTxt, isRTL && styles.txtRtl]} numberOfLines={2}>
+                  <Text style={[styles.featTxt, isRTL && styles.featTxtRtl]} numberOfLines={2}>
                     {line}
                   </Text>
                 </View>
@@ -221,54 +231,33 @@ export function ShopServiceCatalogCard({
           ) : null}
 
           {priceMode !== 'hidden' ? (
-            <View style={[styles.priceBox, showPromoStyle && styles.priceBoxPromo]}>
-              <View style={[styles.priceRow, isRTL && styles.priceRowRtl]}>
-                {priceMode === 'promo-primary-only' && hasPromo && !isUpgradePrice ? (
-                  <View style={styles.promoChip}>
-                    <Text style={styles.promoChipTxt}>{t('shopServicePromoChip')}</Text>
-                  </View>
-                ) : isUpgradePrice ? (
-                  <View style={[styles.promoChip, styles.upgradeChip]}>
-                    <Text style={[styles.promoChipTxt, styles.upgradeChipTxt]}>
-                      {t('shopEntitlementUpgradeAvailable')}
-                    </Text>
-                  </View>
-                ) : null}
-                <Text
-                  style={[
-                    styles.priceMain,
-                    inactive && styles.priceMuted,
-                    showPromoStyle && styles.priceSale,
-                  ]}
-                >
-                  {formatShopPrice(pricePrimary, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </Text>
-                {priceCompare && priceMode === 'standard' ? (
-                  <Text style={styles.priceCompare}>
-                    {formatShopPrice(priceCompare, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </Text>
-                ) : null}
-              </View>
-              {promoDeadline?.displayText ? (
-                <Text style={[styles.deadline, isRTL && styles.txtRtl]} numberOfLines={2}>
-                  {locale === 'ar' ? 'حتى ' : "Jusqu'au "}
-                  {promoDeadline.displayText}
-                  {promoDeadline.timeRemaining ? ` · ${promoDeadline.timeRemaining}` : ''}
-                </Text>
-              ) : null}
-            </View>
+            <PlatformServiceCatalogPriceBlock
+              pricePrimary={pricePrimary}
+              priceCompare={priceCompare}
+              priceMode={priceMode}
+              hasPromo={hasPromo}
+              isUpgradePrice={isUpgradePrice}
+              showPromoStyle={showPromoStyle}
+              inactive={inactive}
+              currency={cur}
+              promotionDeadlineAt={s.promotionDeadlineAt}
+              locale={locale}
+              isRTL={isRTL}
+              promoLabel={t('shopServicePromoChip')}
+              upgradeLabel={t('shopEntitlementUpgradeAvailable')}
+            />
           ) : null}
 
           <View style={styles.detailBtn}>
             <FontAwesome name="file-text-o" size={12} color={brand.primary} />
-            <Text style={styles.detailBtnTxt}>{t('shopServiceDetail')}</Text>
+            <Text style={[styles.detailBtnTxt, isRTL && styles.txtRtl]}>{t('shopServiceDetail')}</Text>
             <FontAwesome name={isRTL ? 'chevron-left' : 'chevron-right'} size={11} color={brand.primary} />
           </View>
         </View>
       </Pressable>
 
       <View style={[styles.actionsBar, isStack && styles.actionsBarStack]}>
-        <View style={[styles.actions, isRTL && styles.actionsRtl]}>
+        <View style={styles.actions}>
           <Pressable
             onPress={() => {
               if (!purchasable && !inCart) return;
@@ -309,6 +298,7 @@ export function ShopServiceCatalogCard({
             <Text
               style={[
                 styles.buyTxt,
+                isRTL && styles.buyTxtRtl,
                 ((!purchasable && !inCart) || entitlementsLoading) && styles.buyTxtDisabled,
               ]}
             >
@@ -352,6 +342,9 @@ const styles = StyleSheet.create({
   },
   outerInactive: {
     opacity: 0.92,
+  },
+  outerRtl: {
+    direction: 'rtl',
   },
   header: {
     paddingHorizontal: spacing.md,
@@ -400,6 +393,9 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: 6,
   },
+  headerTextsRtl: {
+    alignItems: 'flex-end',
+  },
   titleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -421,16 +417,24 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   badgesRowRtl: {
-    flexDirection: 'row-reverse',
+    alignSelf: 'flex-end',
+    justifyContent: 'flex-end',
+    width: '100%',
   },
   badgePopular: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flexGrow: 0,
+    flexShrink: 1,
     backgroundColor: 'rgba(255,255,255,0.92)',
     paddingHorizontal: 8,
     paddingVertical: 3,
     borderRadius: radius.full,
+  },
+  badgePopularRtl: {
+    flexDirection: 'row-reverse',
+    direction: 'ltr',
   },
   badgePopularTxt: {
     fontSize: 9,
@@ -438,6 +442,8 @@ const styles = StyleSheet.create({
     color: '#92400E',
   },
   badgeBest: {
+    flexGrow: 0,
+    flexShrink: 1,
     backgroundColor: homeShell.green,
     paddingHorizontal: 8,
     paddingVertical: 3,
@@ -466,6 +472,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    flexGrow: 0,
+    flexShrink: 1,
+    maxWidth: '100%',
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: radius.full,
@@ -483,7 +492,7 @@ const styles = StyleSheet.create({
   eligibilityTxt: {
     fontSize: 11,
     fontWeight: '700',
-    maxWidth: '100%',
+    flexShrink: 1,
   },
   eligibilityTxtOk: {
     color: '#15803D',
@@ -512,6 +521,7 @@ const styles = StyleSheet.create({
   },
   featRowRtl: {
     flexDirection: 'row-reverse',
+    direction: 'ltr',
   },
   featCheck: {
     width: 16,
@@ -529,6 +539,10 @@ const styles = StyleSheet.create({
     color: brand.textSecondary,
     lineHeight: 16,
   },
+  featTxtRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
   priceBox: {
     padding: spacing.sm,
     borderRadius: radius.md,
@@ -540,6 +554,15 @@ const styles = StyleSheet.create({
   priceBoxPromo: {
     backgroundColor: 'rgba(254,242,242,0.85)',
     borderColor: 'rgba(248,113,113,0.35)',
+  },
+  promoMetaRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
+  promoMetaRowRtl: {
+    flexDirection: 'row-reverse',
   },
   priceRow: {
     flexDirection: 'row',
@@ -585,12 +608,6 @@ const styles = StyleSheet.create({
     color: brand.textMuted,
     textDecorationLine: 'line-through',
     fontWeight: '600',
-  },
-  deadline: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: '#B91C1C',
-    lineHeight: 15,
   },
   detailBtn: {
     flexDirection: 'row',
@@ -663,10 +680,19 @@ const styles = StyleSheet.create({
     fontWeight: '800',
     letterSpacing: 0.15,
   },
+  buyTxtRtl: {
+    textAlign: 'center',
+    writingDirection: 'rtl',
+  },
   buyTxtDisabled: {
     color: '#F8FAFC',
   },
   txtRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    ...(Platform.OS === 'android' ? { includeFontPadding: false } : null),
+  },
+  tagTxtRtl: {
     textAlign: 'right',
     writingDirection: 'rtl',
     ...(Platform.OS === 'android' ? { includeFontPadding: false } : null),

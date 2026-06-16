@@ -70,7 +70,13 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { campusSeuilLabelsFromApi, mapCampusForDisplay } from '@/utils/campusMaps';
 import { evaluateEligibility } from '@/utils/eligibility';
 import { fireAndForget } from '@/utils/fireAndForget';
-import { formatVillesCourtes, labelEstablishmentBourseType, universityName } from '@/utils/establishmentFormat';
+import {
+  formatEstablishmentStudyDuration,
+  formatEstablishmentStudyDurationYears,
+  formatVillesCourtes,
+  labelEstablishmentBourseType,
+  universityName,
+} from '@/utils/establishmentFormat';
 import { pickBrochureFromDocuments } from '@/utils/establishmentBrochure';
 import { sharePayloadEstablishmentDetail } from '@/utils/sharePagePayloads';
 import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
@@ -602,7 +608,13 @@ export default function EstablishmentDetailScreen() {
           <Section title={t('estDetailSummary')} rtl={isRTL}>
             <Grid rtl={isRTL}>
               <Cell rtl={isRTL} icon="money" label={t('estLabelTuition')} value={data.fraisLabel} />
-              <Cell rtl={isRTL} icon="clock-o" label={t('estLabelDuration')} value={data.dureeLabel || '—'} />
+              <Cell
+                rtl={isRTL}
+                icon="clock-o"
+                label={t('estLabelDuration')}
+                value={formatEstablishmentStudyDuration(data, locale === 'ar' ? 'ar' : 'fr') || data.dureeLabel || '—'}
+                valueLatinDigits={isRTL}
+              />
               <Cell
                 rtl={isRTL}
                 icon={data.concoursAdmission ? 'trophy' : 'folder-open-o'}
@@ -611,7 +623,13 @@ export default function EstablishmentDetailScreen() {
               />
               <Cell rtl={isRTL} icon="graduation-cap" label={t('estLabelTracks')} value={filieresLine(data, isRTL)} />
               <Cell rtl={isRTL} icon="users" label={t('estLabelStudents')} value={formatNb(data.academicInfo?.nbEtudiants)} />
-              <Cell rtl={isRTL} icon="certificate" label={t('estLabelYears')} value={yearsLabel(data, isRTL)} />
+              <Cell
+                rtl={isRTL}
+                icon="certificate"
+                label={t('estLabelYears')}
+                value={yearsLabel(data, isRTL)}
+                valueLatinDigits={isRTL}
+              />
             </Grid>
           </Section>
 
@@ -934,7 +952,9 @@ function formatNb(n: number | null | undefined): string {
 
 function yearsLabel(data: EstablishmentNormalized, rtl: boolean): string {
   const y = data.academicInfo?.anneesEtudes ?? data.anneesEtudes;
-  if (typeof y === 'number' && y > 0) return rtl ? `${y} سنوات` : `${y} ans`;
+  if (typeof y === 'number' && y > 0) {
+    return formatEstablishmentStudyDurationYears(y, rtl ? 'ar' : 'fr');
+  }
   return '—';
 }
 
@@ -956,17 +976,22 @@ function Cell({
   label,
   value,
   rtl,
+  valueLatinDigits = false,
 }: {
   icon: React.ComponentProps<typeof FontAwesome>['name'];
   label: string;
   value: string;
   rtl?: boolean;
+  valueLatinDigits?: boolean;
 }) {
   return (
     <View style={[styles.cell, rtl && styles.cellRtl]}>
       <FontAwesome name={icon} size={13} color={homeShell.greenDark} />
       <Text style={[styles.cellLbl, rtl && styles.txtRtl]}>{label}</Text>
-      <Text style={[styles.cellVal, rtl && styles.txtRtl]} numberOfLines={3}>
+      <Text
+        style={[styles.cellVal, rtl && styles.txtRtl]}
+        numberOfLines={3}
+        latinDigits={valueLatinDigits}>
         {value}
       </Text>
     </View>

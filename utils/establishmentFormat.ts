@@ -109,12 +109,36 @@ export function formatFraisScolarite(e: EstablishmentListItem): string {
   return gratuit ? 'Gratuit' : 'Sur demande';
 }
 
-export function dureeLabel(e: EstablishmentListItem): string {
-  if (e.dureeEtudesMax != null && e.dureeEtudesMax !== undefined) return `${e.dureeEtudesMax} ans`;
-  if (e.dureeEtudes != null) return `${e.dureeEtudes} ans`;
+const LRI = '\u2066';
+const PDI = '\u2069';
+
+export function establishmentStudyDurationYears(e: EstablishmentListItem): number | null {
+  if (e.dureeEtudesMax != null && e.dureeEtudesMax !== undefined) return e.dureeEtudesMax;
+  if (e.dureeEtudes != null) return e.dureeEtudes;
   const y = e.academicInfo?.anneesEtudes ?? e.anneesEtudes;
-  if (typeof y === 'number' && y > 0) return `${y} ans`;
-  return '';
+  return typeof y === 'number' && y > 0 ? y : null;
+}
+
+/** « 5 ans » — chiffre puis unité à droite, y compris en interface arabe RTL. */
+export function formatEstablishmentStudyDurationYears(
+  years: number,
+  locale: 'ar' | 'fr' = 'fr',
+): string {
+  const label = `${years}\u00A0ans`;
+  return locale === 'ar' ? `${LRI}${label}${PDI}` : label;
+}
+
+export function formatEstablishmentStudyDuration(
+  e: EstablishmentListItem,
+  locale: 'ar' | 'fr' = 'fr',
+): string {
+  const years = establishmentStudyDurationYears(e);
+  if (years == null) return '';
+  return formatEstablishmentStudyDurationYears(years, locale);
+}
+
+export function dureeLabel(e: EstablishmentListItem, opts?: { locale?: 'ar' | 'fr' }): string {
+  return formatEstablishmentStudyDuration(e, opts?.locale ?? 'fr');
 }
 
 /** Concours comme sur le listing web (`requirements.concours`). */

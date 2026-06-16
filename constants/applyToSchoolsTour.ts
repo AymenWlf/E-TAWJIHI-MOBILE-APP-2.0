@@ -109,6 +109,7 @@ export const TOUR_DEMO_FGSES_ANNOUNCEMENT: ContestAnnouncementCard = {
   registrationUrl: 'https://admission.fgses-um6p.ma/login',
   registrationUrlLabel: "Lien d'inscription officiel",
   registrationUrlLabelAr: 'رابط التسجيل الرسمي',
+  registrationMethods: ['online'],
   ogImage: null,
   liensUtiles: [],
   filieresAcceptees: [],

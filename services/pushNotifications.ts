@@ -12,7 +12,7 @@
  *          `deviceId` + `installationId` pour la politique multi-appareils).
  *   2. `attachNotificationListeners()` installe :
  *        - listener tap (notification ouverte depuis la barre des tâches)
- *          → record-push-click + deep-link `/inscriptions/{id}`.
+ *          → deep-link `/inscriptions/{id}`.
  *        - listener foreground (notif reçue app ouverte) → handler natif
  *          déjà configuré avec `setNotificationHandler` ci-dessous.
  *   3. Au logout, `unregisterPushToken(getToken)` révoque le token côté
@@ -368,36 +368,6 @@ export async function unregisterPushToken(getAuthToken: AuthTokenGetter): Promis
 }
 
 /**
- * Notifie le backend qu'un user a tapé sur la push d'une annonce (pour les
- * KPIs "clics push"). Idempotent côté backend — seul le premier compte.
- */
-async function recordPushClick(contestId: number, getAuthToken: AuthTokenGetter): Promise<void> {
-  try {
-    const authToken = await getAuthToken();
-    if (!authToken) return;
-    const url = buildApiUrl(`/api/contest-announcements/${contestId}/record-push-click`);
-    await httpPostJson<{ success: boolean }, Record<string, never>>(url, {} as Record<string, never>, {
-      headers: { Authorization: `Bearer ${authToken}` },
-    });
-  } catch {
-    /* noop */
-  }
-}
-
-async function recordPlatformEventPushClick(eventId: number, getAuthToken: AuthTokenGetter): Promise<void> {
-  try {
-    const authToken = await getAuthToken();
-    if (!authToken) return;
-    const url = buildApiUrl(`/api/platform-events/${eventId}/record-push-click`);
-    await httpPostJson<{ success: boolean }, Record<string, never>>(url, {} as Record<string, never>, {
-      headers: { Authorization: `Bearer ${authToken}` },
-    });
-  } catch {
-    /* noop */
-  }
-}
-
-/**
  * Type minimal de la donnée embarquée dans une notification push backend.
  * Le serveur émet `{ type: 'contest_announcement', contestId, route }` ou
  * `{ type: 'daily_challenge', route }`.
@@ -413,6 +383,12 @@ type PushData = Record<string, unknown> & {
   contest_announcement_id?: number | string;
   commercial_client?: boolean | string | number;
   tab?: string;
+  platformEventId?: number | string;
+  platform_event_id?: number | string;
+  link_kind?: string;
+  linkKind?: string;
+  web_url?: string;
+  webUrl?: string;
 };
 
 function navigateFromPushPayload(data: PushData): boolean {
@@ -459,7 +435,7 @@ function navigateFromPushPayload(data: PushData): boolean {
 
 /**
  * Lit la `data` d'une notification (avec tolérance sur le format) et
- * exécute le côté « clic » : tracking + deep-link vers la fiche annonce ou le défi du jour.
+ * exécute le deep-link vers la fiche annonce ou le défi du jour.
  */
 async function handleNotificationTap(
   raw: Notifications.NotificationContent | null | undefined,
@@ -477,7 +453,6 @@ async function handleNotificationTap(
     const idRaw = data.contestId ?? data.contest_announcement_id;
     const id = typeof idRaw === 'string' ? Number(idRaw) : idRaw;
     if (id && Number.isFinite(id)) {
-      await recordPushClick(id, getAuthToken);
       navigateToContestAnnouncement(id, data as Record<string, unknown>);
     }
     return;
@@ -516,7 +491,6 @@ async function handleNotificationTap(
     const idRaw = data.platformEventId ?? data.platform_event_id;
     const id = typeof idRaw === 'string' ? Number(idRaw) : idRaw;
     if (id && Number.isFinite(id)) {
-      await recordPlatformEventPushClick(id, getAuthToken);
       const route =
         typeof data.route === 'string' && data.route.trim() !== ''
           ? data.route.trim()

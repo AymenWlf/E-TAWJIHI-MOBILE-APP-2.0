@@ -25,6 +25,10 @@ import {
   ShopProductGridSkeleton,
 } from '@/components/shop/ShopProductCardSkeleton';
 import { ShopServicesPreviewSkeleton } from '@/components/shop/ShopServicesPreviewSkeleton';
+import { PlatformServiceCatalogPriceBlock } from '@/components/shop/PlatformServiceCatalogPriceBlock';
+import { ShopLocalizedDescription } from '@/components/shop/ShopLocalizedDescription';
+import { ShopPriceAmount } from '@/components/shop/ShopPriceAmount';
+import { ShopPromoCampaignBanner } from '@/components/shop/ShopPromoCampaignBanner';
 import { ShopServiceCompactCardSkeletonStack } from '@/components/shop/ShopServiceCompactCardSkeleton';
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
@@ -58,6 +62,7 @@ import {
   shopPromoDiscountPercent,
 } from '@/utils/shopFormatPrice';
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
+import { shopProductLocalizedTitle } from '@/utils/shopProductLocale';
 import { platformServiceCartProductId } from '@/utils/platformServiceCart';
 import {
   addPlatformServiceToCartWithEviction,
@@ -136,6 +141,7 @@ export default function BoutiqueTabScreen() {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+  const [promoBannerRefreshKey, setPromoBannerRefreshKey] = useState(0);
   const [error, setError] = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
@@ -426,6 +432,7 @@ export default function BoutiqueTabScreen() {
         jobs.push(loadServices());
       }
       await Promise.all(jobs);
+      setPromoBannerRefreshKey((k) => k + 1);
     } finally {
       refreshInFlightRef.current = false;
       setRefreshing(false);
@@ -455,7 +462,7 @@ export default function BoutiqueTabScreen() {
       await addLine({
         productId: p.id,
         slug: p.slug,
-        title: p.title,
+        title: shopProductLocalizedTitle(p, locale),
         price: p.price,
         currency: p.currency,
         quantity: 1,
@@ -466,7 +473,7 @@ export default function BoutiqueTabScreen() {
       });
       void recordShopBoutiqueEvent('add_to_cart', p.id);
     },
-    [addLine, removeLine, inCartIds],
+    [addLine, removeLine, inCartIds, locale],
   );
 
   const handleBuyNow = useCallback(
@@ -476,7 +483,7 @@ export default function BoutiqueTabScreen() {
         await addLine({
           productId: p.id,
           slug: p.slug,
-          title: p.title,
+          title: shopProductLocalizedTitle(p, locale),
           price: p.price,
           currency: p.currency,
           quantity: 1,
@@ -490,7 +497,7 @@ export default function BoutiqueTabScreen() {
       const path = await getShopPathAfterBuyNow();
       router.push(path as any);
     },
-    [addLine, router, inCartIds],
+    [addLine, router, inCartIds, locale],
   );
 
   const renderHero = useCallback(
@@ -631,8 +638,8 @@ export default function BoutiqueTabScreen() {
               <FontAwesome name="handshake-o" size={16} color={brand.primary} />
             </View>
             <View style={[styles.servicesPreviewTitleTexts, isRTL && styles.servicesPreviewTitleTextsRtl]}>
-              <Text style={[styles.servicesPreviewKicker, isRTL && styles.txtRtl]}>{t('shopEyebrow')}</Text>
-              <Text style={[styles.servicesPreviewTitle, isRTL && styles.txtRtl]}>
+              <Text style={[styles.servicesPreviewKicker, isRTL && styles.tagTxtRtl]}>{t('shopEyebrow')}</Text>
+              <Text style={[styles.servicesPreviewTitle, isRTL && styles.tagTxtRtl]}>
                 {t('shopServicesSectionTitle')}
               </Text>
             </View>
@@ -659,9 +666,9 @@ export default function BoutiqueTabScreen() {
                   nestedScrollEnabled
                   removeClippedSubviews={false}
                   showsHorizontalScrollIndicator={false}
+                  style={isRTL ? styles.servicesPreviewScrollViewRtl : undefined}
                 contentContainerStyle={[
                   styles.servicesPreviewScroll,
-                  isRTL && styles.servicesPreviewScrollRtl,
                   { paddingHorizontal: serviceCarouselPad },
                 ]}
                 >
@@ -740,6 +747,16 @@ export default function BoutiqueTabScreen() {
 
   const listingHeaderElement = useMemo(() => renderListingHeader(), [renderListingHeader]);
 
+  const listHeaderWithPromo = useMemo(
+    () => (
+      <View style={isRTL ? styles.listHeaderRtl : undefined}>
+        <ShopPromoCampaignBanner refreshKey={promoBannerRefreshKey} />
+        {listingHeaderElement}
+      </View>
+    ),
+    [listingHeaderElement, isRTL],
+  );
+
   const renderItem = useCallback(
     ({ item: p, index }: { item: ShopProductListItem; index: number }) => {
       // En RTL on inverse les marges pour que la grille s'aligne correctement.
@@ -757,6 +774,7 @@ export default function BoutiqueTabScreen() {
             product={p}
             t={t}
             isRTL={isRTL}
+            locale={locale}
             onPress={() => {
               void recordShopBoutiqueEvent('click_product', p.id);
               router.push(`/boutique/${p.slug}` as any);
@@ -768,7 +786,7 @@ export default function BoutiqueTabScreen() {
         </View>
       );
     },
-    [handleAdd, handleBuyNow, inCartIds, router, t, isRTL],
+    [handleAdd, handleBuyNow, inCartIds, router, t, isRTL, locale],
   );
 
   const keyExtractor = useCallback((p: ShopProductListItem) => String(p.id), []);
@@ -819,7 +837,7 @@ export default function BoutiqueTabScreen() {
         {renderHero()}
       </SafeAreaView>
       {renderCatalogTabs()}
-      <View style={styles.listRegion}>
+      <View style={[styles.listRegion, isServicesTab && styles.listRegionServices]}>
         {isServicesTab ? (
           <PlatformServiceUniformHeightProvider
             itemIds={filteredServices.map((s) => s.slug)}
@@ -831,14 +849,19 @@ export default function BoutiqueTabScreen() {
             data={filteredServices}
             keyExtractor={keyExtractorService}
             renderItem={renderServiceListItem}
-            ListHeaderComponent={listingHeaderElement}
+            ListHeaderComponent={listHeaderWithPromo}
             contentContainerStyle={[
               styles.list,
               styles.listServicesStack,
               isRTL && styles.listServicesStackRtl,
+              isServicesTab && styles.listServicesStackSurface,
               { paddingBottom: listContentBottomPad },
             ]}
-            style={[styles.flatList, isRTL ? styles.rtl : styles.ltr]}
+            style={[
+              styles.flatList,
+              isServicesTab && styles.flatListServices,
+              isRTL ? styles.rtl : styles.ltr,
+            ]}
             refreshControl={
               <AppRefreshControl refreshing={refreshing} onRefresh={() => void refreshBoutique()} />
             }
@@ -879,7 +902,7 @@ export default function BoutiqueTabScreen() {
             keyExtractor={keyExtractor}
             renderItem={renderItem}
             numColumns={2}
-            ListHeaderComponent={listingHeaderElement}
+            ListHeaderComponent={listHeaderWithPromo}
             contentContainerStyle={[styles.list, { paddingBottom: listContentBottomPad }]}
             style={[styles.flatList, isRTL ? styles.rtl : styles.ltr]}
             refreshControl={
@@ -1013,6 +1036,7 @@ function ServiceCompactCard({
     <View
       style={[
         styles.svcCompactOuter,
+        isRTL && styles.svcCompactOuterRtl,
         inactive && styles.svcCompactOuterInactive,
         isStack
           ? styles.svcCompactOuterStack
@@ -1039,7 +1063,13 @@ function ServiceCompactCard({
             { backgroundColor: withAlpha(brandHex, inactive ? 0.2 : 0.45) },
           ]}
         />
-        <View style={[styles.svcCompactBody, isStack && styles.svcCompactBodyStack]}>
+        <View
+          style={[
+            styles.svcCompactBody,
+            isStack && styles.svcCompactBodyStack,
+            isRTL && styles.svcCompactBodyRtl,
+          ]}
+        >
           <View style={[styles.svcCompactHeroRow, isRTL && styles.svcCompactHeroRowRtl]}>
             <PlatformServiceVisualThumb
               brandIcon={s.brandIcon}
@@ -1048,31 +1078,37 @@ function ServiceCompactCard({
               iconSize={22}
               inactive={inactive}
             />
-            <View style={styles.svcCompactTitleCol}>
-              <View style={[styles.svcCompactTitleRow, isRTL && styles.svcCompactTitleRowRtl]}>
-                <Text
-                  style={[
-                    styles.svcCompactName,
-                    inactive && styles.svcCompactNameInactive,
-                    isRTL && styles.txtRtl,
-                  ]}
-                  numberOfLines={isStack ? 3 : 2}
-                >
-                  {s.name}
-                </Text>
-                {!inactive && s.popular ? (
-                  <View style={[styles.svcCompactPopularChip, isRTL && styles.svcCompactPopularChipRtl]}>
-                    <FontAwesome name="star" size={8} color="#B45309" />
-                    <Text style={styles.svcCompactPopularChipTxt}>{t('shopServicesPopular')}</Text>
-                  </View>
-                ) : null}
-                {!inactive && s.isBestseller ? (
-                  <View style={[styles.svcCompactBestsellerChip, isRTL && styles.svcCompactBestsellerChipRtl]}>
-                    <FontAwesome name="trophy" size={8} color={brand.white} />
-                    <Text style={styles.svcCompactBestsellerChipTxt}>{t('shopBadgeBestseller')}</Text>
-                  </View>
-                ) : null}
-              </View>
+            <View style={[styles.svcCompactTitleCol, isRTL && styles.svcCompactTitleColRtl]}>
+              <Text
+                style={[
+                  styles.svcCompactName,
+                  inactive && styles.svcCompactNameInactive,
+                  isRTL && styles.svcCompactNameRtl,
+                ]}
+                numberOfLines={isStack ? 3 : 2}
+              >
+                {s.name}
+              </Text>
+              {!inactive && (s.popular || s.isBestseller) ? (
+                <View style={[styles.svcCompactBadgesRow, isRTL && styles.svcCompactBadgesRowRtl]}>
+                  {!inactive && s.popular ? (
+                    <View style={[styles.svcCompactPopularChip, isRTL && styles.svcCompactPopularChipRtl]}>
+                      <FontAwesome name="star" size={8} color="#B45309" />
+                      <Text style={[styles.svcCompactPopularChipTxt, isRTL && styles.tagTxtRtl]}>
+                        {t('shopServicesPopular')}
+                      </Text>
+                    </View>
+                  ) : null}
+                  {!inactive && s.isBestseller ? (
+                    <View style={[styles.svcCompactBestsellerChip, isRTL && styles.svcCompactBestsellerChipRtl]}>
+                      <FontAwesome name="trophy" size={8} color={brand.white} />
+                      <Text style={[styles.svcCompactBestsellerChipTxt, isRTL && styles.tagTxtRtl]}>
+                        {t('shopBadgeBestseller')}
+                      </Text>
+                    </View>
+                  ) : null}
+                </View>
+              ) : null}
               {showEligibilityBadge ? (
                 <View
                   style={[
@@ -1090,7 +1126,7 @@ function ServiceCompactCard({
                     style={[
                       styles.svcCompactFilierePillTxt,
                       isEligible ? styles.svcCompactEligiblePillTxt : styles.svcCompactNotEligiblePillTxt,
-                      isRTL && styles.txtRtl,
+                      isRTL && styles.tagTxtRtl,
                     ]}
                     numberOfLines={1}
                   >
@@ -1111,12 +1147,16 @@ function ServiceCompactCard({
           </View>
 
           {localizedDesc ? (
-            <Text
-              style={[styles.svcCompactDesc, isStack && styles.svcCompactDescStack, isRTL && styles.txtRtl]}
+            <ShopLocalizedDescription
+              value={localizedDesc}
+              isRTL={isRTL}
+              style={[styles.svcCompactDesc, isStack && styles.svcCompactDescStack]}
+              containerStyle={styles.svcCompactDescWrap}
               numberOfLines={isStack ? 5 : 3}
-            >
-              {localizedDesc}
-            </Text>
+              htmlFontSize={isStack ? 13 : 12}
+              htmlLineHeight={isStack ? 18 : 17}
+              htmlColor={brand.textMuted}
+            />
           ) : null}
 
           {feats.length > 0 ? (
@@ -1126,7 +1166,7 @@ function ServiceCompactCard({
                   <View style={styles.svcCompactFeatDot}>
                     <FontAwesome name="check" size={7} color={brand.emerald} />
                   </View>
-                  <Text style={[styles.svcCompactFeatTxt, isRTL && styles.txtRtl]} numberOfLines={2}>
+                  <Text style={[styles.svcCompactFeatTxt, isRTL && styles.svcCompactFeatTxtRtl]} numberOfLines={2}>
                     {line}
                   </Text>
                 </View>
@@ -1134,44 +1174,27 @@ function ServiceCompactCard({
             </View>
           ) : null}
 
-          {priceMode !== 'hidden' ? (
-            <View style={[styles.svcCompactPriceBlock, isStack && styles.svcCompactPriceBlockStack]}>
-              <View style={styles.svcCompactPriceLabels}>
-                {priceMode === 'promo-primary-only' && hasPromo && !isUpgradePrice ? (
-                  <View style={styles.svcCompactPromoBadge}>
-                    <Text style={styles.svcCompactPromoBadgeTxt}>{t('shopServicePromoChip')}</Text>
-                  </View>
-                ) : isUpgradePrice ? (
-                  <View style={styles.svcCompactPromoBadge}>
-                    <Text style={styles.svcCompactPromoBadgeTxt}>{t('shopEntitlementUpgradeAvailable')}</Text>
-                  </View>
-                ) : null}
-                <View style={[styles.svcCompactPriceRow, isRTL && styles.svcCompactPriceRowRtl]}>
-                  <Text
-                    style={[
-                      styles.svcCompactPrice,
-                      inactive && styles.svcCompactPriceInactive,
-                      (showPromoStyle && priceMode === 'standard') || priceMode === 'promo-primary-only'
-                        ? styles.priceSale
-                        : undefined,
-                    ]}
-                  >
-                    {formatShopPrice(pricePrimary, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </Text>
-                  {priceCompare && priceMode === 'standard' ? (
-                    <Text style={styles.priceCompare}>
-                      {formatShopPrice(priceCompare, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                    </Text>
-                  ) : null}
-                </View>
-              </View>
-            </View>
-          ) : null}
+          <PlatformServiceCatalogPriceBlock
+            pricePrimary={pricePrimary}
+            priceCompare={priceCompare}
+            priceMode={priceMode}
+            hasPromo={hasPromo}
+            isUpgradePrice={isUpgradePrice}
+            showPromoStyle={showPromoStyle}
+            inactive={inactive}
+            currency={cur}
+            promotionDeadlineAt={s.promotionDeadlineAt}
+            locale={locale}
+            isRTL={isRTL}
+            promoLabel={t('shopServicePromoChip')}
+            upgradeLabel={t('shopEntitlementUpgradeAvailable')}
+            stack={isStack}
+          />
         </View>
       </Pressable>
 
       <View style={[styles.svcCompactActionsBar, isStack && styles.svcCompactActionsBarStack]}>
-        <View style={[styles.svcCompactActions, isRTL && styles.svcCompactActionsRtl]}>
+        <View style={styles.svcCompactActions}>
           <Pressable
             onPress={() => {
               if (!purchasable && !inCart) return;
@@ -1218,6 +1241,7 @@ function ServiceCompactCard({
             <Text
               style={[
                 styles.svcCompactBuyTxt,
+                isRTL && styles.svcCompactBuyTxtRtl,
                 ((!purchasable && !inCart) || entitlementsLoading) && styles.svcCompactBuyTxtDisabled,
               ]}
             >
@@ -1238,6 +1262,7 @@ function ProductCard({
   product: p,
   t,
   isRTL,
+  locale,
   onPress,
   onAdd,
   onBuyNow,
@@ -1246,6 +1271,7 @@ function ProductCard({
   product: ShopProductListItem;
   t: LocaleT;
   isRTL: boolean;
+  locale: AppLocale;
   onPress: () => void;
   onAdd: () => void;
   onBuyNow: () => void;
@@ -1259,6 +1285,7 @@ function ProductCard({
   const isOut = p.isOutOfStock === true;
   const priceOpts = shopPriceFormatOptsForCatalogOrCartLine(p);
   const hasPromo = shopHasPromotionalPrice(p.price, p.compareAtPrice);
+  const localizedTitle = shopProductLocalizedTitle(p, locale);
 
   return (
     <View style={styles.card}>
@@ -1267,7 +1294,7 @@ function ProductCard({
         onPress={onPress}
         style={({ pressed }) => pressed && { opacity: 0.96 }}
         accessibilityRole="button"
-        accessibilityLabel={`${t('shopViewProductA11y')}: ${p.title}`}
+        accessibilityLabel={`${t('shopViewProductA11y')}: ${localizedTitle}`}
       >
         {/* Image */}
         <View style={styles.cardImgWrap}>
@@ -1321,7 +1348,7 @@ function ProductCard({
         {/* Info body */}
         <View style={styles.cardBody}>
           <Text style={[styles.cardTitle, isRTL && styles.txtRtl]} numberOfLines={2}>
-            {p.title}
+            {localizedTitle}
           </Text>
 
           {p.ratingCount > 0 || p.ratingAverage != null ? (
@@ -1335,13 +1362,27 @@ function ProductCard({
           ) : null}
 
           <View style={[styles.priceRow, isRTL && styles.priceRowRtl]}>
-            <Text style={[styles.price, hasPromo && styles.priceSale]}>
-              {formatShopPrice(p.price, p.currency, priceOpts)}
-            </Text>
-            {hasPromo && p.compareAtPrice ? (
-              <Text style={styles.priceCompare}>
-                {formatShopPrice(p.compareAtPrice, p.currency)}
-              </Text>
+            {isRTL && hasPromo && p.compareAtPrice ? (
+              <ShopPriceAmount
+                amount={p.compareAtPrice}
+                currency={p.currency}
+                amountStyle={styles.priceCompare}
+                currencyStyle={styles.priceCompare}
+              />
+            ) : null}
+            <ShopPriceAmount
+              amount={p.price}
+              currency={p.currency}
+              intl={priceOpts}
+              amountStyle={[styles.price, hasPromo && styles.priceSale]}
+            />
+            {!isRTL && hasPromo && p.compareAtPrice ? (
+              <ShopPriceAmount
+                amount={p.compareAtPrice}
+                currency={p.currency}
+                amountStyle={styles.priceCompare}
+                currencyStyle={styles.priceCompare}
+              />
             ) : null}
           </View>
         </View>
@@ -1375,7 +1416,7 @@ function ProductCard({
             style={({ pressed }) => [styles.buyBtn, pressed && { opacity: 0.88 }]}
             accessibilityLabel={t('shopBuyNowA11y')}
           >
-            <Text style={styles.buyBtnTxt}>{t('shopBuyNow')}</Text>
+            <Text style={[styles.buyBtnTxt, isRTL && styles.buyBtnTxtRtl]}>{t('shopBuyNow')}</Text>
           </Pressable>
         </View>
       )}
@@ -1397,6 +1438,9 @@ const styles = StyleSheet.create({
   listRegion: {
     flex: 1,
     backgroundColor: brand.white,
+  },
+  listRegionServices: {
+    backgroundColor: brand.chatSurface,
   },
   listRegionInner: {
     flex: 1,
@@ -1432,11 +1476,25 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: brand.white,
   },
+  flatListServices: {
+    backgroundColor: brand.chatSurface,
+  },
   ltr: { direction: 'ltr' },
   rtl: { direction: 'rtl' },
   txtRtl: {
     textAlign: 'right',
     writingDirection: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  /** Texte dans une puce / tag (sans pleine largeur). */
+  tagTxtRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
+  listHeaderRtl: {
+    direction: 'rtl',
+    alignSelf: 'stretch',
   },
 
   list: {
@@ -1449,7 +1507,11 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     gap: spacing.md,
   },
+  listServicesStackSurface: {
+    backgroundColor: brand.chatSurface,
+  },
   listServicesStackRtl: {
+    direction: 'rtl',
     alignItems: 'stretch',
   },
   /* ── Hero ── */
@@ -1649,7 +1711,6 @@ const styles = StyleSheet.create({
     borderBottomColor: brand.border,
   },
   servicesPreviewSectionRtl: {
-    direction: 'rtl',
     alignSelf: 'stretch',
   },
   servicesPreviewTitleBlock: {
@@ -1661,6 +1722,9 @@ const styles = StyleSheet.create({
   },
   servicesPreviewTitleBlockRtl: {
     flexDirection: 'row-reverse',
+    direction: 'ltr',
+    alignSelf: 'stretch',
+    justifyContent: 'flex-end',
   },
   servicesPreviewIconWrap: {
     width: 40,
@@ -1679,6 +1743,7 @@ const styles = StyleSheet.create({
   },
   servicesPreviewTitleTextsRtl: {
     alignItems: 'flex-end',
+    flexShrink: 1,
   },
   servicesPreviewKicker: {
     fontSize: 10,
@@ -1710,8 +1775,8 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
   },
-  servicesPreviewScrollRtl: {
-    flexDirection: 'row-reverse',
+  servicesPreviewScrollViewRtl: {
+    direction: 'rtl',
   },
 
   svcCompactOuter: {
@@ -1725,6 +1790,9 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
+  },
+  svcCompactOuterRtl: {
+    direction: 'rtl',
   },
   svcCompactOuterCarousel: {
     maxWidth: '100%',
@@ -1762,6 +1830,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.sm + 4,
   },
+  svcCompactBodyRtl: {
+    direction: 'rtl',
+    alignItems: 'stretch',
+  },
   svcCompactPriceBlockStack: {
     marginTop: 'auto',
   },
@@ -1772,6 +1844,7 @@ const styles = StyleSheet.create({
   },
   svcCompactHeroRowRtl: {
     flexDirection: 'row-reverse',
+    direction: 'ltr',
   },
   svcCompactIconCircle: {
     width: 40,
@@ -1789,23 +1862,32 @@ const styles = StyleSheet.create({
     minWidth: 0,
     gap: 6,
   },
-  svcCompactTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: 8,
-    flexWrap: 'wrap',
+  svcCompactTitleColRtl: {
+    alignItems: 'flex-end',
+    alignSelf: 'stretch',
   },
-  svcCompactTitleRowRtl: {
-    flexDirection: 'row-reverse',
+  svcCompactBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    alignSelf: 'flex-start',
+  },
+  svcCompactBadgesRowRtl: {
+    alignSelf: 'flex-end',
+    justifyContent: 'flex-end',
+    width: '100%',
   },
   svcCompactName: {
-    flex: 1,
-    minWidth: 0,
+    alignSelf: 'stretch',
     fontSize: 15,
     fontWeight: '700',
     color: brand.text,
     lineHeight: 20,
     letterSpacing: -0.2,
+  },
+  svcCompactNameRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
   svcCompactNameInactive: {
     color: '#94A3B8',
@@ -1814,6 +1896,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flexGrow: 0,
+    flexShrink: 1,
     backgroundColor: '#FFFBEB',
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -1823,6 +1907,7 @@ const styles = StyleSheet.create({
   },
   svcCompactPopularChipRtl: {
     flexDirection: 'row-reverse',
+    direction: 'ltr',
   },
   svcCompactPopularChipTxt: {
     fontSize: 9,
@@ -1834,6 +1919,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
+    flexGrow: 0,
+    flexShrink: 1,
     backgroundColor: '#F59E0B',
     paddingHorizontal: 7,
     paddingVertical: 3,
@@ -1841,6 +1928,7 @@ const styles = StyleSheet.create({
   },
   svcCompactBestsellerChipRtl: {
     flexDirection: 'row-reverse',
+    direction: 'ltr',
   },
   svcCompactBestsellerChipTxt: {
     fontSize: 9,
@@ -1853,6 +1941,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 5,
+    flexGrow: 0,
+    flexShrink: 1,
+    maxWidth: '100%',
     backgroundColor: 'rgba(51,62,143,0.06)',
     paddingHorizontal: 8,
     paddingVertical: 4,
@@ -1865,7 +1956,7 @@ const styles = StyleSheet.create({
   svcCompactFilierePillTxt: {
     fontSize: 11,
     fontWeight: '600',
-    maxWidth: '100%',
+    flexShrink: 1,
   },
   svcCompactEligiblePill: {
     backgroundColor: 'rgba(47,206,148,0.12)',
@@ -1881,12 +1972,25 @@ const styles = StyleSheet.create({
     color: '#B91C1C',
     fontWeight: '700',
   },
-  svcCompactDesc: {
+  svcCompactDescWrap: {
+    alignSelf: 'stretch',
+    width: '100%',
     marginTop: spacing.sm,
+  },
+  svcCompactDescWrapRtl: {
+    direction: 'rtl',
+  },
+  svcCompactDesc: {
     fontSize: 12,
     color: brand.textMuted,
     fontWeight: '500',
     lineHeight: 17,
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  svcCompactDescRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
   },
   svcCompactDescStack: {
     fontSize: 13,
@@ -1900,6 +2004,7 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: brand.border,
+    alignSelf: 'stretch',
   },
   svcCompactFeatRow: {
     flexDirection: 'row',
@@ -1908,6 +2013,7 @@ const styles = StyleSheet.create({
   },
   svcCompactFeatRowRtl: {
     flexDirection: 'row-reverse',
+    direction: 'ltr',
   },
   svcCompactFeatDot: {
     width: 15,
@@ -1925,6 +2031,10 @@ const styles = StyleSheet.create({
     color: brand.textSecondary,
     lineHeight: 15,
   },
+  svcCompactFeatTxtRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+  },
   svcCompactPriceBlock: {
     marginTop: spacing.sm,
     paddingTop: spacing.sm,
@@ -1934,6 +2044,15 @@ const styles = StyleSheet.create({
 
   svcCompactPriceLabels: {
     gap: 6,
+  },
+  svcCompactPromoRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    gap: 6,
+  },
+  svcCompactPromoRowRtl: {
+    flexDirection: 'row-reverse',
   },
   svcCompactPromoBadge: {
     alignSelf: 'flex-start',
@@ -2022,6 +2141,11 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontWeight: '700',
     letterSpacing: 0.1,
+  },
+  svcCompactBuyTxtRtl: {
+    textAlign: 'center',
+    writingDirection: 'rtl',
+    width: '100%',
   },
   svcCompactBuyBtnDisabled: {
     backgroundColor: '#CBD5E1',
@@ -2282,8 +2406,7 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
   priceRowRtl: {
-    flexDirection: 'row-reverse',
-    justifyContent: 'flex-start',
+    justifyContent: 'flex-end',
   },
   price: {
     fontSize: fontSize.md,
@@ -2360,5 +2483,10 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '900',
     letterSpacing: 0.2,
+  },
+  buyBtnTxtRtl: {
+    textAlign: 'center',
+    writingDirection: 'rtl',
+    width: '100%',
   },
 });

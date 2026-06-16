@@ -99,7 +99,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   cardRtl: {
-    direction: 'rtl',
+    alignItems: 'stretch',
   },
   accentBar: {
     position: 'absolute',
@@ -125,6 +125,7 @@ const styles = StyleSheet.create({
   },
   topRowRtl: {
     flexDirection: 'row-reverse',
+    direction: 'ltr',
   },
   logo: {
     width: 62,

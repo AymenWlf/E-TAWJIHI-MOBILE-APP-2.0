@@ -3,7 +3,9 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
+import { useLocale } from '@/contexts/LocaleContext';
 import type { EstablishmentNormalized } from '@/services/establishments';
+import { formatEstablishmentStudyDuration } from '@/utils/establishmentFormat';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
 /** Skeleton commun aux cartes du chat pendant le chargement des métadonnées / listes. */
@@ -35,6 +37,10 @@ export function ChatMiniEstablishmentCard({
   item: EstablishmentNormalized;
   onPress: () => void;
 }) {
+  const { isRTL, locale } = useLocale();
+  const durationLabel =
+    formatEstablishmentStudyDuration(item, locale === 'ar' ? 'ar' : 'fr') || item.dureeLabel;
+
   return (
     <Pressable onPress={onPress} style={({ pressed }) => [styles.card, pressed && { opacity: 0.96 }]}>
       <View style={styles.row}>
@@ -58,11 +64,11 @@ export function ChatMiniEstablishmentCard({
       </View>
       <View style={styles.metaRow}>
         <EstablishmentTypeBadge type={item.type} size="xs" hideIfUnknown={false} />
-        {item.dureeLabel ? (
+        {durationLabel ? (
           <View style={styles.pill}>
             <FontAwesome name="clock-o" size={12} color={brand.primary} />
-            <Text style={styles.pillTxt} numberOfLines={1}>
-              {item.dureeLabel}
+            <Text style={styles.pillTxt} numberOfLines={1} latinDigits={isRTL}>
+              {durationLabel}
             </Text>
           </View>
         ) : null}

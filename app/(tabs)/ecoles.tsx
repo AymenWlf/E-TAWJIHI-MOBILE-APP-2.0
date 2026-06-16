@@ -1,4 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
+import { useFocusEffect } from '@react-navigation/native';
 import { StatusBar } from 'expo-status-bar';
 import { useRouter } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -63,9 +64,7 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
   applyEstablishmentWebClientFilters,
   dedupeEstablishmentsById,
-  getListingWebOrderContentSig,
-  sortEstablishmentsLikeEcolesSuperieuresWeb,
-  sortSponsoredFirst,
+  sortEstablishmentsMobileRandomListing,
 } from '@/utils/establishmentWebFilters';
 import { resolveEstablishmentLockedVariant } from '@/utils/establishmentLockDisplay';
 
@@ -125,22 +124,13 @@ export default function EcolesScreen() {
   const [cities, setCities] = useState<CityRow[]>([]);
   const [secteurs, setSecteurs] = useState<SecteurRow[]>([]);
   const [placementByEid, setPlacementByEid] = useState<Record<number, ListingPlacementInfo>>({});
-  /** Ne reshuffle le tri « style EcolesSupérieures » que si la piscine / les placements changent. */
-  const listingWebOrderContentSigRef = useRef<string>('');
-  /** Ordre mélangé (client mode) — ne pas réécrire `filteredPool` pour éviter boucles de re-render. */
-  const orderedClientPoolRef = useRef<EstablishmentNormalized[] | null>(null);
-  /** Catalogue complet ordonné (filtre « Éligibles ») — évite reshuffle à chaque scroll / placement. */
-  const catalogListingContentSigRef = useRef<string>('');
-  const orderedCatalogPoolRef = useRef<EstablishmentNormalized[] | null>(null);
+  /** Seed aléatoire — nouveau tirage à chaque chargement / refresh / focus onglet. */
+  const [listingShuffleSeed, setListingShuffleSeed] = useState(() => Math.random());
+  const [orderedListing, setOrderedListing] = useState<EstablishmentNormalized[]>([]);
   /** Évite les appels `onEndReached` en rafale (skeleton / fetch en boucle). */
   const loadMoreInFlightRef = useRef(false);
   /** Ignore le premier `onEndReached` au montage (liste courte). */
   const endReachedEnabledRef = useRef(false);
-  /** Révision du listing client ordonné (ref seule ne déclenche pas de re-render). */
-  const [clientListingRevision, setClientListingRevision] = useState(0);
-  /** Listing serveur : ordre stable à l’append (évite de revoir les mêmes écoles au load more). */
-  const stableServerListingRef = useRef<EstablishmentNormalized[]>([]);
-  const serverListingNeedsResetRef = useRef(true);
 
   /* Suivi d'écoles : Set des IDs suivis + IDs en cours de toggle */
   const { user, getValidAccessToken, isLoading: authLoading } = useAuth();
@@ -222,24 +212,29 @@ export default function EcolesScreen() {
       .catch(() => setPlacementByEid({}));
   }, []);
 
-  /** Mode client : même composition que `EcolesSupérieures.tsx` (shuffle sponsorisés + blocs mélangés). */
+  /** Nouveau tirage aléatoire sponsorisés + reste à chaque ouverture de l’onglet. */
+  useFocusEffect(
+    useCallback(() => {
+      if (loading || refreshing) return;
+      const pool = clientMode ? filteredPool : fullCatalogPool;
+      if (pool?.length) {
+        setListingShuffleSeed(Math.random());
+      }
+    }, [clientMode, filteredPool, fullCatalogPool, loading, refreshing]),
+  );
+
+  /** Composition listing : sponsorisées aléatoires en tête, puis le reste aléatoire. */
   useEffect(() => {
-    if (!clientMode || !filteredPool?.length) {
-      orderedClientPoolRef.current = null;
+    const pool = clientMode ? filteredPool : fullCatalogPool;
+    if (!pool?.length) {
+      setOrderedListing([]);
       return;
     }
-    const merged = mergeEstablishmentsWithListingPlacements(filteredPool, placementByEid);
-    const contentSig = getListingWebOrderContentSig(merged, placementByEid);
-    if (contentSig === listingWebOrderContentSigRef.current && orderedClientPoolRef.current) {
-      return;
-    }
-    listingWebOrderContentSigRef.current = contentSig;
-    const ordered = dedupeEstablishmentsById(
-      sortEstablishmentsLikeEcolesSuperieuresWeb(merged, placementByEid),
+    const merged = dedupeEstablishmentsById(
+      mergeEstablishmentsWithListingPlacements(pool, placementByEid),
     );
-    orderedClientPoolRef.current = ordered;
-    setClientListingRevision((v) => v + 1);
-  }, [clientMode, filteredPool, placementByEid]);
+    setOrderedListing(dedupeEstablishmentsById(sortEstablishmentsMobileRandomListing(merged)));
+  }, [listingShuffleSeed, clientMode, filteredPool, fullCatalogPool, placementByEid]);
 
   /** Toggle Suivre/Ne plus suivre — mise à jour optimiste, revert si l'API échoue. */
   const handleToggleFollow = useCallback(
@@ -360,26 +355,6 @@ export default function EcolesScreen() {
     [appliedQ, filtersValue],
   );
 
-  const catalogPool = filteredPool ?? fullCatalogPool;
-
-  useEffect(() => {
-    if (filteredPool) {
-      setFullCatalogPool(null);
-      return;
-    }
-    let cancelled = false;
-    void listAllEstablishments(apiQueryBase())
-      .then((all) => {
-        if (!cancelled) setFullCatalogPool(dedupeEstablishmentsById(all));
-      })
-      .catch(() => {
-        if (!cancelled) setFullCatalogPool(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [apiQueryBase, filteredPool, queryKey]);
-
   useEffect(() => {
     let cancelled = false;
     setErr(null);
@@ -388,12 +363,10 @@ export default function EcolesScreen() {
     endReachedEnabledRef.current = false;
     setClientMode(needsClientScan);
     setFilteredPool(null);
-    listingWebOrderContentSigRef.current = '';
-    orderedClientPoolRef.current = null;
-    catalogListingContentSigRef.current = '';
-    orderedCatalogPoolRef.current = null;
-    stableServerListingRef.current = [];
-    serverListingNeedsResetRef.current = true;
+    if (needsClientScan) {
+      setFullCatalogPool(null);
+    }
+    setOrderedListing([]);
 
     if (needsClientScan) {
       if (needsCitiesForRegion && cities.length === 0) {
@@ -403,9 +376,13 @@ export default function EcolesScreen() {
         };
       }
       setLoading(true);
-      void listAllEstablishments(apiQueryBase())
-        .then((all) => {
+      void Promise.all([
+        listAllEstablishments(apiQueryBase()),
+        fetchListingPlacementsByEstablishment().catch(() => ({} as Record<number, ListingPlacementInfo>)),
+      ])
+        .then(([all, placements]) => {
           if (cancelled) return;
+          setPlacementByEid(placements);
           const regionSet =
             needsCitiesForRegion && cities.length > 0
               ? new Set(
@@ -427,6 +404,7 @@ export default function EcolesScreen() {
           setItems([]);
           setVisibleEnd(PAGE_SIZE);
           setPages(Math.max(1, Math.ceil(f.length / PAGE_SIZE)));
+          setListingShuffleSeed(Math.random());
         })
         .catch((e: unknown) => {
           const msg =
@@ -442,11 +420,18 @@ export default function EcolesScreen() {
     }
 
     setLoading(true);
-    void listEstablishments({ ...apiQueryBase(), page: 1, limit: PAGE_SIZE })
-      .then((res) => {
+    void Promise.all([
+      listAllEstablishments(apiQueryBase()),
+      fetchListingPlacementsByEstablishment().catch(() => ({} as Record<number, ListingPlacementInfo>)),
+    ])
+      .then(([all, placements]) => {
         if (cancelled) return;
-        setItems(res.data);
-        setPages(res.pagination.pages);
+        setPlacementByEid(placements);
+        const deduped = dedupeEstablishmentsById(all);
+        setFullCatalogPool(deduped);
+        setItems(deduped.slice(0, PAGE_SIZE));
+        setPages(Math.max(1, Math.ceil(deduped.length / PAGE_SIZE)));
+        setListingShuffleSeed(Math.random());
       })
       .catch((e: unknown) => {
         const msg =
@@ -468,12 +453,7 @@ export default function EcolesScreen() {
     setPage(1);
     setVisibleEnd(PAGE_SIZE);
     setClientMode(needsClientScan);
-    listingWebOrderContentSigRef.current = '';
-    orderedClientPoolRef.current = null;
-    catalogListingContentSigRef.current = '';
-    orderedCatalogPoolRef.current = null;
-    stableServerListingRef.current = [];
-    serverListingNeedsResetRef.current = true;
+    setOrderedListing([]);
 
     try {
       const rt = filtersValue.regionTitle.trim();
@@ -518,14 +498,13 @@ export default function EcolesScreen() {
         setPages(Math.max(1, Math.ceil(f.length / PAGE_SIZE)));
       } else {
         setFilteredPool(null);
-        const [res, all] = await Promise.all([
-          listEstablishments({ ...apiQueryBase(), page: 1, limit: PAGE_SIZE }),
-          listAllEstablishments(apiQueryBase()),
-        ]);
-        setItems(res.data);
-        setPages(res.pagination.pages);
-        setFullCatalogPool(dedupeEstablishmentsById(all));
+        const all = await listAllEstablishments(apiQueryBase());
+        const deduped = dedupeEstablishmentsById(all);
+        setFullCatalogPool(deduped);
+        setItems(deduped.slice(0, PAGE_SIZE));
+        setPages(Math.max(1, Math.ceil(deduped.length / PAGE_SIZE)));
       }
+      setListingShuffleSeed(Math.random());
     } catch (e: unknown) {
       const msg =
         typeof e === 'object' && e && 'message' in e ? String((e as { message: string }).message) : 'Erreur réseau';
@@ -544,59 +523,10 @@ export default function EcolesScreen() {
     apiQueryBase,
   ]);
 
-  const buildListingFromPool = useCallback(
-    (pool: EstablishmentNormalized[]) => {
-      if (!pool.length) return [];
-      const merged = dedupeEstablishmentsById(
-        mergeEstablishmentsWithListingPlacements(pool, placementByEid),
-      );
-      const contentSig = getListingWebOrderContentSig(merged, placementByEid);
-      if (contentSig === catalogListingContentSigRef.current && orderedCatalogPoolRef.current) {
-        return orderedCatalogPoolRef.current;
-      }
-      catalogListingContentSigRef.current = contentSig;
-      const ordered = clientMode
-        ? dedupeEstablishmentsById(sortEstablishmentsLikeEcolesSuperieuresWeb(merged, placementByEid))
-        : sortSponsoredFirst(merged);
-      orderedCatalogPoolRef.current = ordered;
-      return ordered;
-    },
-    [clientMode, placementByEid],
-  );
-
-  const usesFullCatalogEligibleListing =
-    eligibleDiscoveryFilter && hasEligibilityFiliereProfile(eligibilityProfile) && !!catalogPool?.length;
 
   const activeFiltersCount = countActiveEstablishmentFilters(filtersValue);
 
-  const mergedEstablishments = useMemo(() => {
-    if (clientMode) {
-      return dedupeEstablishmentsById(
-        mergeEstablishmentsWithListingPlacements(items, placementByEid),
-      );
-    }
-    const merged = dedupeEstablishmentsById(
-      mergeEstablishmentsWithListingPlacements(items, placementByEid),
-    );
-    if (serverListingNeedsResetRef.current || stableServerListingRef.current.length === 0) {
-      const sorted = sortSponsoredFirst(merged);
-      stableServerListingRef.current = sorted;
-      serverListingNeedsResetRef.current = false;
-      return sorted;
-    }
-    const mergedById = new Map(merged.map((e) => [e.id, e]));
-    const prevIds = new Set(stableServerListingRef.current.map((e) => e.id));
-    const next: EstablishmentNormalized[] = [];
-    for (const e of stableServerListingRef.current) {
-      const updated = mergedById.get(e.id);
-      if (updated) next.push(updated);
-    }
-    for (const e of merged) {
-      if (!prevIds.has(e.id)) next.push(e);
-    }
-    stableServerListingRef.current = next;
-    return next;
-  }, [items, placementByEid, clientMode]);
+  const listingBase = useMemo(() => orderedListing, [orderedListing]);
 
   const matchesEligibleDiscovery = useCallback(
     (it: EstablishmentNormalized) => {
@@ -612,37 +542,13 @@ export default function EcolesScreen() {
     [eligibilityProfile, followedIds, isLoggedIn],
   );
 
-  const listingBase = useMemo(() => {
-    if (usesFullCatalogEligibleListing && catalogPool) {
-      return buildListingFromPool(catalogPool);
-    }
-    if (clientMode && filteredPool?.length) {
-      if (orderedClientPoolRef.current?.length) {
-        return orderedClientPoolRef.current;
-      }
-      return dedupeEstablishmentsById(
-        mergeEstablishmentsWithListingPlacements(filteredPool, placementByEid),
-      );
-    }
-    return mergedEstablishments;
-  }, [
-    usesFullCatalogEligibleListing,
-    catalogPool,
-    buildListingFromPool,
-    mergedEstablishments,
-    clientMode,
-    clientListingRevision,
-    filteredPool,
-    placementByEid,
-  ]);
-
   const eligibleDiscoveryCount = useMemo(() => {
-    if (!hasEligibilityFiliereProfile(eligibilityProfile) || !catalogPool?.length) return 0;
-    return buildListingFromPool(catalogPool).filter(matchesEligibleDiscovery).length;
-  }, [catalogPool, eligibilityProfile, buildListingFromPool, matchesEligibleDiscovery]);
+    if (!hasEligibilityFiliereProfile(eligibilityProfile) || !listingBase.length) return 0;
+    return listingBase.filter(matchesEligibleDiscovery).length;
+  }, [listingBase, eligibilityProfile, matchesEligibleDiscovery]);
 
   /**
-   * Filtres client sur la base listing (pagination serveur ou catalogue complet).
+   * Filtres client sur la base listing (catalogue complet, ordre aléatoire).
    */
   const filteredListingBeforeSlice = useMemo(() => {
     const elig = filtersValue.eligibilityFilter;
@@ -695,8 +601,7 @@ export default function EcolesScreen() {
   );
 
   const hasMoreToShow = visibleEnd < filteredListingBeforeSlice.length;
-  const canFetchMoreFromServer =
-    !clientMode && !usesFullCatalogEligibleListing && page < pages;
+  const canFetchMoreFromServer = false;
 
   useEffect(() => {
     setVisibleEnd((prev) => {
@@ -951,7 +856,7 @@ export default function EcolesScreen() {
         <FlatList
           data={visibleItems}
           keyExtractor={(it) => `school-${it.id}`}
-          extraData={visibleEnd}
+          extraData={`${visibleEnd}-${listingShuffleSeed}-${orderedListing.length}`}
           style={styles.scrollFill}
           contentContainerStyle={styles.list}
           showsVerticalScrollIndicator={false}

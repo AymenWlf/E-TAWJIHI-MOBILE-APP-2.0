@@ -12,6 +12,7 @@ import {
   sanitizeRegistrationMethods,
   type ContestRegistrationMethod,
 } from '@/utils/contestRegistrationMethods';
+import { computeDaysUntilContestClose, effectiveContestClosingDateIso } from '@/utils/contestAnnouncementClosingDate';
 import { getMobileVisitorId } from '@/utils/visitorId';
 
 /**
@@ -183,24 +184,16 @@ function normalizeAvailableStatuses(
     }));
 }
 
-function computeDaysUntilClose(dateEnd: string): number {
-  const end = new Date(dateEnd);
-  if (Number.isNaN(end.getTime())) return 0;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  end.setHours(0, 0, 0, 0);
-  return Math.round((end.getTime() - today.getTime()) / 86_400_000);
-}
-
 function normalize(c: RawCard): ContestAnnouncementCard {
   const deadlineLocked = c.deadlineLocked === true;
+  const closingDateIso = effectiveContestClosingDateIso(c.dateDebut, c.dateFin);
   const days = deadlineLocked
     ? null
-    : c.daysUntilClose ?? computeDaysUntilClose(c.dateFin);
+    : computeDaysUntilContestClose(c.dateDebut, c.dateFin);
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   const start = new Date(c.dateDebut);
-  const end = new Date(c.dateFin);
+  const end = new Date(closingDateIso || c.dateFin);
   const liens: CustomLink[] = Array.isArray(c.liensUtiles)
     ? c.liensUtiles
         .map((l) => ({

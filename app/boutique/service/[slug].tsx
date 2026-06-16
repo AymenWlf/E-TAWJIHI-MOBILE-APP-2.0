@@ -16,6 +16,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { EstablishmentRowLogoThumb } from '@/components/shop/EstablishmentRowLogoThumb';
 import { PlatformServiceVisualThumb } from '@/components/shop/PlatformServiceVisualThumb';
+import { ShopLocalizedDescription } from '@/components/shop/ShopLocalizedDescription';
 import { ShopDetailScreenSkeleton } from '@/components/shop/ShopDetailScreenSkeleton';
 import { Text } from '@/components/ui/Text';
 import { ETAWJIHI_LOGO_TRANSPARENT } from '@/constants/brandAssets';
@@ -32,6 +33,7 @@ import {
   fetchPlatformServices,
   platformServiceLocalizedDescription,
   platformServiceLocalizedFeatures,
+  platformServiceLocalizedMiniDescription,
   type PlatformServiceItem,
 } from '@/services/platformServices';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
@@ -40,7 +42,6 @@ import { getShopPathAfterBuyNow } from '@/utils/shopCartStorage';
 import {
   formatShopPrice,
   shopFormatPromoDiscountPercentLabel,
-  shopHasPromotionalPrice,
   shopPromoDiscountPercent,
 } from '@/utils/shopFormatPrice';
 import { platformServiceCartProductId } from '@/utils/platformServiceCart';
@@ -60,8 +61,11 @@ import {
   splitEstablishmentsByDisplayCategory,
 } from '@/utils/establishmentDisplayCategories';
 import { PlatformServiceEntitlementStatus } from '@/components/shop/PlatformServiceEntitlementStatus';
+import { PlatformServiceCatalogPriceBlock } from '@/components/shop/PlatformServiceCatalogPriceBlock';
 import {
+  platformServiceCatalogCardInactive,
   platformServiceCatalogDisplayPrices,
+  platformServiceCatalogPriceMode,
   platformServiceEntitlementCtaLabel,
   platformServiceShouldShowCatalogPrice,
 } from '@/utils/platformServiceEntitlementUi';
@@ -118,7 +122,11 @@ export default function PlatformServiceDetailScreen() {
   }, [slug, eligibilityProfile?.niveau]);
 
   const localizedDescription = useMemo(
-    () => (service ? platformServiceLocalizedDescription(service, locale) : null),
+    () =>
+      service
+        ? platformServiceLocalizedMiniDescription(service, locale) ??
+          platformServiceLocalizedDescription(service, locale)
+        : null,
     [service, locale],
   );
 
@@ -154,21 +162,25 @@ export default function PlatformServiceDetailScreen() {
   const unitStr = service ? platformServiceEffectiveUnitPriceString(service, entitlement) : '0';
   const list = service?.price ?? null;
   const sale = service?.promotionalPrice ?? null;
+  const hasPromo = Boolean(
+    service && platformServiceActivePromotionalPrice(list, sale, service.promotionDeadlineAt),
+  );
+  const priceMode = platformServiceCatalogPriceMode(entitlement, entitlementsLoading, hasPromo);
   const priceDisplay = platformServiceCatalogDisplayPrices(
     list,
     sale,
-    'standard',
+    priceMode,
     entitlement,
     service?.promotionDeadlineAt,
-  );
-  const hasPromo = Boolean(
-    service && platformServiceActivePromotionalPrice(list, sale, service.promotionDeadlineAt),
   );
   const showPromoStyle = priceDisplay.isUpgradePrice || hasPromo;
   const promoPct =
     service && priceDisplay.compare && showPromoStyle
       ? shopPromoDiscountPercent(priceDisplay.primary, priceDisplay.compare)
       : null;
+  const discountPercentLabel =
+    promoPct != null ? `−${shopFormatPromoDiscountPercentLabel(promoPct)}%` : null;
+  const priceInactive = platformServiceCatalogCardInactive(entitlement, entitlementsLoading);
 
   const galleryIconSize = useMemo(() => platformServiceGalleryLogoIconSize(width), [width]);
 
@@ -446,17 +458,10 @@ export default function PlatformServiceDetailScreen() {
             surfaceColor={brand.primary}
             logoVariant="square"
           />
-          {promoPct != null ? (
-            <View style={styles.galPromoBadge}>
-              <Text style={styles.galPromoBadgeTxt}>
-                −{shopFormatPromoDiscountPercentLabel(promoPct)}%
-              </Text>
-            </View>
-          ) : null}
         </View>
 
-        <View style={styles.content}>
-          <View style={styles.badgeRow}>
+        <View style={[styles.content, isRTL && styles.contentRtl]}>
+          <View style={[styles.badgeRow, isRTL && styles.badgeRowRtl]}>
             <View style={styles.typeBadge}>
               <Image
                 source={ETAWJIHI_LOGO_TRANSPARENT}
@@ -484,7 +489,7 @@ export default function PlatformServiceDetailScreen() {
             ) : null}
           </View>
 
-          <Text style={styles.title}>{service.name}</Text>
+          <Text style={[styles.title, isRTL && styles.titleRtl]}>{service.name}</Text>
 
           <PlatformServiceEntitlementStatus
             entitlement={entitlement}
@@ -497,27 +502,34 @@ export default function PlatformServiceDetailScreen() {
           />
 
           {localizedDescription ? (
-            <Text style={[styles.desc, isRTL && styles.descRtl]}>{localizedDescription}</Text>
+            <ShopLocalizedDescription
+              value={localizedDescription}
+              isRTL={isRTL}
+              style={styles.desc}
+              htmlFontSize={14}
+              htmlLineHeight={22}
+              htmlColor={brand.textSecondary}
+            />
           ) : null}
 
           {showPrice ? (
-            <View style={styles.priceCard}>
-              <View style={styles.priceRow}>
-                <Text style={[styles.price, showPromoStyle && styles.priceSale]}>
-                  {formatShopPrice(priceDisplay.primary, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                </Text>
-                {showPromoStyle && priceDisplay.compare ? (
-                  <Text style={styles.priceCompare}>
-                    {formatShopPrice(priceDisplay.compare, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })}
-                  </Text>
-                ) : null}
-                {promoPct != null ? (
-                  <View style={styles.promoChip}>
-                    <Text style={styles.promoChipTxt}>−{shopFormatPromoDiscountPercentLabel(promoPct)}%</Text>
-                  </View>
-                ) : null}
-              </View>
-            </View>
+            <PlatformServiceCatalogPriceBlock
+              pricePrimary={priceDisplay.primary}
+              priceCompare={priceDisplay.compare}
+              priceMode={priceMode}
+              hasPromo={hasPromo}
+              isUpgradePrice={priceDisplay.isUpgradePrice}
+              showPromoStyle={showPromoStyle}
+              inactive={priceInactive}
+              currency={cur}
+              promotionDeadlineAt={service.promotionDeadlineAt}
+              locale={locale}
+              isRTL={isRTL}
+              promoLabel={t('shopServicePromoChip')}
+              upgradeLabel={t('shopEntitlementUpgradeAvailable')}
+              discountPercentLabel={discountPercentLabel}
+              stack
+            />
           ) : entitlement?.status === 'included' || entitlement?.status === 'already_owned' ? (
             <Text style={[styles.includedPriceHint, isRTL && styles.descRtl]}>
               {t('shopEntitlementIncludedPriceHint')}
@@ -532,7 +544,7 @@ export default function PlatformServiceDetailScreen() {
               {localizedFeatures.map((line) => (
                 <View key={line} style={[styles.featRow, isRTL && styles.featRowRtl]}>
                   <FontAwesome name="check" size={12} color={brand.emerald} />
-                  <Text style={[styles.featTxt, isRTL && styles.txtRtl]}>{line}</Text>
+                  <Text style={[styles.featTxt, isRTL && styles.featTxtRtl]}>{line}</Text>
                 </View>
               ))}
             </>
@@ -658,7 +670,13 @@ export default function PlatformServiceDetailScreen() {
               pressed && purchasable && !entitlementsLoading && { opacity: 0.9 },
             ]}
           >
-            <Text style={[styles.buyBtnTxt, (!purchasable || entitlementsLoading) && styles.buyBtnTxtDisabled]}>
+            <Text
+              style={[
+                styles.buyBtnTxt,
+                isRTL && styles.buyBtnTxtRtl,
+                (!purchasable || entitlementsLoading) && styles.buyBtnTxtDisabled,
+              ]}
+            >
               {entitlement?.status === 'upgrade_available' || !purchasable
                 ? platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'shopBuyNow')
                 : service.cta}
@@ -775,17 +793,6 @@ const styles = StyleSheet.create({
     position: 'relative',
     overflow: 'hidden',
   },
-  galPromoBadge: {
-    position: 'absolute',
-    top: 14,
-    left: 14,
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: radius.sm,
-    zIndex: 5,
-  },
-  galPromoBadgeTxt: { color: brand.white, fontSize: 12, fontWeight: '900' },
 
   content: {
     backgroundColor: brand.white,
@@ -801,6 +808,12 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: -3 },
     elevation: 3,
     gap: spacing.md,
+  },
+  contentRtl: {
+    alignItems: 'stretch',
+  },
+  badgeRowRtl: {
+    justifyContent: 'flex-end',
   },
   badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 8 },
   typeBadge: {
@@ -846,24 +859,19 @@ const styles = StyleSheet.create({
     writingDirection: 'rtl',
   },
   title: { fontSize: 24, fontWeight: '900', color: brand.text, letterSpacing: -0.4, lineHeight: 30 },
+  titleRtl: {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    alignSelf: 'stretch',
+    width: '100%',
+  },
   desc: { fontSize: fontSize.sm, lineHeight: 22, color: brand.textSecondary, fontWeight: '600' },
   descRtl: { textAlign: 'right', writingDirection: 'rtl' },
-  priceCard: { marginTop: 4 },
-  priceRow: { flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 8 },
-  price: { fontSize: 26, fontWeight: '900', color: brand.primary },
-  priceSale: { color: '#EF4444' },
-  priceCompare: { fontSize: 14, color: brand.textMuted, textDecorationLine: 'line-through' },
-  promoChip: {
-    backgroundColor: '#FEE2E2',
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: radius.sm,
-  },
-  promoChipTxt: { fontSize: 11, fontWeight: '900', color: '#B91C1C' },
   sectionTitle: { fontSize: 15, fontWeight: '900', color: brand.text, marginTop: 8 },
   featRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 4 },
-  featRowRtl: { flexDirection: 'row-reverse' },
+  featRowRtl: { flexDirection: 'row-reverse', direction: 'ltr' },
   featTxt: { flex: 1, fontSize: 14, fontWeight: '600', color: brand.text, lineHeight: 20 },
+  featTxtRtl: { textAlign: 'right', writingDirection: 'rtl' },
   establishmentsBlock: { marginTop: 4, gap: 6 },
   establishmentsCount: { fontSize: 12, color: brand.textMuted, fontWeight: '600', marginBottom: 4 },
   establishmentsNotice: {
@@ -986,6 +994,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   buyBtnTxt: { color: brand.white, fontSize: 14, fontWeight: '900' },
+  buyBtnTxtRtl: { textAlign: 'center', writingDirection: 'rtl' },
   buyBtnDisabled: { backgroundColor: '#CBD5E1' },
   buyBtnTxtDisabled: { color: '#F1F5F9' },
 });

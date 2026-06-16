@@ -85,15 +85,14 @@ export function platformServiceLocalizedMiniDescription(
   >,
   locale: AppLocale,
 ): string | null {
-  const fr =
-    (s.miniDescriptionFr ?? '').trim() ||
-    platformServiceLocalizedDescription(s, 'fr') ||
-    '';
-  const ar = (s.miniDescriptionAr ?? '').trim();
+  const miniFr = (s.miniDescriptionFr ?? '').trim();
+  const miniAr = (s.miniDescriptionAr ?? '').trim();
+  const descFr = platformServiceLocalizedDescription(s, 'fr');
+  const descAr = platformServiceLocalizedDescription(s, 'ar');
   if (locale === 'ar') {
-    return ar || fr || null;
+    return miniAr || descAr || miniFr || descFr || null;
   }
-  return fr || ar || null;
+  return miniFr || descFr || miniAr || descAr || null;
 }
 
 export function platformServiceLocalizedFeatures(
@@ -128,6 +127,8 @@ function normalizeItem(raw: Record<string, unknown>): PlatformServiceItem {
   const featsAr = Array.isArray(featsArRaw) ? featsArRaw.map(String) : [];
   const descriptionFrRaw = raw.descriptionFr ?? raw.description_fr;
   const descriptionArRaw = raw.descriptionAr ?? raw.description_ar;
+  const miniDescriptionFrRaw = raw.miniDescriptionFr ?? raw.mini_description_fr;
+  const miniDescriptionArRaw = raw.miniDescriptionAr ?? raw.mini_description_ar;
   const estRaw = raw.establishments;
   const establishments: PlatformServiceEstablishment[] = Array.isArray(estRaw)
     ? (estRaw as unknown[]).map((row) => {
@@ -185,6 +186,10 @@ function normalizeItem(raw: Record<string, unknown>): PlatformServiceItem {
       raw.niveauKeyApplied == null || raw.niveauKeyApplied === ''
         ? null
         : String(raw.niveauKeyApplied),
+    miniDescriptionFr:
+      miniDescriptionFrRaw == null || miniDescriptionFrRaw === '' ? null : String(miniDescriptionFrRaw),
+    miniDescriptionAr:
+      miniDescriptionArRaw == null || miniDescriptionArRaw === '' ? null : String(miniDescriptionArRaw),
   };
 }
 

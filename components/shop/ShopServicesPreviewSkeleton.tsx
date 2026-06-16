@@ -44,7 +44,6 @@ const styles = StyleSheet.create({
     borderBottomColor: brand.border,
   },
   sectionRtl: {
-    direction: 'rtl',
     alignSelf: 'stretch',
   },
   titleBlock: {
@@ -56,6 +55,9 @@ const styles = StyleSheet.create({
   },
   titleBlockRtl: {
     flexDirection: 'row-reverse',
+    direction: 'ltr',
+    alignSelf: 'stretch',
+    justifyContent: 'flex-end',
   },
   iconWrap: {
     width: 40,

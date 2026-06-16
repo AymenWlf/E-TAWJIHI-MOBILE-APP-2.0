@@ -24,6 +24,7 @@ import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
 import { resolveAnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
+import { computeDaysUntilContestClose } from '@/utils/contestAnnouncementClosingDate';
 import { FollowedSchoolCard } from '@/components/inscriptions/FollowedSchoolCard';
 import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
 import { TawjihPlusLockBanner } from '@/components/inscriptions/TawjihPlusPaywall';
@@ -796,8 +797,14 @@ function InscriptionsTabScreenInner() {
         const aClosed = a.isExpire || !a.isOpen;
         const bClosed = b.isExpire || !b.isOpen;
         if (aClosed !== bClosed) return aClosed ? 1 : -1;
-        const aDays = Number.isFinite(a.daysUntilClose) ? a.daysUntilClose : 9999;
-        const bDays = Number.isFinite(b.daysUntilClose) ? b.daysUntilClose : 9999;
+        const aDays =
+          typeof a.daysUntilClose === 'number' && Number.isFinite(a.daysUntilClose)
+            ? a.daysUntilClose
+            : (computeDaysUntilContestClose(a.dateStart, a.dateEnd) ?? 9999);
+        const bDays =
+          typeof b.daysUntilClose === 'number' && Number.isFinite(b.daysUntilClose)
+            ? b.daysUntilClose
+            : (computeDaysUntilContestClose(b.dateStart, b.dateEnd) ?? 9999);
         return aDays - bDays;
       });
     }
@@ -1854,53 +1861,35 @@ function InscriptionsTabScreenInner() {
         </Pressable>
 
         {/*
-          Tri par dernier délai — toggle binaire ON/OFF placé à côté du
-          bouton « Filtres avancés ». Le label reste fixe (« Trier par
-          délai ») ; on signifie l'état via le style (couleur de fond
-          + couleur du texte).
+          Tri par dernier délai — accessible à tous (y compris visiteurs non clients).
+          Les autres filtres annonces restent réservés aux clients TAWJIH PLUS / TASSJIL.
         */}
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel={
-            announcementsFiltersLocked
-              ? t('schoolsSearchFiltersLockedHint')
-              : t('inscSortClosingSoon')
-          }
-          accessibilityState={{ selected: !announcementsFiltersLocked && sortByClosingSoon }}
-          onPress={
-            announcementsFiltersLocked
-              ? showAnnouncementsFiltersUpgradeAlert
-              : () => setSortByClosingSoon((v) => !v)
-          }
+          accessibilityLabel={t('inscSortClosingSoon')}
+          accessibilityState={{ selected: sortByClosingSoon }}
+          onPress={() => setSortByClosingSoon((v) => !v)}
           style={({ pressed }) => [
             styles.advancedFilterBtn,
             isRTL && styles.rowRtl,
-            announcementsFiltersLocked && styles.advancedFilterBtnLocked,
-            !announcementsFiltersLocked && sortByClosingSoon && styles.advancedFilterBtnActive,
-            pressed && !announcementsFiltersLocked && { opacity: 0.9 },
+            sortByClosingSoon && styles.advancedFilterBtnActive,
+            pressed && { opacity: 0.9 },
           ]}>
           <FontAwesome
-            name={announcementsFiltersLocked ? 'lock' : 'sort-amount-asc'}
+            name="sort-amount-asc"
             size={14}
-            color={
-              announcementsFiltersLocked
-                ? '#94A3B8'
-                : sortByClosingSoon
-                  ? brand.white
-                  : brand.primary
-            }
+            color={sortByClosingSoon ? brand.white : brand.primary}
           />
           <Text
             style={[
               styles.advancedFilterBtnTxt,
-              announcementsFiltersLocked && styles.advancedFilterBtnTxtLocked,
-              !announcementsFiltersLocked && sortByClosingSoon && styles.advancedFilterBtnTxtActive,
+              sortByClosingSoon && styles.advancedFilterBtnTxtActive,
             ]}>
             {t('inscSortClosingSoon')}
           </Text>
         </Pressable>
 
-        {hasActiveAnnouncementListingFilters && !announcementsFiltersLocked ? (
+        {hasActiveAnnouncementListingFilters ? (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={t('schoolsReset')}

@@ -85,10 +85,10 @@ export function PlatformServiceEntitlementStatus({
 }: Props) {
   if (entitlementsLoading) {
     return (
-      <View style={[styles.row, isRTL && styles.rowRtl]}>
-        <View style={[styles.pill, styles.pillInfo, isRTL && styles.rowRtl]}>
+      <View style={[styles.wrap, isRTL && styles.wrapRtl]}>
+        <View style={[styles.pill, styles.pillInfo, isRTL && styles.pillRtl]}>
           <ActivityIndicator size="small" color={brand.primary} />
-          <Text style={[styles.pillTxt, styles.pillTxtInfo, isRTL && styles.txtRtl]} numberOfLines={2}>
+          <Text style={[styles.pillTxt, styles.pillTxtInfo, isRTL && styles.tagTxtRtl]} numberOfLines={2}>
             {t('shopEntitlementChecking')}
           </Text>
         </View>
@@ -120,11 +120,11 @@ export function PlatformServiceEntitlementStatus({
       entitlement?.status === 'upgrade_available');
 
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, isRTL && styles.wrapRtl]}>
       {shortLabel ? (
-        <View style={[styles.pill, ts.pill, isRTL && styles.rowRtl]}>
+        <View style={[styles.pill, ts.pill, isRTL && styles.pillRtl]}>
           <FontAwesome name={iconName(entitlement?.status) as 'gift'} size={11} color={ts.icon} />
-          <Text style={[styles.pillTxt, ts.pillTxt, isRTL && styles.txtRtl]} numberOfLines={3}>
+          <Text style={[styles.pillTxt, ts.pillTxt, isRTL && styles.tagTxtRtl]} numberOfLines={3}>
             {shortLabel}
           </Text>
         </View>
@@ -139,22 +139,28 @@ export function PlatformServiceEntitlementStatus({
 }
 
 const styles = StyleSheet.create({
-  wrap: { gap: spacing.sm, marginTop: spacing.sm },
-  row: { flexDirection: 'row', flexWrap: 'wrap' },
-  rowRtl: { flexDirection: 'row-reverse' },
+  wrap: { gap: spacing.sm, marginTop: spacing.sm, alignSelf: 'stretch' },
+  wrapRtl: { direction: 'rtl', alignItems: 'flex-end' },
   pill: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     gap: 8,
     alignSelf: 'flex-start',
+    flexGrow: 0,
+    flexShrink: 1,
     maxWidth: '100%',
     paddingVertical: 6,
     paddingHorizontal: 10,
     borderRadius: radius.md,
     borderWidth: 1,
   },
-  pillTxt: { flex: 1, fontSize: 12, fontWeight: '700', lineHeight: 17 },
-  txtRtl: { textAlign: 'right' },
+  pillRtl: {
+    flexDirection: 'row-reverse',
+    alignSelf: 'flex-end',
+  },
+  pillTxt: { flexShrink: 1, fontSize: 12, fontWeight: '700', lineHeight: 17 },
+  txtRtl: { textAlign: 'right', writingDirection: 'rtl', alignSelf: 'stretch', width: '100%' },
+  tagTxtRtl: { textAlign: 'right', writingDirection: 'rtl' },
   pillSuccess: { backgroundColor: 'rgba(47,206,148,0.12)', borderColor: 'rgba(47,206,148,0.35)' },
   pillTxtSuccess: { color: '#047857' },
   pillInfo: { backgroundColor: 'rgba(51,62,143,0.08)', borderColor: 'rgba(51,62,143,0.2)' },

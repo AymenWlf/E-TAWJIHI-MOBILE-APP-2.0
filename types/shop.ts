@@ -23,7 +23,9 @@ export interface ShopProductListItem {
   id: number;
   slug: string;
   title: string;
+  titleAr?: string | null;
   shortDescription: string | null;
+  shortDescriptionAr?: string | null;
   type: ShopProductType;
   packPricingMode?: 'manual' | 'discount_from_sum' | null;
   price: string;
@@ -50,7 +52,9 @@ export interface ShopPackLineDetail {
     id: number;
     slug: string;
     title: string;
+    titleAr?: string | null;
     shortDescription: string | null;
+    shortDescriptionAr?: string | null;
     price: string;
     currency: string;
     type: ShopProductType;
@@ -63,6 +67,7 @@ export interface ShopPackLineDetail {
 
 export interface ShopProductDetail extends ShopProductListItem {
   description: string | null;
+  descriptionAr?: string | null;
   metaTitle: string | null;
   metaDescription: string | null;
   packLines: ShopPackLineDetail[];

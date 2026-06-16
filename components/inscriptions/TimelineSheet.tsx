@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useEffect, useState } from 'react';
-import { Linking, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { LoadingTimelineStackSkeleton } from '@/components/ui/CardLoadingSkeleton';
 import { Text } from '@/components/ui/Text';
@@ -155,27 +155,6 @@ export function TimelineSheet({ visible, loading, payload, onClose }: Props) {
                           </Text>
                         </View>
                       </View>
-                      {Array.isArray(a.liensUtiles) && a.liensUtiles.length > 0 ? (
-                        <View style={[styles.relLinks, isRTL && styles.rowRtl]}>
-                          {a.liensUtiles.slice(0, 4).map((l, i) => (
-                            <Pressable
-                              key={`${l.url}-${i}`}
-                              onPress={() => {
-                                void Linking.openURL(l.url).catch(() => undefined);
-                              }}
-                              style={({ pressed }) => [
-                                styles.relLinkChip,
-                                pressed && { opacity: 0.85 },
-                              ]}
-                            >
-                              <FontAwesome name="link" size={10} color={brand.primary} />
-                              <Text style={styles.relLinkChipTxt} numberOfLines={1}>
-                                {l.titre || l.url}
-                              </Text>
-                            </Pressable>
-                          ))}
-                        </View>
-                      ) : null}
                     </View>
                   ))}
                 </View>
@@ -264,28 +243,5 @@ const styles = StyleSheet.create({
   },
   relTitle: { fontWeight: '700', color: brand.text, fontSize: fontSize.sm },
   relMeta: { color: brand.textMuted, fontSize: fontSize.xs, marginTop: 2 },
-  relLinks: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-  },
-  relLinkChip: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 5,
-    paddingHorizontal: 9,
-    paddingVertical: 5,
-    borderRadius: radius.full,
-    borderWidth: StyleSheet.hairlineWidth,
-    borderColor: 'rgba(51,62,143,0.25)',
-    backgroundColor: brand.white,
-    maxWidth: 220,
-  },
-  relLinkChipTxt: {
-    color: brand.primary,
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    flexShrink: 1,
-  },
   rtl: { textAlign: 'right', writingDirection: 'rtl' },
 });

@@ -280,18 +280,24 @@ export function AnnouncementCard({
   if (!item?.id) {
     return null;
   }
+  const { t, locale, isRTL } = useLocale();
+  const router = useRouter();
+  const tawjihPlusAccess = useTawjihPlusAccessContextOptional();
   const lockVariant: 'none' | AnnouncementLockedVariant =
     lockedVariantProp ?? (previewOnly ? 'featured' : 'none');
   const contentLocked = lockVariant !== 'none';
-  const registrationLocked = contentLocked || item.registrationLinkLocked === true;
-  const deadlineLocked = contentLocked || item.deadlineLocked === true;
+  const isApplyTour = tourGate != null;
+  const hasFullInscriptionsAccess = tawjihPlusAccess?.hasAccess === true;
+  const registrationLocked =
+    contentLocked ||
+    (!isApplyTour && !hasFullInscriptionsAccess && item.registrationLinkLocked === true);
+  const deadlineLocked =
+    contentLocked ||
+    (!isApplyTour && !hasFullInscriptionsAccess && item.deadlineLocked === true);
   const sensitiveHidden = contentLocked;
   const showOgCoverImage = Boolean(item.ogImage) && !contentLocked;
   const showOgCoverLocked = Boolean(item.ogImage) && contentLocked;
   const showHeaderRow = !contentLocked || !item.ogImage;
-  const { t, locale, isRTL } = useLocale();
-  const router = useRouter();
-  const tawjihPlusAccess = useTawjihPlusAccessContextOptional();
   const openTawjihPlusProduct = useCallback(() => {
     if (tawjihPlusAccess?.openTawjihPlusProduct) {
       tawjihPlusAccess.openTawjihPlusProduct();
@@ -369,9 +375,6 @@ export function AnnouncementCard({
     Boolean(villesShort) ||
     Boolean(item.dateStart?.trim()) ||
     Boolean(item.dateEnd?.trim());
-  const usefulLinks = Array.isArray(item.liensUtiles)
-    ? item.liensUtiles.filter((l) => Boolean(l?.url?.trim())).slice(0, 6)
-    : [];
 
   const registrationLinkDisplayLabel = hasEmailOnly
     ? locale === 'ar'
@@ -455,12 +458,12 @@ export function AnnouncementCard({
 
   const promptPartialLock = useCallback(() => {
     promptTawjihPlusPartialFeatureLock({
-      hasAccess: false,
-      loading: false,
+      hasAccess: hasFullInscriptionsAccess,
+      loading: tawjihPlusAccess?.loading ?? false,
       openProduct: openTawjihPlusProduct,
       t,
     });
-  }, [openTawjihPlusProduct, t]);
+  }, [hasFullInscriptionsAccess, openTawjihPlusProduct, t, tawjihPlusAccess?.loading]);
 
   const registrationLinkBtn = (fullWidth: boolean, locked = false) => (
     <TourFocusWrap
@@ -823,32 +826,6 @@ export function AnnouncementCard({
           </View>
         ) : null}
 
-        {/* Liens utiles */}
-        {usefulLinks.length > 0 ? (
-          <View style={styles.linksPanel}>
-            <Text
-              style={[styles.linksPanelTitle, isRTL && styles.rtlText, isRTL && styles.infoTextRtl]}
-              numberOfLines={1}>
-              {t('inscDetailUsefulLinks')}
-            </Text>
-            <View style={styles.linksWrap}>
-              {usefulLinks.map((l, i) => (
-                <Pressable
-                  key={`${l.url}-${i}`}
-                  onPress={() => {
-                    void Linking.openURL(l.url).catch(() => undefined);
-                  }}
-                  style={({ pressed }) => [styles.linkChip, pressed && { opacity: 0.85 }]}>
-                  <FontAwesome name="link" size={10} color={brand.primary} />
-                  <Text style={[styles.linkChipTxt, isRTL && styles.rtlText]} numberOfLines={1}>
-                    {l.titre || l.url}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </View>
-        ) : null}
-
         {!contentLocked && hasOnlinePending ? (
           <View style={styles.pendingBanner}>
             <FontAwesome name="clock-o" size={11} color="#B45309" />
@@ -923,22 +900,6 @@ export function AnnouncementCard({
               pointerEvents="none">
               <FontAwesome name="lock" size={11} color="#64748B" />
               <HiddenBar flex={1} height={12} isRTL={isRTL} />
-            </View>
-
-            <View style={[styles.linksPanel, styles.sectionDisabled]} pointerEvents="none">
-              <Text
-                style={[styles.linksPanelTitle, isRTL && styles.rtlText, isRTL && styles.infoTextRtl]}
-                numberOfLines={1}>
-                {t('inscDetailUsefulLinks')}
-              </Text>
-              <View style={styles.linksWrap}>
-                <View style={styles.linkChipLocked}>
-                  <HiddenBar width={72} height={10} />
-                </View>
-                <View style={styles.linkChipLocked}>
-                  <HiddenBar width={56} height={10} />
-                </View>
-              </View>
             </View>
           </>
         )}
@@ -1320,6 +1281,13 @@ const styles = StyleSheet.create({
     backgroundColor: '#F1F5F9',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: '#E2E8F0',
+  },
+  linkChipLockedPaywall: {
+    borderColor: '#E2E8F0',
+    backgroundColor: '#F1F5F9',
+  },
+  linkChipTxtLocked: {
+    color: '#64748B',
   },
   linkChip: {
     flexDirection: 'row',

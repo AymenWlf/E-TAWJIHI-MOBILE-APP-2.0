@@ -107,16 +107,28 @@ function enrichTourAnnouncement(announcement: ContestAnnouncementCard): ContestA
   if (!est || !fallbackEst) {
     return {
       ...announcement,
+      previewOnly: false,
+      registrationLinkLocked: false,
+      deadlineLocked: false,
       registrationUrl,
       registrationUrlLabel,
       registrationUrlLabelAr,
+      registrationMethods: announcement.registrationMethods?.length
+        ? announcement.registrationMethods
+        : fallback.registrationMethods,
     };
   }
   return {
     ...announcement,
+    previewOnly: false,
+    registrationLinkLocked: false,
+    deadlineLocked: false,
     registrationUrl,
     registrationUrlLabel,
     registrationUrlLabelAr,
+    registrationMethods: announcement.registrationMethods?.length
+      ? announcement.registrationMethods
+      : fallback.registrationMethods,
     establishment: {
       ...est,
       logo: est.logo?.trim() || fallbackEst.logo || null,

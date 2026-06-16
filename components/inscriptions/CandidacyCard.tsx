@@ -8,7 +8,6 @@ import {
   InscriptionCardSchoolBlock,
   InscriptionCardStatusPanel,
   InscriptionCardTypeHeader,
-  InscriptionCardUsefulLinks,
   inscriptionCardStyles,
 } from '@/components/inscriptions/InscriptionAnnouncementCardParts';
 import { TassjilServiceBadge } from '@/components/inscriptions/TassjilServiceBadge';
@@ -131,10 +130,6 @@ export function CandidacyCard({ candidacy, onPress, onUpdateStatus, onOpenLink, 
         ) : null}
 
         <InscriptionCardCountdown deadline={deadline} isRTL={isRTL} />
-
-        {Array.isArray(a?.liensUtiles) && a.liensUtiles.length > 0 ? (
-          <InscriptionCardUsefulLinks links={a.liensUtiles} title={t('inscDetailUsefulLinks')} isRTL={isRTL} />
-        ) : null}
 
         {hasUpdateAction && onUpdateStatus ? (
           <InscriptionCardStatusPanel

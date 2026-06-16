@@ -18,7 +18,7 @@ import { recordReferencingClickNative, recordReferencingImpressionNative } from 
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { evaluateEligibility } from '@/utils/eligibility';
-import { formatVillesCourtes, secteurTitres, universityName } from '@/utils/establishmentFormat';
+import { formatVillesCourtes, formatEstablishmentStudyDuration, secteurTitres, universityName } from '@/utils/establishmentFormat';
 import { fireAndForget } from '@/utils/fireAndForget';
 import { stripHtmlToText } from '@/utils/sanitizeRichHtml';
 import type { EstablishmentLockedVariant } from '@/utils/establishmentLockDisplay';
@@ -96,6 +96,8 @@ export function EstablishmentCard({
     secShow.length > 0 || item.echangeInternational || item.eTawjihiInscription || item.boursesDisponibles;
   const showMetrics = true;
   const typeLabel = establishmentTypeDisplayLabel(item.type, t) || '—';
+  const durationLabel =
+    formatEstablishmentStudyDuration(item, locale === 'ar' ? 'ar' : 'fr') || item.dureeLabel || '—';
 
   return (
     <Pressable
@@ -110,7 +112,7 @@ export function EstablishmentCard({
       <View style={[styles.accentBar, isRTL && styles.accentBarRtl]} />
 
       {item.isSponsored && !contentLocked ? (
-        <View style={styles.sponsoredTopWrap}>
+        <View style={[styles.sponsoredTopWrap, isRTL && styles.sponsoredTopWrapRtl]}>
           <TinyBadge label={t('estCardBadgeSponsored')} tint="blue" textRtl={isRTL} />
         </View>
       ) : null}
@@ -139,12 +141,14 @@ export function EstablishmentCard({
           ) : (
             <>
               <View style={styles.titleLine}>
-                <Text style={[styles.title, isRTL && styles.titleRtl, isRTL && styles.txtRtl]} numberOfLines={2}>
+                <Text
+                  style={[styles.title, isRTL && styles.titleRtl, isRTL && styles.txtRtl]}>
                   {primaryName}
                 </Text>
               </View>
               {secondaryLine ? (
-                <Text style={[styles.sigleLine, isRTL && styles.sigleLineRtl, isRTL && styles.txtRtl]} numberOfLines={1}>
+                <Text
+                  style={[styles.sigleLine, isRTL && styles.sigleLineRtl, isRTL && styles.txtRtl]}>
                   {secondaryLine}
                 </Text>
               ) : null}
@@ -237,8 +241,9 @@ export function EstablishmentCard({
           <Metric
             icon="clock-o"
             label={t('estLabelDuration')}
-            value={item.dureeLabel ?? '—'}
+            value={durationLabel}
             locked={contentLocked}
+            latinDigits={isRTL}
           />
           <Metric
             icon="graduation-cap"
@@ -439,11 +444,13 @@ function Metric({
   label,
   value,
   locked = false,
+  latinDigits = false,
 }: {
   icon: React.ComponentProps<typeof FontAwesome>['name'];
   label: string;
   value: string;
   locked?: boolean;
+  latinDigits?: boolean;
 }) {
   return (
     <View style={[styles.metric, locked && styles.metricLocked]}>
@@ -454,7 +461,7 @@ function Metric({
           <FontAwesome name="lock" size={10} color="#94A3B8" />
         </View>
       ) : (
-        <Text style={styles.metricVal} numberOfLines={2}>
+        <Text style={styles.metricVal} numberOfLines={2} latinDigits={latinDigits}>
           {value}
         </Text>
       )}
@@ -487,7 +494,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#faf5ff',
   },
   cardRtl: {
-    direction: 'rtl',
+    alignItems: 'stretch',
   },
   accentBar: {
     position: 'absolute',
@@ -512,6 +519,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.sm,
   },
+  sponsoredTopWrapRtl: {
+    justifyContent: 'flex-end',
+  },
   sectionDisabled: {
     opacity: 0.72,
   },
@@ -533,6 +543,7 @@ const styles = StyleSheet.create({
   },
   topRowRtl: {
     flexDirection: 'row-reverse',
+    direction: 'ltr',
   },
   logoOuter: {
     width: 62,
@@ -545,14 +556,15 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     padding: 8,
     marginStart: spacing.sm,
+    flexShrink: 0,
   },
   logoOuterLocked: {
     backgroundColor: '#F1F5F9',
     borderColor: '#E2E8F0',
   },
   logoOuterRtl: {
-    marginStart: 0,
-    marginEnd: spacing.sm,
+    marginStart: spacing.sm,
+    marginEnd: 0,
   },
   logo: {
     width: 52,
@@ -574,11 +586,13 @@ const styles = StyleSheet.create({
     paddingEnd: spacing.md,
   },
   titleLine: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignSelf: 'stretch',
+    width: '100%',
+    minWidth: 0,
   },
   title: {
-    flex: 1,
+    flexShrink: 1,
+    alignSelf: 'stretch',
     color: homeShell.cardText,
     fontSize: fontSize.lg,
     fontWeight: '800',
@@ -591,6 +605,8 @@ const styles = StyleSheet.create({
   },
   sigleLine: {
     marginTop: 5,
+    flexShrink: 1,
+    alignSelf: 'stretch',
     color: homeShell.cardMuted,
     fontSize: fontSize.sm,
     fontWeight: '600',
@@ -631,10 +647,11 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
     gap: 8,
     marginStart: spacing.sm,
+    flexShrink: 0,
   },
   topRightRtl: {
-    marginStart: 0,
-    marginEnd: spacing.sm,
+    marginStart: spacing.sm,
+    marginEnd: 0,
     alignItems: 'flex-start',
   },
   chev: {

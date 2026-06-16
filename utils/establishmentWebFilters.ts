@@ -131,6 +131,19 @@ export function shuffleEstablishmentsCopy<T>(arr: T[]): T[] {
 }
 
 /**
+ * Listing mobile : sponsorisées mélangées en tête, puis toutes les autres mélangées.
+ * `merged` doit déjà inclure `mergeEstablishmentsWithListingPlacements`.
+ */
+export function sortEstablishmentsMobileRandomListing(
+  merged: EstablishmentNormalized[],
+): EstablishmentNormalized[] {
+  if (merged.length === 0) return [];
+  const sponsored = merged.filter((e) => Boolean(e.isSponsored));
+  const others = merged.filter((e) => !e.isSponsored);
+  return [...shuffleEstablishmentsCopy(sponsored), ...shuffleEstablishmentsCopy(others)];
+}
+
+/**
  * Signature stable du contenu (ids + placement) pour ne reshuffler le listing
  * « style web » que lorsque la piscine ou les placements changent.
  */
@@ -189,12 +202,13 @@ export function sortEstablishmentsLikeEcolesSuperieuresWeb(
   const restOfFirstPageCount = Math.max(0, itemsPerPage - first10Size);
   const remainingOthers = othersList.filter((o) => !first10Ids.has(o.id));
   const remainingReferenced = referencedOnlyList.filter((r) => !first10Ids.has(r.id));
-  const restOfFirstPage = remainingOthers.slice(0, restOfFirstPageCount);
+  const shuffledRemainingOthers = shuffleEstablishmentsCopy(remainingOthers);
+  const restOfFirstPage = shuffledRemainingOthers.slice(0, restOfFirstPageCount);
   const restOfFirstPageIds = new Set(restOfFirstPage.map((x) => x.id));
-  const remaining = [
+  const remaining = shuffleEstablishmentsCopy([
     ...remainingReferenced,
-    ...remainingOthers.filter((o) => !restOfFirstPageIds.has(o.id)),
-  ];
+    ...shuffledRemainingOthers.filter((o) => !restOfFirstPageIds.has(o.id)),
+  ]);
 
   return [
     ...shuffleEstablishmentsCopy(sponsoredList),
