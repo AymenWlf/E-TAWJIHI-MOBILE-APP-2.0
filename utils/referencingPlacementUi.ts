@@ -1,12 +1,18 @@
 import type { ListingPlacementInfo } from '@/services/referencingAds';
 
 export function placementShowsContactForm(
-  info: Pick<ListingPlacementInfo, 'goalType' | 'includeLeadFormOnTraffic' | 'isSponsored'> | null | undefined,
+  info: Pick<ListingPlacementInfo, 'goalType' | 'includeLeadFormOnTraffic'> | null | undefined,
 ): boolean {
   if (!info) return false;
-  if (info.isSponsored) return true;
   if (info.goalType === 'leadgen') return true;
   return info.goalType === 'traffic' && Boolean(info.includeLeadFormOnTraffic);
+}
+
+/** Badge / style sponsorisé : placement actif avec isSponsored (≠ simple référencement traffic). */
+export function placementIsActivelySponsored(
+  info: Pick<ListingPlacementInfo, 'isSponsored'> | null | undefined,
+): boolean {
+  return Boolean(info?.isSponsored);
 }
 
 export function placementTrafficDestinationUrl(

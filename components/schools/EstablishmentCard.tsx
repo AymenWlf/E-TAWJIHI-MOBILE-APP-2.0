@@ -22,7 +22,7 @@ import { establishmentListingPlacement } from '@/utils/establishmentListingPlace
 import { evaluateEligibility } from '@/utils/eligibility';
 import { formatVillesCourtes, formatEstablishmentStudyDuration, secteurTitres, universityName } from '@/utils/establishmentFormat';
 import { fireAndForget } from '@/utils/fireAndForget';
-import { placementShowsContactForm, placementTrafficDestinationUrl, addUtmToUrl } from '@/utils/referencingPlacementUi';
+import { placementIsActivelySponsored, placementShowsContactForm, placementTrafficDestinationUrl, addUtmToUrl } from '@/utils/referencingPlacementUi';
 import { stripHtmlToText } from '@/utils/sanitizeRichHtml';
 import type { EstablishmentLockedVariant } from '@/utils/establishmentLockDisplay';
 
@@ -55,19 +55,20 @@ export function EstablishmentCard({
   const contentLocked = lockedVariant === 'compact';
 
   const placement = establishmentListingPlacement(item);
+  const isActivelySponsored = placementIsActivelySponsored(placement);
   const showLeadgenButton = !contentLocked && placementShowsContactForm(placement);
   const trafficUrl = placementTrafficDestinationUrl(placement);
   const showTrafficSiteButton = !contentLocked && Boolean(trafficUrl);
   const showSponsorActions = showLeadgenButton || showTrafficSiteButton;
-  const cardSource = item.isSponsored ? 'sponsorship' : 'referencing';
+  const cardSource = isActivelySponsored ? 'sponsorship' : 'referencing';
 
   const placementId = item.referencingPlacementId;
   useEffect(() => {
     if (!placementId || referencingImpSent.current) return;
     referencingImpSent.current = true;
-    const source = item.isSponsored ? 'sponsorship' : 'referencing';
+    const source = isActivelySponsored ? 'sponsorship' : 'referencing';
     fireAndForget(recordReferencingImpressionNative({ placementId, source }));
-  }, [placementId, item.isSponsored]);
+  }, [placementId, isActivelySponsored]);
 
   const handleCardPress = () => {
     if (placementId) {
@@ -134,14 +135,14 @@ export function EstablishmentCard({
       onPress={handleCardPress}
       style={({ pressed }) => [
         styles.card,
-        item.isSponsored && !contentLocked && styles.cardSponsored,
+        isActivelySponsored && !contentLocked && styles.cardSponsored,
         contentLocked && styles.cardLocked,
         isRTL && styles.cardRtl,
         pressed && { opacity: 0.96 },
       ]}>
       <View style={[styles.accentBar, isRTL && styles.accentBarRtl]} />
 
-      {item.isSponsored && !contentLocked ? (
+      {isActivelySponsored && !contentLocked ? (
         <View style={[styles.sponsoredTopWrap, isRTL && styles.sponsoredTopWrapRtl]}>
           <TinyBadge label={t('estCardBadgeSponsored')} tint="blue" textRtl={isRTL} />
         </View>

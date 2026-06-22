@@ -31,6 +31,7 @@ import {
   submitReferencingLead,
   type ListingPlacementInfo,
 } from '@/services/referencingAds';
+import { placementIsActivelySponsored } from '@/utils/referencingPlacementUi';
 import { getUserProfile } from '@/services/userProfile';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -316,7 +317,7 @@ export function EstablishmentLeadGenForm({
         phone: phoneForApi || undefined,
         message: message.trim() || undefined,
         source: 'referencing',
-        cardSource: placement.isSponsored ? 'sponsorship' : 'referencing',
+        cardSource: placementIsActivelySponsored(placement) ? 'sponsorship' : 'referencing',
         role,
         niveau: niveau || undefined,
         bacType,

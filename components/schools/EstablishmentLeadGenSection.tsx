@@ -8,6 +8,7 @@ import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import type { EstablishmentNormalized } from '@/services/establishments';
 import type { ListingPlacementInfo } from '@/services/referencingAds';
+import { placementIsActivelySponsored } from '@/utils/referencingPlacementUi';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
@@ -117,7 +118,7 @@ export function EstablishmentLeadGenSection({
           ) : null}
         </View>
 
-        {placement.isSponsored ? (
+        {placementIsActivelySponsored(placement) ? (
           <Pressable
             onPress={keyboardAware ? dismissKeyboard : undefined}
             accessibilityRole="none"

@@ -351,7 +351,8 @@ export default function EstablishmentDetailScreen() {
     [listingPlacement],
   );
   const placementCardSource = listingPlacement?.isSponsored ? 'sponsorship' : 'referencing';
-  const mightBeSponsoredPartner = Boolean(data?.isSponsored);
+  const mightBeSponsoredPartner = Boolean(listingPlacement?.isSponsored);
+  const showSponsoredBadge = listingPlacementResolved && Boolean(listingPlacement?.isSponsored);
 
   const showPartnerFooterSite = Boolean(listingPlacement) && Boolean(placementTrafficUrl);
   const showPartnerFooterContact = Boolean(listingPlacement) && showPlacementContactForm;
@@ -593,7 +594,7 @@ export default function EstablishmentDetailScreen() {
               <EstablishmentTypeBadge type={data.type} size="md" hideIfUnknown={false} />
               {data.accreditationEtat ? <PillSolid label={t('estBadgeStateRecognized')} tint="green" /> : null}
               {data.isRecommended ? <PillSolid label={t('estBadgeRecommended')} tint="green" /> : null}
-              {data.isSponsored ? <PillSolid label={t('estBadgeSponsored')} tint="sponsor" /> : null}
+              {showSponsoredBadge ? <PillSolid label={t('estBadgeSponsored')} tint="sponsor" /> : null}
               {/* Badge éligibilité personnalisé — masqué si pas de critères / pas connecté. */}
               {isLoggedIn && eligibilityProfileLoading ? (
                 <View style={styles.heroEligibilityLoading}>
