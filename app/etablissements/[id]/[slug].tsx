@@ -39,6 +39,8 @@ import { EstablishmentCampusSection } from '@/components/schools/EstablishmentCa
 import { EstablishmentSeuilAdmissionSection } from '@/components/schools/EstablishmentSeuilAdmissionSection';
 import { getSeuilAdmissionDisplay } from '@/utils/establishmentSeuilAdmission';
 import { EstablishmentDescriptionHtml } from '@/components/schools/EstablishmentDescriptionHtml';
+import { EstablishmentLeadGenForm } from '@/components/schools/EstablishmentLeadGenForm';
+import { EstablishmentLeadGenSection } from '@/components/schools/EstablishmentLeadGenSection';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -51,7 +53,9 @@ import {
 } from '@/services/contestAnnouncements';
 import {
   establishmentBlocksPartnerBanners,
-  fetchListingPlacementsByEstablishment,
+  fetchEstablishmentPlacementInfo,
+  recordReferencingClickNative,
+  recordReferencingContactClickNative,
   recordReferencingPageViewNative,
   type ListingPlacementInfo,
 } from '@/services/referencingAds';
@@ -70,6 +74,11 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { campusSeuilLabelsFromApi, mapCampusForDisplay } from '@/utils/campusMaps';
 import { evaluateEligibility } from '@/utils/eligibility';
 import { fireAndForget } from '@/utils/fireAndForget';
+import {
+  addUtmToUrl,
+  placementShowsContactForm,
+  placementTrafficDestinationUrl,
+} from '@/utils/referencingPlacementUi';
 import {
   formatEstablishmentStudyDuration,
   formatEstablishmentStudyDurationYears,
@@ -93,6 +102,7 @@ export default function EstablishmentDetailScreen() {
   const insets = useSafeAreaInsets();
   const scrollRef = useRef<ScrollView>(null);
   const announcementsSectionYRef = useRef(0);
+  const partnerSectionYRef = useRef(0);
   const { user, getValidAccessToken } = useAuth();
   const {
     hasSchoolsCatalogAccess,
@@ -164,6 +174,7 @@ export default function EstablishmentDetailScreen() {
   const [err, setErr] = useState<string | null>(null);
   const [listingPlacement, setListingPlacement] = useState<ListingPlacementInfo | null>(null);
   const [listingPlacementResolved, setListingPlacementResolved] = useState(false);
+  const [placementInfoLoading, setPlacementInfoLoading] = useState(false);
 
   /* Annonces publiées de cet établissement (concours, résultats, bourses…). */
   const [announcements, setAnnouncements] = useState<ContestAnnouncementCard[]>([]);
@@ -173,6 +184,11 @@ export default function EstablishmentDetailScreen() {
   const [followBusy, setFollowBusy] = useState(false);
   const [followId, setFollowId] = useState<number | null>(null);
   const [followProbeDone, setFollowProbeDone] = useState(!isLoggedIn);
+  const [leadSubmitted, setLeadSubmitted] = useState(false);
+
+  useEffect(() => {
+    setLeadSubmitted(false);
+  }, [id]);
 
   useEffect(() => {
     if (!isLoggedIn) setFollowProbeDone(true);
@@ -298,28 +314,50 @@ export default function EstablishmentDetailScreen() {
     if (!Number.isFinite(id) || id <= 0) {
       setListingPlacement(null);
       setListingPlacementResolved(false);
+      setPlacementInfoLoading(false);
       return;
     }
     if (loading) return;
 
     let cancelled = false;
     setListingPlacementResolved(false);
-    void fetchListingPlacementsByEstablishment()
-      .then((map) => {
+    setPlacementInfoLoading(true);
+    void fetchEstablishmentPlacementInfo(id)
+      .then((info) => {
         if (cancelled) return;
-        setListingPlacement(map[id] ?? null);
+        setListingPlacement(info);
       })
       .catch(() => {
         if (!cancelled) setListingPlacement(null);
       })
       .finally(() => {
-        if (!cancelled) setListingPlacementResolved(true);
+        if (!cancelled) {
+          setListingPlacementResolved(true);
+          setPlacementInfoLoading(false);
+        }
       });
 
     return () => {
       cancelled = true;
     };
   }, [id, loading]);
+
+  const showPlacementContactForm = useMemo(
+    () => placementShowsContactForm(listingPlacement),
+    [listingPlacement],
+  );
+  const placementTrafficUrl = useMemo(
+    () => placementTrafficDestinationUrl(listingPlacement),
+    [listingPlacement],
+  );
+  const placementCardSource = listingPlacement?.isSponsored ? 'sponsorship' : 'referencing';
+  const mightBeSponsoredPartner = Boolean(data?.isSponsored);
+
+  const showPartnerFooterSite = Boolean(listingPlacement) && Boolean(placementTrafficUrl);
+  const showPartnerFooterContact = Boolean(listingPlacement) && showPlacementContactForm;
+  const showPartnerFooter =
+    listingPlacementResolved && (showPartnerFooterSite || showPartnerFooterContact);
+  const showPartnerFooterLoading = mightBeSponsoredPartner && !listingPlacementResolved;
 
   const showPartnerBannersOnDetail = useMemo(() => {
     if (!listingPlacementResolved) return false;
@@ -453,6 +491,28 @@ export default function EstablishmentDetailScreen() {
     const y = Math.max(0, announcementsSectionYRef.current - spacing.md);
     scrollRef.current?.scrollTo({ y, animated: true });
   }, []);
+
+  const scrollToPartnerSection = useCallback(() => {
+    const y = Math.max(0, partnerSectionYRef.current - spacing.md);
+    scrollRef.current?.scrollTo({ y, animated: true });
+  }, []);
+
+  const openPartnerSite = useCallback(() => {
+    if (!listingPlacement || !placementTrafficUrl) return;
+    fireAndForget(
+      recordReferencingClickNative({
+        placementId: listingPlacement.placementId,
+        source: placementCardSource,
+      }),
+    );
+    void Linking.openURL(addUtmToUrl(placementTrafficUrl)).catch(() => undefined);
+  }, [listingPlacement, placementCardSource, placementTrafficUrl]);
+
+  const scrollToPartnerContactForm = useCallback(() => {
+    if (!listingPlacement) return;
+    fireAndForget(recordReferencingContactClickNative({ placementId: listingPlacement.placementId }));
+    scrollToPartnerSection();
+  }, [listingPlacement, scrollToPartnerSection]);
 
   const renderTopBar = () => (
     <View style={[styles.topBar, { paddingTop: insets.top + 6 }, isRTL && styles.rowRtl]}>
@@ -593,6 +653,16 @@ export default function EstablishmentDetailScreen() {
                 </Pressable>
               ) : null}
             </View>
+            {placementTrafficUrl ? (
+              <Pressable
+                onPress={openPartnerSite}
+                accessibilityRole="link"
+                accessibilityLabel={t('estLeadgenVisitSite')}
+                style={({ pressed }) => [styles.heroVisitSiteBtn, pressed && { opacity: 0.9 }]}>
+                <FontAwesome name="external-link" size={14} color={brand.white} />
+                <Text style={[styles.heroVisitSiteBtnTxt, isRTL && styles.txtRtl]}>{t('estLeadgenVisitSite')}</Text>
+              </Pressable>
+            ) : null}
             {(data.villesListe.length > 0 || !!uni) && (
               <View style={[styles.locRow, isRTL && styles.locRowRtl]}>
                 <FontAwesome name="map-marker" size={14} color={homeShell.greenDark} />
@@ -648,6 +718,31 @@ export default function EstablishmentDetailScreen() {
 
           {showPartnerBannersOnDetail ? (
             <AppBannerSlot zone="mid_square" analyticsPage="/mobile/ecoles/detail" style={{ marginHorizontal: spacing.md }} />
+          ) : null}
+
+          {placementInfoLoading ? (
+            <View style={[styles.placementLoading, { marginHorizontal: spacing.md }]}>
+              <ActivityIndicator size="small" color={brand.primary} />
+            </View>
+          ) : listingPlacement ? (
+            <>
+              {showPlacementContactForm ? (
+                <EstablishmentLeadGenSection
+                  establishment={data}
+                  placement={listingPlacement}
+                  hideFormIntro={leadSubmitted}
+                  onLayout={(e) => {
+                    partnerSectionYRef.current = e.nativeEvent.layout.y;
+                  }}>
+                  <EstablishmentLeadGenForm
+                    establishment={data}
+                    placement={listingPlacement}
+                    variant="detail"
+                    onSubmitted={() => setLeadSubmitted(true)}
+                  />
+                </EstablishmentLeadGenSection>
+              ) : null}
+            </>
           ) : null}
 
           <Section title={t('estDetailPresentation')} rtl={isRTL}>
@@ -891,19 +986,87 @@ export default function EstablishmentDetailScreen() {
             Platform.OS === 'android' && { elevation: 8 },
           ]}
         >
-          <Pressable
-            onPress={scrollToAnnouncementsSection}
-            accessibilityRole="button"
-            accessibilityLabel={t('estDetailInscriptionCtaA11y')}
-            style={({ pressed }) => [
-              styles.inscriptionCta,
-              isRTL && styles.rowRtl,
-              pressed && { opacity: 0.9 },
-            ]}
-          >
-            <FontAwesome name="pencil" size={14} color={brand.white} />
-            <Text style={styles.inscriptionCtaTxt}>{t('estDetailInscriptionCta')}</Text>
-          </Pressable>
+          {!listingPlacementResolved && showPartnerFooterLoading ? (
+            <View style={styles.partnerFooterLoading}>
+              <ActivityIndicator size="small" color={brand.primary} />
+            </View>
+          ) : showPartnerFooter ? (
+            showPartnerFooterSite && showPartnerFooterContact ? (
+              <View style={[styles.partnerFooterRow, isRTL && styles.partnerFooterRowRtl]}>
+                <Pressable
+                  onPress={openPartnerSite}
+                  accessibilityRole="link"
+                  accessibilityLabel={t('estLeadgenVisitSite')}
+                  style={({ pressed }) => [
+                    styles.partnerFooterBtn,
+                    styles.partnerFooterSiteBtn,
+                    pressed && { opacity: 0.9 },
+                  ]}>
+                  <FontAwesome name="external-link" size={14} color={brand.white} />
+                  <Text style={styles.partnerFooterBtnTxt} numberOfLines={1}>
+                    {t('estCardBtnVisitSite')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  onPress={scrollToPartnerContactForm}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('estCardBtnContact')}
+                  style={({ pressed }) => [
+                    styles.partnerFooterBtn,
+                    styles.partnerFooterContactBtn,
+                    pressed && { opacity: 0.9 },
+                  ]}>
+                  <FontAwesome name="comment" size={14} color={brand.white} />
+                  <Text style={styles.partnerFooterBtnTxt} numberOfLines={1}>
+                    {t('estCardBtnContact')}
+                  </Text>
+                </Pressable>
+              </View>
+            ) : showPartnerFooterSite ? (
+              <Pressable
+                onPress={openPartnerSite}
+                accessibilityRole="link"
+                accessibilityLabel={t('estLeadgenVisitSite')}
+                style={({ pressed }) => [
+                  styles.partnerFooterBtn,
+                  styles.partnerFooterSiteBtn,
+                  styles.partnerFooterBtnFull,
+                  pressed && { opacity: 0.9 },
+                ]}>
+                <FontAwesome name="external-link" size={14} color={brand.white} />
+                <Text style={styles.partnerFooterBtnTxt}>{t('estLeadgenVisitSite')}</Text>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={scrollToPartnerContactForm}
+                accessibilityRole="button"
+                accessibilityLabel={t('estCardBtnContact')}
+                style={({ pressed }) => [
+                  styles.partnerFooterBtn,
+                  styles.partnerFooterContactBtn,
+                  styles.partnerFooterBtnFull,
+                  pressed && { opacity: 0.9 },
+                ]}>
+                <FontAwesome name="comment" size={14} color={brand.white} />
+                <Text style={styles.partnerFooterBtnTxt}>{t('estCardBtnContact')}</Text>
+                <FontAwesome name="chevron-down" size={12} color={brand.white} />
+              </Pressable>
+            )
+          ) : (
+            <Pressable
+              onPress={scrollToAnnouncementsSection}
+              accessibilityRole="button"
+              accessibilityLabel={t('estDetailInscriptionCtaA11y')}
+              style={({ pressed }) => [
+                styles.inscriptionCta,
+                isRTL && styles.rowRtl,
+                pressed && { opacity: 0.9 },
+              ]}
+            >
+              <FontAwesome name="pencil" size={14} color={brand.white} />
+              <Text style={styles.inscriptionCtaTxt}>{t('estDetailInscriptionCta')}</Text>
+            </Pressable>
+          )}
         </View>
         </>
       )}
@@ -958,9 +1121,19 @@ function yearsLabel(data: EstablishmentNormalized, rtl: boolean): string {
   return '—';
 }
 
-function Section({ title, children, rtl }: { title: string; children: React.ReactNode; rtl?: boolean }) {
+function Section({
+  title,
+  children,
+  rtl,
+  style,
+}: {
+  title: string;
+  children: React.ReactNode;
+  rtl?: boolean;
+  style?: object;
+}) {
   return (
-    <View style={styles.section}>
+    <View style={[styles.section, style]}>
       <Text style={[styles.sectionTitle, rtl && styles.txtRtl]}>{title}</Text>
       {children}
     </View>
@@ -1136,6 +1309,46 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontWeight: '800',
   },
+  partnerFooterLoading: {
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  partnerFooterRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.sm,
+  },
+  partnerFooterRowRtl: {
+    flexDirection: 'row-reverse',
+  },
+  partnerFooterBtn: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 8,
+    minHeight: 48,
+    paddingHorizontal: spacing.md,
+    borderRadius: radius.lg,
+  },
+  partnerFooterBtnFull: {
+    alignSelf: 'stretch',
+    width: '100%',
+  },
+  partnerFooterSiteBtn: {
+    backgroundColor: brand.emerald,
+  },
+  partnerFooterContactBtn: {
+    backgroundColor: brand.primary,
+  },
+  partnerFooterBtnTxt: {
+    color: brand.white,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    flexShrink: 1,
+  },
   heroCard: {
     marginHorizontal: spacing.xl,
     backgroundColor: homeShell.card,
@@ -1299,6 +1512,28 @@ const styles = StyleSheet.create({
     direction: 'rtl',
     alignSelf: 'stretch',
     width: '100%',
+  },
+  placementLoading: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.lg,
+    alignItems: 'center',
+  },
+  heroVisitSiteBtn: {
+    marginTop: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    alignSelf: 'stretch',
+    backgroundColor: brand.emerald,
+    borderRadius: radius.lg,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+  },
+  heroVisitSiteBtnTxt: {
+    color: brand.white,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
   },
   body: {
     color: homeShell.cardMuted,

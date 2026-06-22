@@ -27,7 +27,7 @@ const WHATSAPP_GREEN = '#25D366';
 /**
  * Bulle flottante WhatsApp — contact E-TAWJIHI pour toute demande d’information.
  */
-const AUTH_ROUTE_PREFIXES = [
+const HIDDEN_ROUTE_PREFIXES = [
   'login',
   'register',
   'device-transfer',
@@ -36,6 +36,8 @@ const AUTH_ROUTE_PREFIXES = [
   'verify-reset-otp',
   'reset-password',
   'logout',
+  /** Jeu SNAKE — ne pas recouvrir la grille / les contrôles. */
+  'daily-challenge',
 ] as const;
 
 export function FloatingBubbleHub() {
@@ -49,7 +51,7 @@ export function FloatingBubbleHub() {
 
   const hidden = useMemo(() => {
     if (isLoading || !user) return true;
-    return AUTH_ROUTE_PREFIXES.some((p) => route === p || route.startsWith(`${p}/`));
+    return HIDDEN_ROUTE_PREFIXES.some((p) => route === p || route.startsWith(`${p}/`));
   }, [isLoading, user, route]);
 
   const bottom = TAB_BAR_EXTRA + Math.max(insets.bottom, spacing.sm) + spacing.sm;

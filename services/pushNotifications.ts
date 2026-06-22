@@ -39,6 +39,7 @@ import { ensureAndroidNotificationChannels } from '@/services/pushNotificationCh
 import { navigateToContestAnnouncement } from '@/utils/contestAnnouncementNavigation';
 import { navigateFromAppNotification } from '@/utils/notificationNavigation';
 import { getResolvedAppLaunchIntent } from '@/utils/appLaunchIntent';
+import { openWhatsAppHref } from '@/utils/openWhatsApp';
 import type { AppNotification } from '@/types/inscriptions';
 
 export type NotificationPermissionStatus = 'granted' | 'denied' | 'undetermined';
@@ -389,6 +390,14 @@ type PushData = Record<string, unknown> & {
   linkKind?: string;
   web_url?: string;
   webUrl?: string;
+  whatsapp_wa_me?: string;
+  whatsappWaMe?: string;
+  whatsapp_message_fr?: string;
+  whatsappMessageFr?: string;
+  whatsapp_message_ar?: string;
+  whatsappMessageAr?: string;
+  order_number?: string;
+  orderNumber?: string;
 };
 
 function navigateFromPushPayload(data: PushData): boolean {
@@ -446,6 +455,40 @@ async function handleNotificationTap(
 
   /** Démo tutoriel « Gestion des inscriptions » : affichage uniquement, pas de navigation. */
   if (data.type === 'apply_tour_demo') {
+    return;
+  }
+
+  if (data.type === 'shop_order_status_update') {
+    const route = typeof data.route === 'string' ? data.route.trim() : '';
+    if (route) {
+      try {
+        router.push(route as Parameters<typeof router.push>[0]);
+      } catch {
+        /* noop */
+      }
+    }
+    return;
+  }
+
+  if (data.type === 'shop_order_finalize_whatsapp') {
+    const locale = await getAppLocaleForPush();
+    const waMe = String(data.whatsapp_wa_me ?? data.whatsappWaMe ?? '212655690632').replace(/\D/g, '');
+    const messageFr = String(data.whatsapp_message_fr ?? data.whatsappMessageFr ?? '').trim();
+    const messageAr = String(data.whatsapp_message_ar ?? data.whatsappMessageAr ?? '').trim();
+    const orderNo = String(data.order_number ?? data.orderNumber ?? '').trim();
+    const fallbackFr = orderNo
+      ? `Bonjour, je souhaite finaliser ma commande E-Tawjihi n° ${orderNo}. Merci.`
+      : 'Bonjour, je souhaite finaliser ma commande E-Tawjihi. Merci.';
+    const fallbackAr = orderNo
+      ? `مرحبًا، أرغب في إتمام طلبي E-Tawjihi رقم ${orderNo}. شكرًا.`
+      : 'مرحبًا، أرغب في إتمام طلبي E-Tawjihi. شكرًا.';
+    const message = locale === 'ar' ? messageAr || fallbackAr : messageFr || fallbackFr;
+    const href = `https://wa.me/${waMe}?text=${encodeURIComponent(message)}`;
+    try {
+      await openWhatsAppHref(href);
+    } catch {
+      /* noop */
+    }
     return;
   }
 

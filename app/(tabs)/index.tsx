@@ -9,7 +9,7 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native';
-import { Gesture, GestureDetector, ScrollView } from 'react-native-gesture-handler';
+import { ScrollView as GHScrollView } from 'react-native-gesture-handler';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 
@@ -864,13 +864,23 @@ function HomeTabScreen() {
     t,
   ]);
 
-  const androidHomeScrollNative = useMemo(
-    () => (Platform.OS === 'android' ? Gesture.Native() : null),
-    [],
-  );
+  return (
+    <View style={styles.root}>
+      <SchoolDiagnosticPendingNavigation />
+      <StatusBar style="light" />
+      {/** Bleu jusqu’aux icônes de statut (iOS/Android) — plus de bande blanche au-dessus du header */}
+      <View style={[styles.headerSafe, { paddingTop: insets.top }]}>
+        <View style={styles.stickyHeader}>
+          <HomeTopBar
+            unreadCount={notifUnreadCount}
+            onPressNotifications={() => openDrawer()}
+            onPressProfile={() => router.push('/compte' as never)}
+            onPressMenu={openSidebar}
+          />
+        </View>
+      </View>
 
-  const homeScrollView = (
-      <ScrollView
+      <GHScrollView
         style={styles.scroll}
         contentContainerStyle={[
           styles.content,
@@ -879,14 +889,17 @@ function HomeTabScreen() {
         nestedScrollEnabled
         showsVerticalScrollIndicator={false}
         bounces={false}
+        overScrollMode="always"
+        keyboardShouldPersistTaps="handled"
+        removeClippedSubviews={Platform.OS !== 'android'}
         {...(Platform.OS === 'ios' ? { contentInsetAdjustmentBehavior: 'never' as const } : {})}
       >
-        <View style={[styles.heroShell, heroWide && styles.heroShellWide]}>
+        <View style={[styles.heroShell, heroWide && styles.heroShellWide]} pointerEvents="box-none">
           <View style={[styles.heroBackdropLayer, heroWide && styles.heroBackdropLayerWide]} pointerEvents="none">
             <HomeTopBackdrop width={screenW} />
           </View>
-          <View style={[styles.greetingRow, isRTL && styles.greetingRowRtl]}>
-            <View style={styles.greetingCol}>
+          <View style={[styles.greetingRow, isRTL && styles.greetingRowRtl]} pointerEvents="box-none">
+            <View style={styles.greetingCol} pointerEvents="box-none">
           {isLoading ? (
                 <HomeGreetingBlockSkeleton isRTL={isRTL} />
           ) : (
@@ -990,30 +1003,7 @@ function HomeTabScreen() {
           onSeeMore={openInscriptionsTab}
         />
         </View>
-      </ScrollView>
-  );
-
-  return (
-    <View style={styles.root}>
-      <SchoolDiagnosticPendingNavigation />
-      <StatusBar style="light" />
-      {/** Bleu jusqu’aux icônes de statut (iOS/Android) — plus de bande blanche au-dessus du header */}
-      <View style={[styles.headerSafe, { paddingTop: insets.top }]}>
-        <View style={styles.stickyHeader}>
-          <HomeTopBar
-            unreadCount={notifUnreadCount}
-            onPressNotifications={() => openDrawer()}
-            onPressProfile={() => router.push('/compte' as never)}
-            onPressMenu={openSidebar}
-          />
-        </View>
-      </View>
-
-      {androidHomeScrollNative ? (
-        <GestureDetector gesture={androidHomeScrollNative}>{homeScrollView}</GestureDetector>
-      ) : (
-        homeScrollView
-      )}
+      </GHScrollView>
 
       <StoryViewerModal
         visible={storyViewer.open}

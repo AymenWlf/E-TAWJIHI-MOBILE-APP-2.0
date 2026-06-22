@@ -32,6 +32,7 @@ import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { getApiBaseUrl } from '@/constants/api';
 import { useAuth } from '@/contexts/AuthContext';
+import { EstablishmentLeadGenSheetProvider } from '@/contexts/EstablishmentLeadGenSheetContext';
 import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
@@ -729,6 +730,7 @@ export default function EcolesScreen() {
   );
 
   return (
+    <EstablishmentLeadGenSheetProvider>
     <View style={[styles.root, isRTL ? styles.rtl : styles.ltr]}>
       <StatusBar style="light" />
       {/** Même traitement que l’accueil : bleu jusqu’aux icônes de statut (plus de bande grise sous la notch). */}
@@ -985,6 +987,7 @@ export default function EcolesScreen() {
         secteurs={secteurs}
       />
     </View>
+    </EstablishmentLeadGenSheetProvider>
   );
 }
 

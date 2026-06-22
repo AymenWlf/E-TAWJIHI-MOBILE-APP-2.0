@@ -113,6 +113,8 @@ export type EstablishmentListItem = {
   referencingPlacementId?: number | null;
   referencingGoalType?: 'traffic' | 'leadgen';
   referencingDestinationUrl?: string | null;
+  referencingIncludeLeadFormOnTraffic?: boolean;
+  referencingCampaignId?: number | null;
 };
 
 /** Valeurs pré-calculées pour l’UI (liste + détail). */

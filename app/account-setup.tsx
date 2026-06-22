@@ -62,7 +62,7 @@ import {
   type OldClientSetupSource,
 } from '@/utils/accountSetupAutofill';
 import type { UserProfile } from '@/services/userProfile';
-import { applyArabicFontOverlay } from '@/theme/arabicTypography';
+import { rtlTextInputStyle } from '@/theme/arabicTypography';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { errorMessage } from '@/utils/errorMessage';
 import { isValidEmail } from '@/utils/isValidEmail';
@@ -187,7 +187,7 @@ function SetupTextInput({
 }: SetupTextInputProps) {
   const inputRef = useRef<TextInput>(null);
   const [focused, setFocused] = useState(false);
-  const arabicInput = rtl ? applyArabicFontOverlay(styles.inputInner as TextStyle) : undefined;
+  const mergedStyle = StyleSheet.flatten([styles.inputInner, style]) as TextStyle;
   return (
     <Pressable
       accessible={false}
@@ -201,6 +201,8 @@ function SetupTextInput({
           {...rest}
           placeholderTextColor={placeholderTextColor ?? INPUT_PLACEHOLDER_RGBA}
           selectionColor={BLUE}
+          textAlign={rtl ? 'right' : 'left'}
+          textAlignVertical="center"
           onFocus={(e) => {
             setFocused(true);
             onFocus?.(e);
@@ -209,7 +211,7 @@ function SetupTextInput({
             setFocused(false);
             onBlur?.(e);
           }}
-          style={[styles.inputInner, rtl && styles.rtl, style, arabicInput]}
+          style={[styles.inputInner, style, rtl ? rtlTextInputStyle(mergedStyle) : undefined]}
         />
       </AnimatedFieldShell>
     </Pressable>
@@ -1567,11 +1569,16 @@ const styles = StyleSheet.create({
   inputInner: {
     padding: 0,
     margin: 0,
+    width: '100%',
+    alignSelf: 'stretch',
     fontSize: fontSize.lg,
     fontWeight: '600',
-    lineHeight: Math.round(fontSize.lg * 1.35),
     letterSpacing: -0.15,
     color: brand.text,
+    ...Platform.select({
+      ios: { lineHeight: Math.round(fontSize.lg * 1.35) },
+      default: {},
+    }),
   },
   dateField: {
     flexDirection: 'row',

@@ -2,8 +2,10 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
 import type { Href } from 'expo-router';
 import { useRouter } from 'expo-router';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Alert,
   Animated,
   DeviceEventEmitter,
   Easing,
@@ -40,6 +42,7 @@ import { CAIRO } from '@/theme/arabicTypography';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { heroShellHeaderUi, useHeroShellHeaderWide } from '@/utils/heroShellHeaderUi';
+import { errorMessage } from '@/utils/errorMessage';
 
 type IconKind = 'fa' | 'mci';
 
@@ -134,7 +137,7 @@ export function AppSidebarPanel() {
   const { visible: ctxVisible, close } = useAppSidebar();
   const router = useRouter();
   const { t, isRTL } = useLocale();
-  const { user, getValidAccessToken } = useAuth();
+  const { user, getValidAccessToken, logout } = useAuth();
   const { count: cartCount } = useShopCart();
   const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading } = useTawjihPlusAccess();
   const { width: windowWidth } = useWindowDimensions();
@@ -144,6 +147,7 @@ export function AppSidebarPanel() {
   const backdropOpacity = useRef(new Animated.Value(0)).current;
 
   const [sheetMounted, setSheetMounted] = useState(false);
+  const [loggingOut, setLoggingOut] = useState(false);
 
   const panelWidth = useMemo(() => {
     if (windowWidth >= 1024) return Math.min(380, Math.round(windowWidth * 0.32));
@@ -350,6 +354,27 @@ export function AppSidebarPanel() {
     if (link.href) router.push(link.href as Href);
   };
 
+  const handleLogout = useCallback(() => {
+    Alert.alert(t('accountLogoutTitle'), t('accountLogoutMessage'), [
+      { text: t('accountLogoutCancel'), style: 'cancel' },
+      {
+        text: t('accountLogoutConfirm'),
+        style: 'destructive',
+        onPress: async () => {
+          close();
+          setLoggingOut(true);
+          try {
+            await logout();
+          } catch (e: unknown) {
+            Alert.alert(t('commonErrorTitle'), errorMessage(e, t, 'account'));
+          } finally {
+            setLoggingOut(false);
+          }
+        },
+      },
+    ]);
+  }, [close, logout, t]);
+
   const safePadTop = Math.max(insets.top, spacing.md);
   const safePadBottom =
     Platform.OS === 'android' ? Math.max(insets.bottom, 20) : Math.max(insets.bottom, spacing.md);
@@ -415,7 +440,10 @@ export function AppSidebarPanel() {
 
             <ScrollView
               style={styles.scroll}
-              contentContainerStyle={[styles.scrollContent, { paddingBottom: safePadBottom + spacing.lg }]}
+              contentContainerStyle={[
+                styles.scrollContent,
+                { paddingBottom: user ? spacing.md : safePadBottom + spacing.lg },
+              ]}
               showsVerticalScrollIndicator={false}
               bounces={Platform.OS === 'ios'}
             >
@@ -430,6 +458,33 @@ export function AppSidebarPanel() {
                 />
               ))}
             </ScrollView>
+
+            {user ? (
+              <View style={[styles.sidebarFooter, { paddingBottom: safePadBottom }]}>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={t('accountLogoutConfirm')}
+                  onPress={handleLogout}
+                  disabled={loggingOut}
+                  style={({ pressed }): ViewStyle[] => [
+                    styles.logoutFooterBtn,
+                    isRTL && styles.rowRtl,
+                    ...(loggingOut || pressed ? [{ opacity: 0.88 }] : []),
+                  ]}
+                >
+                  {loggingOut ? (
+                    <ActivityIndicator color={brand.error} />
+                  ) : (
+                    <>
+                      <FontAwesome name="sign-out" size={16} color={brand.error} />
+                      <Text style={[styles.logoutFooterBtnTxt, isRTL && styles.textRtl]}>
+                        {t('accountLogoutConfirm')}
+                      </Text>
+                    </>
+                  )}
+                </Pressable>
+              </View>
+            ) : null}
           </View>
         </Animated.View>
       </View>
@@ -641,5 +696,28 @@ const styles = StyleSheet.create({
   textRtl: {
     textAlign: 'right',
     writingDirection: 'rtl',
+  },
+  sidebarFooter: {
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: brand.border,
+    backgroundColor: brand.backgroundSoft,
+  },
+  logoutFooterBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: 14,
+    borderRadius: radius.full,
+    backgroundColor: brand.white,
+    borderWidth: 1.5,
+    borderColor: brand.error,
+  },
+  logoutFooterBtnTxt: {
+    color: brand.error,
+    fontSize: fontSize.md,
+    fontWeight: '900',
   },
 });

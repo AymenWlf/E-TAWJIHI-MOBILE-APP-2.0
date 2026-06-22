@@ -1,12 +1,15 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   Platform,
   Pressable,
+  ScrollView,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import Animated, {
@@ -19,6 +22,7 @@ import Animated, {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { KeyboardAwareBottomSpacer } from '@/components/ui/KeyboardAwareBottomSpacer';
+import { useEffectiveKeyboardHeight } from '@/hooks/useEffectiveKeyboardHeight';
 import { PlatformSheetOverlay } from '@/components/ui/PlatformSheetOverlay';
 import { Text } from '@/components/ui/Text';
 import { openStoreReviewPage } from '@/constants/mobileAppStores';
@@ -32,6 +36,8 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
 const SHEET_SLIDE_MS = 320;
 const STAR_COUNT = 5;
+/** Hauteur approx. du pied fixe (boutons + padding) pour le spacer clavier. */
+const SUBMIT_FOOTER_APPROX = 72;
 
 type Props = {
   visible: boolean;
@@ -86,8 +92,15 @@ export function SimpleAppFeedbackModal({
   onDismiss,
 }: Props) {
   const insets = useSafeAreaInsets();
+  const { height: windowHeight } = useWindowDimensions();
   const { t, isRTL, locale } = useLocale();
   const { getValidAccessToken, user } = useAuth();
+
+  const scrollMaxHeight = Math.max(220, windowHeight * 0.42);
+  const footerPad = Math.max(insets.bottom, spacing.md) + SUBMIT_FOOTER_APPROX;
+
+  const keyboardHeight = useEffectiveKeyboardHeight();
+  const scrollRef = useRef<ScrollView>(null);
 
   const [mounted, setMounted] = useState(false);
   const [rating, setRating] = useState<number | null>(null);
@@ -126,12 +139,33 @@ export function SimpleAppFeedbackModal({
   }, [visible, backdropOpacity, sheetTranslateY, resetForm]);
 
   const backdropStyle = useAnimatedStyle(() => ({ opacity: backdropOpacity.value }));
-  const sheetStyle = useAnimatedStyle(() => ({ transform: [{ translateY: sheetTranslateY.value }] }));
+  const sheetStyle = useAnimatedStyle(() => ({
+    transform: [{ translateY: sheetTranslateY.value - (Platform.OS === 'ios' ? keyboardHeight.value : 0) }],
+  }));
+
+  const footerKeyboardStyle = useAnimatedStyle(() => {
+    if (Platform.OS !== 'android') return {};
+    const kb = keyboardHeight.value;
+    if (kb <= 0) return {};
+    return { transform: [{ translateY: -Math.min(kb, footerPad) }] };
+  });
+
+  const focusCommentField = useCallback(() => {
+    if (Platform.OS !== 'android') return;
+    setTimeout(() => {
+      scrollRef.current?.scrollToEnd({ animated: true });
+    }, 120);
+  }, []);
+
+  const dismissKeyboard = useCallback(() => {
+    Keyboard.dismiss();
+  }, []);
 
   const handleClose = useCallback(() => {
     if (submitting) return;
+    dismissKeyboard();
     onClose();
-  }, [onClose, submitting]);
+  }, [dismissKeyboard, onClose, submitting]);
 
   const handleLater = useCallback(() => {
     if (submitting) return;
@@ -213,46 +247,48 @@ export function SimpleAppFeedbackModal({
         </Animated.View>
 
         <Animated.View
-          style={[styles.sheet, sheetStyle, isRTL && styles.sheetRtl, { paddingBottom: insets.bottom + spacing.md }]}
+          style={[styles.sheet, sheetStyle, isRTL && styles.sheetRtl]}
           accessibilityViewIsModal>
-          <View style={styles.handleWrap}>
-            <View style={styles.handle} />
-          </View>
+          <Pressable onPress={dismissKeyboard} style={styles.sheetDismissTap} accessibilityRole="none">
+            <View style={styles.handleWrap}>
+              <View style={styles.handle} />
+            </View>
 
-          <View style={[styles.header, isRTL && styles.rowRtl]}>
-            <View style={styles.headerIcon}>
-              <FontAwesome
-                name={storeReviewPrompt ? 'external-link' : showPostSubmit ? 'check' : 'star'}
-                size={18}
-                color={showPostSubmit ? homeShell.greenDark : brand.primary}
-              />
+            <View style={[styles.header, isRTL && styles.rowRtl]}>
+              <View style={styles.headerIcon}>
+                <FontAwesome
+                  name={storeReviewPrompt ? 'external-link' : showPostSubmit ? 'check' : 'star'}
+                  size={18}
+                  color={showPostSubmit ? homeShell.greenDark : brand.primary}
+                />
+              </View>
+              <View style={{ flex: 1, minWidth: 0 }}>
+                <Text style={[styles.eyebrow, isRTL && styles.rtl]}>{t('appFeedbackSimpleEyebrow')}</Text>
+                <Text style={[styles.title, isRTL && styles.rtl]}>
+                  {storeReviewPrompt
+                    ? t('appFeedbackSimpleStoreTitle')
+                    : showPostSubmit
+                      ? t('appFeedbackSimpleThanks')
+                      : t('appFeedbackSimpleTitle')}
+                </Text>
+                <Text style={[styles.subtitle, isRTL && styles.rtl]}>
+                  {storeReviewPrompt
+                    ? t('appFeedbackSimpleStoreSub')
+                    : showPostSubmit
+                      ? t('appFeedbackSimpleThanksSub')
+                      : intro}
+                </Text>
+              </View>
+              {!showPostSubmit ? (
+                <Pressable onPress={handleClose} hitSlop={10} accessibilityLabel={t('modalClose')}>
+                  <FontAwesome name="times" size={16} color={brand.textMuted} />
+                </Pressable>
+              ) : null}
             </View>
-            <View style={{ flex: 1, minWidth: 0 }}>
-              <Text style={[styles.eyebrow, isRTL && styles.rtl]}>{t('appFeedbackSimpleEyebrow')}</Text>
-              <Text style={[styles.title, isRTL && styles.rtl]}>
-                {storeReviewPrompt
-                  ? t('appFeedbackSimpleStoreTitle')
-                  : showPostSubmit
-                    ? t('appFeedbackSimpleThanks')
-                    : t('appFeedbackSimpleTitle')}
-              </Text>
-              <Text style={[styles.subtitle, isRTL && styles.rtl]}>
-                {storeReviewPrompt
-                  ? t('appFeedbackSimpleStoreSub')
-                  : showPostSubmit
-                    ? t('appFeedbackSimpleThanksSub')
-                    : intro}
-              </Text>
-            </View>
-            {!showPostSubmit ? (
-              <Pressable onPress={handleClose} hitSlop={10} accessibilityLabel={t('modalClose')}>
-                <FontAwesome name="times" size={16} color={brand.textMuted} />
-              </Pressable>
-            ) : null}
-          </View>
+          </Pressable>
 
           {storeReviewPrompt ? (
-            <View style={[styles.actions, isRTL && styles.rowRtl]}>
+            <View style={[styles.actions, styles.actionsPadded, isRTL && styles.rowRtl, { paddingBottom: insets.bottom + spacing.md }]}>
               <Pressable
                 onPress={onClose}
                 style={({ pressed }) => [styles.laterBtn, pressed && { opacity: 0.88 }]}>
@@ -270,53 +306,86 @@ export function SimpleAppFeedbackModal({
               </Pressable>
             </View>
           ) : !showPostSubmit ? (
-            <>
-              <Text style={[styles.starsLabel, isRTL && styles.rtl]}>{t('appFeedbackSimpleStarsLabel')}</Text>
-              <StarRating
-                value={rating}
-                onChange={setRating}
-                isRTL={isRTL}
-                label={t('appFeedbackSimpleStarsLabel')}
-              />
-
-              <Text style={[styles.commentLabel, isRTL && styles.rtl]}>{t('appFeedbackSimpleCommentLabel')}</Text>
-              <TextInput
-                value={comment}
-                onChangeText={setComment}
-                placeholder={t('appFeedbackSimpleCommentPh')}
-                placeholderTextColor={brand.textMuted}
-                multiline
-                textAlignVertical="top"
-                style={[styles.commentInput, isRTL && styles.commentInputRtl]}
-                maxLength={1200}
-              />
-
-              <View style={[styles.actions, isRTL && styles.rowRtl]}>
-                <Pressable
-                  onPress={handleLater}
-                  disabled={submitting}
-                  style={({ pressed }) => [styles.laterBtn, pressed && { opacity: 0.88 }]}>
-                  <Text style={styles.laterBtnTxt}>{t('appFeedbackSimpleLater')}</Text>
+            <View style={styles.sheetBody}>
+              <ScrollView
+                ref={scrollRef}
+                style={[styles.scroll, { maxHeight: scrollMaxHeight }]}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
+                automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}
+                showsVerticalScrollIndicator={false}
+                onScrollBeginDrag={dismissKeyboard}>
+                <Pressable onPress={dismissKeyboard} accessibilityRole="none">
+                  <Text style={[styles.starsLabel, isRTL && styles.rtl]}>{t('appFeedbackSimpleStarsLabel')}</Text>
+                  <StarRating
+                    value={rating}
+                    onChange={(star) => {
+                      dismissKeyboard();
+                      setRating(star);
+                    }}
+                    isRTL={isRTL}
+                    label={t('appFeedbackSimpleStarsLabel')}
+                  />
                 </Pressable>
-                <Pressable
-                  onPress={() => void handleSubmit()}
-                  disabled={!canSubmit}
-                  style={({ pressed }) => [
-                    styles.submitBtn,
-                    isRTL && styles.rowRtl,
-                    !canSubmit && styles.submitBtnDisabled,
-                    pressed && canSubmit && { opacity: 0.9 },
-                  ]}>
-                  {submitting ? (
-                    <ActivityIndicator size="small" color={brand.white} />
-                  ) : (
-                    <FontAwesome name="send" size={13} color={brand.white} />
-                  )}
-                  <Text style={styles.submitBtnTxt}>{t('appFeedbackSimpleSubmit')}</Text>
-                </Pressable>
-              </View>
-              <KeyboardAwareBottomSpacer />
-            </>
+
+                <Text style={[styles.commentLabel, isRTL && styles.rtl]}>{t('appFeedbackSimpleCommentLabel')}</Text>
+                <TextInput
+                  value={comment}
+                  onChangeText={setComment}
+                  placeholder={t('appFeedbackSimpleCommentPh')}
+                  placeholderTextColor={brand.textMuted}
+                  multiline
+                  textAlignVertical="top"
+                  style={[styles.commentInput, isRTL && styles.commentInputRtl]}
+                  maxLength={1200}
+                  returnKeyType="done"
+                  blurOnSubmit
+                  onFocus={focusCommentField}
+                  onSubmitEditing={dismissKeyboard}
+                />
+
+                <KeyboardAwareBottomSpacer
+                  minPaddingWhenKeyboardClosed={footerPad}
+                  scrollMarginWhenKeyboardOpen={
+                    Platform.OS === 'android' ? Math.min(scrollMaxHeight * 0.35, 140) : undefined
+                  }
+                />
+              </ScrollView>
+
+              <Animated.View
+                style={[
+                  styles.footer,
+                  { paddingBottom: Math.max(insets.bottom, spacing.md) },
+                  footerKeyboardStyle,
+                  isRTL && styles.rowRtl,
+                ]}>
+                <View style={[styles.actions, isRTL && styles.rowRtl]}>
+                  <Pressable
+                    onPress={handleLater}
+                    disabled={submitting}
+                    style={({ pressed }) => [styles.laterBtn, pressed && { opacity: 0.88 }]}>
+                    <Text style={styles.laterBtnTxt}>{t('appFeedbackSimpleLater')}</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => void handleSubmit()}
+                    disabled={!canSubmit}
+                    style={({ pressed }) => [
+                      styles.submitBtn,
+                      isRTL && styles.rowRtl,
+                      !canSubmit && styles.submitBtnDisabled,
+                      pressed && canSubmit && { opacity: 0.9 },
+                    ]}>
+                    {submitting ? (
+                      <ActivityIndicator size="small" color={brand.white} />
+                    ) : (
+                      <FontAwesome name="send" size={13} color={brand.white} />
+                    )}
+                    <Text style={styles.submitBtnTxt}>{t('appFeedbackSimpleSubmit')}</Text>
+                  </Pressable>
+                </View>
+              </Animated.View>
+            </View>
           ) : null}
         </Animated.View>
       </View>
@@ -334,6 +403,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
     maxHeight: '88%',
+  },
+  sheetDismissTap: {
+    width: '100%',
+  },
+  sheetBody: {
+    width: '100%',
+  },
+  scroll: {
+    width: '100%',
+  },
+  scrollContent: {
+    paddingBottom: spacing.xs,
+  },
+  footer: {
+    paddingTop: spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+    borderTopColor: brand.border,
+    backgroundColor: brand.white,
+    marginHorizontal: -spacing.lg,
+    paddingHorizontal: spacing.lg,
   },
   sheetRtl: { direction: 'rtl' },
   handleWrap: { alignItems: 'center', paddingVertical: spacing.sm },
@@ -371,6 +460,9 @@ const styles = StyleSheet.create({
   },
   commentInputRtl: { textAlign: 'right' },
   actions: { flexDirection: 'row', gap: spacing.sm },
+  actionsPadded: {
+    paddingBottom: spacing.md,
+  },
   laterBtn: {
     flex: 1,
     alignItems: 'center',

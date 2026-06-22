@@ -24,18 +24,19 @@ export function HomeGreetingBlock({
   rtl,
 }: Props) {
   return (
-    <View style={[styles.wrap, rtl && styles.wrapRtl]}>
-      <Text style={[styles.greet, rtl && styles.textRtl]}>
+    <View style={[styles.wrap, rtl && styles.wrapRtl]} pointerEvents="box-none">
+      <Text style={[styles.greet, rtl && styles.textRtl]} selectable={false}>
         {greetingWord} <Text style={styles.name}>{firstName}</Text>
       </Text>
       <View
         style={[styles.subRow, rtl && styles.subRowRtl]}
+        pointerEvents="box-none"
         accessibilityLabel={subtitleLoading ? undefined : subtitle}
       >
         {subtitleLoading ? (
           <HomeGreetingSubtitleSkeleton isRTL={rtl} />
         ) : (
-          <Text style={[styles.subText, rtl && styles.textRtl]} numberOfLines={2}>
+          <Text style={[styles.subText, rtl && styles.textRtl]} numberOfLines={2} selectable={false}>
             {subtitle}
           </Text>
         )}

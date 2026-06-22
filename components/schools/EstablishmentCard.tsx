@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useEffect, useRef } from 'react';
-import { ActivityIndicator, Image, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlusPaywall';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
@@ -12,14 +12,17 @@ import {
 import { Text } from '@/components/ui/Text';
 
 import { useLocale } from '@/contexts/LocaleContext';
+import { useEstablishmentLeadGenSheetOptional } from '@/contexts/EstablishmentLeadGenSheetContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import type { EstablishmentNormalized } from '@/services/establishments';
-import { recordReferencingClickNative, recordReferencingImpressionNative } from '@/services/referencingAds';
+import { recordReferencingClickNative, recordReferencingContactClickNative, recordReferencingImpressionNative } from '@/services/referencingAds';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { establishmentListingPlacement } from '@/utils/establishmentListingPlacement';
 import { evaluateEligibility } from '@/utils/eligibility';
 import { formatVillesCourtes, formatEstablishmentStudyDuration, secteurTitres, universityName } from '@/utils/establishmentFormat';
 import { fireAndForget } from '@/utils/fireAndForget';
+import { placementShowsContactForm, placementTrafficDestinationUrl, addUtmToUrl } from '@/utils/referencingPlacementUi';
 import { stripHtmlToText } from '@/utils/sanitizeRichHtml';
 import type { EstablishmentLockedVariant } from '@/utils/establishmentLockDisplay';
 
@@ -47,8 +50,16 @@ export function EstablishmentCard({
 }: Props) {
   const { isRTL, t, locale } = useLocale();
   const { profile: eligibilityProfile } = useEligibilityProfile();
+  const leadGenSheet = useEstablishmentLeadGenSheetOptional();
   const referencingImpSent = useRef(false);
   const contentLocked = lockedVariant === 'compact';
+
+  const placement = establishmentListingPlacement(item);
+  const showLeadgenButton = !contentLocked && placementShowsContactForm(placement);
+  const trafficUrl = placementTrafficDestinationUrl(placement);
+  const showTrafficSiteButton = !contentLocked && Boolean(trafficUrl);
+  const showSponsorActions = showLeadgenButton || showTrafficSiteButton;
+  const cardSource = item.isSponsored ? 'sponsorship' : 'referencing';
 
   const placementId = item.referencingPlacementId;
   useEffect(() => {
@@ -60,10 +71,29 @@ export function EstablishmentCard({
 
   const handleCardPress = () => {
     if (placementId) {
-      const source = item.isSponsored ? 'sponsorship' : 'referencing';
-      fireAndForget(recordReferencingClickNative({ placementId, source }));
+      fireAndForget(recordReferencingClickNative({ placementId, source: cardSource }));
     }
     onPress?.();
+  };
+
+  const recordPlacementClick = () => {
+    if (placementId) {
+      fireAndForget(recordReferencingClickNative({ placementId, source: cardSource }));
+    }
+  };
+
+  const handleLeadgenPress = () => {
+    if (!placement) return;
+    fireAndForget(recordReferencingContactClickNative({ placementId: placement.placementId }));
+    recordPlacementClick();
+    leadGenSheet?.openLeadGenSheet(item, placement);
+  };
+
+  const handleTrafficSitePress = () => {
+    recordPlacementClick();
+    if (trafficUrl) {
+      void Linking.openURL(addUtmToUrl(trafficUrl)).catch(() => undefined);
+    }
   };
 
   const eligibility = evaluateEligibility(
@@ -321,6 +351,41 @@ export function EstablishmentCard({
           )}
         </View>
       )}
+
+      {showSponsorActions ? (
+        <View style={[styles.sponsorActions, isRTL && styles.sponsorActionsRtl]}>
+          {showTrafficSiteButton ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                handleTrafficSitePress();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('estCardBtnVisitSite')} — ${primaryName}`}
+              style={({ pressed }) => [styles.sponsorBtn, styles.sponsorBtnTraffic, pressed && { opacity: 0.88 }]}>
+              <FontAwesome name="external-link" size={12} color={brand.white} />
+              <Text style={[styles.sponsorBtnTxt, isRTL && styles.txtRtl]} numberOfLines={1}>
+                {t('estCardBtnVisitSite')}
+              </Text>
+            </Pressable>
+          ) : null}
+          {showLeadgenButton ? (
+            <Pressable
+              onPress={(e) => {
+                e.stopPropagation?.();
+                handleLeadgenPress();
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={`${t('estCardBtnContact')} — ${primaryName}`}
+              style={({ pressed }) => [styles.sponsorBtn, styles.sponsorBtnContact, pressed && { opacity: 0.88 }]}>
+              <FontAwesome name="comment" size={12} color={brand.white} />
+              <Text style={[styles.sponsorBtnTxt, isRTL && styles.txtRtl]} numberOfLines={1}>
+                {t('estCardBtnContact')}
+              </Text>
+            </Pressable>
+          ) : null}
+        </View>
+      ) : null}
 
       {onToggleFollow ? (
         <View style={[styles.actionBar, isRTL && styles.actionBarRtl]}>
@@ -826,6 +891,41 @@ const styles = StyleSheet.create({
   },
   footerIconsRtl: {
     flexDirection: 'row-reverse',
+  },
+  sponsorActions: {
+    marginTop: spacing.md,
+    marginHorizontal: -spacing.lg,
+    paddingHorizontal: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    gap: spacing.sm,
+  },
+  sponsorActionsRtl: {
+    flexDirection: 'row-reverse',
+  },
+  sponsorBtn: {
+    flex: 1,
+    minWidth: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    minHeight: 40,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 8,
+    borderRadius: radius.lg,
+  },
+  sponsorBtnContact: {
+    backgroundColor: brand.primary,
+  },
+  sponsorBtnTraffic: {
+    backgroundColor: brand.emerald,
+  },
+  sponsorBtnTxt: {
+    color: brand.white,
+    fontSize: 11,
+    fontWeight: '800',
+    flexShrink: 1,
   },
   actionBar: {
     marginTop: spacing.md,

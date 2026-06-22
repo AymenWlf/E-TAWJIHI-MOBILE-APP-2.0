@@ -8,7 +8,11 @@ export type ListingPlacementInfo = {
   isSponsored: boolean;
   goalType: 'traffic' | 'leadgen';
   destinationUrl: string | null;
+  includeLeadFormOnTraffic?: boolean;
+  campaignId?: number | null;
 };
+
+export type EstablishmentPlacementInfo = ListingPlacementInfo;
 
 /** Carte placementId / méta campagne par établissement (aligné sur `/api/referencing/listing-placements`). */
 export async function fetchListingPlacementsByEstablishment(): Promise<Record<number, ListingPlacementInfo>> {
@@ -24,9 +28,71 @@ export async function fetchListingPlacementsByEstablishment(): Promise<Record<nu
       isSponsored: Boolean(v.isSponsored),
       goalType: v.goalType === 'leadgen' ? 'leadgen' : 'traffic',
       destinationUrl: v.destinationUrl ?? null,
+      includeLeadFormOnTraffic: Boolean(v.includeLeadFormOnTraffic),
+      campaignId: v.campaignId ?? null,
     };
   }
   return out;
+}
+
+export async function fetchEstablishmentPlacementInfo(
+  establishmentId: number,
+): Promise<EstablishmentPlacementInfo | null> {
+  if (!Number.isFinite(establishmentId) || establishmentId <= 0) return null;
+  const url = buildApiUrl(`/api/referencing/establishment/${establishmentId}/placement-info`);
+  const res = await httpGetJson<{ success: boolean; data?: EstablishmentPlacementInfo | null }>(url);
+  if (!res.success || !res.data?.placementId) return null;
+  const d = res.data;
+  return {
+    placementId: d.placementId,
+    isSponsored: Boolean(d.isSponsored),
+    goalType: d.goalType === 'leadgen' ? 'leadgen' : 'traffic',
+    destinationUrl:
+      d.destinationUrl != null && String(d.destinationUrl).trim() !== '' ? String(d.destinationUrl).trim() : null,
+    includeLeadFormOnTraffic: Boolean(d.includeLeadFormOnTraffic),
+    campaignId: d.campaignId ?? null,
+  };
+}
+
+export type ReferencingLeadPayload = {
+  placementId?: number;
+  establishmentId?: number;
+  campaignId?: number;
+  name: string;
+  email?: string;
+  phone?: string;
+  message?: string;
+  source?: 'referencing' | 'banner';
+  cardSource?: 'referencing' | 'sponsorship';
+  role?: 'élève' | 'tuteur';
+  niveau?: string;
+  bacType?: 'normal' | 'mission';
+  filiere?: string;
+  specialite1?: string;
+  specialite2?: string;
+  ville?: string;
+};
+
+export async function submitReferencingLead(payload: ReferencingLeadPayload): Promise<void> {
+  await httpPostJson<{ success: boolean; message?: string }, Record<string, unknown>>(
+    buildApiUrl('/api/referencing/lead'),
+    { ...payload, viewport: 'mobile', clientSurface: 'native_app' },
+  );
+}
+
+export async function recordReferencingContactClickNative(opts: {
+  placementId: number;
+}): Promise<void> {
+  const visitorId = await getMobileVisitorId();
+  await httpPostJson<{ success: boolean }, Record<string, unknown>>(
+    buildApiUrl('/api/referencing/record-contact-click'),
+    {
+      placementId: opts.placementId,
+      visitorId,
+      viewport: 'mobile',
+      clientSurface: 'native_app',
+    },
+  );
 }
 
 export function mergeEstablishmentsWithListingPlacements<
@@ -41,6 +107,8 @@ export function mergeEstablishmentsWithListingPlacements<
       referencingPlacementId: p.placementId,
       referencingGoalType: p.goalType,
       referencingDestinationUrl: p.destinationUrl,
+      referencingIncludeLeadFormOnTraffic: p.includeLeadFormOnTraffic,
+      referencingCampaignId: p.campaignId ?? null,
     };
   });
 }
@@ -57,9 +125,11 @@ export function establishmentBlocksPartnerBanners(
   if ('placementId' in item && item.placementId > 0) {
     return true;
   }
-  const placementId = item.referencingPlacementId;
-  if (typeof placementId === 'number' && placementId > 0) {
-    return true;
+  if ('referencingPlacementId' in item) {
+    const placementId = item.referencingPlacementId;
+    if (typeof placementId === 'number' && placementId > 0) {
+      return true;
+    }
   }
   return Boolean(item.isSponsored);
 }

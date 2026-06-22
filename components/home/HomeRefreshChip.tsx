@@ -1,6 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { ActivityIndicator, Pressable, StyleSheet } from 'react-native';
+import { ActivityIndicator, StyleSheet } from 'react-native';
 
+import { AppPressable } from '@/components/ui/AppPressable';
 import { Text } from '@/components/ui/Text';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, spacing } from '@/theme/tokens';
@@ -22,7 +23,7 @@ export function HomeRefreshChip({
   isRTL = false,
 }: Props) {
   return (
-    <Pressable
+    <AppPressable
       onPress={onPress}
       disabled={refreshing}
       style={({ pressed }) => [
@@ -40,7 +41,7 @@ export function HomeRefreshChip({
         <FontAwesome name="refresh" size={11} color={homeShell.text} />
       )}
       <Text style={styles.label}>{label}</Text>
-    </Pressable>
+    </AppPressable>
   );
 }
 

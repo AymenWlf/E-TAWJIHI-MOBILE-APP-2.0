@@ -56,6 +56,37 @@ export function applyArabicFontOverlay(flat?: TextStyle | null): TextStyle {
   }) as TextStyle;
 }
 
+/**
+ * Styles TextInput en arabe (RTL) — centrage vertical, Cairo, sans padding fantôme Android.
+ */
+export function rtlTextInputStyle(flat?: TextStyle | null): TextStyle {
+  const fontOverlay = applyArabicFontOverlay(flat);
+  const rawFs = flat?.fontSize;
+  const fontSizeNum =
+    typeof rawFs === 'number'
+      ? rawFs
+      : typeof rawFs === 'string'
+        ? Number.parseFloat(rawFs)
+        : 15;
+
+  return {
+    textAlign: 'right',
+    writingDirection: 'rtl',
+    textAlignVertical: 'center',
+    alignSelf: 'stretch',
+    width: '100%',
+    ...fontOverlay,
+    ...(Platform.OS === 'android'
+      ? {
+          paddingVertical: 0,
+          lineHeight: Math.round(fontSizeNum * 1.22),
+        }
+      : {
+          lineHeight: undefined,
+        }),
+  };
+}
+
 /** Style Cairo explicite (champs OTP, auth, etc.). */
 export function cairoFontStyle(family: keyof typeof CAIRO): TextStyle {
   return applyArabicFontOverlay({ fontFamily: CAIRO[family] });

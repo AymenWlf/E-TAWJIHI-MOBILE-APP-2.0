@@ -15,7 +15,7 @@ export type AppTextInputProps = TextInputProps & {
 };
 
 export const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function AppTextInput(
-  { style, onFocus, onBlur, textRtl, plain, placeholderTextColor, ...rest },
+  { style, onFocus, onBlur, textRtl, plain, placeholderTextColor, multiline, ...rest },
   ref,
 ) {
   const { isRTL } = useLocale();
@@ -27,6 +27,7 @@ export const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function Ap
       ref={ref}
       placeholderTextColor={placeholderTextColor ?? brand.textMuted}
       selectionColor={brand.primary}
+      multiline={multiline}
       {...rest}
       onFocus={(e) => {
         setFocused(true);
@@ -36,6 +37,7 @@ export const AppTextInput = forwardRef<TextInput, AppTextInputProps>(function Ap
         setFocused(false);
         onBlur?.(e);
       }}
+      textAlignVertical={multiline ? 'top' : 'center'}
       style={[
         plain ? styles.plain : styles.filled,
         !plain && focused && styles.filledFocused,

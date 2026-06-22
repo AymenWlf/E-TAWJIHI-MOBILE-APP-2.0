@@ -8,11 +8,13 @@ import {
   StyleSheet,
   TextInput,
   View,
+  type TextStyle,
 } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import type { HomeCopyKey } from '@/constants/i18n';
 import { changePasswordWithToken } from '@/services/auth';
+import { rtlTextInputStyle } from '@/theme/arabicTypography';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { homeShell } from '@/theme/homeShell';
 import { evaluateAccountPassword, isStrongAccountPassword } from '@/utils/accountPasswordPolicy';
@@ -237,6 +239,7 @@ function PasswordInput({
   invalid?: boolean;
   valid?: boolean;
 }) {
+  const baseStyle = StyleSheet.flatten(styles.input) as TextStyle;
   return (
     <>
       <TextInput
@@ -250,9 +253,10 @@ function PasswordInput({
         autoComplete={autoComplete}
         textContentType={autoComplete === 'new-password' ? 'newPassword' : 'password'}
         textAlign={rtl ? 'right' : 'left'}
+        textAlignVertical="center"
         style={[
           styles.input,
-          rtl && styles.inputRtl,
+          rtl ? rtlTextInputStyle(baseStyle) : null,
           invalid ? styles.inputInvalid : undefined,
           valid ? styles.inputValid : undefined,
         ]}
@@ -331,12 +335,15 @@ const styles = StyleSheet.create({
   input: {
     flex: 1,
     minWidth: 0,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    alignSelf: 'stretch',
     color: homeShell.cardText,
     fontSize: fontSize.md,
     fontWeight: '600',
+    ...Platform.select({
+      ios: { paddingVertical: 12 },
+      android: { paddingVertical: 0 },
+    }),
   },
-  inputRtl: { textAlign: 'right', writingDirection: 'rtl' },
   inputInvalid: { borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
   inputValid: { borderColor: '#86EFAC', backgroundColor: '#F0FDF4' },
   eyeBtn: { padding: 4 },

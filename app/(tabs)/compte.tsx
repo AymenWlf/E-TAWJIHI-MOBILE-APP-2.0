@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useFocusEffect } from '@react-navigation/native';
 import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -13,6 +13,7 @@ import {
   StyleSheet,
   TextInput,
   View,
+  type TextStyle,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -70,6 +71,7 @@ import { getReferralRequiredServiceName, isReferralProgramUnlocked } from '@/ser
 import { userIsCommercialClient } from '@/utils/commercialClientAccess';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { homeShell } from '@/theme/homeShell';
+import { rtlTextInputStyle } from '@/theme/arabicTypography';
 import { formatOrderCreatedAtShort } from '@/utils/dateParis';
 import { getUserFacingApiError, getUserFacingLoadError } from '@/utils/apiError';
 import { errorMessage } from '@/utils/errorMessage';
@@ -853,29 +855,29 @@ export default function CompteTabScreen() {
               </Field>
 
               <Field label={t('setupLastName')} rtl={isRTL}>
-                <TextInput
+                <CompteTextInput
+                  isRTL={isRTL}
                   value={form.nom}
                   onChangeText={(v) => setForm((s) => ({ ...s, nom: v }))}
                   placeholder={t('setupLastName')}
                   placeholderTextColor={homeShell.cardMuted}
-                  textAlign={isRTL ? 'right' : 'left'}
-                  style={[styles.input, isRTL && styles.inputRtl]}
                 />
               </Field>
 
               <Field label={t('setupFirstName')} rtl={isRTL}>
-                <TextInput
+                <CompteTextInput
+                  isRTL={isRTL}
                   value={form.prenom}
                   onChangeText={(v) => setForm((s) => ({ ...s, prenom: v }))}
                   placeholder={t('setupFirstName')}
                   placeholderTextColor={homeShell.cardMuted}
-                  textAlign={isRTL ? 'right' : 'left'}
-                  style={[styles.input, isRTL && styles.inputRtl]}
                 />
               </Field>
 
               <Field label={t('setupEmail')} rtl={isRTL}>
-                <TextInput
+                <CompteTextInput
+                  isRTL={isRTL}
+                  forcedLtr
                   value={form.email}
                   onChangeText={(v) => setForm((s) => ({ ...s, email: v }))}
                   placeholder={t('setupEmail')}
@@ -883,8 +885,6 @@ export default function CompteTabScreen() {
                   autoCapitalize="none"
                   autoCorrect={false}
                   placeholderTextColor={homeShell.cardMuted}
-                  textAlign="left"
-                  style={[styles.input, styles.inputForcedLtr]}
                 />
               </Field>
 
@@ -901,13 +901,12 @@ export default function CompteTabScreen() {
               </Field>
 
               <Field label={t('setupGender')} hint={`${t('setupMale')} · ${t('setupFemale')}`} rtl={isRTL}>
-                <TextInput
+                <CompteTextInput
+                  isRTL={isRTL}
                   value={form.genre}
                   onChangeText={(v) => setForm((s) => ({ ...s, genre: v }))}
                   placeholder={t('setupGender')}
                   placeholderTextColor={homeShell.cardMuted}
-                  textAlign={isRTL ? 'right' : 'left'}
-                  style={[styles.input, isRTL && styles.inputRtl]}
                 />
               </Field>
 
@@ -1006,15 +1005,14 @@ export default function CompteTabScreen() {
                     onPress={() => setAcademicField('specialite3')}
                   />
                   <Field label={t('accountStudentCode')} hint={t('accountStudentCodeHint')} rtl={isRTL}>
-                    <TextInput
+                    <CompteTextInput
+                      isRTL={isRTL}
                       value={form.studentCode}
                       onChangeText={(v) => setForm((s) => ({ ...s, studentCode: v }))}
                       placeholder={t('accountStudentCode')}
                       placeholderTextColor={homeShell.cardMuted}
                       autoCapitalize="none"
                       autoCorrect={false}
-                      textAlign={isRTL ? 'right' : 'left'}
-                      style={[styles.input, isRTL && styles.inputRtl]}
                     />
                   </Field>
                 </>
@@ -1022,15 +1020,15 @@ export default function CompteTabScreen() {
 
               {form.bacType === 'normal' ? (
                 <Field label={t('accountMassarCode')} hint={t('accountMassarCodeHint')} rtl={isRTL}>
-                  <TextInput
+                  <CompteTextInput
+                    isRTL={isRTL}
+                    forcedLtr
                     value={form.massarCode}
                     onChangeText={(v) => setForm((s) => ({ ...s, massarCode: v }))}
                     placeholder={t('accountMassarCode')}
                     placeholderTextColor={homeShell.cardMuted}
                     autoCapitalize="none"
                     autoCorrect={false}
-                    textAlign={isRTL ? 'right' : 'left'}
-                    style={[styles.input, isRTL && styles.inputRtl]}
                   />
                 </Field>
               ) : null}
@@ -1047,25 +1045,23 @@ export default function CompteTabScreen() {
 
               {showDiplomeEnCours ? (
                 <Field label={t('setupDiplomeEnCours')} rtl={isRTL}>
-                  <TextInput
+                  <CompteTextInput
+                    isRTL={isRTL}
                     value={form.diplomeEnCours}
                     onChangeText={(v) => setForm((s) => ({ ...s, diplomeEnCours: v }))}
                     placeholder="Ex: Licence, Master..."
                     placeholderTextColor={homeShell.cardMuted}
-                    textAlign={isRTL ? 'right' : 'left'}
-                    style={[styles.input, isRTL && styles.inputRtl]}
                   />
                 </Field>
               ) : null}
 
               <Field label={t('setupEtablissement')} rtl={isRTL}>
-                <TextInput
+                <CompteTextInput
+                  isRTL={isRTL}
                   value={form.nomEtablissement}
                   onChangeText={(v) => setForm((s) => ({ ...s, nomEtablissement: v }))}
                   placeholder={t('setupEtablissement')}
                   placeholderTextColor={homeShell.cardMuted}
-                  textAlign={isRTL ? 'right' : 'left'}
-                  style={[styles.input, isRTL && styles.inputRtl]}
                 />
               </Field>
 
@@ -1095,59 +1091,55 @@ export default function CompteTabScreen() {
               />
 
               <Field label={t('setupGuardianLastName')} rtl={isRTL}>
-                <TextInput
+                <CompteTextInput
+                  isRTL={isRTL}
                   value={form.nomTuteur}
                   onChangeText={(v) => setForm((s) => ({ ...s, nomTuteur: v }))}
                   placeholder={t('setupGuardianLastName')}
                   placeholderTextColor={homeShell.cardMuted}
-                  textAlign={isRTL ? 'right' : 'left'}
-                  style={[styles.input, isRTL && styles.inputRtl]}
                 />
               </Field>
 
               <Field label={t('setupGuardianFirstName')} rtl={isRTL}>
-                <TextInput
+                <CompteTextInput
+                  isRTL={isRTL}
                   value={form.prenomTuteur}
                   onChangeText={(v) => setForm((s) => ({ ...s, prenomTuteur: v }))}
                   placeholder={t('setupGuardianFirstName')}
                   placeholderTextColor={homeShell.cardMuted}
-                  textAlign={isRTL ? 'right' : 'left'}
-                  style={[styles.input, isRTL && styles.inputRtl]}
                 />
               </Field>
 
               <Field label={t('setupGuardianPhone')} rtl={isRTL}>
-                <TextInput
+                <CompteTextInput
+                  isRTL={isRTL}
+                  forcedLtr
                   value={form.telTuteur}
                   onChangeText={(v) => setForm((s) => ({ ...s, telTuteur: v }))}
                   placeholder={t('setupGuardianPhone')}
                   keyboardType="phone-pad"
                   placeholderTextColor={homeShell.cardMuted}
-                  textAlign="left"
-                  style={[styles.input, styles.inputForcedLtr]}
                 />
               </Field>
 
               <Field label={t('setupGuardianJob')} rtl={isRTL}>
-                <TextInput
+                <CompteTextInput
+                  isRTL={isRTL}
                   value={form.professionTuteur}
                   onChangeText={(v) => setForm((s) => ({ ...s, professionTuteur: v }))}
                   placeholder={t('setupGuardianJob')}
                   placeholderTextColor={homeShell.cardMuted}
-                  textAlign={isRTL ? 'right' : 'left'}
-                  style={[styles.input, isRTL && styles.inputRtl]}
                 />
               </Field>
 
               <Field label={t('setupGuardianAddress')} rtl={isRTL}>
-                <TextInput
+                <CompteTextInput
+                  isRTL={isRTL}
                   value={form.adresseTuteur}
                   onChangeText={(v) => setForm((s) => ({ ...s, adresseTuteur: v }))}
                   placeholder={t('setupGuardianAddress')}
                   placeholderTextColor={homeShell.cardMuted}
-                  textAlign={isRTL ? 'right' : 'left'}
                   multiline
-                  style={[styles.input, isRTL && styles.inputRtl]}
                 />
               </Field>
             </View>
@@ -1545,6 +1537,30 @@ function OrderRow({
 
 // ─── Field ──────────────────────────────────────────────────────────────────
 
+type CompteTextInputProps = ComponentProps<typeof TextInput> & {
+  isRTL: boolean;
+  forcedLtr?: boolean;
+};
+
+function CompteTextInput({ isRTL, forcedLtr, style, multiline, ...rest }: CompteTextInputProps) {
+  const baseStyle = StyleSheet.flatten([styles.input, multiline && styles.inputMultiline, style]) as TextStyle;
+  return (
+    <TextInput
+      {...rest}
+      multiline={multiline}
+      textAlign={forcedLtr ? 'left' : isRTL ? 'right' : 'left'}
+      textAlignVertical={multiline ? 'top' : 'center'}
+      style={[
+        styles.input,
+        multiline && styles.inputMultiline,
+        forcedLtr ? styles.inputForcedLtr : null,
+        isRTL && !forcedLtr ? rtlTextInputStyle(baseStyle) : null,
+        style,
+      ]}
+    />
+  );
+}
+
 function Field({
   label,
   hint,
@@ -1567,7 +1583,7 @@ function Field({
           {required ? <Text style={styles.fieldRequiredMark}> *</Text> : null}
         </Text>
       </View>
-      <View style={[styles.inputShell, rtl && styles.inputShellRtl]}>{children}</View>
+      <View style={styles.inputShell}>{children}</View>
       {hint ? (
         <View style={styles.fieldLabelRow}>
           <Text
@@ -1963,24 +1979,26 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     minHeight: 48,
   },
-  inputShellRtl: {
-    flexDirection: 'row-reverse',
-  },
   input: {
     flex: 1,
     minWidth: 0,
-    paddingVertical: Platform.OS === 'ios' ? 12 : 10,
+    alignSelf: 'stretch',
     color: homeShell.cardText,
     fontSize: fontSize.md,
     fontWeight: '600',
-  },
-  inputRtl: {
-    textAlign: 'right',
-    writingDirection: 'rtl',
+    ...Platform.select({
+      ios: { paddingVertical: 12 },
+      android: { paddingVertical: 0 },
+    }),
   },
   inputForcedLtr: {
     textAlign: 'left',
     writingDirection: 'ltr',
+  },
+  inputMultiline: {
+    minHeight: 88,
+    paddingTop: Platform.OS === 'ios' ? 12 : 8,
+    textAlignVertical: 'top',
   },
   cityPickerBtn: {
     flexDirection: 'row',

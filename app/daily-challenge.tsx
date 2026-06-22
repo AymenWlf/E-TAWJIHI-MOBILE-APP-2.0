@@ -8,7 +8,6 @@ import {
   Easing,
   Image,
   Modal,
-  PanResponder,
   Platform,
   Pressable,
   ScrollView,
@@ -22,6 +21,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TawjihPlusUpgradeCta } from '@/components/inscriptions/TawjihPlusPaywall';
 import { DailyChallengeHubLoadingSkeleton } from '@/components/daily-challenge/DailyChallengeHubLoadingSkeleton';
+import { ZipSnakeGrid } from '@/components/daily-challenge/ZipSnakeGrid';
 import { LoadingCardStack } from '@/components/ui/CardLoadingSkeleton';
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
@@ -52,11 +52,11 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
 /** Largeur disponible pour la grille SNAKE (marges scroll + carte quiz à padding horizontal réduit). */
 function zipQuizGridInnerWidth(screenWidth: number): number {
-  return screenWidth - spacing.lg * 2 - spacing.sm * 2;
+  return screenWidth - spacing.lg * 2 - spacing.xs;
 }
 
 /** Plafond taille case (px) — au-delà, limité par la largeur / hauteur utiles. */
-const ZIP_GRID_MAX_CELL = 92;
+const ZIP_GRID_MAX_CELL = 112;
 
 function maxScoreForGame(g: DailyChallengeGameEntry): number {
   if (g.type === 'zip' && g.zip) {
@@ -282,52 +282,6 @@ function shuffleZipItems<T>(arr: readonly T[]): T[] {
   return a;
 }
 
-/** Couleur du serpent SNAKE (corps + tête). */
-const ZIP_SNAKE_BODY = '#1d4ed8';
-const ZIP_SNAKE_HEAD = '#2563eb';
-const ZIP_SNAKE_ERR = 'rgba(220, 38, 38, 0.9)';
-
-type ZipSnakeSegment = {
-  key: string;
-  left: number;
-  top: number;
-  width: number;
-  height: number;
-  angleDeg: number;
-};
-
-function buildZipSnakeSegments(order: readonly number[], cols: number, cellSize: number): ZipSnakeSegment[] {
-  const th = Math.max(5, Math.round(cellSize * 0.14));
-  const out: ZipSnakeSegment[] = [];
-  for (let i = 0; i < order.length - 1; i++) {
-    const a = order[i]!;
-    const b = order[i + 1]!;
-    const ra = Math.floor(a / cols);
-    const ca = a % cols;
-    const rb = Math.floor(b / cols);
-    const cb = b % cols;
-    const cxA = ca * cellSize + cellSize / 2;
-    const cyA = ra * cellSize + cellSize / 2;
-    const cxB = cb * cellSize + cellSize / 2;
-    const cyB = rb * cellSize + cellSize / 2;
-    const dx = cxB - cxA;
-    const dy = cyB - cyA;
-    const len = Math.sqrt(dx * dx + dy * dy) || 1;
-    const midX = (cxA + cxB) / 2;
-    const midY = (cyA + cyB) / 2;
-    const angleDeg = (Math.atan2(dy, dx) * 180) / Math.PI;
-    out.push({
-      key: `zip-snake-${i}-${a}-${b}`,
-      left: midX - len / 2,
-      top: midY - th / 2,
-      width: len,
-      height: th,
-      angleDeg,
-    });
-  }
-  return out;
-}
-
 type Step = 'load' | 'hub' | 'quiz' | 'result';
 
 type LeaderboardVm = {
@@ -400,7 +354,6 @@ export default function DailyChallengeScreen() {
   const zipHelpNextAllowedAtRef = useRef(0);
   const zipHintClearTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [shuffledZipItems, setShuffledZipItems] = useState<Array<{ id: number; text: string }>>([]);
-  const lastDragZipCell = useRef<number | null>(null);
   const zipAutoSubmittedRef = useRef(false);
   const finishQuizRef = useRef<(finalAnswers: number[]) => Promise<void>>(async () => {});
   const [zipTick, setZipTick] = useState(0);
@@ -411,8 +364,6 @@ export default function DailyChallengeScreen() {
   const isScreenFocusedRef = useRef(true);
   const stepRef = useRef(step);
   const activeGameRef = useRef(activeGame);
-  const zipSnakePulse = useRef(new Animated.Value(1)).current;
-  const zipSnakeHeadScale = useRef(new Animated.Value(1)).current;
   const iceUsedNoticeShownForDateRef = useRef<string>('');
 
   const games = useMemo(() => (today?.games?.length ? today.games : []), [today?.games]);
@@ -504,55 +455,6 @@ export default function DailyChallengeScreen() {
     const id = setInterval(() => setZipTick((x) => x + 1), 1000);
     return () => clearInterval(id);
   }, [step, activeGame?.type]);
-
-  useEffect(() => {
-    const inZipQuiz = step === 'quiz' && activeGame?.type === 'zip';
-    if (!inZipQuiz) {
-      zipSnakePulse.stopAnimation();
-      zipSnakeHeadScale.stopAnimation();
-      zipSnakePulse.setValue(1);
-      zipSnakeHeadScale.setValue(1);
-      return;
-    }
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(zipSnakePulse, {
-          toValue: 0.76,
-          duration: 680,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-        Animated.timing(zipSnakePulse, {
-          toValue: 1,
-          duration: 680,
-          easing: Easing.inOut(Easing.quad),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    const head = Animated.loop(
-      Animated.sequence([
-        Animated.timing(zipSnakeHeadScale, {
-          toValue: 1.14,
-          duration: 550,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-        Animated.timing(zipSnakeHeadScale, {
-          toValue: 1,
-          duration: 550,
-          easing: Easing.inOut(Easing.sin),
-          useNativeDriver: true,
-        }),
-      ]),
-    );
-    pulse.start();
-    head.start();
-    return () => {
-      pulse.stop();
-      head.stop();
-    };
-  }, [step, activeGame?.type, zipSnakePulse, zipSnakeHeadScale]);
 
   const primaryLeaderboardGameId = games.find((g) => g.type === 'zip')?.id ?? games[0]?.id ?? 0;
 
@@ -991,59 +893,21 @@ export default function DailyChallengeScreen() {
     const rows = zip.rows;
     const cols = zip.cols;
     const innerW = zipQuizGridInnerWidth(width);
-    const cellW = Math.max(16, Math.floor(innerW / cols) - 2);
+    const cellW = Math.max(20, Math.floor(innerW / cols));
     const topBarH = headerPadTop + 40 + spacing.sm;
     /** Espace hors grille : paddings écran + carte + barre d’outils + consigne + pied + marge. */
     const zipQuizChrome =
-      spacing.lg * 5 +
-      spacing.md * 4 +
-      120 +
-      56 +
-      72 +
-      48;
+      spacing.lg * 4 +
+      spacing.md * 3 +
+      96 +
+      44 +
+      52 +
+      36;
     const availForGrid = height - topBarH - zipQuizChrome - insets.bottom;
-    const maxByHeight = rows > 0 ? Math.max(16, Math.floor(availForGrid / rows) - 2) : ZIP_GRID_MAX_CELL;
+    const maxByHeight = rows > 0 ? Math.max(20, Math.floor(availForGrid / rows)) : ZIP_GRID_MAX_CELL;
     const cellSize = Math.min(ZIP_GRID_MAX_CELL, cellW, maxByHeight);
     return { zip, rows, cols, cellSize };
   }, [step, activeGame, width, height, headerPadTop, insets.bottom]);
-
-  const zipGridPanResponder = useMemo(() => {
-    if (!zipGridLayout || !zipSnakeStarted) return null;
-    const { rows, cols, cellSize } = zipGridLayout;
-    const pick = (lx: number, ly: number): number | null => {
-      const col = Math.floor(lx / cellSize);
-      const row = Math.floor(ly / cellSize);
-      if (row < 0 || col < 0 || row >= rows || col >= cols) return null;
-      return row * cols + col;
-    };
-    return PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onStartShouldSetPanResponderCapture: () => false,
-      onMoveShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponderCapture: () => false,
-      onPanResponderGrant: (e) => {
-        lastDragZipCell.current = null;
-        const idx = pick(e.nativeEvent.locationX, e.nativeEvent.locationY);
-        if (idx != null) {
-          lastDragZipCell.current = idx;
-          applyZipGridCellTap(idx);
-        }
-      },
-      onPanResponderMove: (e) => {
-        const idx = pick(e.nativeEvent.locationX, e.nativeEvent.locationY);
-        if (idx != null && idx !== lastDragZipCell.current) {
-          lastDragZipCell.current = idx;
-          applyZipGridCellDrag(idx);
-        }
-      },
-      onPanResponderRelease: () => {
-        lastDragZipCell.current = null;
-      },
-      onPanResponderTerminate: () => {
-        lastDragZipCell.current = null;
-      },
-    });
-  }, [zipGridLayout, zipSnakeStarted, applyZipGridCellTap, applyZipGridCellDrag]);
 
   const onTapZipItem = (id: number) => {
     if (!activeGame?.zip || isZipGridV2(activeGame.zip)) return;
@@ -1679,140 +1543,45 @@ export default function DailyChallengeScreen() {
                   const rows = zip.rows;
                   const cols = zip.cols;
                   const n = rows * cols;
-                  const wh = zip.wallsHorizontal ?? [];
-                  const wv = zip.wallsVertical ?? [];
-                  const pathPos = new Map<number, number>();
-                  zipOrder.forEach((idx, step) => pathPos.set(idx, step + 1));
                   const zipPathError = zipGridV2PrefixIssue != null && zipOrder.length > 0;
                   const cellSize =
                     zipGridLayout?.cellSize ??
                     Math.min(
                       ZIP_GRID_MAX_CELL,
-                      Math.max(16, Math.floor(zipQuizGridInnerWidth(width) / cols) - 2),
+                      Math.max(20, Math.floor(zipQuizGridInnerWidth(width) / cols)),
                     );
-                  const snakeSegs = buildZipSnakeSegments(zipOrder, cols, cellSize);
-                  const snakeColor = zipPathError ? ZIP_SNAKE_ERR : ZIP_SNAKE_BODY;
-                  const lastIdx = zipOrder.length > 0 ? zipOrder[zipOrder.length - 1]! : null;
-                  const lastRow = lastIdx != null ? Math.floor(lastIdx / cols) : 0;
-                  const lastCol = lastIdx != null ? lastIdx % cols : 0;
-                  const headSz = Math.max(11, Math.round(cellSize * 0.28));
-                  const headLeft = lastIdx != null ? lastCol * cellSize + cellSize / 2 - headSz / 2 : 0;
-                  const headTop = lastIdx != null ? lastRow * cellSize + cellSize / 2 - headSz / 2 : 0;
                   return (
                     <View style={step === 'quiz' ? styles.zipQuizColumn : undefined}>
                       <View style={step === 'quiz' ? styles.zipQuizFlexMiddle : undefined}>
                       <ZipObjectivePrompt text={zipPrompt(zip)} isRTL={isRTL} />
-                      <View
-                        style={[
-                          styles.zipGridFrame,
-                          { width: cols * cellSize, height: rows * cellSize },
-                          zipPathError && styles.zipGridFrameErr,
-                        ]}
-                        {...(zipGridPanResponder?.panHandlers ?? {})}
-                      >
-                        <View style={styles.zipSnakeUnderlay} pointerEvents="none">
-                          <Animated.View style={[styles.zipSnakePulseWrap, { opacity: zipSnakePulse }]}>
-                            {snakeSegs.map((s) => (
-                              <View
-                                key={s.key}
-                                style={[
-                                  styles.zipSnakeSegment,
-                                  {
-                                    left: s.left,
-                                    top: s.top,
-                                    width: s.width,
-                                    height: s.height,
-                                    borderRadius: s.height / 2,
-                                    backgroundColor: snakeColor,
-                                    transform: [{ rotate: `${s.angleDeg}deg` }],
-                                  },
-                                ]}
-                              />
-                            ))}
-                          </Animated.View>
-                        </View>
-                        <View style={styles.zipGridCellsLayer}>
-                        {Array.from({ length: rows }, (_, r) => (
-                          <View key={`zip-row-${r}`} style={styles.zipGridRow} pointerEvents="none">
-                            {Array.from({ length: cols }, (_, c) => {
-                              const idx = r * cols + c;
-                              const v = zip.cells![idx] ?? 0;
-                              const wallR = c < cols - 1 && (wv[r * (cols - 1) + c] ?? 0) === 1;
-                              const wallB = r < rows - 1 && (wh[r * cols + c] ?? 0) === 1;
-                              const onP = pathPos.has(idx);
-                              const stepLabel = pathPos.get(idx);
-                              return (
-                                <View
-                                  key={`zip-cell-${idx}`}
-                                  style={[
-                                    styles.zipGridCell,
-                                    { width: cellSize, height: cellSize },
-                                    onP && (zipPathError ? styles.zipGridCellPathErr : styles.zipGridCellPath),
-                                    zipHintHighlightIdx === idx && styles.zipGridCellHint,
-                                    wallR && styles.zipGridWallR,
-                                    wallB && styles.zipGridWallB,
-                                  ]}
-                                >
-                                  {v > 0 ? (
-                                    <Text style={[styles.zipGridNum, onP && styles.zipGridGlyphOnSnake]}>{v}</Text>
-                                  ) : (
-                                    <Text style={[styles.zipGridDot, onP && styles.zipGridGlyphOnSnake]}>·</Text>
-                                  )}
-                                  {stepLabel != null ? (
-                                    <Text
-                                      style={[
-                                        styles.zipGridStep,
-                                        zipPathError && styles.zipGridStepErr,
-                                        onP && styles.zipGridGlyphOnSnake,
-                                      ]}
-                                    >
-                                      {stepLabel}
-                                    </Text>
-                                  ) : null}
-                                </View>
-                              );
-                            })}
-                          </View>
-                        ))}
-                        </View>
-                        {lastIdx != null ? (
-                          <View style={styles.zipSnakeHeadLayer} pointerEvents="none">
-                            <Animated.View
-                              style={[
-                                styles.zipSnakeHead,
-                                {
-                                  left: headLeft,
-                                  top: headTop,
-                                  width: headSz,
-                                  height: headSz,
-                                  borderRadius: headSz / 2,
-                                  backgroundColor: zipPathError ? '#fecaca' : ZIP_SNAKE_HEAD,
-                                  borderWidth: 2,
-                                  borderColor: zipPathError ? ZIP_SNAKE_ERR : '#eff6ff',
-                                  transform: [{ scale: zipSnakeHeadScale }],
-                                },
-                              ]}
-                            />
-                          </View>
-                        ) : null}
-                        {!zipSnakeStarted ? (
-                          <View style={styles.zipStartOverlay}>
-                            <AnimatedPlayButton
-                              label={t('dailyChallengePlayThis')}
-                              onPress={beginZipSnakeSession}
-                              isRTL={isRTL}
-                              size="lg"
-                            />
-                          </View>
-                        ) : null}
-                      </View>
-                      {zipPathError ? (
-                        <Text style={[styles.zipGridErrorBanner, isRTL && styles.rtl]}>
-                          {zipGridV2PrefixIssue === 'order'
-                            ? t('dailyChallengeZipOrderError')
-                            : t('dailyChallengeZipPathError')}
-                        </Text>
-                      ) : null}
+                      <ZipSnakeGrid
+                        zip={{
+                          rows,
+                          cols,
+                          cells: zip.cells,
+                          wallsHorizontal: zip.wallsHorizontal ?? [],
+                          wallsVertical: zip.wallsVertical ?? [],
+                        }}
+                        zipOrder={zipOrder}
+                        cellSize={cellSize}
+                        zipPathError={zipPathError}
+                        zipGridV2PrefixIssue={zipGridV2PrefixIssue}
+                        zipHintHighlightIdx={zipHintHighlightIdx}
+                        zipSnakeStarted={zipSnakeStarted}
+                        isRTL={isRTL}
+                        orderErrorLabel={t('dailyChallengeZipOrderError')}
+                        pathErrorLabel={t('dailyChallengeZipPathError')}
+                        onCellTap={applyZipGridCellTap}
+                        onCellDrag={applyZipGridCellDrag}
+                        startOverlay={
+                          <AnimatedPlayButton
+                            label={t('dailyChallengePlayThis')}
+                            onPress={beginZipSnakeSession}
+                            isRTL={isRTL}
+                            size="lg"
+                          />
+                        }
+                      />
                       {submitting && zipOrder.length === n ? (
                         <LoadingCardStack count={2} isRTL={isRTL} style={{ marginTop: spacing.md }} />
                       ) : null}
@@ -3041,9 +2810,17 @@ const styles = StyleSheet.create({
     position: 'absolute',
     shadowColor: '#1e3a8a',
     shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.35,
+    shadowOpacity: 0.42,
+    shadowRadius: 3,
+    elevation: 3,
+  },
+  zipSnakeJoint: {
+    position: 'absolute',
+    shadowColor: '#1e3a8a',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.38,
     shadowRadius: 2,
-    elevation: 2,
+    elevation: 3,
   },
   zipSnakeHeadLayer: {
     ...StyleSheet.absoluteFillObject,
@@ -3058,7 +2835,7 @@ const styles = StyleSheet.create({
     elevation: 4,
   },
   zipGridCellPath: {
-    backgroundColor: Platform.OS === 'android' ? '#f8fafc' : 'rgba(248, 250, 252, 0.42)',
+    backgroundColor: 'rgba(248, 250, 252, 0.38)',
     borderColor: brand.primary,
     borderWidth: StyleSheet.hairlineWidth,
   },

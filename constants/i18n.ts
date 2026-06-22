@@ -226,6 +226,26 @@ export type HomeCopyKey =
   | 'estCardQnaOpenA11y'
   | 'estCardBtnComment'
   | 'estCardBadgeSponsored'
+  | 'estCardBtnContact'
+  | 'estCardBtnVisitSite'
+  | 'estLeadgenTitle'
+  | 'estLeadgenRole'
+  | 'estLeadgenRoleStudent'
+  | 'estLeadgenRoleTutor'
+  | 'estLeadgenName'
+  | 'estLeadgenEmail'
+  | 'estLeadgenPhone'
+  | 'estLeadgenMessage'
+  | 'estLeadgenSubmit'
+  | 'estLeadgenSuccessTitle'
+  | 'estLeadgenSuccessEyebrow'
+  | 'estLeadgenSuccessBody'
+  | 'estLeadgenNewRequest'
+  | 'estLeadgenErrName'
+  | 'estLeadgenErrSubmit'
+  | 'estLeadgenPartnerSponsored'
+  | 'estLeadgenPartnerReferenced'
+  | 'estLeadgenVisitSite'
   | 'estCardStatsClusterA11y'
   | 'estCardStatsLoadingA11y'
   | 'schoolsClearFilter'
@@ -1974,6 +1994,27 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estCardQnaOpenA11y: 'Ouvrir les questions et réponses',
     estCardBtnComment: 'Commentaire',
     estCardBadgeSponsored: 'Sponsorisé',
+    estCardBtnContact: 'Nous contacter',
+    estCardBtnVisitSite: 'Site officiel',
+    estLeadgenTitle: 'Nous contacter',
+    estLeadgenRole: 'Vous êtes',
+    estLeadgenRoleStudent: 'Élève',
+    estLeadgenRoleTutor: 'Tuteur',
+    estLeadgenName: 'Nom complet',
+    estLeadgenEmail: 'Email',
+    estLeadgenPhone: 'Téléphone',
+    estLeadgenMessage: 'Question ou demande d\'information (optionnel)',
+    estLeadgenSubmit: 'Envoyer ma demande',
+    estLeadgenSuccessTitle: 'Demande envoyée',
+    estLeadgenSuccessEyebrow: 'Confirmation',
+    estLeadgenSuccessBody:
+      'Votre formulaire a bien été transmis à l’établissement. Vous serez recontacté rapidement.',
+    estLeadgenNewRequest: 'Nouvelle demande',
+    estLeadgenErrName: 'Le nom est obligatoire.',
+    estLeadgenErrSubmit: 'Erreur lors de l’envoi.',
+    estLeadgenPartnerSponsored: 'Partenaire sponsorisé',
+    estLeadgenPartnerReferenced: 'Établissement référencé',
+    estLeadgenVisitSite: 'Visiter le site officiel',
     estCardStatsClusterA11y: '{{followers}} personnes suivent cette école, {{comments}} messages dans la communauté',
     estCardStatsLoadingA11y: 'Chargement des statistiques de la communauté',
     schoolsClearFilter: 'Effacer la sélection',
@@ -3509,7 +3550,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscDetailFilieresBacMission: 'Filières (Bac Mission)',
     inscDetailAnneesBac: 'Années du Bac acceptées',
     inscDetailNoEligibilityCriteria: 'Annonce ouverte à tous (aucun critère restrictif).',
-    eligibilityYouEligible: 'Vous êtes éligible',
+    eligibilityYouEligible: 'Filière acceptée',
     eligibilityYouNotEligible: 'Vous n’êtes pas éligible',
     eligibilityProfileIncomplete:
       'Complétez votre profil (filière, année du bac…) pour vérifier votre éligibilité.',
@@ -3525,7 +3566,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     eligibilityYearAccepted: 'Année acceptée',
     eligibilityYearNotAccepted: 'Année non acceptée',
     eligibilityNotProvided: 'Non renseigné',
-    eligibilityBadgeEligible: 'Éligible',
+    eligibilityBadgeEligible: 'Filière acceptée',
     eligibilityBadgeNotEligible: 'Non éligible',
     eligibilityBadgeIncomplete: 'Profil à compléter',
     eligibilityBacTypeMismatchLabel: 'Type de baccalauréat',
@@ -3853,6 +3894,26 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estCardQnaOpenA11y: 'فتح الأسئلة والأجوبة',
     estCardBtnComment: 'تعليقات',
     estCardBadgeSponsored: 'برعاية',
+    estCardBtnContact: 'اتصل بنا',
+    estCardBtnVisitSite: 'الموقع الرسمي',
+    estLeadgenTitle: 'اتصل بنا',
+    estLeadgenRole: 'أنت',
+    estLeadgenRoleStudent: 'تلميذ',
+    estLeadgenRoleTutor: 'ولي الأمر',
+    estLeadgenName: 'الاسم الكامل',
+    estLeadgenEmail: 'البريد الإلكتروني',
+    estLeadgenPhone: 'الهاتف',
+    estLeadgenMessage: 'سؤال أو طلب معلومات (اختياري)',
+    estLeadgenSubmit: 'إرسال طلبي',
+    estLeadgenSuccessTitle: 'تم إرسال الطلب',
+    estLeadgenSuccessEyebrow: 'تأكيد',
+    estLeadgenSuccessBody: 'تم إرسال النموذج إلى المؤسسة. سيتم التواصل معك قريبًا.',
+    estLeadgenNewRequest: 'طلب جديد',
+    estLeadgenErrName: 'الاسم مطلوب.',
+    estLeadgenErrSubmit: 'حدث خطأ أثناء الإرسال.',
+    estLeadgenPartnerSponsored: 'شريك برعاية',
+    estLeadgenPartnerReferenced: 'مؤسسة مرجعية',
+    estLeadgenVisitSite: 'زيارة الموقع الرسمي',
     estCardStatsClusterA11y: '{{followers}} يتابعون هذه المدرسة، {{comments}} رسالة في المجتمع',
     estCardStatsLoadingA11y: 'جارٍ تحميل إحصائيات المجتمع',
     schoolsClearFilter: 'إلغاء الاختيار',
@@ -5349,7 +5410,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscDetailFilieresBacMission: 'الشُّعب (الباكالوريا البعثة)',
     inscDetailAnneesBac: 'سنوات الباكالوريا المقبولة',
     inscDetailNoEligibilityCriteria: 'الإعلان مفتوح للجميع (لا توجد شروط مقيدة).',
-    eligibilityYouEligible: 'أنت مؤهَّل',
+    eligibilityYouEligible: 'الشعبة مقبولة',
     eligibilityYouNotEligible: 'أنت غير مؤهَّل',
     eligibilityProfileIncomplete:
       'أكمل ملفك الشخصي (الشعبة، سنة الباكالوريا…) للتحقق من أهليتك.',
@@ -5365,7 +5426,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     eligibilityYearAccepted: 'السنة مقبولة',
     eligibilityYearNotAccepted: 'السنة غير مقبولة',
     eligibilityNotProvided: 'غير محدد',
-    eligibilityBadgeEligible: 'مؤهَّل',
+    eligibilityBadgeEligible: 'الشعبة مقبولة',
     eligibilityBadgeNotEligible: 'غير مؤهَّل',
     eligibilityBadgeIncomplete: 'الملف غير مكتمل',
     eligibilityBacTypeMismatchLabel: 'نوع البكالوريا',

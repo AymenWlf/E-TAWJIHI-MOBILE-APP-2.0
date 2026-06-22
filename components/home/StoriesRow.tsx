@@ -1,6 +1,8 @@
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, StyleSheet, View } from 'react-native';
+import { ScrollView } from 'react-native-gesture-handler';
 
 import { Text } from '@/components/ui/Text';
+import { AppPressable } from '@/components/ui/AppPressable';
 
 import type { StoryChannel } from '@/data/mock/homeFeed';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -46,6 +48,7 @@ export function StoriesRow({
       <ScrollView
         horizontal
         nestedScrollEnabled
+        directionalLockEnabled
         showsHorizontalScrollIndicator={false}
         style={[styles.scrollTrack, isRTL && styles.scrollRtl]}
         contentContainerStyle={styles.scroll}
@@ -81,7 +84,7 @@ export function StoriesRow({
           const a11y =
             `${ch.label}${read ? t('storyRingSuffixRead') : t('storyRingSuffixUnread')}`;
           return (
-            <Pressable
+            <AppPressable
               key={ch.id}
               onPress={() => onOpenChannel(index)}
               style={({ pressed }) => [styles.item, pressed && { opacity: 0.88 }]}
@@ -119,7 +122,7 @@ export function StoriesRow({
                 numberOfLines={1}>
                 {ch.label}
               </Text>
-            </Pressable>
+            </AppPressable>
           );
         })
           : null}

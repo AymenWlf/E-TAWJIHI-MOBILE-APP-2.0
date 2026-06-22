@@ -64,7 +64,7 @@ export function EligibilityBadge({
   const small = size === 'xs';
   const label =
     result.verdict === 'eligible'
-      ? t('eligibilityBadgeEligible')
+      ? t('eligibilityFiliereAccepted')
       : result.verdict === 'not_eligible'
         ? t('eligibilityBadgeNotEligible')
         : t('eligibilityBadgeIncomplete');
@@ -162,7 +162,7 @@ export function EligibilitySummary({
   const palette = TONE_STYLES[tone];
   const verdictLabel =
     result.verdict === 'eligible'
-      ? t('eligibilityYouEligible')
+      ? t('eligibilityFiliereAccepted')
       : result.verdict === 'not_eligible'
         ? t('eligibilityYouNotEligible')
         : t('eligibilityProfileIncomplete');
