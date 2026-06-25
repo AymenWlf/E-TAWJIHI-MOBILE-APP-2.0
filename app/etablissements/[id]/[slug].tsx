@@ -1,7 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -86,7 +86,13 @@ import {
   labelEstablishmentBourseType,
   universityName,
 } from '@/utils/establishmentFormat';
+import {
+  formatProgrammeFeeLabel,
+  programmeDisplayName,
+  programmeSecteursLabel,
+} from '@/utils/establishmentProgrammes';
 import { pickBrochureFromDocuments } from '@/utils/establishmentBrochure';
+import { downloadDocument } from '@/utils/documents';
 import { sharePayloadEstablishmentDetail } from '@/utils/sharePagePayloads';
 import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
 import { isEstablishmentDetailAllowed } from '@/utils/establishmentLockDisplay';
@@ -175,6 +181,7 @@ export default function EstablishmentDetailScreen() {
   const [listingPlacement, setListingPlacement] = useState<ListingPlacementInfo | null>(null);
   const [listingPlacementResolved, setListingPlacementResolved] = useState(false);
   const [placementInfoLoading, setPlacementInfoLoading] = useState(false);
+  const [brochureDownloading, setBrochureDownloading] = useState(false);
 
   /* Annonces publiées de cet établissement (concours, résultats, bourses…). */
   const [announcements, setAnnouncements] = useState<ContestAnnouncementCard[]>([]);
@@ -470,7 +477,8 @@ export default function EstablishmentDetailScreen() {
       return {
         photoUris: [] as string[],
         videoRaw: null as string | null,
-        brochureUrl: null as string | null,
+        brochureRawUrl: null as string | null,
+        brochureTitle: null as string | null,
       };
     }
     const rawPhotos = data.media?.photos ?? [];
@@ -481,8 +489,9 @@ export default function EstablishmentDetailScreen() {
       String(data.media?.videoUrl ?? data.videoUrl ?? '')
         .trim() || null;
     const brochureDoc = pickBrochureFromDocuments(data.media?.documents);
-    const brochureUrl = brochureDoc?.url ? getEstablishmentFileUrl(brochureDoc.url) : null;
-    return { photoUris, videoRaw, brochureUrl };
+    const brochureRawUrl = brochureDoc?.url?.trim() || null;
+    const brochureTitle = brochureDoc?.titre?.trim() || null;
+    return { photoUris, videoRaw, brochureRawUrl, brochureTitle };
   }, [data]);
 
   const inscriptionFooterBarHeight = 80;
@@ -752,6 +761,88 @@ export default function EstablishmentDetailScreen() {
             </View>
           </Section>
 
+          {Array.isArray(data.filieres) && data.filieres.length > 0 ? (
+            <Section
+              title={`${t('estDetailProgrammes')} (${data.filieres.length})`}
+              rtl={isRTL}
+            >
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={[
+                  styles.programmeStrip,
+                  isRTL && styles.programmeStripRtl,
+                ]}
+              >
+                {data.filieres.map((programme) => {
+                  const notSpecified = t('estDetailProgrammeNotSpecified');
+                  return (
+                    <View key={programme.id} style={styles.programmeCard}>
+                      <View style={styles.programmeCardAccent} />
+                      <View style={styles.programmeCardBody}>
+                        {programme.diplome ? (
+                          <View style={styles.programmeDiplomePill}>
+                            <FontAwesome name="graduation-cap" size={11} color={homeShell.blue} />
+                            <Text style={styles.programmeDiplomeTxt} numberOfLines={1}>
+                              {programme.diplome}
+                            </Text>
+                          </View>
+                        ) : null}
+                        <Text style={[styles.programmeTitle, isRTL && styles.txtRtl]} numberOfLines={3}>
+                          {programmeDisplayName(programme, isRTL)}
+                        </Text>
+                        <View style={styles.programmeInfoList}>
+                          <ProgrammeInfoRow
+                            rtl={isRTL}
+                            icon="calendar"
+                            label={t('estDetailProgrammeDuration')}
+                            value={
+                              formatProgrammeDuration(programme.nombreAnnees, data, isRTL) ||
+                              notSpecified
+                            }
+                          />
+                          <ProgrammeInfoRow
+                            rtl={isRTL}
+                            icon="briefcase"
+                            label={t('estDetailProgrammeSector')}
+                            value={programmeSecteursLabel(programme.secteurs, isRTL, notSpecified)}
+                          />
+                          <ProgrammeInfoRow
+                            rtl={isRTL}
+                            icon="file-text-o"
+                            label={t('estDetailProgrammeEnrollmentFee')}
+                            value={formatProgrammeFeeLabel(
+                              programme.fraisInscription,
+                              notSpecified,
+                            )}
+                          />
+                          <ProgrammeInfoRow
+                            rtl={isRTL}
+                            icon="money"
+                            label={t('estDetailProgrammeTuitionFee')}
+                            value={formatProgrammeFeeLabel(programme.fraisScolarite, notSpecified)}
+                          />
+                          <ProgrammeInfoRow
+                            rtl={isRTL}
+                            icon="certificate"
+                            label={t('estDetailProgrammeDegree')}
+                            value={programme.diplome?.trim() || notSpecified}
+                          />
+                          <ProgrammeInfoRow
+                            rtl={isRTL}
+                            icon="shield"
+                            label={t('estDetailProgrammeAccreditation')}
+                            value={programme.reconnaissance?.trim() || notSpecified}
+                          />
+                        </View>
+                      </View>
+                    </View>
+                  );
+                })}
+              </ScrollView>
+            </Section>
+          ) : null}
+
           {schoolMedia.photoUris.length > 0 ? (
             <Section
               title={`${t('estDetailMediaPhotos')} (${schoolMedia.photoUris.length})`}
@@ -813,17 +904,50 @@ export default function EstablishmentDetailScreen() {
             )
           ) : null}
 
-          {schoolMedia.brochureUrl ? (
+          {schoolMedia.brochureRawUrl ? (
             <Section title={t('estDetailMediaBrochure')} rtl={isRTL}>
               <Pressable
-                onPress={() =>
-                  void Linking.openURL(schoolMedia.brochureUrl!).catch(() => undefined)
-                }
-                style={({ pressed }) => [styles.mediaOpenRow, isRTL && styles.mediaOpenRowRtl, pressed && { opacity: 0.88 }]}
+                disabled={brochureDownloading}
+                onPress={() => {
+                  if (brochureDownloading || !schoolMedia.brochureRawUrl) return;
+                  void (async () => {
+                    setBrochureDownloading(true);
+                    const result = await downloadDocument(
+                      schoolMedia.brochureRawUrl!,
+                      schoolMedia.brochureTitle ?? undefined,
+                    );
+                    setBrochureDownloading(false);
+                    if (!result.ok) {
+                      if (result.reason === 'sharing-unavailable') {
+                        Alert.alert(
+                          t('inscDetailDocumentDownloadErrorTitle'),
+                          t('inscDetailDocumentSharingUnavailableMsg'),
+                        );
+                      } else {
+                        Alert.alert(
+                          t('inscDetailDocumentDownloadErrorTitle'),
+                          t('inscDetailDocumentDownloadErrorMsg'),
+                        );
+                      }
+                    }
+                  })();
+                }}
+                style={({ pressed }) => [
+                  styles.mediaOpenRow,
+                  isRTL && styles.mediaOpenRowRtl,
+                  pressed && !brochureDownloading && { opacity: 0.88 },
+                  brochureDownloading && { opacity: 0.65 },
+                ]}
               >
-                <FontAwesome name="file-pdf-o" size={18} color={homeShell.blue} />
+                {brochureDownloading ? (
+                  <ActivityIndicator size="small" color={homeShell.blue} />
+                ) : (
+                  <FontAwesome name="file-pdf-o" size={18} color={homeShell.blue} />
+                )}
                 <Text style={[styles.mediaOpenTxt, isRTL && styles.txtRtl]}>
-                  {t('estDetailMediaBrochureOpen')}
+                  {brochureDownloading
+                    ? t('estDetailMediaBrochurePreparing')
+                    : t('estDetailMediaBrochureDownload')}
                 </Text>
               </Pressable>
             </Section>
@@ -1077,10 +1201,56 @@ export default function EstablishmentDetailScreen() {
 }
 
 function filieresLine(data: EstablishmentNormalized, rtl: boolean): string {
-  const n = data.academicInfo?.nbFilieres ?? data.nbFilieres;
+  const programmeCount = Array.isArray(data.filieres) ? data.filieres.length : 0;
+  const n =
+    programmeCount > 0
+      ? programmeCount
+      : data.academicInfo?.nbFilieres ?? data.nbFilieres;
   if (typeof n !== 'number' || !Number.isFinite(n)) return '—';
   if (rtl) return `${n} شعبة`;
   return `${n} filière${n > 1 ? 's' : ''}`;
+}
+
+function ProgrammeInfoRow({
+  icon,
+  label,
+  value,
+  rtl,
+}: {
+  icon: ComponentProps<typeof FontAwesome>['name'];
+  label: string;
+  value: string;
+  rtl: boolean;
+}) {
+  return (
+    <View style={[styles.programmeInfoRow, rtl && styles.programmeInfoRowRtl]}>
+      <View style={[styles.programmeInfoLabelWrap, rtl && styles.programmeInfoLabelWrapRtl]}>
+        <FontAwesome name={icon} size={12} color={brand.textMuted} />
+        <Text style={[styles.programmeInfoLabel, rtl && styles.txtRtl]}>{label}</Text>
+      </View>
+      <Text style={[styles.programmeInfoValue, rtl && styles.txtRtl]} numberOfLines={3}>
+        {value}
+      </Text>
+    </View>
+  );
+}
+
+function formatProgrammeDuration(
+  raw: string | null | undefined,
+  establishment: EstablishmentNormalized,
+  rtl: boolean,
+): string {
+  const lang = rtl ? 'ar' : 'fr';
+  const trimmed = String(raw ?? '').trim();
+  if (trimmed) {
+    if (trimmed.includes('ans') || trimmed.includes('سنة')) return trimmed;
+    const n = parseInt(trimmed, 10);
+    if (Number.isFinite(n)) {
+      return formatEstablishmentStudyDurationYears(n, lang);
+    }
+    return trimmed;
+  }
+  return formatEstablishmentStudyDuration(establishment, lang) || establishment.dureeLabel || '—';
 }
 
 function secteurLines(data: EstablishmentNormalized, rtl: boolean): string[] {
@@ -1672,6 +1842,117 @@ const styles = StyleSheet.create({
     height: 120,
     borderRadius: radius.lg,
     backgroundColor: '#E2E8F0',
+  },
+  programmeStrip: {
+    flexDirection: 'row',
+    gap: spacing.md,
+    paddingVertical: 2,
+  },
+  programmeStripRtl: {
+    flexDirection: 'row-reverse',
+  },
+  programmeCard: {
+    width: 300,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: 'rgba(15,23,42,0.1)',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden',
+    shadowColor: '#0F172A',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 8,
+    elevation: 2,
+  },
+  programmeCardAccent: {
+    height: 4,
+    backgroundColor: homeShell.blue,
+  },
+  programmeCardBody: {
+    padding: spacing.md,
+    gap: spacing.sm,
+  },
+  programmeDiplomePill: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(37,99,235,0.12)',
+    borderRadius: radius.full,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    maxWidth: '100%',
+  },
+  programmeDiplomeTxt: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: homeShell.blue,
+  },
+  programmeTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    color: homeShell.cardText,
+    lineHeight: 22,
+    marginBottom: 2,
+  },
+  programmeInfoList: {
+    marginTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: 'rgba(15,23,42,0.06)',
+    paddingTop: spacing.xs,
+    gap: 2,
+  },
+  programmeInfoRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderBottomColor: 'rgba(15,23,42,0.05)',
+  },
+  programmeInfoRowRtl: {
+    flexDirection: 'row-reverse',
+  },
+  programmeInfoLabelWrap: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flexShrink: 0,
+    maxWidth: '48%',
+  },
+  programmeInfoLabelWrapRtl: {
+    flexDirection: 'row-reverse',
+  },
+  programmeInfoLabel: {
+    fontSize: fontSize.sm,
+    color: brand.textMuted,
+    flexShrink: 1,
+  },
+  programmeInfoValue: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: homeShell.cardText,
+    flex: 1,
+    textAlign: 'right',
+    lineHeight: 18,
+  },
+  programmeMetaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+  },
+  programmeMetaLabel: {
+    fontSize: fontSize.sm,
+    color: brand.textMuted,
+  },
+  programmeMetaValue: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: homeShell.cardText,
+    flexShrink: 1,
+    textAlign: 'right',
   },
   mediaOpenRow: {
     flexDirection: 'row',

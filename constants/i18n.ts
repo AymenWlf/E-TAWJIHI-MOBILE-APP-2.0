@@ -748,11 +748,23 @@ export type HomeCopyKey =
   | 'estDetailSeuilsBacMission'
   | 'estDetailSeuilsMode'
   | 'estDetailPresentation'
+  | 'estDetailProgrammes'
+  | 'estDetailProgrammesEmpty'
+  | 'estDetailProgrammeDuration'
+  | 'estDetailProgrammeSector'
+  | 'estDetailProgrammeEnrollmentFee'
+  | 'estDetailProgrammeTuitionFee'
+  | 'estDetailProgrammeDegree'
+  | 'estDetailProgrammeAccreditation'
+  | 'estDetailProgrammeNotSpecified'
+  | 'estDetailProgrammeFees'
   | 'estDetailMediaPhotos'
   | 'estDetailMediaVideo'
   | 'estDetailMediaVideoOpen'
   | 'estDetailMediaBrochure'
   | 'estDetailMediaBrochureOpen'
+  | 'estDetailMediaBrochureDownload'
+  | 'estDetailMediaBrochurePreparing'
   | 'estDetailDegrees'
   | 'estDetailSectors'
   | 'estDetailScholarships'
@@ -2570,11 +2582,23 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailSeuilsBacMission: 'Bac mission',
     estDetailSeuilsMode: 'Mode',
     estDetailPresentation: 'Présentation',
+    estDetailProgrammes: 'Filières proposées',
+    estDetailProgrammesEmpty: 'Aucune filière disponible pour le moment.',
+    estDetailProgrammeDuration: "Durée d'études",
+    estDetailProgrammeSector: 'Secteur',
+    estDetailProgrammeEnrollmentFee: "Frais d'inscription",
+    estDetailProgrammeTuitionFee: 'Frais de scolarité',
+    estDetailProgrammeDegree: 'Diplôme délivré',
+    estDetailProgrammeAccreditation: 'Accréditation',
+    estDetailProgrammeNotSpecified: 'Non renseigné',
+    estDetailProgrammeFees: 'Frais/an',
     estDetailMediaPhotos: 'Photos',
     estDetailMediaVideo: 'Vidéo',
     estDetailMediaVideoOpen: 'Voir la vidéo',
     estDetailMediaBrochure: 'Brochure',
     estDetailMediaBrochureOpen: 'Ouvrir la brochure',
+    estDetailMediaBrochureDownload: 'Télécharger la brochure',
+    estDetailMediaBrochurePreparing: 'Préparation du document…',
     estDetailDegrees: 'Diplômes délivrés',
     estDetailSectors: 'Secteurs métiers',
     estDetailScholarships: 'Bourses',
@@ -4456,11 +4480,23 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailSeuilsBacMission: 'البكالوريا الدولية',
     estDetailSeuilsMode: 'النمط',
     estDetailPresentation: 'نبذة',
+    estDetailProgrammes: 'الشعب المقترحة',
+    estDetailProgrammesEmpty: 'لا توجد شعب متاحة حالياً.',
+    estDetailProgrammeDuration: 'مدة الدراسة',
+    estDetailProgrammeSector: 'القطاع',
+    estDetailProgrammeEnrollmentFee: 'رسوم التسجيل',
+    estDetailProgrammeTuitionFee: 'رسوم الدراسة',
+    estDetailProgrammeDegree: 'الشهادة الممنوحة',
+    estDetailProgrammeAccreditation: 'الاعتماد',
+    estDetailProgrammeNotSpecified: 'غير محدد',
+    estDetailProgrammeFees: 'الرسوم/سنة',
     estDetailMediaPhotos: 'صور',
     estDetailMediaVideo: 'فيديو',
     estDetailMediaVideoOpen: 'مشاهدة الفيديو',
     estDetailMediaBrochure: 'الكتيب',
     estDetailMediaBrochureOpen: 'فتح الكتيب',
+    estDetailMediaBrochureDownload: 'تحميل الكتيب',
+    estDetailMediaBrochurePreparing: 'جارٍ تجهيز المستند…',
     estDetailDegrees: 'الشهادات الممنوحة',
     estDetailSectors: 'قطاعات المهن',
     estDetailScholarships: 'المنح',

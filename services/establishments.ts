@@ -109,12 +109,34 @@ export type EstablishmentListItem = {
   followersCount?: number;
   /** Questions + réponses publiques non masquées (Q&R établissement). */
   communityQnaMessageCount?: number;
+  /** Programmes (filières) actifs rattachés à l’établissement — payload détail API. */
+  filieres?: EstablishmentProgramme[];
   /** Référencement / sponsorisation — enrichi côté app depuis `/api/referencing/listing-placements`. */
   referencingPlacementId?: number | null;
   referencingGoalType?: 'traffic' | 'leadgen';
   referencingDestinationUrl?: string | null;
   referencingIncludeLeadFormOnTraffic?: boolean;
   referencingCampaignId?: number | null;
+};
+
+export type EstablishmentProgrammeSecteur = {
+  id: number;
+  titre?: string | null;
+  titreAr?: string | null;
+};
+
+export type EstablishmentProgramme = {
+  id: number;
+  nom: string;
+  nomArabe?: string | null;
+  slug?: string | null;
+  diplome?: string | null;
+  nombreAnnees?: string | null;
+  fraisScolarite?: string | null;
+  fraisInscription?: string | null;
+  reconnaissance?: string | null;
+  secteurs?: EstablishmentProgrammeSecteur[] | null;
+  url?: string | null;
 };
 
 /** Valeurs pré-calculées pour l’UI (liste + détail). */
