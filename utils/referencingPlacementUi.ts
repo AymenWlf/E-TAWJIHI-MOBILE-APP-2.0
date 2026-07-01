@@ -8,6 +8,14 @@ export function placementShowsContactForm(
   return info.goalType === 'traffic' && Boolean(info.includeLeadFormOnTraffic);
 }
 
+/** Formulaire CRM sur la fiche détail établissement (hors bannières campagne). */
+export function placementShowsContactFormOnDetail(
+  info: Pick<ListingPlacementInfo, 'goalType' | 'includeLeadFormOnTraffic' | 'showLeadFormOnDetailPage'> | null | undefined,
+): boolean {
+  if (!info || !placementShowsContactForm(info)) return false;
+  return info.showLeadFormOnDetailPage !== false;
+}
+
 /** Badge / style sponsorisé : placement actif avec isSponsored (≠ simple référencement traffic). */
 export function placementIsActivelySponsored(
   info: Pick<ListingPlacementInfo, 'isSponsored'> | null | undefined,

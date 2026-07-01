@@ -227,6 +227,7 @@ export type HomeCopyKey =
   | 'estCardBtnComment'
   | 'estCardBadgeSponsored'
   | 'estCardBtnContact'
+  | 'estCardBtnEnroll'
   | 'estCardBtnVisitSite'
   | 'estLeadgenTitle'
   | 'estLeadgenRole'
@@ -749,6 +750,8 @@ export type HomeCopyKey =
   | 'estDetailSeuilsMode'
   | 'estDetailPresentation'
   | 'estDetailProgrammes'
+  | 'estDetailProgrammesPrev'
+  | 'estDetailProgrammesNext'
   | 'estDetailProgrammesEmpty'
   | 'estDetailProgrammeDuration'
   | 'estDetailProgrammeSector'
@@ -765,13 +768,19 @@ export type HomeCopyKey =
   | 'estDetailMediaBrochureOpen'
   | 'estDetailMediaBrochureDownload'
   | 'estDetailMediaBrochurePreparing'
+  | 'estDetailPhotoGalleryClose'
+  | 'estDetailPhotoGalleryPrev'
+  | 'estDetailPhotoGalleryNext'
   | 'estDetailDegrees'
   | 'estDetailSectors'
   | 'estDetailScholarships'
   | 'estDetailEngagements'
   | 'estDetailCampus'
+  | 'estDetailCampusPrev'
+  | 'estDetailCampusNext'
   | 'estDetailCampusNoMapsUrl'
   | 'estDetailContact'
+  | 'estDetailWebsiteLink'
   | 'estDetailAnnouncements'
   | 'estDetailAnnouncementsEmpty'
   | 'estDetailInscriptionCta'
@@ -785,11 +794,18 @@ export type HomeCopyKey =
   | 'estAdmissionDossier'
   | 'estLabelTracks'
   | 'estLabelStudents'
-  | 'estLabelYears'
+  | 'estLabelReconnaissance'
   | 'estBadgeStateRecognized'
   | 'estBadgeRecommended'
   | 'estBadgeSponsored'
   | 'estScholarshipsAvailable'
+  | 'estScholarshipsSubtitle'
+  | 'estScholarshipsValueLabel'
+  | 'estScholarshipsTypesLabel'
+  | 'estScholarshipsFromPct'
+  | 'estScholarshipsUpToPct'
+  | 'estScholarshipsPctSuffix'
+  | 'estScholarshipsRangeSep'
   | 'estBourseTypeFinanciere'
   | 'estBourseTypeLogement'
   | 'estBourseTypeReductionScolarite'
@@ -2007,6 +2023,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estCardBtnComment: 'Commentaire',
     estCardBadgeSponsored: 'Sponsorisé',
     estCardBtnContact: 'Nous contacter',
+    estCardBtnEnroll: "S'inscrire",
     estCardBtnVisitSite: 'Site officiel',
     estLeadgenTitle: 'Nous contacter',
     estLeadgenRole: 'Vous êtes',
@@ -2583,13 +2600,15 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailSeuilsMode: 'Mode',
     estDetailPresentation: 'Présentation',
     estDetailProgrammes: 'Filières proposées',
+    estDetailProgrammesPrev: 'Filières précédentes',
+    estDetailProgrammesNext: 'Filières suivantes',
     estDetailProgrammesEmpty: 'Aucune filière disponible pour le moment.',
     estDetailProgrammeDuration: "Durée d'études",
     estDetailProgrammeSector: 'Secteur',
     estDetailProgrammeEnrollmentFee: "Frais d'inscription",
     estDetailProgrammeTuitionFee: 'Frais de scolarité',
     estDetailProgrammeDegree: 'Diplôme délivré',
-    estDetailProgrammeAccreditation: 'Accréditation',
+    estDetailProgrammeAccreditation: 'Reconnaissance',
     estDetailProgrammeNotSpecified: 'Non renseigné',
     estDetailProgrammeFees: 'Frais/an',
     estDetailMediaPhotos: 'Photos',
@@ -2599,13 +2618,19 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailMediaBrochureOpen: 'Ouvrir la brochure',
     estDetailMediaBrochureDownload: 'Télécharger la brochure',
     estDetailMediaBrochurePreparing: 'Préparation du document…',
+    estDetailPhotoGalleryClose: 'Fermer la galerie',
+    estDetailPhotoGalleryPrev: 'Photo précédente',
+    estDetailPhotoGalleryNext: 'Photo suivante',
     estDetailDegrees: 'Diplômes délivrés',
     estDetailSectors: 'Secteurs métiers',
     estDetailScholarships: 'Bourses',
     estDetailEngagements: 'Engagements',
     estDetailCampus: 'Campus',
+    estDetailCampusPrev: 'Campus précédents',
+    estDetailCampusNext: 'Campus suivants',
     estDetailCampusNoMapsUrl: 'Aucun lien Google Maps pour ce campus.',
     estDetailContact: 'Contact',
+    estDetailWebsiteLink: 'Visiter le site web',
     estDetailAnnouncements: 'Annonces de l\'école',
     estDetailAnnouncementsEmpty: 'Aucune annonce publiée pour cette école pour le moment.',
     estDetailInscriptionCta: 'Inscription',
@@ -2619,11 +2644,19 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estAdmissionDossier: 'Étude de dossier',
     estLabelTracks: 'Filières',
     estLabelStudents: 'Étudiants',
-    estLabelYears: 'Années études',
-    estBadgeStateRecognized: 'Reconnu État',
+    estLabelReconnaissance: 'Reconnaissance',
+    estBadgeStateRecognized: 'Reconnu par l\'État',
     estBadgeRecommended: 'Recommandé',
     estBadgeSponsored: 'Sponsorisé',
     estScholarshipsAvailable: 'Bourses disponibles',
+    estScholarshipsSubtitle:
+      'Cet établissement propose des aides financières ou des réductions pour ses étudiants.',
+    estScholarshipsValueLabel: 'Valeur de la bourse',
+    estScholarshipsTypesLabel: 'Types de bourses proposées',
+    estScholarshipsFromPct: 'À partir de',
+    estScholarshipsUpToPct: "Jusqu'à",
+    estScholarshipsPctSuffix: '%',
+    estScholarshipsRangeSep: ' – ',
     estBourseTypeFinanciere: 'Bourse financière',
     estBourseTypeLogement: 'Bourse logement',
     estBourseTypeReductionScolarite: 'Réduction dans la scolarité',
@@ -3515,13 +3548,13 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscStatusUnavailable: 'Non disponible pour le moment',
     inscStatusSectionInProgress: 'En cours',
     inscStatusSectionFinalized: 'Résultat final',
-    inscOpenLinkBtn: 'Ouvrir le lien',
+    inscOpenLinkBtn: "S'inscrire",
     inscOpenLinkA11y: 'Ouvrir le lien d\'inscription officiel',
     inscOpenLinkBtnResult: 'Voir le résultat',
     inscOpenLinkBtnScholarship: 'Postuler à la bourse',
     inscOpenLinkBtnOffer: 'Profiter de l\'offre',
     inscOpenLinkBtnInfo: 'En savoir plus',
-    inscOpenLinkBtnRegister: 'Lien d\'inscription',
+    inscOpenLinkBtnRegister: "S'inscrire",
     inscAnnTypeOpening: 'Ouverture d\'inscription',
     inscAnnTypeImportant: 'Message important',
     inscAnnTypeOffer: 'Offre',
@@ -3905,7 +3938,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsMin: 'الحد الأدنى',
     schoolsMax: 'الحد الأقصى',
     schoolsToggleRecommended: 'الموصى بها فقط',
-    schoolsToggleSponsored: 'الممولة فقط',
+    schoolsToggleSponsored: 'إعلان فقط',
     schoolsToggleFeatured: 'مميزة',
     schoolsToggleAccreditationEtat: 'اعتراف الدولة',
     schoolsToggleExchangeInternational: 'تبادل دولي',
@@ -3917,8 +3950,9 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     schoolsRefreshing: 'جاري التحديث…',
     estCardQnaOpenA11y: 'فتح الأسئلة والأجوبة',
     estCardBtnComment: 'تعليقات',
-    estCardBadgeSponsored: 'برعاية',
+    estCardBadgeSponsored: 'إعلان',
     estCardBtnContact: 'اتصل بنا',
+    estCardBtnEnroll: 'التسجيل',
     estCardBtnVisitSite: 'الموقع الرسمي',
     estLeadgenTitle: 'اتصل بنا',
     estLeadgenRole: 'أنت',
@@ -3935,7 +3969,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estLeadgenNewRequest: 'طلب جديد',
     estLeadgenErrName: 'الاسم مطلوب.',
     estLeadgenErrSubmit: 'حدث خطأ أثناء الإرسال.',
-    estLeadgenPartnerSponsored: 'شريك برعاية',
+    estLeadgenPartnerSponsored: 'شريك إعلان',
     estLeadgenPartnerReferenced: 'مؤسسة مرجعية',
     estLeadgenVisitSite: 'زيارة الموقع الرسمي',
     estCardStatsClusterA11y: '{{followers}} يتابعون هذه المدرسة، {{comments}} رسالة في المجتمع',
@@ -4481,13 +4515,15 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailSeuilsMode: 'النمط',
     estDetailPresentation: 'نبذة',
     estDetailProgrammes: 'الشعب المقترحة',
+    estDetailProgrammesPrev: 'الشعب السابقة',
+    estDetailProgrammesNext: 'الشعب التالية',
     estDetailProgrammesEmpty: 'لا توجد شعب متاحة حالياً.',
     estDetailProgrammeDuration: 'مدة الدراسة',
     estDetailProgrammeSector: 'القطاع',
     estDetailProgrammeEnrollmentFee: 'رسوم التسجيل',
     estDetailProgrammeTuitionFee: 'رسوم الدراسة',
     estDetailProgrammeDegree: 'الشهادة الممنوحة',
-    estDetailProgrammeAccreditation: 'الاعتماد',
+    estDetailProgrammeAccreditation: 'الاعتراف',
     estDetailProgrammeNotSpecified: 'غير محدد',
     estDetailProgrammeFees: 'الرسوم/سنة',
     estDetailMediaPhotos: 'صور',
@@ -4497,13 +4533,19 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailMediaBrochureOpen: 'فتح الكتيب',
     estDetailMediaBrochureDownload: 'تحميل الكتيب',
     estDetailMediaBrochurePreparing: 'جارٍ تجهيز المستند…',
+    estDetailPhotoGalleryClose: 'إغلاق المعرض',
+    estDetailPhotoGalleryPrev: 'الصورة السابقة',
+    estDetailPhotoGalleryNext: 'الصورة التالية',
     estDetailDegrees: 'الشهادات الممنوحة',
     estDetailSectors: 'قطاعات المهن',
     estDetailScholarships: 'المنح',
     estDetailEngagements: 'الالتزامات',
     estDetailCampus: 'الحرم الجامعي',
+    estDetailCampusPrev: 'الحرم السابق',
+    estDetailCampusNext: 'الحرم التالي',
     estDetailCampusNoMapsUrl: 'لا يوجد رابط خرائط Google لهذا الحرم.',
     estDetailContact: 'التواصل',
+    estDetailWebsiteLink: 'زيارة الموقع الرسمي',
     estDetailAnnouncements: 'إعلانات المؤسسة',
     estDetailAnnouncementsEmpty: 'لا توجد إعلانات منشورة لهذه المؤسسة حاليًا.',
     estDetailInscriptionCta: 'التسجيل',
@@ -4517,11 +4559,18 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estAdmissionDossier: 'دراسة الملف',
     estLabelTracks: 'الشُّعب',
     estLabelStudents: 'الطلبة',
-    estLabelYears: 'سنوات الدراسة',
+    estLabelReconnaissance: 'الاعتراف',
     estBadgeStateRecognized: 'معترف بها من الدولة',
     estBadgeRecommended: 'موصى بها',
-    estBadgeSponsored: 'مموّلة',
+    estBadgeSponsored: 'إعلان',
     estScholarshipsAvailable: 'منح متاحة',
+    estScholarshipsSubtitle: 'يقدّم هذا المؤسسة منحًا أو تخفيضات لطلبته.',
+    estScholarshipsValueLabel: 'قيمة المنحة',
+    estScholarshipsTypesLabel: 'أنواع المنح المقترحة',
+    estScholarshipsFromPct: 'ابتداءً من',
+    estScholarshipsUpToPct: 'حتى',
+    estScholarshipsPctSuffix: '%',
+    estScholarshipsRangeSep: ' – ',
     estBourseTypeFinanciere: 'منحة مالية',
     estBourseTypeLogement: 'منحة سكن',
     estBourseTypeReductionScolarite: 'تخفيض في الرسوم الدراسية',
@@ -5388,13 +5437,13 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscStatusUnavailable: 'غير متاحة حاليًا',
     inscStatusSectionInProgress: 'قيد المتابعة',
     inscStatusSectionFinalized: 'النتيجة النهائية',
-    inscOpenLinkBtn: 'فتح الرابط',
+    inscOpenLinkBtn: 'سجّل الآن',
     inscOpenLinkA11y: 'فتح رابط التسجيل الرسمي',
     inscOpenLinkBtnResult: 'عرض النتيجة',
     inscOpenLinkBtnScholarship: 'التقديم للمنحة',
     inscOpenLinkBtnOffer: 'الاستفادة من العرض',
     inscOpenLinkBtnInfo: 'معرفة المزيد',
-    inscOpenLinkBtnRegister: 'رابط التسجيل',
+    inscOpenLinkBtnRegister: 'سجّل الآن',
     inscAnnTypeOpening: 'فتح التسجيل',
     inscAnnTypeImportant: 'رسالة مهمة',
     inscAnnTypeOffer: 'عرض',

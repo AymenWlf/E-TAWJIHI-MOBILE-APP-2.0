@@ -15,7 +15,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useEstablishmentLeadGenSheetOptional } from '@/contexts/EstablishmentLeadGenSheetContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import type { EstablishmentNormalized } from '@/services/establishments';
-import { recordReferencingClickNative, recordReferencingContactClickNative, recordReferencingImpressionNative } from '@/services/referencingAds';
+import { recordReferencingClickNative, recordReferencingContactClickNative, recordReferencingImpressionNative, recordExternalLinkClickNative } from '@/services/referencingAds';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { establishmentListingPlacement } from '@/utils/establishmentListingPlacement';
@@ -62,6 +62,15 @@ export function EstablishmentCard({
   const showSponsorActions = showLeadgenButton || showTrafficSiteButton;
   const cardSource = isActivelySponsored ? 'sponsorship' : 'referencing';
 
+  const showPrimaryCta = showTrafficSiteButton || showLeadgenButton;
+  const primaryCtaUsesTraffic = showTrafficSiteButton;
+  const primaryCtaLabel = isActivelySponsored
+    ? t('estCardBtnEnroll')
+    : primaryCtaUsesTraffic
+      ? t('estCardBtnVisitSite')
+      : t('estCardBtnContact');
+  const showSecondaryContact = showLeadgenButton && showTrafficSiteButton;
+
   const placementId = item.referencingPlacementId;
   useEffect(() => {
     if (!placementId || referencingImpSent.current) return;
@@ -91,9 +100,19 @@ export function EstablishmentCard({
   };
 
   const handleTrafficSitePress = () => {
-    recordPlacementClick();
+    if (placementId) {
+      fireAndForget(recordExternalLinkClickNative({ placementId }));
+    }
     if (trafficUrl) {
       void Linking.openURL(addUtmToUrl(trafficUrl)).catch(() => undefined);
+    }
+  };
+
+  const handlePrimaryCtaPress = () => {
+    if (primaryCtaUsesTraffic) {
+      handleTrafficSitePress();
+    } else {
+      handleLeadgenPress();
     }
   };
 
@@ -135,7 +154,6 @@ export function EstablishmentCard({
       onPress={handleCardPress}
       style={({ pressed }) => [
         styles.card,
-        isActivelySponsored && !contentLocked && styles.cardSponsored,
         contentLocked && styles.cardLocked,
         isRTL && styles.cardRtl,
         pressed && { opacity: 0.96 },
@@ -353,24 +371,86 @@ export function EstablishmentCard({
         </View>
       )}
 
-      {showSponsorActions ? (
-        <View style={[styles.sponsorActions, isRTL && styles.sponsorActionsRtl]}>
-          {showTrafficSiteButton ? (
-            <Pressable
-              onPress={(e) => {
-                e.stopPropagation?.();
-                handleTrafficSitePress();
-              }}
-              accessibilityRole="button"
-              accessibilityLabel={`${t('estCardBtnVisitSite')} — ${primaryName}`}
-              style={({ pressed }) => [styles.sponsorBtn, styles.sponsorBtnTraffic, pressed && { opacity: 0.88 }]}>
-              <FontAwesome name="external-link" size={12} color={brand.white} />
-              <Text style={[styles.sponsorBtnTxt, isRTL && styles.txtRtl]} numberOfLines={1}>
-                {t('estCardBtnVisitSite')}
-              </Text>
-            </Pressable>
-          ) : null}
-          {showLeadgenButton ? (
+      {(showSponsorActions || onToggleFollow) && !contentLocked ? (
+        <View style={[styles.cardActions, isRTL && styles.cardActionsRtl]}>
+          <View style={[styles.cardActionsRow, isRTL && styles.cardActionsRowRtl]}>
+            {showPrimaryCta ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  handlePrimaryCtaPress();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={`${primaryCtaLabel} — ${primaryName}`}
+                style={({ pressed }) => [
+                  styles.sponsorBtn,
+                  primaryCtaUsesTraffic ? styles.sponsorBtnTraffic : styles.sponsorBtnContact,
+                  pressed && { opacity: 0.88 },
+                ]}>
+                <FontAwesome
+                  name={isActivelySponsored ? 'pencil' : primaryCtaUsesTraffic ? 'external-link' : 'comment'}
+                  size={12}
+                  color={brand.white}
+                />
+                <Text style={[styles.sponsorBtnTxt, isRTL && styles.txtRtl]} numberOfLines={1}>
+                  {primaryCtaLabel}
+                </Text>
+              </Pressable>
+            ) : null}
+            {onToggleFollow ? (
+              <Pressable
+                onPress={(e) => {
+                  e.stopPropagation?.();
+                  onToggleFollow();
+                }}
+                disabled={followBusy || followStateLoading}
+                accessibilityRole="button"
+                accessibilityState={{
+                  selected: !!isFollowed,
+                  busy: !!followBusy || !!followStateLoading,
+                }}
+                accessibilityLabel={
+                  followStateLoading
+                    ? t('inscLoading')
+                    : isFollowed
+                      ? t('followSchoolUnfollowBtn')
+                      : t('followSchoolBtn')
+                }
+                hitSlop={8}
+                style={({ pressed }) => [
+                  styles.sponsorBtn,
+                  styles.followBtn,
+                  !followStateLoading && isFollowed && styles.followBtnActive,
+                  pressed && { opacity: 0.85 },
+                  (followBusy || followStateLoading) && { opacity: 0.6 },
+                ]}>
+                {followBusy || followStateLoading ? (
+                  <ActivityIndicator
+                    size="small"
+                    color={!followStateLoading && isFollowed ? brand.primary : brand.white}
+                  />
+                ) : (
+                  <>
+                    <FontAwesome
+                      name={isFollowed ? 'heart' : 'heart-o'}
+                      size={12}
+                      color={isFollowed ? brand.primary : brand.white}
+                    />
+                    <Text
+                      style={[
+                        styles.followBtnTxt,
+                        isFollowed && styles.followBtnTxtActive,
+                        isRTL && styles.txtRtl,
+                      ]}
+                      numberOfLines={1}>
+                      {isFollowed ? t('inscAnnouncementsFollowing') : t('inscAnnouncementsFollow')}
+                    </Text>
+                  </>
+                )}
+              </Pressable>
+            ) : null}
+          </View>
+          {showSecondaryContact ? (
             <Pressable
               onPress={(e) => {
                 e.stopPropagation?.();
@@ -378,7 +458,12 @@ export function EstablishmentCard({
               }}
               accessibilityRole="button"
               accessibilityLabel={`${t('estCardBtnContact')} — ${primaryName}`}
-              style={({ pressed }) => [styles.sponsorBtn, styles.sponsorBtnContact, pressed && { opacity: 0.88 }]}>
+              style={({ pressed }) => [
+                styles.sponsorBtn,
+                styles.sponsorBtnContact,
+                styles.sponsorBtnFull,
+                pressed && { opacity: 0.88 },
+              ]}>
               <FontAwesome name="comment" size={12} color={brand.white} />
               <Text style={[styles.sponsorBtnTxt, isRTL && styles.txtRtl]} numberOfLines={1}>
                 {t('estCardBtnContact')}
@@ -388,65 +473,21 @@ export function EstablishmentCard({
         </View>
       ) : null}
 
-      {onToggleFollow ? (
+      {onToggleFollow && contentLocked ? (
         <View style={[styles.actionBar, isRTL && styles.actionBarRtl]}>
           <Pressable
             onPress={(e) => {
               e.stopPropagation?.();
               onToggleFollow();
             }}
-            disabled={contentLocked || followBusy || followStateLoading}
+            disabled
             accessibilityRole="button"
-            accessibilityState={{
-              selected: !contentLocked && !!isFollowed,
-              busy: !contentLocked && (!!followBusy || !!followStateLoading),
-            }}
-            accessibilityLabel={
-              contentLocked
-                ? t('inscTawjihPlusUpgradeCta')
-                : followStateLoading
-                  ? t('inscLoading')
-                  : isFollowed
-                    ? t('followSchoolUnfollowBtn')
-                    : t('followSchoolBtn')
-            }
-            hitSlop={8}
-            style={({ pressed }) => [
-              styles.actionBarBtn,
-              styles.followBtn,
-              contentLocked && styles.followBtnLocked,
-              !contentLocked && !followStateLoading && isFollowed && styles.followBtnActive,
-              pressed && { opacity: 0.85 },
-              !contentLocked && (followBusy || followStateLoading) && { opacity: 0.6 },
-            ]}>
-            {followBusy || followStateLoading ? (
-              <ActivityIndicator
-                size="small"
-                color={!followStateLoading && isFollowed ? brand.primary : brand.white}
-              />
-            ) : (
-              <>
-                <FontAwesome
-                  name={contentLocked ? 'lock' : isFollowed ? 'heart' : 'heart-o'}
-                  size={12}
-                  color={contentLocked ? '#64748B' : isFollowed ? brand.primary : brand.white}
-                />
-                <Text
-                  style={[
-                    styles.followBtnTxt,
-                    contentLocked && styles.followBtnTxtLocked,
-                    !contentLocked && isFollowed && styles.followBtnTxtActive,
-                    isRTL && styles.txtRtl,
-                  ]}
-                  numberOfLines={1}>
-                  {contentLocked
-                    ? t('inscTawjihPlusUpgradeCta')
-                    : isFollowed
-                      ? t('inscAnnouncementsFollowing')
-                      : t('inscAnnouncementsFollow')}
-                </Text>
-              </>
-            )}
+            accessibilityLabel={t('inscTawjihPlusUpgradeCta')}
+            style={[styles.actionBarBtn, styles.followBtn, styles.followBtnLocked]}>
+            <FontAwesome name="lock" size={12} color="#64748B" />
+            <Text style={[styles.followBtnTxt, styles.followBtnTxtLocked, isRTL && styles.txtRtl]} numberOfLines={1}>
+              {t('inscTawjihPlusUpgradeCta')}
+            </Text>
           </Pressable>
         </View>
       ) : null}
@@ -553,11 +594,6 @@ const styles = StyleSheet.create({
   },
   cardLocked: {
     backgroundColor: '#FAFBFC',
-  },
-  cardSponsored: {
-    borderColor: '#a78bfa',
-    borderWidth: 2,
-    backgroundColor: '#faf5ff',
   },
   cardRtl: {
     alignItems: 'stretch',
@@ -893,15 +929,22 @@ const styles = StyleSheet.create({
   footerIconsRtl: {
     flexDirection: 'row-reverse',
   },
-  sponsorActions: {
+  cardActions: {
     marginTop: spacing.md,
     marginHorizontal: -spacing.lg,
     paddingHorizontal: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'stretch',
     gap: spacing.sm,
   },
-  sponsorActionsRtl: {
+  cardActionsRtl: {
+    direction: 'ltr',
+  },
+  cardActionsRow: {
+    flexDirection: 'row',
+    alignItems: 'stretch',
+    flexWrap: 'nowrap',
+    gap: spacing.sm,
+  },
+  cardActionsRowRtl: {
     flexDirection: 'row-reverse',
   },
   sponsorBtn: {
@@ -915,6 +958,12 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 8,
     borderRadius: radius.lg,
+  },
+  sponsorBtnFull: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flexBasis: 'auto',
+    width: '100%',
   },
   sponsorBtnContact: {
     backgroundColor: brand.primary,
@@ -951,6 +1000,7 @@ const styles = StyleSheet.create({
     minHeight: 40,
   },
   followBtn: {
+    minHeight: 40,
     gap: 5,
     paddingHorizontal: spacing.sm,
     paddingVertical: 8,

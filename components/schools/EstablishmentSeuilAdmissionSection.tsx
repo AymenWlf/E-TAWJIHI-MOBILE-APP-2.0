@@ -1,9 +1,9 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { StyleSheet, View } from 'react-native';
+import { type ComponentProps } from 'react';
+import { StyleSheet, View, type ViewStyle } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { homeShell } from '@/theme/homeShell';
-import { fontSize, radius, spacing } from '@/theme/tokens';
+import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
   type SeuilAdmissionDisplay,
   type SeuilAdmissionMode,
@@ -20,59 +20,44 @@ type Props = {
   modeLabel: string;
 };
 
-type ModeTheme = {
-  accent: string;
-  accentSoft: string;
-  border: string;
-  icon: 'tachometer' | 'book' | 'users' | 'map-marker' | 'graduation-cap';
-};
-
-function themeForMode(mode: SeuilAdmissionMode): ModeTheme {
+function iconForMode(mode: SeuilAdmissionMode): ComponentProps<typeof FontAwesome>['name'] {
   switch (mode) {
     case 'general':
-      return {
-        accent: '#B45309',
-        accentSoft: 'rgba(245,158,11,0.10)',
-        border: 'rgba(245,158,11,0.22)',
-        icon: 'tachometer',
-      };
+      return 'tachometer';
     case 'filiere_bac':
-      return {
-        accent: homeShell.greenDark,
-        accentSoft: homeShell.greenAlpha11,
-        border: 'rgba(47,206,148,0.22)',
-        icon: 'book',
-      };
+      return 'book';
     case 'genre':
-      return {
-        accent: homeShell.blue,
-        accentSoft: 'rgba(51,62,143,0.08)',
-        border: 'rgba(51,62,143,0.18)',
-        icon: 'users',
-      };
+      return 'users';
     case 'ville':
-      return {
-        accent: '#0F766E',
-        accentSoft: 'rgba(15,118,110,0.10)',
-        border: 'rgba(15,118,110,0.20)',
-        icon: 'map-marker',
-      };
+      return 'map-marker';
     default:
-      return {
-        accent: homeShell.cardMuted,
-        accentSoft: '#F8FAFC',
-        border: homeShell.borderOnWhite,
-        icon: 'graduation-cap',
-      };
+      return 'graduation-cap';
   }
+}
+
+function segmentIconName(label: string, mission?: boolean): ComponentProps<typeof FontAwesome>['name'] {
+  if (mission) return 'star';
+  const l = label.toLowerCase();
+  if (l.includes('mission') || l.includes('international') || l.includes('دولية')) return 'star';
+  if (l.includes('site') || l.includes('ville') || l.includes('موقع') || l.includes('مدينة')) return 'map-marker';
+  if (l.includes('hommes') || l.includes('femmes') || l.includes('ذكور') || l.includes('إناث')) return 'users';
+  if (l.includes('filière') || l.includes('filiere') || l.includes('شعبة')) return 'book';
+  return 'graduation-cap';
+}
+
+/** Largeur segment si plusieurs lignes (filières, campus…). */
+function segmentCellStyle(count: number): ViewStyle | undefined {
+  if (count <= 1) return undefined;
+  if (count === 2) return { flexBasis: '48%', minWidth: '46%', flexGrow: 1, maxWidth: '100%' };
+  return { flexBasis: '100%', minWidth: 0, flexGrow: 1 };
 }
 
 function sourceColors(source: SeuilSource): { bg: string; text: string; border: string } {
   if (source === 'official') {
     return {
-      bg: 'rgba(16,185,129,0.10)',
-      text: '#047857',
-      border: 'rgba(16,185,129,0.22)',
+      bg: 'rgba(4,120,87,0.10)',
+      text: brand.emerald,
+      border: 'rgba(4,120,87,0.22)',
     };
   }
   return {
@@ -82,22 +67,35 @@ function sourceColors(source: SeuilSource): { bg: string; text: string; border: 
   };
 }
 
+/** Largeur des cartes valeur selon le nombre affiché (évite les colonnes vides). */
+function valueChipFlexStyle(count: number): ViewStyle {
+  if (count <= 1) {
+    return { flexBasis: '100%', maxWidth: '100%', flexGrow: 1 };
+  }
+  if (count === 2) {
+    return { flexBasis: '48%', minWidth: '46%', flexGrow: 1, maxWidth: '100%' };
+  }
+  return { flexBasis: '31%', minWidth: '30%', flexGrow: 1, maxWidth: '100%' };
+}
+
 function ValueChip({
   temporalLabel,
   valueLabel,
   sourceLabel,
   source,
   rtl,
+  flexStyle,
 }: {
   temporalLabel: string;
   valueLabel: string;
   sourceLabel: string;
   source: SeuilSource;
   rtl?: boolean;
+  flexStyle: ViewStyle;
 }) {
   const colors = sourceColors(source);
   return (
-    <View style={[styles.valueChip, { borderColor: colors.border, backgroundColor: colors.bg }]}>
+    <View style={[styles.valueChip, flexStyle, { borderColor: colors.border, backgroundColor: colors.bg }]}>
       <Text style={[styles.valueTemporal, rtl && styles.rtlText]}>{temporalLabel}</Text>
       <Text style={[styles.valueNote, rtl && styles.rtlText]}>{valueLabel}</Text>
       <View style={[styles.sourcePill, { borderColor: colors.border, backgroundColor: '#fff' }]}>
@@ -109,20 +107,21 @@ function ValueChip({
 
 function SegmentBlock({
   row,
-  theme,
   rtl,
   mission,
 }: {
   row: SeuilRowDisplay;
-  theme: ModeTheme;
   rtl?: boolean;
   mission?: boolean;
 }) {
-  const iconName = mission ? 'star' : theme.icon;
+  const valueCount = row.values.length;
+  const iconName = segmentIconName(row.segmentLabel, mission);
   return (
-    <View style={[styles.segment, { borderColor: theme.border, backgroundColor: theme.accentSoft }]}>
+    <View style={styles.segment}>
       <View style={[styles.segmentHead, rtl && styles.rowRtl]}>
-        <FontAwesome name={iconName} size={13} color={theme.accent} />
+        <View style={styles.segmentIcon}>
+          <FontAwesome name={iconName} size={13} color={brand.primary} />
+        </View>
         <Text style={[styles.segmentTitle, rtl && styles.rtlText]}>{row.segmentLabel}</Text>
       </View>
       <View style={styles.valuesGrid}>
@@ -134,6 +133,7 @@ function SegmentBlock({
             sourceLabel={val.sourceLabel}
             source={val.source}
             rtl={rtl}
+            flexStyle={valueChipFlexStyle(valueCount)}
           />
         ))}
       </View>
@@ -143,7 +143,6 @@ function SegmentBlock({
 
 function SeuilPanel({
   display,
-  theme,
   rtl,
   disclaimer,
   bacNormalLabel,
@@ -151,23 +150,26 @@ function SeuilPanel({
   modeLabel,
 }: {
   display: SeuilAdmissionDisplay;
-  theme: ModeTheme;
   rtl?: boolean;
   disclaimer: string;
   bacNormalLabel: string;
   bacMissionLabel: string;
   modeLabel: string;
 }) {
+  const modeIcon = iconForMode(display.mode);
+  const hasBacNormal = display.bacNormalRows.length > 0;
+
   return (
-    <View style={[styles.panel, { borderLeftColor: theme.accent }]}>
+    <View style={styles.panel}>
+      <View style={styles.accentBar} />
       <View style={[styles.panelHead, rtl && styles.rowRtl]}>
-        <View style={[styles.panelIcon, { backgroundColor: theme.accentSoft }]}>
-          <FontAwesome name={theme.icon} size={16} color={theme.accent} />
+        <View style={styles.panelIcon}>
+          <FontAwesome name={modeIcon} size={16} color={brand.primary} />
         </View>
         <View style={[styles.panelHeadText, rtl && styles.rtlCol]}>
           {display.mode ? (
-            <View style={[styles.modePill, { borderColor: theme.border, backgroundColor: theme.accentSoft }]}>
-              <Text style={[styles.modePillTxt, { color: theme.accent }, rtl && styles.rtlText]}>
+            <View style={styles.modePill}>
+              <Text style={[styles.modePillTxt, rtl && styles.rtlText]}>
                 {modeLabel} : {display.modeShortLabel}
               </Text>
             </View>
@@ -175,21 +177,30 @@ function SeuilPanel({
         </View>
       </View>
 
-      {display.bacNormalRows.length > 0 ? (
-        <View style={styles.group}>
-          <Text style={[styles.groupLbl, rtl && styles.rtlText]}>{bacNormalLabel}</Text>
-          {display.bacNormalRows.map((row, idx) => (
-            <SegmentBlock key={`${row.segmentLabel}-${idx}`} row={row} theme={theme} rtl={rtl} />
-          ))}
-        </View>
-      ) : null}
+      <View style={styles.groupsCol}>
+        {hasBacNormal ? (
+          <View style={styles.group}>
+            <Text style={[styles.groupLbl, rtl && styles.rtlText]}>{bacNormalLabel}</Text>
+            <View style={display.bacNormalRows.length > 1 ? styles.segmentsGrid : styles.segmentsCol}>
+              {display.bacNormalRows.map((row, idx) => (
+                <View
+                  key={`${row.segmentLabel}-${idx}`}
+                  style={segmentCellStyle(display.bacNormalRows.length)}
+                >
+                  <SegmentBlock row={row} rtl={rtl} />
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : null}
 
-      {display.bacMissionRow ? (
-        <View style={styles.group}>
-          <Text style={[styles.groupLbl, rtl && styles.rtlText]}>{bacMissionLabel}</Text>
-          <SegmentBlock row={display.bacMissionRow} theme={theme} rtl={rtl} mission />
-        </View>
-      ) : null}
+        {display.bacMissionRow ? (
+          <View style={styles.group}>
+            <Text style={[styles.groupLbl, rtl && styles.rtlText]}>{bacMissionLabel}</Text>
+            <SegmentBlock row={display.bacMissionRow} rtl={rtl} mission />
+          </View>
+        ) : null}
+      </View>
 
       <Text style={[styles.disclaimer, rtl && styles.rtlText]}>{disclaimer}</Text>
     </View>
@@ -204,12 +215,9 @@ export function EstablishmentSeuilAdmissionSection({
   bacMissionLabel,
   modeLabel,
 }: Props) {
-  const theme = themeForMode(display.mode);
-
   return (
     <SeuilPanel
       display={display}
-      theme={theme}
       rtl={rtl}
       disclaimer={disclaimer}
       bacNormalLabel={bacNormalLabel}
@@ -223,23 +231,33 @@ const styles = StyleSheet.create({
   panel: {
     borderRadius: radius.lg,
     borderWidth: 1,
-    borderColor: homeShell.borderOnWhite,
-    borderLeftWidth: 4,
+    borderColor: 'rgba(51,62,143,0.12)',
     backgroundColor: '#fff',
+    overflow: 'hidden',
     padding: spacing.md,
     gap: spacing.md,
+  },
+  accentBar: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: brand.primary,
   },
   panelHead: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: spacing.sm,
+    paddingTop: 4,
   },
   panelIcon: {
-    width: 36,
-    height: 36,
+    width: 40,
+    height: 40,
     borderRadius: radius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: 'rgba(51,62,143,0.10)',
   },
   panelHeadText: {
     flex: 1,
@@ -249,12 +267,18 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     borderRadius: radius.full,
     borderWidth: 1,
+    borderColor: 'rgba(51,62,143,0.18)',
+    backgroundColor: 'rgba(51,62,143,0.08)',
     paddingHorizontal: 10,
     paddingVertical: 5,
   },
   modePillTxt: {
     fontSize: 11,
     fontWeight: '800',
+    color: brand.primary,
+  },
+  groupsCol: {
+    gap: spacing.md,
   },
   group: {
     gap: spacing.sm,
@@ -262,13 +286,23 @@ const styles = StyleSheet.create({
   groupLbl: {
     fontSize: 10,
     fontWeight: '900',
-    color: '#94A3B8',
+    color: brand.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.45,
+  },
+  segmentsCol: {
+    gap: spacing.sm,
+  },
+  segmentsGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.sm,
   },
   segment: {
     borderRadius: radius.lg,
     borderWidth: 1,
+    borderColor: 'rgba(51,62,143,0.10)',
+    backgroundColor: brand.backgroundSoft,
     padding: spacing.md,
     gap: spacing.sm,
   },
@@ -277,11 +311,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
+  segmentIcon: {
+    width: 32,
+    height: 32,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: 'rgba(51,62,143,0.10)',
+  },
   segmentTitle: {
     flex: 1,
     fontSize: fontSize.sm,
     fontWeight: '800',
-    color: homeShell.cardText,
+    color: brand.text,
   },
   valuesGrid: {
     flexDirection: 'row',
@@ -289,8 +331,6 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   valueChip: {
-    minWidth: '46%',
-    flexGrow: 1,
     borderRadius: radius.md,
     borderWidth: 1,
     padding: spacing.sm,
@@ -299,14 +339,14 @@ const styles = StyleSheet.create({
   valueTemporal: {
     fontSize: 10,
     fontWeight: '800',
-    color: '#94A3B8',
+    color: brand.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.35,
   },
   valueNote: {
     fontSize: fontSize.md,
     fontWeight: '900',
-    color: homeShell.cardText,
+    color: brand.text,
   },
   sourcePill: {
     alignSelf: 'flex-start',
@@ -325,10 +365,10 @@ const styles = StyleSheet.create({
   disclaimer: {
     fontSize: 11,
     lineHeight: 16,
-    color: homeShell.cardMuted,
+    color: brand.textMuted,
     fontWeight: '600',
     borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: homeShell.borderOnWhite,
+    borderTopColor: 'rgba(51,62,143,0.10)',
     paddingTop: spacing.sm,
   },
   rowRtl: {

@@ -16,6 +16,49 @@ export function labelEstablishmentBourseType(
   return key ? translate(key) : raw.trim();
 }
 
+export function formatEstablishmentBoursePercentRange(
+  min: number | string | null | undefined,
+  max: number | string | null | undefined,
+  labels: {
+    from: string;
+    upTo: string;
+    singleSuffix: string;
+    rangeSep: string;
+  },
+): string | null {
+  const parse = (v: number | string | null | undefined): number | null => {
+    if (v === null || v === undefined || v === '') return null;
+    const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',', '.'));
+    return Number.isFinite(n) ? n : null;
+  };
+  const mn = parse(min);
+  const mx = parse(max);
+  const fmt = (n: number) => n.toLocaleString('fr-FR');
+
+  if (mn !== null && mx !== null) {
+    if (mn === mx) return `${fmt(mn)} ${labels.singleSuffix}`;
+    return `${fmt(mn)} ${labels.singleSuffix}${labels.rangeSep}${fmt(mx)} ${labels.singleSuffix}`;
+  }
+  if (mn !== null) return `${labels.from} ${fmt(mn)} ${labels.singleSuffix}`;
+  if (mx !== null) return `${labels.upTo} ${fmt(mx)} ${labels.singleSuffix}`;
+  return null;
+}
+
+export type BourseTypeIconName = 'money' | 'home' | 'tag' | 'gift';
+
+export function bourseTypeIconName(type: string): BourseTypeIconName {
+  switch (type.trim()) {
+    case 'financiere':
+      return 'money';
+    case 'logement':
+      return 'home';
+    case 'reduction_scolarite':
+      return 'tag';
+    default:
+      return 'gift';
+  }
+}
+
 /** Normalise les libellés type comme sur le listing web */
 export function formatEstablishmentType(t?: string | null): string {
   switch (t) {

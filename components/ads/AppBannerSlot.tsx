@@ -21,11 +21,14 @@ import {
 } from '@/constants/partnerBannerDimensions';
 import { fontSize, radius, spacing } from '@/theme/tokens';
 import {
-  fetchBannersByZone,
+  fetchBannerSlotsByZone,
   pickBannerCreativeImageUrl,
+  pickBannerSlotVariant,
   recordBannerClickNative,
   recordBannerImpressionNative,
+  variantToDisplayCreative,
   type BannerCreativePublic,
+  type BannerSlotPublic,
   type BannerZoneCode,
 } from '@/services/publicBanners';
 import { fireAndForget } from '@/utils/fireAndForget';
@@ -38,12 +41,12 @@ const SLIDE_ANIM_MS = 300;
 const SWIPE_THRESHOLD_PX = 48;
 
 function bannerImpressionKey(
-  slotId: number,
+  variantId: number,
   page: string,
   position: number,
   viewport: 'mobile' | 'desktop',
 ): string {
-  return `${slotId}|${page}|${position}|${viewport}`;
+  return `${variantId}|${page}|${position}|${viewport}`;
 }
 
 type Props = {
@@ -51,12 +54,25 @@ type Props = {
   zone: Exclude<BannerZoneCode, 'bottom'>;
   analyticsPage: string;
   style?: ViewStyle;
+  /** Fiche établissement client : limiter aux bannières de cette campagne. */
+  campaignId?: number | null;
 };
 
 function resolveClickUrl(c: BannerCreativePublic): string | null {
   const raw = (c.linkUrl || c.destinationUrl || '').trim();
   if (!raw) return null;
   return /^https?:\/\//i.test(raw) ? raw : `https://${raw}`;
+}
+
+function shuffleSlots<T>(items: T[]): T[] {
+  const copy = [...items];
+  for (let i = copy.length - 1; i > 0; i -= 1) {
+    const j = Math.floor(Math.random() * (i + 1));
+    const tmp = copy[i];
+    copy[i] = copy[j]!;
+    copy[j] = tmp!;
+  }
+  return copy;
 }
 
 /** Marge horizontale minimale pour ne pas déborder sur petits écrans. */
@@ -66,7 +82,7 @@ const HORIZONTAL_SAFE = spacing.lg * 2;
  * Bandeau publicitaire — créatives API, KPI comptés comme **app mobile native**
  * (`clientSurface: native_app`). Rotation 10 s, swipe / flèches après la 1ʳᵉ bannière (aligné web).
  */
-export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
+export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }: Props) {
   const isSquare = zone === 'mid_square';
   const isMiddleZone = zone === 'mid' || isSquare;
   const { width: screenWidth } = useWindowDimensions();
@@ -89,7 +105,9 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
   const slideWidth = isSquare ? layout.squareSide : layout.wideW;
   const slideHeight = isSquare ? layout.squareSide : layout.wideH;
 
-  const [creatives, setCreatives] = useState<BannerCreativePublic[]>([]);
+  const [orderedSlots, setOrderedSlots] = useState<BannerSlotPublic[]>([]);
+  const [slideCreatives, setSlideCreatives] = useState<BannerCreativePublic[]>([]);
+  const creatives = slideCreatives;
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
   const [navigationUnlocked, setNavigationUnlocked] = useState(false);
@@ -168,19 +186,21 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
     setNavigationUnlocked(false);
     setInitialCountdown(10);
     setCountdown(10);
-    void fetchBannersByZone(zone)
+    void fetchBannerSlotsByZone(zone, { campaignId })
       .then((list) => {
         if (!cancelled) {
-          const filtered = (Array.isArray(list) ? list : []).filter(
-            (c) => pickBannerCreativeImageUrl(c, viewport).trim() !== '',
-          );
-          setCreatives(filtered);
+          const slots = list.length <= 1 ? list : shuffleSlots(list);
+          setOrderedSlots(slots);
+          setSlideCreatives([]);
           setIndex(0);
           translateX.value = 0;
         }
       })
       .catch(() => {
-        if (!cancelled) setCreatives([]);
+        if (!cancelled) {
+          setOrderedSlots([]);
+          setSlideCreatives([]);
+        }
       })
       .finally(() => {
         if (!cancelled) setLoading(false);
@@ -188,29 +208,50 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
     return () => {
       cancelled = true;
     };
-  }, [zone, translateX, viewport]);
+  }, [zone, translateX, campaignId]);
+
+  useEffect(() => {
+    const slotItem = orderedSlots[index];
+    if (!slotItem?.variants?.length) return;
+    let cancelled = false;
+    void pickBannerSlotVariant(slotItem).then((variant) => {
+      if (cancelled) return;
+      const creative = variantToDisplayCreative(slotItem, variant);
+      if (pickBannerCreativeImageUrl(creative, viewport).trim() === '') return;
+      setSlideCreatives((prev) => {
+        if (prev[index]?.variantId === creative.variantId) return prev;
+        const next = [...prev];
+        next[index] = creative;
+        return next;
+      });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [index, orderedSlots, viewport]);
 
   useEffect(() => {
     translateX.value = withTiming(-index * slideWidth, { duration: SLIDE_ANIM_MS });
   }, [index, slideWidth, translateX]);
 
   const creative = creatives[index] ?? null;
-  const creativeId = creative?.id ?? 0;
+  const variantId = creative?.variantId ?? creative?.id ?? 0;
 
   useEffect(() => {
-    if (!creativeId) return;
-    const key = bannerImpressionKey(creativeId, analyticsPage, index + 1, viewport);
+    if (!variantId) return;
+    const key = bannerImpressionKey(variantId, analyticsPage, index + 1, viewport);
     if (recordedBannerImpressions.has(key)) return;
     recordedBannerImpressions.add(key);
     fireAndForget(
       recordBannerImpressionNative({
-        slotId: creativeId,
+        variantId,
+        slotId: creative?.slotId,
         page: analyticsPage,
         position: index + 1,
         viewport,
       }),
     );
-  }, [creativeId, analyticsPage, index, viewport]);
+  }, [variantId, creative?.slotId, analyticsPage, index, viewport]);
 
   useEffect(() => {
     if (creatives.length <= 1) return;
@@ -259,10 +300,12 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
 
   const onPressCurrentCreative = useCallback(() => {
     const c = creatives[index];
-    if (!c?.id) return;
+    const vid = c?.variantId ?? c?.id;
+    if (!vid) return;
     fireAndForget(
       recordBannerClickNative({
-        slotId: c.id,
+        variantId: vid,
+        slotId: c?.slotId,
         page: analyticsPage,
         position: index + 1,
         viewport,
@@ -311,7 +354,11 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
     );
   }
 
-  if (creatives.length === 0) {
+  if (orderedSlots.length === 0 && !loading) {
+    return null;
+  }
+
+  if (creatives.length === 0 && !loading) {
     return null;
   }
 
@@ -333,10 +380,19 @@ export function AppBannerSlot({ zone, analyticsPage, style }: Props) {
             ]}
           >
             {creatives.map((c, i) => {
-              const url = pickBannerCreativeImageUrl(c, viewport);
+              const url = c ? pickBannerCreativeImageUrl(c, viewport) : '';
+              if (!url) {
+                return (
+                  <View
+                    key={`empty-${i}`}
+                    pointerEvents="none"
+                    style={[styles.slide, { width: slideWidth, height: slideHeight }]}
+                  />
+                );
+              }
               return (
                 <View
-                  key={c.id}
+                  key={c.variantId ?? c.id}
                   pointerEvents="none"
                   style={[styles.slide, { width: slideWidth, height: slideHeight }]}
                 >

@@ -9,6 +9,7 @@ export type ListingPlacementInfo = {
   goalType: 'traffic' | 'leadgen';
   destinationUrl: string | null;
   includeLeadFormOnTraffic?: boolean;
+  showLeadFormOnDetailPage?: boolean;
   campaignId?: number | null;
 };
 
@@ -29,6 +30,7 @@ export async function fetchListingPlacementsByEstablishment(): Promise<Record<nu
       goalType: v.goalType === 'leadgen' ? 'leadgen' : 'traffic',
       destinationUrl: v.destinationUrl ?? null,
       includeLeadFormOnTraffic: Boolean(v.includeLeadFormOnTraffic),
+      showLeadFormOnDetailPage: v.showLeadFormOnDetailPage !== false,
       campaignId: v.campaignId ?? null,
     };
   }
@@ -50,6 +52,7 @@ export async function fetchEstablishmentPlacementInfo(
     destinationUrl:
       d.destinationUrl != null && String(d.destinationUrl).trim() !== '' ? String(d.destinationUrl).trim() : null,
     includeLeadFormOnTraffic: Boolean(d.includeLeadFormOnTraffic),
+    showLeadFormOnDetailPage: d.showLeadFormOnDetailPage !== false,
     campaignId: d.campaignId ?? null,
   };
 }
@@ -113,7 +116,29 @@ export function mergeEstablishmentsWithListingPlacements<
   });
 }
 
-/** Établissement client référencement / sponsorisation : pas de bannières « Publicité partenaire » (aligné web). */
+/**
+ * Bannières « Publicité partenaire » sur la fiche établissement :
+ * - sans placement client → toutes les bannières ;
+ * - établissement référencé / sponsorisé → uniquement la campagne du placement.
+ */
+export function resolveEstablishmentDetailBannerFilter(
+  placement: ListingPlacementInfo | null | undefined,
+  placementResolved: boolean,
+): { show: boolean; campaignId: number | null } {
+  if (!placementResolved) {
+    return { show: false, campaignId: null };
+  }
+  if (!placement) {
+    return { show: true, campaignId: null };
+  }
+  const campaignId = placement.campaignId;
+  if (typeof campaignId === 'number' && campaignId > 0) {
+    return { show: true, campaignId };
+  }
+  return { show: false, campaignId: null };
+}
+
+/** @deprecated Utiliser `resolveEstablishmentDetailBannerFilter`. */
 export function establishmentBlocksPartnerBanners(
   item:
     | Pick<EstablishmentListItem, 'isSponsored' | 'referencingPlacementId'>
@@ -172,6 +197,32 @@ export async function recordReferencingPageViewNative(establishmentId: number): 
   const visitorId = await getMobileVisitorId();
   await httpPostJson<{ success: boolean }, Record<string, unknown>>(
     buildApiUrl('/api/referencing/page-view'),
+    {
+      establishmentId,
+      visitorId,
+      viewport: 'mobile',
+      clientSurface: 'native_app',
+    },
+  );
+}
+
+export async function recordExternalLinkClickNative(opts: { placementId: number }): Promise<void> {
+  const visitorId = await getMobileVisitorId();
+  await httpPostJson<{ success: boolean }, Record<string, unknown>>(
+    buildApiUrl('/api/referencing/external-link-click'),
+    {
+      placementId: opts.placementId,
+      visitorId,
+      viewport: 'mobile',
+      clientSurface: 'native_app',
+    },
+  );
+}
+
+export async function recordBrochureDownloadNative(establishmentId: number): Promise<void> {
+  const visitorId = await getMobileVisitorId();
+  await httpPostJson<{ success: boolean }, Record<string, unknown>>(
+    buildApiUrl('/api/referencing/brochure-download'),
     {
       establishmentId,
       visitorId,

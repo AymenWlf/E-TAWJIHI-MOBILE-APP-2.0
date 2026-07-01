@@ -85,7 +85,7 @@ export function pickAnnouncementTitle(
  *  1. `customLabel` non vide ⇒ tel quel (saisie admin),
  *  2. sinon, libellé i18n par défaut selon le type d'annonce
  *     ("Voir le résultat", "Postuler à la bourse", "Lien d'inscription"…),
- *  3. fallback générique `inscOpenLinkBtn` ("Ouvrir le lien" / "فتح الرابط").
+ *  3. fallback générique `inscOpenLinkBtn` ("S'inscrire" / "سجّل الآن").
  */
 export function pickRegistrationUrlLabelKey(
   announcementType: string | null | undefined,

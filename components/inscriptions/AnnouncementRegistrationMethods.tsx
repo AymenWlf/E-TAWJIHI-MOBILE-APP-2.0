@@ -195,7 +195,7 @@ export function AnnouncementRegistrationMethodsPanel({
                 </Text>
               </View>
               <Text style={[styles.linkTxt, isRTL && styles.rtl]}>
-                {locale === 'ar' ? 'التسجيل عبر الإنترنت' : "S'inscrire en ligne"}
+                {locale === 'ar' ? 'سجّل الآن' : "S'inscrire"}
               </Text>
             </Pressable>
           );

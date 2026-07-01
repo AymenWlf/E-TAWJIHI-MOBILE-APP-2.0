@@ -93,6 +93,8 @@ export function reportMaintenanceIfPresent(url: string, status: number, bodyText
   return true;
 }
 
+const MAINTENANCE_FETCH_TIMEOUT_MS = 8_000;
+
 async function fetchPublicMaintenanceStatusNetwork(): Promise<MaintenancePublicStatus> {
   const url = buildApiUrl('/api/public/maintenance');
   try {
@@ -100,6 +102,7 @@ async function fetchPublicMaintenanceStatusNetwork(): Promise<MaintenancePublicS
       method: 'GET',
       headers: { Accept: 'application/json' },
       cache: 'no-store',
+      signal: AbortSignal.timeout(MAINTENANCE_FETCH_TIMEOUT_MS),
     });
     if (!res.ok) {
       return normalizeStatus({ enabled: false, message: DEFAULT_MAINTENANCE_MESSAGE });

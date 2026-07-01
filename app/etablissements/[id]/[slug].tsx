@@ -35,10 +35,14 @@ import {
   EligibilitySummary,
 } from '@/components/inscriptions/EligibilityViews';
 import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnostic/DiagnosticEstablishmentCompatibilityBadge';
-import { EstablishmentCampusSection } from '@/components/schools/EstablishmentCampusSection';
+import { EstablishmentCampusCarousel } from '@/components/schools/EstablishmentCampusCarousel';
+import { EstablishmentPhotosCarousel } from '@/components/schools/EstablishmentPhotosCarousel';
 import { EstablishmentSeuilAdmissionSection } from '@/components/schools/EstablishmentSeuilAdmissionSection';
+import { EstablishmentProgrammesCarousel } from '@/components/schools/EstablishmentProgrammesCarousel';
+import { EstablishmentScholarshipsSection } from '@/components/schools/EstablishmentScholarshipsSection';
 import { getSeuilAdmissionDisplay } from '@/utils/establishmentSeuilAdmission';
 import { EstablishmentDescriptionHtml } from '@/components/schools/EstablishmentDescriptionHtml';
+import { PhotoGalleryModal } from '@/components/schools/PhotoGalleryModal';
 import { EstablishmentLeadGenForm } from '@/components/schools/EstablishmentLeadGenForm';
 import { EstablishmentLeadGenSection } from '@/components/schools/EstablishmentLeadGenSection';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
@@ -52,11 +56,13 @@ import {
   type ContestAnnouncementCard,
 } from '@/services/contestAnnouncements';
 import {
-  establishmentBlocksPartnerBanners,
+  resolveEstablishmentDetailBannerFilter,
   fetchEstablishmentPlacementInfo,
   recordReferencingClickNative,
   recordReferencingContactClickNative,
   recordReferencingPageViewNative,
+  recordExternalLinkClickNative,
+  recordBrochureDownloadNative,
   type ListingPlacementInfo,
 } from '@/services/referencingAds';
 import {
@@ -76,21 +82,14 @@ import { evaluateEligibility } from '@/utils/eligibility';
 import { fireAndForget } from '@/utils/fireAndForget';
 import {
   addUtmToUrl,
-  placementShowsContactForm,
+  placementShowsContactFormOnDetail,
   placementTrafficDestinationUrl,
 } from '@/utils/referencingPlacementUi';
 import {
   formatEstablishmentStudyDuration,
-  formatEstablishmentStudyDurationYears,
   formatVillesCourtes,
-  labelEstablishmentBourseType,
   universityName,
 } from '@/utils/establishmentFormat';
-import {
-  formatProgrammeFeeLabel,
-  programmeDisplayName,
-  programmeSecteursLabel,
-} from '@/utils/establishmentProgrammes';
 import { pickBrochureFromDocuments } from '@/utils/establishmentBrochure';
 import { downloadDocument } from '@/utils/documents';
 import { sharePayloadEstablishmentDetail } from '@/utils/sharePagePayloads';
@@ -100,6 +99,7 @@ import {
   isDefaultFreePreviewEstablishmentId,
   loadDefaultFreePreviewEstablishmentIds,
 } from '@/services/establishmentFreePreview';
+import { normalizeWebsiteHref } from '@/utils/websiteLink';
 
 export default function EstablishmentDetailScreen() {
   const router = useRouter();
@@ -182,6 +182,7 @@ export default function EstablishmentDetailScreen() {
   const [listingPlacementResolved, setListingPlacementResolved] = useState(false);
   const [placementInfoLoading, setPlacementInfoLoading] = useState(false);
   const [brochureDownloading, setBrochureDownloading] = useState(false);
+  const [photoGalleryIndex, setPhotoGalleryIndex] = useState<number | null>(null);
 
   /* Annonces publiées de cet établissement (concours, résultats, bourses…). */
   const [announcements, setAnnouncements] = useState<ContestAnnouncementCard[]>([]);
@@ -349,8 +350,8 @@ export default function EstablishmentDetailScreen() {
     };
   }, [id, loading]);
 
-  const showPlacementContactForm = useMemo(
-    () => placementShowsContactForm(listingPlacement),
+  const showPlacementContactFormOnDetail = useMemo(
+    () => placementShowsContactFormOnDetail(listingPlacement),
     [listingPlacement],
   );
   const placementTrafficUrl = useMemo(
@@ -361,16 +362,24 @@ export default function EstablishmentDetailScreen() {
   const mightBeSponsoredPartner = Boolean(listingPlacement?.isSponsored);
   const showSponsoredBadge = listingPlacementResolved && Boolean(listingPlacement?.isSponsored);
 
+  const placementTrafficCtaLabel = listingPlacement?.isSponsored
+    ? t('estCardBtnEnroll')
+    : t('estLeadgenVisitSite');
+  const placementTrafficCtaShort = listingPlacement?.isSponsored
+    ? t('estCardBtnEnroll')
+    : t('estCardBtnVisitSite');
   const showPartnerFooterSite = Boolean(listingPlacement) && Boolean(placementTrafficUrl);
-  const showPartnerFooterContact = Boolean(listingPlacement) && showPlacementContactForm;
+  const showPartnerFooterContact = Boolean(listingPlacement) && showPlacementContactFormOnDetail;
   const showPartnerFooter =
     listingPlacementResolved && (showPartnerFooterSite || showPartnerFooterContact);
   const showPartnerFooterLoading = mightBeSponsoredPartner && !listingPlacementResolved;
 
-  const showPartnerBannersOnDetail = useMemo(() => {
-    if (!listingPlacementResolved) return false;
-    return !establishmentBlocksPartnerBanners(listingPlacement ?? data);
-  }, [listingPlacement, listingPlacementResolved, data]);
+  const establishmentBannerFilter = useMemo(
+    () => resolveEstablishmentDetailBannerFilter(listingPlacement, listingPlacementResolved),
+    [listingPlacement, listingPlacementResolved],
+  );
+  const showPartnerBannersOnDetail = establishmentBannerFilter.show;
+  const establishmentDetailBannerCampaignId = establishmentBannerFilter.campaignId;
 
   /* Tracking analytique : impression « detail » (1 fois par session pour
      éviter de gonfler les chiffres si l'utilisateur ouvre/ferme la même
@@ -441,6 +450,13 @@ export default function EstablishmentDetailScreen() {
     if (isRTL && data.nomArabe) return [data.sigle, data.nom].filter(Boolean).join(' · ');
     return [data.sigle, data.nomArabe].filter(Boolean).join(' · ');
   }, [data, isRTL]);
+  const nbEtudiantsLabel = useMemo(() => {
+    if (!data) return null;
+    const raw = data.academicInfo?.nbEtudiants;
+    const nb = Number(raw);
+    if (!Number.isFinite(nb) || nb <= 0) return null;
+    return formatNb(nb);
+  }, [data]);
   const desc = useMemo(() => {
     if (!data) return '';
     return (isRTL ? data.descriptionAr || data.description : data.description) || '';
@@ -509,12 +525,7 @@ export default function EstablishmentDetailScreen() {
 
   const openPartnerSite = useCallback(() => {
     if (!listingPlacement || !placementTrafficUrl) return;
-    fireAndForget(
-      recordReferencingClickNative({
-        placementId: listingPlacement.placementId,
-        source: placementCardSource,
-      }),
-    );
+    fireAndForget(recordExternalLinkClickNative({ placementId: listingPlacement.placementId }));
     void Linking.openURL(addUtmToUrl(placementTrafficUrl)).catch(() => undefined);
   }, [listingPlacement, placementCardSource, placementTrafficUrl]);
 
@@ -667,10 +678,57 @@ export default function EstablishmentDetailScreen() {
               <Pressable
                 onPress={openPartnerSite}
                 accessibilityRole="link"
-                accessibilityLabel={t('estLeadgenVisitSite')}
+                accessibilityLabel={placementTrafficCtaLabel}
                 style={({ pressed }) => [styles.heroVisitSiteBtn, pressed && { opacity: 0.9 }]}>
                 <FontAwesome name="external-link" size={14} color={brand.white} />
-                <Text style={[styles.heroVisitSiteBtnTxt, isRTL && styles.txtRtl]}>{t('estLeadgenVisitSite')}</Text>
+                <Text style={[styles.heroVisitSiteBtnTxt, isRTL && styles.txtRtl]}>{placementTrafficCtaLabel}</Text>
+              </Pressable>
+            ) : null}
+            {schoolMedia.brochureRawUrl ? (
+              <Pressable
+                disabled={brochureDownloading}
+                onPress={() => {
+                  if (brochureDownloading || !schoolMedia.brochureRawUrl) return;
+                  void (async () => {
+                    setBrochureDownloading(true);
+                    const result = await downloadDocument(
+                      schoolMedia.brochureRawUrl!,
+                      schoolMedia.brochureTitle ?? undefined,
+                    );
+                    setBrochureDownloading(false);
+                    if (result.ok) {
+                      fireAndForget(recordBrochureDownloadNative(id));
+                    } else if (result.reason === 'sharing-unavailable') {
+                      Alert.alert(
+                        t('inscDetailDocumentDownloadErrorTitle'),
+                        t('inscDetailDocumentSharingUnavailableMsg'),
+                      );
+                    } else {
+                      Alert.alert(
+                        t('inscDetailDocumentDownloadErrorTitle'),
+                        t('inscDetailDocumentDownloadErrorMsg'),
+                      );
+                    }
+                  })();
+                }}
+                accessibilityRole="button"
+                accessibilityLabel={t('estDetailMediaBrochureDownload')}
+                style={({ pressed }) => [
+                  styles.heroBrochureBtn,
+                  pressed && !brochureDownloading && { opacity: 0.9 },
+                  brochureDownloading && { opacity: 0.65 },
+                ]}
+              >
+                {brochureDownloading ? (
+                  <ActivityIndicator size="small" color={brand.white} />
+                ) : (
+                  <FontAwesome name="file-pdf-o" size={14} color={brand.white} />
+                )}
+                <Text style={[styles.heroBrochureBtnTxt, isRTL && styles.txtRtl]}>
+                  {brochureDownloading
+                    ? t('estDetailMediaBrochurePreparing')
+                    : t('estDetailMediaBrochureDownload')}
+                </Text>
               </Pressable>
             ) : null}
             {(data.villesListe.length > 0 || !!uni) && (
@@ -702,13 +760,14 @@ export default function EstablishmentDetailScreen() {
                 value={data.concoursAdmission ? t('estAdmissionConcours') : t('estAdmissionDossier')}
               />
               <Cell rtl={isRTL} icon="graduation-cap" label={t('estLabelTracks')} value={filieresLine(data, isRTL)} />
-              <Cell rtl={isRTL} icon="users" label={t('estLabelStudents')} value={formatNb(data.academicInfo?.nbEtudiants)} />
+              {nbEtudiantsLabel ? (
+                <Cell rtl={isRTL} icon="users" label={t('estLabelStudents')} value={nbEtudiantsLabel} />
+              ) : null}
               <Cell
                 rtl={isRTL}
-                icon="certificate"
-                label={t('estLabelYears')}
-                value={yearsLabel(data, isRTL)}
-                valueLatinDigits={isRTL}
+                icon="shield"
+                label={t('estLabelReconnaissance')}
+                value={data.accreditationEtat ? t('estBadgeStateRecognized') : '—'}
               />
             </Grid>
           </Section>
@@ -726,8 +785,25 @@ export default function EstablishmentDetailScreen() {
             </Section>
           ) : null}
 
+          {data.boursesDisponibles ? (
+            <Section title={t('estDetailScholarships')} rtl={isRTL}>
+              <EstablishmentScholarshipsSection
+                bourseMin={data.bourseMin}
+                bourseMax={data.bourseMax}
+                typesBourse={data.typesBourse}
+                rtl={isRTL}
+                t={t}
+              />
+            </Section>
+          ) : null}
+
           {showPartnerBannersOnDetail ? (
-            <AppBannerSlot zone="mid_square" analyticsPage="/mobile/ecoles/detail" style={{ marginHorizontal: spacing.md }} />
+            <AppBannerSlot
+              zone="mid_square"
+              analyticsPage="/mobile/ecoles/detail"
+              style={{ marginHorizontal: spacing.md }}
+              campaignId={establishmentDetailBannerCampaignId}
+            />
           ) : null}
 
           {placementInfoLoading ? (
@@ -736,7 +812,7 @@ export default function EstablishmentDetailScreen() {
             </View>
           ) : listingPlacement ? (
             <>
-              {showPlacementContactForm ? (
+              {showPlacementContactFormOnDetail ? (
                 <EstablishmentLeadGenSection
                   establishment={data}
                   placement={listingPlacement}
@@ -766,80 +842,12 @@ export default function EstablishmentDetailScreen() {
               title={`${t('estDetailProgrammes')} (${data.filieres.length})`}
               rtl={isRTL}
             >
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[
-                  styles.programmeStrip,
-                  isRTL && styles.programmeStripRtl,
-                ]}
-              >
-                {data.filieres.map((programme) => {
-                  const notSpecified = t('estDetailProgrammeNotSpecified');
-                  return (
-                    <View key={programme.id} style={styles.programmeCard}>
-                      <View style={styles.programmeCardAccent} />
-                      <View style={styles.programmeCardBody}>
-                        {programme.diplome ? (
-                          <View style={styles.programmeDiplomePill}>
-                            <FontAwesome name="graduation-cap" size={11} color={homeShell.blue} />
-                            <Text style={styles.programmeDiplomeTxt} numberOfLines={1}>
-                              {programme.diplome}
-                            </Text>
-                          </View>
-                        ) : null}
-                        <Text style={[styles.programmeTitle, isRTL && styles.txtRtl]} numberOfLines={3}>
-                          {programmeDisplayName(programme, isRTL)}
-                        </Text>
-                        <View style={styles.programmeInfoList}>
-                          <ProgrammeInfoRow
-                            rtl={isRTL}
-                            icon="calendar"
-                            label={t('estDetailProgrammeDuration')}
-                            value={
-                              formatProgrammeDuration(programme.nombreAnnees, data, isRTL) ||
-                              notSpecified
-                            }
-                          />
-                          <ProgrammeInfoRow
-                            rtl={isRTL}
-                            icon="briefcase"
-                            label={t('estDetailProgrammeSector')}
-                            value={programmeSecteursLabel(programme.secteurs, isRTL, notSpecified)}
-                          />
-                          <ProgrammeInfoRow
-                            rtl={isRTL}
-                            icon="file-text-o"
-                            label={t('estDetailProgrammeEnrollmentFee')}
-                            value={formatProgrammeFeeLabel(
-                              programme.fraisInscription,
-                              notSpecified,
-                            )}
-                          />
-                          <ProgrammeInfoRow
-                            rtl={isRTL}
-                            icon="money"
-                            label={t('estDetailProgrammeTuitionFee')}
-                            value={formatProgrammeFeeLabel(programme.fraisScolarite, notSpecified)}
-                          />
-                          <ProgrammeInfoRow
-                            rtl={isRTL}
-                            icon="certificate"
-                            label={t('estDetailProgrammeDegree')}
-                            value={programme.diplome?.trim() || notSpecified}
-                          />
-                          <ProgrammeInfoRow
-                            rtl={isRTL}
-                            icon="shield"
-                            label={t('estDetailProgrammeAccreditation')}
-                            value={programme.reconnaissance?.trim() || notSpecified}
-                          />
-                        </View>
-                      </View>
-                    </View>
-                  );
-                })}
-              </ScrollView>
+              <EstablishmentProgrammesCarousel
+                programmes={data.filieres}
+                establishment={data}
+                rtl={isRTL}
+                t={t}
+              />
             </Section>
           ) : null}
 
@@ -848,28 +856,12 @@ export default function EstablishmentDetailScreen() {
               title={`${t('estDetailMediaPhotos')} (${schoolMedia.photoUris.length})`}
               rtl={isRTL}
             >
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={[
-                  styles.photoStrip,
-                  isRTL && styles.photoStripRtl,
-                ]}
-              >
-                {schoolMedia.photoUris.map((uri, idx) => (
-                  <Pressable
-                    key={`${uri}-${idx}`}
-                    onPress={() => void Linking.openURL(uri).catch(() => undefined)}
-                  >
-                    <Image
-                      source={{ uri }}
-                      style={styles.photoThumb}
-                      resizeMode="cover"
-                      accessibilityIgnoresInvertColors
-                    />
-                  </Pressable>
-                ))}
-              </ScrollView>
+              <EstablishmentPhotosCarousel
+                uris={schoolMedia.photoUris}
+                rtl={isRTL}
+                t={t}
+                onPhotoPress={setPhotoGalleryIndex}
+              />
             </Section>
           ) : null}
 
@@ -902,55 +894,6 @@ export default function EstablishmentDetailScreen() {
                 </Pressable>
               </Section>
             )
-          ) : null}
-
-          {schoolMedia.brochureRawUrl ? (
-            <Section title={t('estDetailMediaBrochure')} rtl={isRTL}>
-              <Pressable
-                disabled={brochureDownloading}
-                onPress={() => {
-                  if (brochureDownloading || !schoolMedia.brochureRawUrl) return;
-                  void (async () => {
-                    setBrochureDownloading(true);
-                    const result = await downloadDocument(
-                      schoolMedia.brochureRawUrl!,
-                      schoolMedia.brochureTitle ?? undefined,
-                    );
-                    setBrochureDownloading(false);
-                    if (!result.ok) {
-                      if (result.reason === 'sharing-unavailable') {
-                        Alert.alert(
-                          t('inscDetailDocumentDownloadErrorTitle'),
-                          t('inscDetailDocumentSharingUnavailableMsg'),
-                        );
-                      } else {
-                        Alert.alert(
-                          t('inscDetailDocumentDownloadErrorTitle'),
-                          t('inscDetailDocumentDownloadErrorMsg'),
-                        );
-                      }
-                    }
-                  })();
-                }}
-                style={({ pressed }) => [
-                  styles.mediaOpenRow,
-                  isRTL && styles.mediaOpenRowRtl,
-                  pressed && !brochureDownloading && { opacity: 0.88 },
-                  brochureDownloading && { opacity: 0.65 },
-                ]}
-              >
-                {brochureDownloading ? (
-                  <ActivityIndicator size="small" color={homeShell.blue} />
-                ) : (
-                  <FontAwesome name="file-pdf-o" size={18} color={homeShell.blue} />
-                )}
-                <Text style={[styles.mediaOpenTxt, isRTL && styles.txtRtl]}>
-                  {brochureDownloading
-                    ? t('estDetailMediaBrochurePreparing')
-                    : t('estDetailMediaBrochureDownload')}
-                </Text>
-              </Pressable>
-            </Section>
           ) : null}
 
           {/* Éligibilité personnalisée — visible uniquement si l'école a publié
@@ -1046,26 +989,6 @@ export default function EstablishmentDetailScreen() {
             </Section>
           ) : null}
 
-          {data.boursesDisponibles ? (
-            <Section title={t('estDetailScholarships')} rtl={isRTL}>
-              <Text style={[styles.body, isRTL && styles.txtRtl]}>
-                {t('estScholarshipsAvailable')}
-                {data.bourseMin != null || data.bourseMax != null
-                  ? ` · ${fmtMaybeNum(data.bourseMin)} → ${fmtMaybeNum(data.bourseMax)} Dhs`
-                  : ''}
-              </Text>
-              {data.typesBourse && data.typesBourse.length ? (
-                <Wrap rtl={isRTL}>
-                  {data.typesBourse.map((typeKey) => (
-                    <Chip
-                      key={typeKey}
-                      txt={labelEstablishmentBourseType(String(typeKey), t)}
-                    />
-                  ))}
-                </Wrap>
-              ) : null}
-            </Section>
-          ) : null}
 
           <Section title={t('estDetailEngagements')} rtl={isRTL}>
             <View style={[styles.flagsRow, isRTL && styles.flagsRowRtl]}>
@@ -1078,7 +1001,11 @@ export default function EstablishmentDetailScreen() {
 
           {campusRows.length > 0 ? (
             <Section title={`${t('estDetailCampus')} (${campusRows.length})`} rtl={isRTL}>
-              <EstablishmentCampusSection rows={campusRows} />
+              <EstablishmentCampusCarousel
+                rows={campusRows}
+                rtl={isRTL}
+                t={t}
+              />
             </Section>
           ) : null}
 
@@ -1096,9 +1023,18 @@ export default function EstablishmentDetailScreen() {
                 </Text>
               ) : null}
               {data.contact.siteWeb ? (
-                <Text style={[styles.linkLine, isRTL && styles.linkLineRtl]} numberOfLines={2}>
-                  <FontAwesome name="link" size={14} color={homeShell.blue} /> {data.contact.siteWeb}
-                </Text>
+                <Pressable
+                  onPress={() => {
+                    const href = normalizeWebsiteHref(data.contact?.siteWeb);
+                    if (href) void Linking.openURL(href).catch(() => undefined);
+                  }}
+                  accessibilityRole="link"
+                  accessibilityLabel={t('estDetailWebsiteLink')}
+                  style={({ pressed }) => [pressed && { opacity: 0.85 }]}>
+                  <Text style={[styles.linkLine, styles.linkLinePressable, isRTL && styles.linkLineRtl]}>
+                    <FontAwesome name="link" size={14} color={homeShell.blue} /> {t('estDetailWebsiteLink')}
+                  </Text>
+                </Pressable>
               ) : null}
             </Section>
           ) : null}
@@ -1121,7 +1057,7 @@ export default function EstablishmentDetailScreen() {
                 <Pressable
                   onPress={openPartnerSite}
                   accessibilityRole="link"
-                  accessibilityLabel={t('estLeadgenVisitSite')}
+                  accessibilityLabel={placementTrafficCtaShort}
                   style={({ pressed }) => [
                     styles.partnerFooterBtn,
                     styles.partnerFooterSiteBtn,
@@ -1129,7 +1065,7 @@ export default function EstablishmentDetailScreen() {
                   ]}>
                   <FontAwesome name="external-link" size={14} color={brand.white} />
                   <Text style={styles.partnerFooterBtnTxt} numberOfLines={1}>
-                    {t('estCardBtnVisitSite')}
+                    {placementTrafficCtaShort}
                   </Text>
                 </Pressable>
                 <Pressable
@@ -1151,7 +1087,7 @@ export default function EstablishmentDetailScreen() {
               <Pressable
                 onPress={openPartnerSite}
                 accessibilityRole="link"
-                accessibilityLabel={t('estLeadgenVisitSite')}
+                accessibilityLabel={placementTrafficCtaLabel}
                 style={({ pressed }) => [
                   styles.partnerFooterBtn,
                   styles.partnerFooterSiteBtn,
@@ -1159,7 +1095,7 @@ export default function EstablishmentDetailScreen() {
                   pressed && { opacity: 0.9 },
                 ]}>
                 <FontAwesome name="external-link" size={14} color={brand.white} />
-                <Text style={styles.partnerFooterBtnTxt}>{t('estLeadgenVisitSite')}</Text>
+                <Text style={styles.partnerFooterBtnTxt}>{placementTrafficCtaLabel}</Text>
               </Pressable>
             ) : (
               <Pressable
@@ -1196,6 +1132,17 @@ export default function EstablishmentDetailScreen() {
         </>
       )}
       </View>
+
+      <PhotoGalleryModal
+        visible={photoGalleryIndex !== null}
+        initialIndex={photoGalleryIndex ?? 0}
+        uris={schoolMedia.photoUris}
+        onClose={() => setPhotoGalleryIndex(null)}
+        isRTL={isRTL}
+        closeLabel={t('estDetailPhotoGalleryClose')}
+        prevLabel={t('estDetailPhotoGalleryPrev')}
+        nextLabel={t('estDetailPhotoGalleryNext')}
+      />
     </View>
   );
 }
@@ -1209,48 +1156,6 @@ function filieresLine(data: EstablishmentNormalized, rtl: boolean): string {
   if (typeof n !== 'number' || !Number.isFinite(n)) return '—';
   if (rtl) return `${n} شعبة`;
   return `${n} filière${n > 1 ? 's' : ''}`;
-}
-
-function ProgrammeInfoRow({
-  icon,
-  label,
-  value,
-  rtl,
-}: {
-  icon: ComponentProps<typeof FontAwesome>['name'];
-  label: string;
-  value: string;
-  rtl: boolean;
-}) {
-  return (
-    <View style={[styles.programmeInfoRow, rtl && styles.programmeInfoRowRtl]}>
-      <View style={[styles.programmeInfoLabelWrap, rtl && styles.programmeInfoLabelWrapRtl]}>
-        <FontAwesome name={icon} size={12} color={brand.textMuted} />
-        <Text style={[styles.programmeInfoLabel, rtl && styles.txtRtl]}>{label}</Text>
-      </View>
-      <Text style={[styles.programmeInfoValue, rtl && styles.txtRtl]} numberOfLines={3}>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function formatProgrammeDuration(
-  raw: string | null | undefined,
-  establishment: EstablishmentNormalized,
-  rtl: boolean,
-): string {
-  const lang = rtl ? 'ar' : 'fr';
-  const trimmed = String(raw ?? '').trim();
-  if (trimmed) {
-    if (trimmed.includes('ans') || trimmed.includes('سنة')) return trimmed;
-    const n = parseInt(trimmed, 10);
-    if (Number.isFinite(n)) {
-      return formatEstablishmentStudyDurationYears(n, lang);
-    }
-    return trimmed;
-  }
-  return formatEstablishmentStudyDuration(establishment, lang) || establishment.dureeLabel || '—';
 }
 
 function secteurLines(data: EstablishmentNormalized, rtl: boolean): string[] {
@@ -1282,14 +1187,6 @@ function fmtMaybeNum(n: unknown): string {
 function formatNb(n: number | null | undefined): string {
   if (n === null || n === undefined || !Number.isFinite(n)) return '—';
   return n.toLocaleString('fr-FR');
-}
-
-function yearsLabel(data: EstablishmentNormalized, rtl: boolean): string {
-  const y = data.academicInfo?.anneesEtudes ?? data.anneesEtudes;
-  if (typeof y === 'number' && y > 0) {
-    return formatEstablishmentStudyDurationYears(y, rtl ? 'ar' : 'fr');
-  }
-  return '—';
 }
 
 function Section({
@@ -1706,6 +1603,23 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontWeight: '800',
   },
+  heroBrochureBtn: {
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    alignSelf: 'stretch',
+    backgroundColor: brand.primary,
+    borderRadius: radius.lg,
+    paddingVertical: 12,
+    paddingHorizontal: spacing.md,
+  },
+  heroBrochureBtnTxt: {
+    color: brand.white,
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+  },
   body: {
     color: homeShell.cardMuted,
     fontSize: fontSize.md,
@@ -1829,130 +1743,9 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     writingDirection: 'rtl',
   },
-  photoStrip: {
-    flexDirection: 'row',
-    gap: spacing.sm,
-    paddingVertical: 2,
-  },
-  photoStripRtl: {
-    flexDirection: 'row-reverse',
-  },
-  photoThumb: {
-    width: 200,
-    height: 120,
-    borderRadius: radius.lg,
-    backgroundColor: '#E2E8F0',
-  },
-  programmeStrip: {
-    flexDirection: 'row',
-    gap: spacing.md,
-    paddingVertical: 2,
-  },
-  programmeStripRtl: {
-    flexDirection: 'row-reverse',
-  },
-  programmeCard: {
-    width: 300,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(15,23,42,0.1)',
-    backgroundColor: '#FFFFFF',
-    overflow: 'hidden',
-    shadowColor: '#0F172A',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 8,
-    elevation: 2,
-  },
-  programmeCardAccent: {
-    height: 4,
-    backgroundColor: homeShell.blue,
-  },
-  programmeCardBody: {
-    padding: spacing.md,
-    gap: spacing.sm,
-  },
-  programmeDiplomePill: {
-    alignSelf: 'flex-start',
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    backgroundColor: 'rgba(37,99,235,0.12)',
-    borderRadius: radius.full,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    maxWidth: '100%',
-  },
-  programmeDiplomeTxt: {
-    fontSize: 11,
-    fontWeight: '700',
-    color: homeShell.blue,
-  },
-  programmeTitle: {
-    fontSize: fontSize.md,
-    fontWeight: '800',
-    color: homeShell.cardText,
-    lineHeight: 22,
-    marginBottom: 2,
-  },
-  programmeInfoList: {
-    marginTop: spacing.xs,
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(15,23,42,0.06)',
-    paddingTop: spacing.xs,
-    gap: 2,
-  },
-  programmeInfoRow: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-    paddingVertical: 6,
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(15,23,42,0.05)',
-  },
-  programmeInfoRowRtl: {
-    flexDirection: 'row-reverse',
-  },
-  programmeInfoLabelWrap: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flexShrink: 0,
-    maxWidth: '48%',
-  },
-  programmeInfoLabelWrapRtl: {
-    flexDirection: 'row-reverse',
-  },
-  programmeInfoLabel: {
-    fontSize: fontSize.sm,
-    color: brand.textMuted,
-    flexShrink: 1,
-  },
-  programmeInfoValue: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: homeShell.cardText,
-    flex: 1,
-    textAlign: 'right',
-    lineHeight: 18,
-  },
-  programmeMetaRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: spacing.sm,
-  },
-  programmeMetaLabel: {
-    fontSize: fontSize.sm,
-    color: brand.textMuted,
-  },
-  programmeMetaValue: {
-    fontSize: fontSize.sm,
-    fontWeight: '700',
-    color: homeShell.cardText,
-    flexShrink: 1,
-    textAlign: 'right',
+  linkLinePressable: {
+    textDecorationLine: 'underline',
+    textDecorationColor: homeShell.blue,
   },
   mediaOpenRow: {
     flexDirection: 'row',
