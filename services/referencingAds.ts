@@ -1,6 +1,7 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
 import type { EstablishmentListItem, EstablishmentNormalized } from '@/services/establishments';
+import { logAnalytics } from '@/utils/analyticsDebug';
 import { getMobileVisitorId } from '@/utils/visitorId';
 
 export type ListingPlacementInfo = {
@@ -159,6 +160,32 @@ export function establishmentBlocksPartnerBanners(
   return Boolean(item.isSponsored);
 }
 
+const sessionListingPlacementTracked = new Set<number>();
+
+/** Impression carte référencement / sponsor — une fois par placement et session. */
+export function recordReferencingListingImpressionOnce(opts: {
+  placementId: number;
+  source: 'referencing' | 'sponsorship';
+}): void {
+  const { placementId, source } = opts;
+  if (!Number.isFinite(placementId) || placementId <= 0) return;
+  if (sessionListingPlacementTracked.has(placementId)) return;
+  sessionListingPlacementTracked.add(placementId);
+  logAnalytics('referencing listing impression →', { placementId, source });
+  void recordReferencingImpressionNative(opts)
+    .then(() => {
+      logAnalytics('referencing listing impression ok', { placementId, source });
+    })
+    .catch((e) => {
+      sessionListingPlacementTracked.delete(placementId);
+      logAnalytics('referencing listing impression fail', {
+        placementId,
+        source,
+        error: e instanceof Error ? e.message : String(e),
+      });
+    });
+}
+
 export async function recordReferencingImpressionNative(opts: {
   placementId: number;
   source: 'referencing' | 'sponsorship';
@@ -172,6 +199,7 @@ export async function recordReferencingImpressionNative(opts: {
       visitorId,
       viewport: 'mobile',
       clientSurface: 'native_app',
+      clientNativeApp: true,
     },
   );
 }
@@ -202,6 +230,7 @@ export async function recordReferencingPageViewNative(establishmentId: number): 
       visitorId,
       viewport: 'mobile',
       clientSurface: 'native_app',
+      clientNativeApp: true,
     },
   );
 }

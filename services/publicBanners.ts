@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { buildApiUrl, getApiBaseUrl } from '@/constants/api';
 import { httpGetJson, httpPostJson } from '@/services/http';
+import { logAnalytics } from '@/utils/analyticsDebug';
 import { getMobileVisitorId } from '@/utils/visitorId';
 
 export type BannerZoneCode = 'top' | 'mid' | 'bottom' | 'mid_square';
@@ -165,14 +166,29 @@ export async function recordBannerImpressionNative(opts: {
     visitorId,
     viewport: opts.viewport ?? 'mobile',
     clientSurface: 'native_app',
+    clientNativeApp: true,
   };
   if (opts.slotId != null && opts.slotId > 0) body.slotId = opts.slotId;
   if (opts.page) body.page = opts.page;
   if (opts.position != null && opts.position >= 1) body.position = opts.position;
-  await httpPostJson<{ success: boolean }, Record<string, unknown>>(
-    buildApiUrl('/api/banners/record-impression'),
-    body,
-  );
+  logAnalytics('banner impression →', {
+    variantId: opts.variantId,
+    page: opts.page,
+    position: opts.position,
+  });
+  try {
+    await httpPostJson<{ success: boolean }, Record<string, unknown>>(
+      buildApiUrl('/api/banners/record-impression'),
+      body,
+    );
+    logAnalytics('banner impression ok', { variantId: opts.variantId });
+  } catch (e) {
+    logAnalytics('banner impression fail', {
+      variantId: opts.variantId,
+      error: e instanceof Error ? e.message : String(e),
+    });
+    throw e;
+  }
 }
 
 export async function recordBannerClickNative(opts: {
@@ -186,6 +202,7 @@ export async function recordBannerClickNative(opts: {
     variantId: opts.variantId,
     viewport: opts.viewport ?? 'mobile',
     clientSurface: 'native_app',
+    clientNativeApp: true,
   };
   if (opts.slotId != null && opts.slotId > 0) body.slotId = opts.slotId;
   if (opts.page) body.page = opts.page;

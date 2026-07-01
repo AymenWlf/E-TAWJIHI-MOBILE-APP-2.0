@@ -107,7 +107,7 @@ export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }:
 
   const [orderedSlots, setOrderedSlots] = useState<BannerSlotPublic[]>([]);
   const [slideCreatives, setSlideCreatives] = useState<BannerCreativePublic[]>([]);
-  const creatives = slideCreatives;
+  const slotCount = orderedSlots.length;
   const [loading, setLoading] = useState(true);
   const [index, setIndex] = useState(0);
   const [navigationUnlocked, setNavigationUnlocked] = useState(false);
@@ -141,44 +141,44 @@ export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }:
 
   const goToIndex = useCallback(
     (next: number) => {
-      if (creatives.length <= 1) return;
-      const clamped = ((next % creatives.length) + creatives.length) % creatives.length;
+      if (slotCount <= 1) return;
+      const clamped = ((next % slotCount) + slotCount) % slotCount;
       setIndex(clamped);
       translateX.value = withTiming(-clamped * slideWidth, { duration: SLIDE_ANIM_MS });
       setCountdown(10);
     },
-    [creatives.length, slideWidth, translateX],
+    [slotCount, slideWidth, translateX],
   );
 
   const goNext = useCallback(() => {
-    if (!navigationUnlocked || creatives.length <= 1) return;
+    if (!navigationUnlocked || slotCount <= 1) return;
     goToIndex(index + 1);
-  }, [creatives.length, goToIndex, index, navigationUnlocked]);
+  }, [slotCount, goToIndex, index, navigationUnlocked]);
 
   const goPrev = useCallback(() => {
-    if (!navigationUnlocked || creatives.length <= 1) return;
+    if (!navigationUnlocked || slotCount <= 1) return;
     goToIndex(index - 1);
-  }, [creatives.length, goToIndex, index, navigationUnlocked]);
+  }, [slotCount, goToIndex, index, navigationUnlocked]);
 
   const scheduleAutoAdvance = useCallback(() => {
     clearAutoTimer();
-    if (creatives.length <= 1) return;
+    if (slotCount <= 1) return;
     autoTimerRef.current = setTimeout(() => {
       if (!navigationUnlockedRef.current) {
         setNavigationUnlocked(true);
-        if (creatives.length > 1) {
+        if (slotCount > 1) {
           goToIndex(1);
         }
         return;
       }
       setIndex((current) => {
-        const next = (current + 1) % creatives.length;
+        const next = (current + 1) % slotCount;
         translateX.value = withTiming(-next * slideWidth, { duration: SLIDE_ANIM_MS });
         return next;
       });
       setCountdown(10);
     }, SLIDE_DURATION_MS);
-  }, [clearAutoTimer, creatives.length, goToIndex, slideWidth, translateX]);
+  }, [clearAutoTimer, slotCount, goToIndex, slideWidth, translateX]);
 
   useEffect(() => {
     let cancelled = false;
@@ -234,7 +234,7 @@ export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }:
     translateX.value = withTiming(-index * slideWidth, { duration: SLIDE_ANIM_MS });
   }, [index, slideWidth, translateX]);
 
-  const creative = creatives[index] ?? null;
+  const creative = slideCreatives[index] ?? null;
   const variantId = creative?.variantId ?? creative?.id ?? 0;
 
   useEffect(() => {
@@ -242,47 +242,47 @@ export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }:
     const key = bannerImpressionKey(variantId, analyticsPage, index + 1, viewport);
     if (recordedBannerImpressions.has(key)) return;
     recordedBannerImpressions.add(key);
-    fireAndForget(
-      recordBannerImpressionNative({
-        variantId,
-        slotId: creative?.slotId,
-        page: analyticsPage,
-        position: index + 1,
-        viewport,
-      }),
-    );
+    void recordBannerImpressionNative({
+      variantId,
+      slotId: creative?.slotId,
+      page: analyticsPage,
+      position: index + 1,
+      viewport,
+    }).catch(() => {
+      recordedBannerImpressions.delete(key);
+    });
   }, [variantId, creative?.slotId, analyticsPage, index, viewport]);
 
   useEffect(() => {
-    if (creatives.length <= 1) return;
+    if (slotCount <= 1) return;
     scheduleAutoAdvance();
     return clearAutoTimer;
-  }, [creatives.length, index, navigationUnlocked, scheduleAutoAdvance, clearAutoTimer]);
+  }, [slotCount, index, navigationUnlocked, scheduleAutoAdvance, clearAutoTimer]);
 
   useEffect(() => {
-    if (creatives.length <= 1 || navigationUnlocked) return;
+    if (slotCount <= 1 || navigationUnlocked) return;
     clearCountdownTimer();
     setInitialCountdown(10);
     countdownTimerRef.current = setInterval(() => {
       setInitialCountdown((prev) => (prev > 1 ? prev - 1 : 1));
     }, 1000);
     return clearCountdownTimer;
-  }, [creatives.length, navigationUnlocked, clearCountdownTimer, zone]);
+  }, [slotCount, navigationUnlocked, clearCountdownTimer, zone]);
 
   useEffect(() => {
-    if (creatives.length <= 1 || !navigationUnlocked) return;
+    if (slotCount <= 1 || !navigationUnlocked) return;
     clearCountdownTimer();
     setCountdown(10);
     countdownTimerRef.current = setInterval(() => {
       setCountdown((prev) => (prev > 1 ? prev - 1 : 1));
     }, 1000);
     return clearCountdownTimer;
-  }, [creatives.length, index, navigationUnlocked, clearCountdownTimer]);
+  }, [slotCount, index, navigationUnlocked, clearCountdownTimer]);
 
   const panGesture = useMemo(
     () =>
       Gesture.Pan()
-        .enabled(navigationUnlocked && creatives.length > 1)
+        .enabled(navigationUnlocked && slotCount > 1)
         .activeOffsetX([-14, 14])
         .onEnd((e) => {
           if (e.translationX <= -SWIPE_THRESHOLD_PX) {
@@ -291,7 +291,7 @@ export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }:
             runOnJS(goPrev)();
           }
         }),
-    [creatives.length, goNext, goPrev, navigationUnlocked],
+    [slotCount, goNext, goPrev, navigationUnlocked],
   );
 
   const trackStyle = useAnimatedStyle(() => ({
@@ -299,7 +299,7 @@ export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }:
   }));
 
   const onPressCurrentCreative = useCallback(() => {
-    const c = creatives[index];
+    const c = slideCreatives[index];
     const vid = c?.variantId ?? c?.id;
     if (!vid) return;
     fireAndForget(
@@ -313,7 +313,7 @@ export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }:
     );
     const url = resolveClickUrl(c);
     if (url) void Linking.openURL(url);
-  }, [analyticsPage, creatives, index, viewport]);
+  }, [analyticsPage, slideCreatives, index, viewport]);
 
   const shellStyle = useMemo(
     () => [
@@ -354,15 +354,21 @@ export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }:
     );
   }
 
-  if (orderedSlots.length === 0 && !loading) {
+  if (slotCount === 0 && !loading) {
     return null;
   }
 
-  if (creatives.length === 0 && !loading) {
-    return null;
+  if (slotCount > 0 && !slideCreatives[index] && !loading) {
+    return (
+      <View style={shellStyle}>
+        <View style={loadingBoxStyle}>
+          <ActivityIndicator />
+        </View>
+      </View>
+    );
   }
 
-  const showControls = creatives.length > 1;
+  const showControls = slotCount > 1;
   const countdownLabel = navigationUnlocked ? countdown : initialCountdown;
 
   return (
@@ -375,16 +381,17 @@ export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }:
           <Animated.View
             style={[
               styles.carouselTrack,
-              { width: slideWidth * creatives.length, height: slideHeight },
+              { width: slideWidth * slotCount, height: slideHeight },
               trackStyle,
             ]}
           >
-            {creatives.map((c, i) => {
+            {orderedSlots.map((slotItem, i) => {
+              const c = slideCreatives[i];
               const url = c ? pickBannerCreativeImageUrl(c, viewport) : '';
               if (!url) {
                 return (
                   <View
-                    key={`empty-${i}`}
+                    key={`slot-${slotItem.slotId}-${i}`}
                     pointerEvents="none"
                     style={[styles.slide, { width: slideWidth, height: slideHeight }]}
                   />
@@ -407,11 +414,11 @@ export function AppBannerSlot({ zone, analyticsPage, style, campaignId = null }:
             })}
           </Animated.View>
 
-          {resolveClickUrl(creatives[index]) ? (
+          {resolveClickUrl(slideCreatives[index]) ? (
             <Pressable
               onPress={onPressCurrentCreative}
               accessibilityRole="link"
-              accessibilityLabel={creatives[index]?.label || 'Publicité partenaire'}
+              accessibilityLabel={slideCreatives[index]?.label || 'Publicité partenaire'}
               style={({ pressed }) => [styles.clickOverlay, pressed && { opacity: 0.92 }]}
             />
           ) : null}

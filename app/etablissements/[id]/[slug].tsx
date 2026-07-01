@@ -393,8 +393,13 @@ export default function EstablishmentDetailScreen() {
 
   useEffect(() => {
     if (!Number.isFinite(id) || id <= 0 || referencingPageViewSent.current) return;
-    referencingPageViewSent.current = true;
-    fireAndForget(recordReferencingPageViewNative(id));
+    void recordReferencingPageViewNative(id)
+      .then(() => {
+        referencingPageViewSent.current = true;
+      })
+      .catch(() => {
+        referencingPageViewSent.current = false;
+      });
   }, [id]);
 
   /* Annonces de l'école : chargement séparé, n'attend pas le détail établissement. */

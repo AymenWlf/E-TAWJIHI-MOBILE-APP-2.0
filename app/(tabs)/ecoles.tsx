@@ -11,6 +11,7 @@ import {
   ScrollView,
   StyleSheet,
   View,
+  type ViewToken,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -46,7 +47,7 @@ import {
 } from '@/services/establishmentFollows';
 import {
   recordEstablishmentClick,
-  recordEstablishmentListingImpressionsBatch,
+  recordEstablishmentListingImpressionOnce,
 } from '@/services/establishmentTracking';
 import {
   evaluateEligibilityByFiliere,
@@ -57,6 +58,7 @@ import { fireAndForget } from '@/utils/fireAndForget';
 import {
   fetchListingPlacementsByEstablishment,
   mergeEstablishmentsWithListingPlacements,
+  recordReferencingListingImpressionOnce,
   type ListingPlacementInfo,
 } from '@/services/referencingAds';
 import { listAllSecteursActive, listCities, type CityRow, type SecteurRow } from '@/services/referenceData';
@@ -68,6 +70,8 @@ import {
   sortEstablishmentsMobileRandomListing,
 } from '@/utils/establishmentWebFilters';
 import { resolveEstablishmentLockedVariant } from '@/utils/establishmentLockDisplay';
+import { establishmentListingPlacement } from '@/utils/establishmentListingPlacement';
+import { placementIsActivelySponsored } from '@/utils/referencingPlacementUi';
 
 const PAGE_SIZE = 18;
 /** Bannière `mid` : une seule fois, après la 3e fiche (index 0-based = 2). */
@@ -613,14 +617,27 @@ export default function EcolesScreen() {
     });
   }, [filteredListingBeforeSlice.length]);
 
-  useEffect(() => {
-    if (!visibleItems.length) return;
-    recordEstablishmentListingImpressionsBatch(
-      visibleItems
-        .filter((it) => typeof it.id === 'number')
-        .map((it) => ({ id: it.id as number })),
-    );
-  }, [visibleItems]);
+  const listingViewabilityConfig = useRef({
+    itemVisiblePercentThreshold: 45,
+    minimumViewTime: 280,
+  }).current;
+
+  const onListingViewableItemsChanged = useRef(
+    ({ viewableItems }: { viewableItems: ViewToken[] }) => {
+      for (const vi of viewableItems) {
+        if (!vi.isViewable || vi.item == null) continue;
+        const item = vi.item as EstablishmentNormalized;
+        if (!Number.isFinite(item.id) || item.id <= 0) continue;
+        recordEstablishmentListingImpressionOnce(item.id);
+        const placementId = item.referencingPlacementId;
+        if (typeof placementId === 'number' && placementId > 0) {
+          const placement = establishmentListingPlacement(item);
+          const source = placementIsActivelySponsored(placement) ? 'sponsorship' : 'referencing';
+          recordReferencingListingImpressionOnce({ placementId, source });
+        }
+      }
+    },
+  ).current;
 
   const loadMore = useCallback(async () => {
     if (loadMoreInFlightRef.current || loadingMore || loading || refreshing) return;
@@ -869,6 +886,8 @@ export default function EcolesScreen() {
           maxToRenderPerBatch={PAGE_SIZE}
           windowSize={7}
           removeClippedSubviews={false}
+          viewabilityConfig={listingViewabilityConfig}
+          onViewableItemsChanged={onListingViewableItemsChanged}
           onMomentumScrollBegin={() => {
             endReachedEnabledRef.current = true;
           }}

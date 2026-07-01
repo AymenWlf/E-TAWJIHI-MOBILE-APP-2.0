@@ -1,5 +1,4 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useEffect, useRef } from 'react';
 import { ActivityIndicator, Image, Linking, Pressable, StyleSheet, View } from 'react-native';
 
 import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlusPaywall';
@@ -15,7 +14,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useEstablishmentLeadGenSheetOptional } from '@/contexts/EstablishmentLeadGenSheetContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import type { EstablishmentNormalized } from '@/services/establishments';
-import { recordReferencingClickNative, recordReferencingContactClickNative, recordReferencingImpressionNative, recordExternalLinkClickNative } from '@/services/referencingAds';
+import { recordReferencingClickNative, recordReferencingContactClickNative, recordExternalLinkClickNative } from '@/services/referencingAds';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { establishmentListingPlacement } from '@/utils/establishmentListingPlacement';
@@ -51,7 +50,6 @@ export function EstablishmentCard({
   const { isRTL, t, locale } = useLocale();
   const { profile: eligibilityProfile } = useEligibilityProfile();
   const leadGenSheet = useEstablishmentLeadGenSheetOptional();
-  const referencingImpSent = useRef(false);
   const contentLocked = lockedVariant === 'compact';
 
   const placement = establishmentListingPlacement(item);
@@ -72,12 +70,6 @@ export function EstablishmentCard({
   const showSecondaryContact = showLeadgenButton && showTrafficSiteButton;
 
   const placementId = item.referencingPlacementId;
-  useEffect(() => {
-    if (!placementId || referencingImpSent.current) return;
-    referencingImpSent.current = true;
-    const source = isActivelySponsored ? 'sponsorship' : 'referencing';
-    fireAndForget(recordReferencingImpressionNative({ placementId, source }));
-  }, [placementId, isActivelySponsored]);
 
   const handleCardPress = () => {
     if (placementId) {

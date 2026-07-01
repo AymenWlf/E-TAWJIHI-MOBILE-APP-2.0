@@ -1,6 +1,6 @@
 import { buildApiUrl } from '@/constants/api';
 import { httpPostJson } from '@/services/http';
-import { fireAndForget } from '@/utils/fireAndForget';
+import { logAnalytics } from '@/utils/analyticsDebug';
 import { getMobileVisitorId } from '@/utils/visitorId';
 
 /**
@@ -39,8 +39,8 @@ const sessionDetailTracked = new Set<number>();
 export async function recordEstablishmentImpression(
   establishmentId: number,
   context: 'listing' | 'detail' = 'listing',
-): Promise<void> {
-  if (!Number.isFinite(establishmentId) || establishmentId <= 0) return;
+): Promise<boolean> {
+  if (!Number.isFinite(establishmentId) || establishmentId <= 0) return false;
   try {
     const visitorId = await getMobileVisitorId();
     const url = buildApiUrl('/api/establishments-tracking/record-impression');
@@ -50,8 +50,15 @@ export async function recordEstablishmentImpression(
       source: 'mobile',
       visitorId,
     });
-  } catch {
-    /* noop */
+    logAnalytics('establishments-tracking impression ok', { establishmentId, context });
+    return true;
+  } catch (e) {
+    logAnalytics('establishments-tracking impression fail', {
+      establishmentId,
+      context,
+      error: e instanceof Error ? e.message : String(e),
+    });
+    return false;
   }
 }
 
@@ -75,17 +82,28 @@ export async function recordEstablishmentClick(
 }
 
 /**
- * Enregistre les impressions « listing » pour un lot d'écoles visibles,
- * en évitant les doublons sur la même session d'app.
+ * Impression listing — dédupliquée par session, à appeler quand la carte
+ * entre réellement dans le viewport (FlatList viewability).
+ */
+export function recordEstablishmentListingImpressionOnce(establishmentId: number): void {
+  if (!Number.isFinite(establishmentId) || establishmentId <= 0) return;
+  if (sessionListingTracked.has(establishmentId)) return;
+  sessionListingTracked.add(establishmentId);
+  logAnalytics('establishments-tracking listing impression →', { establishmentId });
+  void recordEstablishmentImpression(establishmentId, 'listing').then((ok) => {
+    if (!ok) sessionListingTracked.delete(establishmentId);
+  });
+}
+
+/**
+ * @deprecated Préférer `recordEstablishmentListingImpressionOnce` au scroll visible.
  */
 export function recordEstablishmentListingImpressionsBatch(items: { id: number }[]): void {
   if (!Array.isArray(items) || items.length === 0) return;
-  const fresh = items.filter(
-    (i) => Number.isFinite(i.id) && i.id > 0 && !sessionListingTracked.has(i.id),
-  );
-  for (const it of fresh) {
-    sessionListingTracked.add(it.id);
-    fireAndForget(recordEstablishmentImpression(it.id, 'listing'));
+  for (const it of items) {
+    if (Number.isFinite(it.id) && it.id > 0) {
+      recordEstablishmentListingImpressionOnce(it.id);
+    }
   }
 }
 
@@ -97,5 +115,7 @@ export function recordEstablishmentDetailImpressionOnce(establishmentId: number)
   if (!Number.isFinite(establishmentId) || establishmentId <= 0) return;
   if (sessionDetailTracked.has(establishmentId)) return;
   sessionDetailTracked.add(establishmentId);
-  fireAndForget(recordEstablishmentImpression(establishmentId, 'detail'));
+  void recordEstablishmentImpression(establishmentId, 'detail').then((ok) => {
+    if (!ok) sessionDetailTracked.delete(establishmentId);
+  });
 }
