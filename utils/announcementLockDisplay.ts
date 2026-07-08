@@ -13,6 +13,17 @@ export function resolveAnnouncementLockedVariant(
   return index === 0 ? 'featured' : 'compact';
 }
 
+/** Annonces concours sponsorisées : contenu visible sans TAWJIH PLUS. */
+export function resolveContestAnnouncementLockedVariant(
+  previewOnly: boolean | undefined,
+  showPaywall: boolean,
+  index: number,
+  isSponsored?: boolean,
+): 'none' | AnnouncementLockedVariant {
+  if (isSponsored === true) return 'none';
+  return resolveAnnouncementLockedVariant(previewOnly ?? showPaywall, index);
+}
+
 export function isAnnouncementContentLocked(
   lockedVariant: 'none' | AnnouncementLockedVariant,
 ): boolean {

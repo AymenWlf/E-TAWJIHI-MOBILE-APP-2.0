@@ -68,7 +68,7 @@ function LatestAnnouncementCard({
       fallbackEstablishmentAvatarName(school.nom, school.sigle)
     : null;
   const dateLabel = formatShortDate(item.dateStart, locale);
-  const showDateLocked = datesLocked || Boolean(item.previewOnly);
+  const showDateLocked = (datesLocked || Boolean(item.previewOnly)) && item.isSponsored !== true;
   const statusLabel = item.isOpen ? openLabel : closedLabel;
   const typeVisual = getAnnouncementTypeStyle(item.announcementType);
 
@@ -291,7 +291,7 @@ export function HomeLatestAnnouncementsSection({
                 closedLabel={t('homeAnnouncementClosed')}
                 datesLocked={datesLocked}
                 datesLockedLabel={t('homeAnnouncementDatesLocked')}
-                compactLocked={datesLocked}
+                compactLocked={datesLocked && item.isSponsored !== true}
                 onPress={() => onPressAnnouncement(item)}
               />
             </View>

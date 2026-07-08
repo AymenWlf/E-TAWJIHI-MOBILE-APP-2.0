@@ -144,6 +144,20 @@ export function primaryRegistrationUrl(data: ContestRegistrationMethodsData): st
   return (data.registrationUrl ?? '').trim();
 }
 
+export function resolveContestOnlineRegistrationUrl(
+  data: ContestRegistrationMethodsData,
+  campaignTrafficUrl?: string | null,
+): string {
+  const fromCampaign = (campaignTrafficUrl ?? '').trim();
+  if (fromCampaign) return fromCampaign;
+  if (isOnlineRegistrationPending(data)) return '';
+  return primaryRegistrationUrl(data);
+}
+
+export function hasCampaignTrafficRegistrationUrl(campaignTrafficUrl?: string | null): boolean {
+  return (campaignTrafficUrl ?? '').trim() !== '';
+}
+
 export function registrationMailto(email: string): string {
   const trimmed = email.trim();
   if (!trimmed) return '';

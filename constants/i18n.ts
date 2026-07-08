@@ -748,6 +748,8 @@ export type HomeCopyKey =
   | 'estDetailSeuilsBacNormal'
   | 'estDetailSeuilsBacMission'
   | 'estDetailSeuilsMode'
+  | 'estDetailEtudeDossierBody'
+  | 'estDetailEtudeDossierHint'
   | 'estDetailPresentation'
   | 'estDetailProgrammes'
   | 'estDetailProgrammesPrev'
@@ -2598,6 +2600,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailSeuilsBacNormal: 'Bac marocain',
     estDetailSeuilsBacMission: 'Bac mission',
     estDetailSeuilsMode: 'Mode',
+    estDetailEtudeDossierBody:
+      "L'admission à cet établissement se fait sur étude de dossier (analyse du parcours scolaire et des pièces fournies).",
+    estDetailEtudeDossierHint:
+      "Aucun seuil indicatif n'est publié sur cette fiche. Les critères peuvent varier selon la filière et la session.",
     estDetailPresentation: 'Présentation',
     estDetailProgrammes: 'Filières proposées',
     estDetailProgrammesPrev: 'Filières précédentes',
@@ -4513,6 +4519,10 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     estDetailSeuilsBacNormal: 'البكالوريا المغربية',
     estDetailSeuilsBacMission: 'البكالوريا الدولية',
     estDetailSeuilsMode: 'النمط',
+    estDetailEtudeDossierBody:
+      'القبول يتم عبر دراسة الملف (تحليل المسار الدراسي والوثائق المقدمة).',
+    estDetailEtudeDossierHint:
+      'لا تُعرض عتبات استرشادية على هذه الصفحة. قد تختلف المعايير حسب الشعبة والدورة.',
     estDetailPresentation: 'نبذة',
     estDetailProgrammes: 'الشعب المقترحة',
     estDetailProgrammesPrev: 'الشعب السابقة',

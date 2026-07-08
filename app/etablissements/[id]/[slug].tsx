@@ -26,7 +26,7 @@ import { ShareIconButton } from '@/components/share/ShareIconButton';
 import { AppBannerSlot } from '@/components/ads/AppBannerSlot';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
 import { TawjihPlusPreviewLockPanel } from '@/components/inscriptions/TawjihPlusPaywall';
-import { resolveAnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
+import { resolveContestAnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 import { AnnouncementCardSkeletonStack } from '@/components/inscriptions/AnnouncementCardSkeleton';
 import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { ContestYoutubeTutorial } from '@/components/inscriptions/ContestYoutubeTutorial';
@@ -38,6 +38,7 @@ import { DiagnosticEstablishmentCompatibilityBadge } from '@/components/diagnost
 import { EstablishmentCampusCarousel } from '@/components/schools/EstablishmentCampusCarousel';
 import { EstablishmentPhotosCarousel } from '@/components/schools/EstablishmentPhotosCarousel';
 import { EstablishmentSeuilAdmissionSection } from '@/components/schools/EstablishmentSeuilAdmissionSection';
+import { EstablishmentEtudeDossierSection } from '@/components/schools/EstablishmentEtudeDossierSection';
 import { EstablishmentProgrammesCarousel } from '@/components/schools/EstablishmentProgrammesCarousel';
 import { EstablishmentScholarshipsSection } from '@/components/schools/EstablishmentScholarshipsSection';
 import { getSeuilAdmissionDisplay } from '@/utils/establishmentSeuilAdmission';
@@ -53,6 +54,7 @@ import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import {
   fetchContestAnnouncementsByEstablishment,
   recordContestListingImpressionsBatch,
+  trackContestListingCardClick,
   type ContestAnnouncementCard,
 } from '@/services/contestAnnouncements';
 import {
@@ -760,9 +762,13 @@ export default function EstablishmentDetailScreen() {
               />
               <Cell
                 rtl={isRTL}
-                icon={data.concoursAdmission ? 'trophy' : 'folder-open-o'}
+                icon={data.concoursAdmission && !data.afficherEtudeDossierPublic ? 'trophy' : 'folder-open-o'}
                 label={t('estLabelAdmission')}
-                value={data.concoursAdmission ? t('estAdmissionConcours') : t('estAdmissionDossier')}
+                value={
+                  data.concoursAdmission && !data.afficherEtudeDossierPublic
+                    ? t('estAdmissionConcours')
+                    : t('estAdmissionDossier')
+                }
               />
               <Cell rtl={isRTL} icon="graduation-cap" label={t('estLabelTracks')} value={filieresLine(data, isRTL)} />
               {nbEtudiantsLabel ? (
@@ -777,7 +783,15 @@ export default function EstablishmentDetailScreen() {
             </Grid>
           </Section>
 
-          {seuilAdmissionDisplay?.hasAnyValue ? (
+          {data.afficherEtudeDossierPublic ? (
+            <Section title={t('estAdmissionDossier')} rtl={isRTL}>
+              <EstablishmentEtudeDossierSection
+                body={t('estDetailEtudeDossierBody')}
+                hint={t('estDetailEtudeDossierHint')}
+                rtl={isRTL}
+              />
+            </Section>
+          ) : seuilAdmissionDisplay?.hasAnyValue ? (
             <Section title={t('estDetailSeuilsAdmission')} rtl={isRTL}>
               <EstablishmentSeuilAdmissionSection
                 display={seuilAdmissionDisplay}
@@ -933,9 +947,11 @@ export default function EstablishmentDetailScreen() {
               ) : (
                 <View style={styles.announcementsList}>
                   {announcements.map((a, annIndex) => {
-                    const lockedVariant = resolveAnnouncementLockedVariant(
-                      Boolean(a.previewOnly) || showInscriptionsPaywall,
+                    const lockedVariant = resolveContestAnnouncementLockedVariant(
+                      a.previewOnly,
+                      showInscriptionsPaywall,
                       annIndex,
+                      a.isSponsored,
                     );
                     const cardLocked = lockedVariant !== 'none';
                     return (
@@ -947,15 +963,7 @@ export default function EstablishmentDetailScreen() {
                       followStateLoading={isLoggedIn && !followProbeDone}
                       busy={followBusy}
                       onToggleFollow={onToggleFollow}
-                      onOpenLink={() => {
-                        if (cardLocked) {
-                          openTawjihPlusProduct();
-                          return;
-                        }
-                        if (a.registrationUrl) {
-                          void Linking.openURL(a.registrationUrl).catch(() => undefined);
-                        }
-                      }}
+                      onOpenLink={() => undefined}
                       onUpdateStatus={() => {
                         if (cardLocked) openTawjihPlusProduct();
                       }}
@@ -964,6 +972,7 @@ export default function EstablishmentDetailScreen() {
                           openTawjihPlusProduct();
                           return;
                         }
+                        trackContestListingCardClick(a);
                         router.push(`/inscriptions/${a.id}` as never);
                       }}
                     />

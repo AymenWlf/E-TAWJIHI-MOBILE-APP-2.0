@@ -35,6 +35,7 @@ export type EstablishmentListItem = {
   dureeEtudesMax?: number | null;
   anneesEtudes?: number | null;
   concours?: boolean | null;
+  afficherEtudeDossierPublic?: boolean;
   bacObligatoire?: boolean | null;
   diplomesDelivres?: string[];
   /** Raccourci API (comme sur le web enrichi) */
@@ -148,6 +149,7 @@ export type EstablishmentNormalized = EstablishmentListItem & {
   dureeLabel: string;
   fraisLabel: string;
   concoursAdmission: boolean;
+  afficherEtudeDossierPublic: boolean;
 };
 
 export type EstablishmentListQuery = {
@@ -250,5 +252,6 @@ function normalizeEstablishment(e: EstablishmentListItem): EstablishmentNormaliz
     dureeLabel: dureeLabel(e),
     fraisLabel: formatFraisScolarite(e),
     concoursAdmission: isConcours(e),
+    afficherEtudeDossierPublic: Boolean(e.afficherEtudeDossierPublic),
   };
 }

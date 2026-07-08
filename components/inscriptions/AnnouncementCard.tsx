@@ -44,10 +44,18 @@ import {
 import type { AnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 import {
   effectiveRegistrationMethods,
+  hasCampaignTrafficRegistrationUrl,
   isOnlineRegistrationPending,
   pickRegistrationUrlPendingMessage,
   registrationMailto,
 } from '@/utils/contestRegistrationMethods';
+import {
+  contestCardCampaignTrafficUrl,
+  contestCardEffectiveOnlineUrl,
+  contestCardRegistrationMethodsData,
+} from '@/utils/contestAnnouncementCardRegistration';
+import { addUtmToUrl } from '@/utils/referencingPlacementUi';
+import { trackContestListingRegistrationClick } from '@/services/contestAnnouncements';
 import { shouldShowTassjilServiceBadge } from '@/utils/tassjilServiceIncludedNotice';
 
 type Props = {
@@ -56,7 +64,7 @@ type Props = {
   followStateLoading?: boolean;
   busy?: boolean;
   onToggleFollow: () => void;
-  onOpenLink: () => void;
+  onOpenLink?: () => void;
   onPress?: () => void;
   currentStatus?: CandidacyStatusType | null;
   onUpdateStatus?: () => void;
@@ -284,16 +292,21 @@ export function AnnouncementCard({
   const router = useRouter();
   const tawjihPlusAccess = useTawjihPlusAccessContextOptional();
   const lockVariant: 'none' | AnnouncementLockedVariant =
-    lockedVariantProp ?? (previewOnly ? 'featured' : 'none');
+    item.isSponsored === true
+      ? 'none'
+      : lockedVariantProp ?? (previewOnly ? 'featured' : 'none');
   const contentLocked = lockVariant !== 'none';
   const isApplyTour = tourGate != null;
   const hasFullInscriptionsAccess = tawjihPlusAccess?.hasAccess === true;
+  const paywallExempt = item.isSponsored === true;
   const registrationLocked =
-    contentLocked ||
-    (!isApplyTour && !hasFullInscriptionsAccess && item.registrationLinkLocked === true);
+    !paywallExempt &&
+    (contentLocked ||
+      (!isApplyTour && !hasFullInscriptionsAccess && item.registrationLinkLocked === true));
   const deadlineLocked =
-    contentLocked ||
-    (!isApplyTour && !hasFullInscriptionsAccess && item.deadlineLocked === true);
+    !paywallExempt &&
+    (contentLocked ||
+      (!isApplyTour && !hasFullInscriptionsAccess && item.deadlineLocked === true));
   const sensitiveHidden = contentLocked;
   const showOgCoverImage = Boolean(item.ogImage) && !contentLocked;
   const showOgCoverLocked = Boolean(item.ogImage) && contentLocked;
@@ -345,31 +358,31 @@ export function AnnouncementCard({
   const followInteractionEnabled = !tourGate || tourGate === 'follow';
   const statusInteractionEnabled = !tourGate || tourGate === 'status';
   const linkInteractionEnabled = !tourGate || tourGate === 'link';
-  const registrationMethodsData = {
-    registrationMethods: item.registrationMethods,
-    registrationEmail: item.registrationEmail,
-    physicalDepositAddressFr: item.physicalDepositAddressFr,
-    physicalDepositAddressAr: item.physicalDepositAddressAr,
-    registrationUrl: item.registrationUrl,
-    registrationUrlPending: item.registrationUrlPending,
-    registrationUrlPendingMessageFr: item.registrationUrlPendingMessageFr,
-    registrationUrlPendingMessageAr: item.registrationUrlPendingMessageAr,
-  };
+  const registrationMethodsData = contestCardRegistrationMethodsData(item);
+  const campaignTrafficUrl = contestCardCampaignTrafficUrl(item);
+  const effectiveOnlineUrl = contestCardEffectiveOnlineUrl(item);
   const registrationMethods = effectiveRegistrationMethods(registrationMethodsData);
-  const hasOnlineUrl =
-    registrationMethods.includes('online') && Boolean(item.registrationUrl?.trim());
-  const hasOnlinePending = isOnlineRegistrationPending(registrationMethodsData);
+  const hasOnlineUrl = Boolean(effectiveOnlineUrl);
+  const hasOnlinePending =
+    isOnlineRegistrationPending(registrationMethodsData) &&
+    !hasCampaignTrafficRegistrationUrl(campaignTrafficUrl);
   const hasEmailOnly =
     registrationMethods.includes('email') &&
     Boolean(item.registrationEmail?.trim()) &&
     !hasOnlineUrl;
-  const hasRegistrationUrl = hasOnlineUrl;
   /** Tutoriel « lien d'inscription » : le tap doit rester actif même sans URL API. */
   const canPressRegistrationLink =
     linkInteractionEnabled &&
-    (registrationLocked || hasOnlineUrl || hasEmailOnly || tourGate === 'link');
+    (registrationLocked ||
+      hasOnlineUrl ||
+      hasEmailOnly ||
+      tourGate === 'link');
   const showRegistrationLinkBtn =
-    registrationLocked || hasOnlineUrl || hasEmailOnly || tourGate === 'link';
+    registrationLocked ||
+    hasOnlineUrl ||
+    hasEmailOnly ||
+    hasOnlinePending ||
+    tourGate === 'link';
 
   const hasMetaPanel =
     Boolean(villesShort) ||
@@ -486,7 +499,16 @@ export function AnnouncementCard({
             void Linking.openURL(registrationMailto(item.registrationEmail)).catch(() => undefined);
             return;
           }
-          onOpenLink();
+          if (effectiveOnlineUrl) {
+            void Linking.openURL(addUtmToUrl(effectiveOnlineUrl)).catch(() => undefined);
+            trackContestListingRegistrationClick({
+              id: item.id,
+              placementId: item.placementId,
+              isSponsored: item.isSponsored,
+              usesCampaignTrafficUrl: Boolean(campaignTrafficUrl),
+            });
+          }
+          onOpenLink?.();
         }}
         disabled={!locked && !canPressRegistrationLink}
         accessibilityRole="button"
@@ -607,6 +629,14 @@ export function AnnouncementCard({
       ) : null}
 
       <View style={[styles.body, isRTL && styles.bodyRtl, contentLocked && styles.bodyLocked]}>
+        {item.isSponsored ? (
+          <View style={styles.sponsoredRow}>
+            <View style={styles.sponsoredTag}>
+              <FontAwesome name="star" size={10} color={brand.primary} />
+              <Text style={styles.sponsoredTagText}>{t('estCardBadgeSponsored')}</Text>
+            </View>
+          </View>
+        ) : null}
         {showHeaderRow ? (
           <View style={styles.headerRow}>
             {!item.ogImage || sensitiveHidden ? (
@@ -1432,5 +1462,27 @@ const styles = StyleSheet.create({
   rtlTextCenter: {
     textAlign: 'center',
     writingDirection: 'rtl',
+  },
+  sponsoredRow: {
+    marginBottom: spacing.xs,
+  },
+  sponsoredTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 4,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(51,62,143,0.1)',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(51,62,143,0.2)',
+  },
+  sponsoredTagText: {
+    fontSize: 10,
+    fontWeight: '800',
+    color: brand.primary,
+    textTransform: 'uppercase',
+    letterSpacing: 0.4,
   },
 });

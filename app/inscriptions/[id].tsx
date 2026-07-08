@@ -56,6 +56,13 @@ import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { sharePayloadContestAnnouncementDetail } from '@/utils/sharePagePayloads';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import {
+  fetchContestAnnouncementPlacementInfo,
+  recordContestCampaignExternalLinkClick,
+  recordContestCampaignPageView,
+  resolveContestDetailBannerFilter,
+  type ContestAnnouncementPlacementInfo,
+} from '@/services/contestAnnouncementCampaign';
+import {
   ensureContestDetailEstablishment,
   fetchContestAnnouncementDetail,
   recordContestClick,
@@ -95,11 +102,13 @@ import { parseYoutubeVideoId } from '@/utils/youtubeVideoId';
 import {
   effectiveRegistrationMethods,
   hasAnyRegistrationModality,
+  hasCampaignTrafficRegistrationUrl,
   isOnlineRegistrationPending,
   pickRegistrationUrlPendingMessage,
-  primaryRegistrationUrl,
+  resolveContestOnlineRegistrationUrl,
   registrationMailto,
 } from '@/utils/contestRegistrationMethods';
+import { addUtmToUrl, placementTrafficDestinationUrl } from '@/utils/referencingPlacementUi';
 
 export default function InscriptionDetailScreen() {
   const router = useRouter();
@@ -141,11 +150,21 @@ export default function InscriptionDetailScreen() {
   const [data, setData] = useState<ContestAnnouncementDetail | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [placementInfo, setPlacementInfo] = useState<ContestAnnouncementPlacementInfo | null>(null);
+  const [placementInfoLoading, setPlacementInfoLoading] = useState(true);
+  const campaignPageViewRecorded = useRef(false);
   const showInscriptionsPaywall = !isInscriptionsAccessPending && isInscriptionsLocked;
-  const contentLocked = !isInscriptionsAccessPending && (data?.previewOnly ?? isInscriptionsLocked);
+  const isSponsoredAnnouncement =
+    placementInfo?.isSponsored === true || data?.isSponsored === true;
+  const contentLocked =
+    !isInscriptionsAccessPending &&
+    !isSponsoredAnnouncement &&
+    (data?.previewOnly ?? isInscriptionsLocked);
   /** Description : verrouillée pour tout non-client (y compris accès partiel annonces). */
   const descriptionLocked =
-    !isInscriptionsAccessPending && (Boolean(data?.previewOnly) || !hasAccess);
+    !isInscriptionsAccessPending &&
+    !isSponsoredAnnouncement &&
+    (Boolean(data?.previewOnly) || !hasAccess);
   const registrationLocked =
     contentLocked || (data?.registrationLinkLocked === true && !contentLocked);
   const documentsLocked = registrationLocked;
@@ -174,6 +193,11 @@ export default function InscriptionDetailScreen() {
    */
   const [statusSheetOpen, setStatusSheetOpen] = useState(false);
   const [statusBusy, setStatusBusy] = useState(false);
+
+  const detailBannerFilter = useMemo(
+    () => resolveContestDetailBannerFilter(placementInfo, placementInfoLoading),
+    [placementInfo, placementInfoLoading],
+  );
 
   const load = useCallback(async () => {
     if (!Number.isFinite(id) || id <= 0) {
@@ -223,6 +247,36 @@ export default function InscriptionDetailScreen() {
   useEffect(() => {
     void load();
   }, [load]);
+
+  useEffect(() => {
+    campaignPageViewRecorded.current = false;
+    if (!Number.isFinite(id) || id <= 0) {
+      setPlacementInfo(null);
+      setPlacementInfoLoading(false);
+      return;
+    }
+    setPlacementInfoLoading(true);
+    let cancelled = false;
+    void fetchContestAnnouncementPlacementInfo(id)
+      .then((info) => {
+        if (!cancelled) setPlacementInfo(info);
+      })
+      .catch(() => {
+        if (!cancelled) setPlacementInfo(null);
+      })
+      .finally(() => {
+        if (!cancelled) setPlacementInfoLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [id]);
+
+  useEffect(() => {
+    if (campaignPageViewRecorded.current || !placementInfo?.placementId) return;
+    campaignPageViewRecorded.current = true;
+    recordContestCampaignPageView(placementInfo.placementId, id);
+  }, [placementInfo?.placementId]);
 
   /** Aligner badge + pastilles : marquer annonce comme vue (local + serveur). */
   useEffect(() => {
@@ -410,12 +464,16 @@ export default function InscriptionDetailScreen() {
       return;
     }
     if (!data) return;
+    const campaignTrafficUrl = placementTrafficDestinationUrl(placementInfo);
     const methods = effectiveRegistrationMethods(data);
-    const onlineUrl = primaryRegistrationUrl(data);
+    const onlineUrl = resolveContestOnlineRegistrationUrl(data, campaignTrafficUrl);
     const email = (data.registrationEmail ?? '').trim();
     if (methods.includes('online') && onlineUrl) {
       fireAndForget(recordContestClick(data.id, 'detail'));
-      void Linking.openURL(onlineUrl).catch(() =>
+      if (placementInfo?.placementId && campaignTrafficUrl) {
+        fireAndForget(recordContestCampaignExternalLinkClick(placementInfo.placementId));
+      }
+      void Linking.openURL(addUtmToUrl(onlineUrl)).catch(() =>
         Alert.alert('Erreur', "Impossible d'ouvrir le lien."),
       );
       return;
@@ -426,7 +484,7 @@ export default function InscriptionDetailScreen() {
         Alert.alert('Erreur', "Impossible d'ouvrir l'e-mail."),
       );
     }
-  }, [contentLocked, data, openTawjihPlusProduct, registrationLocked, t]);
+  }, [contentLocked, data, openTawjihPlusProduct, placementInfo, registrationLocked, t]);
 
   const onDocumentsLockedPress = useCallback(() => {
     if (contentLocked) {
@@ -545,11 +603,15 @@ export default function InscriptionDetailScreen() {
     locale,
   );
 
+  const campaignTrafficUrl = placementTrafficDestinationUrl(placementInfo);
+  const effectiveOnlineUrl = resolveContestOnlineRegistrationUrl(data, campaignTrafficUrl);
+
   const registrationMethods = effectiveRegistrationMethods(data);
   const hasDocuments = data.documentsUtiles.length > 0 || contentLocked;
   const hasOnlineAction =
-    registrationMethods.includes('online') && Boolean(primaryRegistrationUrl(data));
-  const hasOnlinePending = isOnlineRegistrationPending(data);
+    registrationMethods.includes('online') && Boolean(effectiveOnlineUrl);
+  const hasOnlinePending =
+    isOnlineRegistrationPending(data) && !hasCampaignTrafficRegistrationUrl(campaignTrafficUrl);
   const hasEmailAction =
     registrationMethods.includes('email') && Boolean(data.registrationEmail?.trim());
   const showRegistrationFooter =
@@ -557,7 +619,9 @@ export default function InscriptionDetailScreen() {
     hasOnlineAction ||
     hasOnlinePending ||
     hasEmailAction ||
-    (registrationMethods.length === 0 && Boolean(data.registrationUrl?.trim()));
+    hasCampaignTrafficRegistrationUrl(campaignTrafficUrl) ||
+    (registrationMethods.length === 0 &&
+      (Boolean(data.registrationUrl?.trim()) || hasCampaignTrafficRegistrationUrl(campaignTrafficUrl)));
   /** Hauteur barre sticky (padding + CTA, hors safe area du footer). */
   const registrationFooterBarHeight = 80;
   const scrollPaddingBottom = showRegistrationFooter
@@ -945,7 +1009,12 @@ export default function InscriptionDetailScreen() {
           )}
         </Section>
 
-        <AppBannerSlot zone="mid_square" analyticsPage="/mobile/inscriptions/annonce/detail" style={{ marginHorizontal: spacing.md }} />
+        <AppBannerSlot
+          zone="mid_square"
+          analyticsPage="/mobile/inscriptions/annonce/detail"
+          style={{ marginHorizontal: spacing.md }}
+          campaignId={detailBannerFilter.show ? detailBannerFilter.campaignId : null}
+        />
 
         {/* ── Description ── */}
         <Section title={t('inscDetailAnnouncementDescription')} icon="info-circle" rtl={isRTL}>
@@ -977,18 +1046,24 @@ export default function InscriptionDetailScreen() {
           </DetailSection>
         ) : null}
 
-        {(hasAnyRegistrationModality(data) || registrationLocked || hasDocuments) ? (
+        {(hasAnyRegistrationModality(data) ||
+          hasCampaignTrafficRegistrationUrl(campaignTrafficUrl) ||
+          registrationLocked ||
+          hasDocuments) ? (
           <DetailSection
             title={locale === 'ar' ? 'طرق التسجيل' : "Modalités d'inscription"}
             icon="edit"
             rtl={isRTL}
             locked={contentLocked && !registrationLocked && !hasDocuments}>
-            {(hasAnyRegistrationModality(data) || registrationLocked) ? (
+            {(hasAnyRegistrationModality(data) ||
+              hasCampaignTrafficRegistrationUrl(campaignTrafficUrl) ||
+              registrationLocked) ? (
               <AnnouncementRegistrationMethodsPanel
                 data={data}
                 locale={locale}
                 isRTL={isRTL}
                 registrationLocked={registrationLocked}
+                campaignTrafficUrl={campaignTrafficUrl}
                 onOnlinePress={onPressOpenLink}
                 onLockedPress={() => {
                   if (contentLocked) openTawjihPlusProduct();
@@ -1587,7 +1662,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: 10,
     paddingHorizontal: spacing.md,
-    borderRadius: radius.full,
+    borderRadius: radius.lg,
   },
   estActionBtnSecondary: {
     backgroundColor: '#EFF6FF',

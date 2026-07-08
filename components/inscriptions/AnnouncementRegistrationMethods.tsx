@@ -6,10 +6,11 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
   effectiveRegistrationMethods,
   formatRegistrationMethodsList,
+  hasCampaignTrafficRegistrationUrl,
   isOnlineRegistrationPending,
   pickPhysicalDepositAddress,
   pickRegistrationUrlPendingMessage,
-  primaryRegistrationUrl,
+  resolveContestOnlineRegistrationUrl,
   registrationMailto,
   registrationMethodLabel,
   type ContestRegistrationMethod,
@@ -21,6 +22,7 @@ type Props = {
   locale: 'fr' | 'ar';
   isRTL: boolean;
   registrationLocked?: boolean;
+  campaignTrafficUrl?: string | null;
   compact?: boolean;
   onOnlinePress?: () => void;
   onLockedPress?: () => void;
@@ -119,6 +121,7 @@ export function AnnouncementRegistrationMethodsPanel({
   locale,
   isRTL,
   registrationLocked = false,
+  campaignTrafficUrl = null,
   compact = false,
   onOnlinePress,
   onLockedPress,
@@ -129,10 +132,12 @@ export function AnnouncementRegistrationMethodsPanel({
       ? resolvedMethods
       : registrationLocked
         ? (['online', 'email', 'physical'] as const)
-        : [];
-  if (methods.length === 0) return null;
+        : hasCampaignTrafficRegistrationUrl(campaignTrafficUrl)
+          ? (['online'] as const)
+          : [];
+  if (methods.length === 0 && !hasCampaignTrafficRegistrationUrl(campaignTrafficUrl)) return null;
 
-  const url = primaryRegistrationUrl(data);
+  const url = resolveContestOnlineRegistrationUrl(data, campaignTrafficUrl);
   const email = (data.registrationEmail ?? '').trim();
   const address = pickPhysicalDepositAddress(data, locale);
 
@@ -162,7 +167,8 @@ export function AnnouncementRegistrationMethodsPanel({
             );
           }
           if (!url) {
-            const pending = isOnlineRegistrationPending(data);
+            const pending =
+              isOnlineRegistrationPending(data) && !hasCampaignTrafficRegistrationUrl(campaignTrafficUrl);
             return (
               <View key={method} style={[styles.block, pending && styles.blockPending]}>
                 <View style={[styles.row, isRTL && styles.rowRtl]}>

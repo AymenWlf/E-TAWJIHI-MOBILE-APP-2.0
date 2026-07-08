@@ -15,7 +15,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
-import { resolveAnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
+import { resolveContestAnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 import { FollowedSchoolDetailLoadingSkeleton } from '@/components/inscriptions/FollowedSchoolDetailLoadingSkeleton';
 import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { StatusBadge } from '@/components/inscriptions/StatusBadge';
@@ -30,7 +30,7 @@ import {
 } from '@/constants/establishmentMedia';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
-import { announcementBriefToListCard } from '@/services/contestAnnouncements';
+import { announcementBriefToListCard, recordContestListingImpressionsBatch, trackContestListingCardClick } from '@/services/contestAnnouncements';
 import {
   deleteEstablishmentFollow,
   fetchEstablishmentFollowTimeline,
@@ -92,6 +92,9 @@ export default function FollowedSchoolDetailScreen() {
           result.inscriptionsPartialAccess,
         );
         setData(result.timeline);
+        recordContestListingImpressionsBatch(
+          anns.map((a) => announcementBriefToListCard(a)),
+        );
       }
     } catch {
       setData(null);
@@ -474,9 +477,11 @@ export default function FollowedSchoolDetailScreen() {
         ItemSeparatorComponent={() => <View style={{ height: spacing.md }} />}
         renderItem={({ item, index }) => {
           const card = announcementBriefToListCard(item);
-          const lockedVariant = resolveAnnouncementLockedVariant(
-            Boolean(card.previewOnly) || showInscriptionsPaywall,
+          const lockedVariant = resolveContestAnnouncementLockedVariant(
+            card.previewOnly,
+            showInscriptionsPaywall,
             index,
+            card.isSponsored,
           );
           const cardLocked = lockedVariant !== 'none';
           return (
@@ -488,15 +493,7 @@ export default function FollowedSchoolDetailScreen() {
               busy={statusBusy}
               currentStatus={follow.status}
               onToggleFollow={() => undefined}
-              onOpenLink={() => {
-                if (cardLocked) {
-                  openTawjihPlusProduct();
-                  return;
-                }
-                if (card.registrationUrl) {
-                  void Linking.openURL(card.registrationUrl).catch(() => undefined);
-                }
-              }}
+              onOpenLink={() => undefined}
               onUpdateStatus={() => {
                 if (cardLocked) {
                   openTawjihPlusProduct();
@@ -510,6 +507,7 @@ export default function FollowedSchoolDetailScreen() {
                   return;
                 }
                 void updateLatestSeenOnDisk(followId, item.id);
+                trackContestListingCardClick(card);
                 router.push(`/inscriptions/${item.id}` as never);
               }}
             />

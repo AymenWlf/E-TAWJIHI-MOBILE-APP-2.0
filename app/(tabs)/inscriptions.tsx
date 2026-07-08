@@ -23,7 +23,7 @@ import { LoadErrorState, loadErrorRetryLabel } from '@/components/ui/LoadErrorSt
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { AnnouncementCard } from '@/components/inscriptions/AnnouncementCard';
-import { resolveAnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
+import { resolveContestAnnouncementLockedVariant } from '@/utils/announcementLockDisplay';
 import { computeDaysUntilContestClose } from '@/utils/contestAnnouncementClosingDate';
 import { FollowedSchoolCard } from '@/components/inscriptions/FollowedSchoolCard';
 import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
@@ -55,11 +55,10 @@ import {
   fetchActiveCandidacyStatuses,
   loadCandidacyStatusesWithRefresh,
 } from '@/services/candidacyStatusTypes';
-import { reportLinkVisited } from '@/services/candidacies';
 import {
   fetchContestAnnouncements,
-  recordContestClick,
   recordContestListingImpressionsBatch,
+  trackContestListingCardClick,
   type ContestAnnouncementCard,
 } from '@/services/contestAnnouncements';
 import {
@@ -1079,36 +1078,6 @@ function InscriptionsTabScreenInner() {
   }, []);
 
   // ── Actions ──
-  const handleOpenLink = useCallback(
-    async (
-      candidacyId: number | null,
-      url: string,
-      contestId: number,
-    ) => {
-      if (isInscriptionsLocked) {
-        openTawjihPlusProduct();
-        return;
-      }
-      if (!url) {
-        Alert.alert(t('inscNoLink'));
-        return;
-      }
-      try {
-        await Linking.openURL(url);
-      } catch {
-        Alert.alert(t('inscErrorLoad'));
-        return;
-      }
-      fireAndForget(recordContestClick(contestId, 'detail'));
-      if (candidacyId) {
-        const token = await getValidAccessToken();
-        if (token) {
-          await reportLinkVisited(token, candidacyId);
-        }
-      }
-    },
-    [getValidAccessToken, isInscriptionsLocked, openTawjihPlusProduct, t],
-  );
 
   /**
    * Suivre une annonce ⇒ on suit l'école.
@@ -1935,9 +1904,11 @@ function InscriptionsTabScreenInner() {
         if (!item) return null;
         const eid = item.establishment?.id ?? 0;
         const isFollowed = eid > 0 && followedEstablishmentSet.has(eid);
-        const lockedVariant = resolveAnnouncementLockedVariant(
-          item.previewOnly ?? showInscriptionsPaywall,
+        const lockedVariant = resolveContestAnnouncementLockedVariant(
+          item.previewOnly,
+          showInscriptionsPaywall,
           index,
+          item.isSponsored,
         );
         const cardLocked = lockedVariant !== 'none';
         return (
@@ -1958,6 +1929,7 @@ function InscriptionsTabScreenInner() {
                 openTawjihPlusProduct();
                 return;
               }
+              trackContestListingCardClick(item);
               void markAnnouncementSeen(item.id);
               router.push(`/inscriptions/${item.id}` as never);
             }}
@@ -1969,7 +1941,7 @@ function InscriptionsTabScreenInner() {
               if (isFollowed) void handleUnfollow(item);
               else void handleFollow(item);
             }}
-            onOpenLink={() => handleOpenLink(null, item.registrationUrl, item.id)}
+            onOpenLink={() => undefined}
             currentStatus={eid > 0 ? followsByEstId.get(eid)?.status ?? null : null}
             onUpdateStatus={() => handleOpenAnnouncementStatusSheet(item)}
           />

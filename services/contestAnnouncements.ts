@@ -7,6 +7,11 @@ import type {
   EstablishmentBrief,
 } from '@/types/inscriptions';
 import { fireAndForget } from '@/utils/fireAndForget';
+import {
+  recordContestCampaignClick,
+  recordContestCampaignExternalLinkClick,
+  recordContestListingPlacementImpressionsBatch,
+} from '@/services/contestAnnouncementCampaign';
 import type { ContestSiblingBrief } from '@/utils/contestAnnouncementSiblings';
 import {
   sanitizeRegistrationMethods,
@@ -69,6 +74,12 @@ export type ContestAnnouncementCard = {
   previewOnly?: boolean;
   registrationLinkLocked?: boolean;
   deadlineLocked?: boolean;
+  isSponsored?: boolean;
+  placementId?: number | null;
+  goalType?: 'traffic' | 'leadgen' | null;
+  destinationUrl?: string | null;
+  includeLeadFormOnTraffic?: boolean;
+  sponsoredCampaignId?: number | null;
 };
 
 type RawCard = {
@@ -100,6 +111,12 @@ type RawCard = {
   previewOnly?: boolean;
   registrationLinkLocked?: boolean;
   deadlineLocked?: boolean;
+  isSponsored?: boolean;
+  placementId?: number | null;
+  goalType?: string | null;
+  destinationUrl?: string | null;
+  includeLeadFormOnTraffic?: boolean;
+  sponsoredCampaignId?: number | null;
   etablissement?: {
     id?: number;
     nom?: string;
@@ -269,6 +286,14 @@ function normalize(c: RawCard): ContestAnnouncementCard {
     previewOnly: c.previewOnly === true,
     registrationLinkLocked: c.registrationLinkLocked === true,
     deadlineLocked,
+    isSponsored: c.isSponsored === true,
+    placementId: typeof c.placementId === 'number' ? c.placementId : null,
+    goalType: c.goalType === 'leadgen' ? 'leadgen' : c.goalType === 'traffic' ? 'traffic' : null,
+    destinationUrl:
+      typeof c.destinationUrl === 'string' && c.destinationUrl.trim() !== '' ? c.destinationUrl.trim() : null,
+    includeLeadFormOnTraffic: c.includeLeadFormOnTraffic === true,
+    sponsoredCampaignId:
+      typeof c.sponsoredCampaignId === 'number' ? c.sponsoredCampaignId : null,
   };
 }
 
@@ -396,6 +421,8 @@ export function announcementBriefToListCard(b: AnnouncementBrief): ContestAnnoun
     previewOnly: b.previewOnly === true,
     registrationLinkLocked: b.registrationLinkLocked === true,
     deadlineLocked,
+    isSponsored: b.isSponsored === true,
+    placementId: typeof b.placementId === 'number' ? b.placementId : null,
   };
 }
 
@@ -444,6 +471,8 @@ export function contestDetailToListCard(d: ContestAnnouncementDetail): ContestAn
     previewOnly: d.previewOnly === true,
     registrationLinkLocked: d.registrationLinkLocked === true,
     deadlineLocked: d.deadlineLocked === true,
+    isSponsored: d.isSponsored === true,
+    placementId: typeof d.placementId === 'number' ? d.placementId : null,
   };
 }
 
@@ -537,6 +566,8 @@ export type ContestAnnouncementDetail = {
   previewOnly?: boolean;
   registrationLinkLocked?: boolean;
   deadlineLocked?: boolean;
+  isSponsored?: boolean;
+  placementId?: number | null;
 };
 
 type RawDetail = {
@@ -598,6 +629,8 @@ type RawDetail = {
   previewOnly?: boolean;
   registrationLinkLocked?: boolean;
   deadlineLocked?: boolean;
+  isSponsored?: boolean;
+  placementId?: number | null;
 };
 
 function normalizeLinks(raw?: { titre?: string; url?: string }[]): CustomLink[] {
@@ -755,6 +788,8 @@ function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
     previewOnly: d.previewOnly === true,
     registrationLinkLocked: d.registrationLinkLocked === true,
     deadlineLocked,
+    isSponsored: d.isSponsored === true,
+    placementId: typeof d.placementId === 'number' ? d.placementId : null,
   };
 }
 
@@ -838,15 +873,44 @@ const sessionListingTracked = new Set<number>();
  * Enregistre les impressions « listing » pour un lot d'annonces visibles,
  * en évitant les doublons sur la même session d'app. Best-effort, jamais
  * bloquant pour le rendu.
+ *
+ * Pour les annonces sponsorisées, enregistre aussi les impressions placement
+ * campagne (KPI portail annonceur / concours sponsorisés).
  */
-export function recordContestListingImpressionsBatch(items: { id: number }[]): void {
+export function recordContestListingImpressionsBatch(
+  items: Array<{ id: number; placementId?: number | null; isSponsored?: boolean }>,
+): void {
   if (!items || items.length === 0) return;
   const fresh = items.filter((i) => Number.isFinite(i.id) && !sessionListingTracked.has(i.id));
   for (const it of fresh) {
     sessionListingTracked.add(it.id);
-    // Fire-and-forget : un by-one keep-alive HTTP simple est suffisant
-    // (pas de batching côté backend pour rester rétro-compatible web).
     fireAndForget(recordContestImpression(it.id, 'listing'));
+  }
+  recordContestListingPlacementImpressionsBatch(items);
+}
+
+/** Clic carte listing : stats annonce + placement campagne si sponsorisée. */
+export function trackContestListingCardClick(item: {
+  id: number;
+  placementId?: number | null;
+  isSponsored?: boolean;
+}): void {
+  fireAndForget(recordContestClick(item.id, 'listing'));
+  if (item.isSponsored && item.placementId) {
+    fireAndForget(recordContestCampaignClick(item.placementId));
+  }
+}
+
+/** Clic inscription depuis une carte listing (lien campagne ou annonce). */
+export function trackContestListingRegistrationClick(item: {
+  id: number;
+  placementId?: number | null;
+  isSponsored?: boolean;
+  usesCampaignTrafficUrl: boolean;
+}): void {
+  trackContestListingCardClick(item);
+  if (item.isSponsored && item.placementId && item.usesCampaignTrafficUrl) {
+    fireAndForget(recordContestCampaignExternalLinkClick(item.placementId));
   }
 }
 
