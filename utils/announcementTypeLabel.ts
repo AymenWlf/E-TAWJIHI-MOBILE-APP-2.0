@@ -11,6 +11,7 @@ const VISUAL_KEY_TO_I18N: Record<Exclude<AnnouncementVisualKey, 'other'>, HomeCo
   result: 'inscAnnTypeResult',
   scholarshipMa: 'inscAnnTypeScholarshipMa',
   scholarshipForeign: 'inscAnnTypeScholarshipForeign',
+  opportunityAbroad: 'inscAnnTypeOpportunityAbroad',
   message: 'inscAnnTypeImportant',
   offer: 'inscAnnTypeOffer',
 };

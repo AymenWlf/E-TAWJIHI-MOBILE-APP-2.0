@@ -52,6 +52,12 @@ export type ContestAnnouncementCard = {
   registrationUrlPendingMessageFr?: string | null;
   registrationUrlPendingMessageAr?: string | null;
   ogImage: string | null;
+  /** Logo carré optionnel (bourses / messages importants). */
+  logo?: string | null;
+  /** Ville / localisation libre (FR) — bourses / messages importants. */
+  locationLabelFr?: string | null;
+  /** Ville / localisation libre (AR). */
+  locationLabelAr?: string | null;
   /** Liens utiles personnalisés (label + URL). */
   liensUtiles: CustomLink[];
   /** Critères d'éligibilité — Filières Bac Normal acceptées (vide = pas de filtrage). */
@@ -99,6 +105,9 @@ type RawCard = {
   registrationUrlPendingMessageFr?: string | null;
   registrationUrlPendingMessageAr?: string | null;
   ogImage?: string | null;
+  logo?: string | null;
+  locationLabelFr?: string | null;
+  locationLabelAr?: string | null;
   isOpen?: boolean;
   isExpire?: boolean;
   daysUntilClose?: number;
@@ -258,6 +267,15 @@ function normalize(c: RawCard): ContestAnnouncementCard {
         ? c.registrationUrlPendingMessageAr.trim()
         : null,
     ogImage: c.ogImage ?? null,
+    logo: typeof c.logo === 'string' && c.logo.trim() !== '' ? c.logo.trim() : null,
+    locationLabelFr:
+      typeof c.locationLabelFr === 'string' && c.locationLabelFr.trim() !== ''
+        ? c.locationLabelFr.trim()
+        : null,
+    locationLabelAr:
+      typeof c.locationLabelAr === 'string' && c.locationLabelAr.trim() !== ''
+        ? c.locationLabelAr.trim()
+        : null,
     liensUtiles: liens,
     filieresAcceptees: Array.isArray(c.filieresAcceptees) ? c.filieresAcceptees : [],
     specialitesBacMissionAcceptees: Array.isArray(c.specialitesBacMissionAcceptees)
@@ -398,6 +416,15 @@ export function announcementBriefToListCard(b: AnnouncementBrief): ContestAnnoun
     registrationUrlPendingMessageFr: b.registrationUrlPendingMessageFr ?? null,
     registrationUrlPendingMessageAr: b.registrationUrlPendingMessageAr ?? null,
     ogImage: b.ogImage ?? null,
+    logo: typeof b.logo === 'string' && b.logo.trim() !== '' ? b.logo.trim() : null,
+    locationLabelFr:
+      typeof b.locationLabelFr === 'string' && b.locationLabelFr.trim() !== ''
+        ? b.locationLabelFr.trim()
+        : null,
+    locationLabelAr:
+      typeof b.locationLabelAr === 'string' && b.locationLabelAr.trim() !== ''
+        ? b.locationLabelAr.trim()
+        : null,
     liensUtiles: b.liensUtiles ?? [],
     filieresAcceptees: b.filieresAcceptees ?? [],
     specialitesBacMissionAcceptees: b.specialitesBacMissionAcceptees ?? [],
@@ -448,6 +475,9 @@ export function contestDetailToListCard(d: ContestAnnouncementDetail): ContestAn
     registrationUrlPendingMessageFr: d.registrationUrlPendingMessageFr ?? null,
     registrationUrlPendingMessageAr: d.registrationUrlPendingMessageAr ?? null,
     ogImage: d.ogImage,
+    logo: d.logo ?? null,
+    locationLabelFr: d.locationLabelFr ?? null,
+    locationLabelAr: d.locationLabelAr ?? null,
     liensUtiles: d.liensUtiles,
     filieresAcceptees: d.filieresAcceptees,
     specialitesBacMissionAcceptees: d.specialitesBacMissionAcceptees,
@@ -534,6 +564,10 @@ export type ContestAnnouncementDetail = {
   registrationUrlPendingMessageAr?: string | null;
   preRegistrationFee: string | null;
   ogImage: string | null;
+  /** Logo carré optionnel (bourses / messages importants). */
+  logo: string | null;
+  locationLabelFr: string | null;
+  locationLabelAr: string | null;
   descriptionLeadImage: string | null;
   /** Lien YouTube (tutoriel inscription) — optionnel */
   inscriptionTutorialYoutubeUrl: string | null;
@@ -598,6 +632,9 @@ type RawDetail = {
   registrationUrlPendingMessageAr?: string | null;
   fraisPreinscription?: string | null;
   ogImage?: string | null;
+  logo?: string | null;
+  locationLabelFr?: string | null;
+  locationLabelAr?: string | null;
   descriptionLeadImage?: string | null;
   inscriptionTutorialYoutubeUrl?: string | null;
   autresAnnoncesMemeEtablissement?: ContestSiblingBrief[];
@@ -768,6 +805,15 @@ function normalizeDetail(d: RawDetail): ContestAnnouncementDetail {
         : null,
     preRegistrationFee: d.fraisPreinscription ?? null,
     ogImage: d.ogImage ?? null,
+    logo: typeof d.logo === 'string' && d.logo.trim() !== '' ? d.logo.trim() : null,
+    locationLabelFr:
+      typeof d.locationLabelFr === 'string' && d.locationLabelFr.trim() !== ''
+        ? d.locationLabelFr.trim()
+        : null,
+    locationLabelAr:
+      typeof d.locationLabelAr === 'string' && d.locationLabelAr.trim() !== ''
+        ? d.locationLabelAr.trim()
+        : null,
     descriptionLeadImage: d.descriptionLeadImage ?? null,
     inscriptionTutorialYoutubeUrl:
       typeof d.inscriptionTutorialYoutubeUrl === 'string' && d.inscriptionTutorialYoutubeUrl.trim() !== ''

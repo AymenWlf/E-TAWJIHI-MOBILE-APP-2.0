@@ -23,6 +23,7 @@ import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { Text } from '@/components/ui/Text';
 import {
   fallbackEstablishmentAvatarName,
+  getEstablishmentFileUrl,
   getEstablishmentLogoUrl,
 } from '@/constants/establishmentMedia';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
@@ -34,10 +35,13 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { CandidacyStatusType } from '@/types/inscriptions';
 import type { ApplyToSchoolsTourGate } from '@/utils/applyToSchoolsTourProgress';
 import { getAnnouncementTypeStyle } from '@/utils/announcementTypeStyle';
+import { isTitleFirstContestAnnouncementType } from '@/utils/contestAnnouncementTitleFirst';
 import {
   formatDaysUntilClose,
   formatShortDate,
   getLockedDaysUntilCloseUi,
+  pickAnnouncementLocationLabel,
+  pickAnnouncementTitle,
   pickEstablishmentNamesPair,
   pickRegistrationUrlLabel,
 } from '@/utils/candidacyStatus';
@@ -319,20 +323,29 @@ export function AnnouncementCard({
     router.push(TAWJIH_PLUS_PRODUCT_PATH as never);
   }, [router, tawjihPlusAccess]);
   const typeVisual = getAnnouncementTypeStyle(item.announcementType);
+  const titleFirst = isTitleFirstContestAnnouncementType(item.announcementType);
+  const announcementTitle = pickAnnouncementTitle(item, locale) || item.title;
 
   const est = item.establishment;
   const { primary: estNamePrimary, secondary: estNameSecondary } = pickEstablishmentNamesPair(
     est,
     locale,
   );
+  const identityPrimary = titleFirst ? announcementTitle : estNamePrimary;
+  const identitySecondary = titleFirst ? null : estNameSecondary;
+  const customLocation = pickAnnouncementLocationLabel(item, locale);
   const villes = (est?.villes ?? []).filter(Boolean);
   const villeMain = est?.ville?.trim() || '';
-  const villesShort = villes.length > 0 ? villes.slice(0, 3).join(' · ') : villeMain;
-  const villesExtra = villes.length > 3 ? villes.length - 3 : 0;
+  const villesFromEst = villes.length > 0 ? villes.slice(0, 3).join(' · ') : villeMain;
+  const villesShort = titleFirst ? customLocation || villesFromEst : villesFromEst;
+  const villesExtra = titleFirst ? 0 : villes.length > 3 ? villes.length - 3 : 0;
 
-  const logoUri =
-    getEstablishmentLogoUrl(est?.logo) ??
-    fallbackEstablishmentAvatarName(est?.nom, est?.sigle);
+  const announcementLogoUri = getEstablishmentFileUrl(item.logo);
+  const showAnnouncementLogo = titleFirst && Boolean(announcementLogoUri);
+  const logoUri = titleFirst
+    ? announcementLogoUri
+    : getEstablishmentLogoUrl(est?.logo) ??
+      fallbackEstablishmentAvatarName(est?.nom, est?.sigle);
 
   const deadline = formatDaysUntilClose(item.daysUntilClose, locale);
   const canUpdateStatus =
@@ -689,26 +702,28 @@ export function AnnouncementCard({
             </>
           ) : (
             <>
-              <Image
-                source={{ uri: logoUri }}
-                style={styles.estLogo}
-                resizeMode="contain"
-                accessibilityIgnoresInvertColors
-              />
+              {(!titleFirst || showAnnouncementLogo) && logoUri ? (
+                <Image
+                  source={{ uri: logoUri }}
+                  style={styles.estLogo}
+                  resizeMode="contain"
+                  accessibilityIgnoresInvertColors
+                />
+              ) : null}
               <View style={[styles.estTexts, isRTL && styles.estTextsRtl]}>
                 <Text
                   style={[styles.estName, isRTL && styles.rtlTextCard, isRTL && styles.infoTextRtl]}
                   numberOfLines={3}>
-                  {estNamePrimary}
+                  {identityPrimary}
                 </Text>
-                {estNameSecondary ? (
+                {identitySecondary ? (
                   <Text
                     style={[styles.estNameAlt, isRTL && styles.rtlTextCard, isRTL && styles.infoTextRtl]}
                     numberOfLines={2}>
-                    {estNameSecondary}
+                    {identitySecondary}
                   </Text>
                 ) : null}
-                {(est?.sigle || est?.type) ? (
+                {!titleFirst && (est?.sigle || est?.type) ? (
                   <View style={[styles.estMetaRow, isRTL && styles.estMetaRowRtl]}>
                     {est?.sigle ? (
                       <View style={styles.siglePill}>
@@ -892,15 +907,17 @@ export function AnnouncementCard({
           </TourFocusWrap>
         ) : null}
 
-        {/* Actions principales */}
+        {/* Actions principales — pas de « Suivre » pour bourses / messages (non liés à une école). */}
+        {!titleFirst || showRegistrationLinkBtn ? (
         <View style={styles.actionsCol}>
           <View style={styles.actionsRow}>
-            {followBtn(false)}
+            {!titleFirst ? followBtn(false) : null}
             {showRegistrationLinkBtn
-              ? registrationLinkBtn(false, registrationLocked && !contentLocked)
+              ? registrationLinkBtn(!titleFirst ? false : true, registrationLocked && !contentLocked)
               : null}
           </View>
         </View>
+        ) : null}
           </>
         ) : (
           <>
@@ -944,8 +961,8 @@ export function AnnouncementCard({
             </View>
             <View style={styles.actionsCol}>
               <View style={styles.actionsRow}>
-                {followBtn(true)}
-                {registrationLinkBtn(false, true)}
+                {!titleFirst ? followBtn(true) : null}
+                {registrationLinkBtn(titleFirst, true)}
               </View>
             </View>
           </>

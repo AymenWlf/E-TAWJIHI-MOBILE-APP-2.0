@@ -34,7 +34,7 @@ import {
 } from '@/contexts/TawjihPlusAccessContext';
 import {
   announcementEstablishmentFiltersFromProfile,
-  countActiveEstablishmentFilters,
+  countAnnouncementSchoolStructuralFilters,
   countAnnouncementTabFiltersActive,
   defaultAnnouncementEstablishmentFilters,
   EstablishmentFiltersModal,
@@ -83,9 +83,9 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { homeShell } from '@/theme/homeShell';
 import type { CandidacyStatusType, EstablishmentFollow } from '@/types/inscriptions';
 import {
-  evaluateEligibilityByFiliere,
-  mergeEligibilityCriteria,
-  matchesAcceptedStudyPathFilter,
+  evaluateAnnouncementListingEligibility,
+  matchesAnnouncementBacYearFilter,
+  matchesAnnouncementStudyPathFilter,
 } from '@/utils/eligibility';
 import { establishmentMatchesAllFilters } from '@/utils/establishmentWebFilters';
 import { fireAndForget } from '@/utils/fireAndForget';
@@ -692,9 +692,9 @@ function InscriptionsTabScreenInner() {
     );
   }, [filtersValue.regionTitle, cities]);
 
-  /** Combien de filtres avancés sont actifs (utile pour le badge). */
-  const activeAdvancedFiltersCount = useMemo(
-    () => countActiveEstablishmentFilters(filtersValue),
+  /** Combien de filtres « école » (ville, type…) — hors filière / éligibilité profil. */
+  const activeSchoolStructuralFiltersCount = useMemo(
+    () => countAnnouncementSchoolStructuralFilters(filtersValue),
     [filtersValue],
   );
 
@@ -714,10 +714,8 @@ function InscriptionsTabScreenInner() {
 
   /**
    * Annonces filtrées par école sélectionnée puis par filtres avancés.
-   * On évalue chaque annonce contre son école parente (lookup via map). Si
-   * les données de référence ne sont pas encore chargées, on n'applique pas
-   * les filtres avancés (sinon on filtrerait tout) — l'utilisateur attend
-   * de toute façon un loader au premier accès.
+   * Éligibilité / filière / année bac : critères **de l’annonce** uniquement
+   * (pas le catalogue établissement — sinon bourses & messages disparaissent).
    */
   const visibleAnnouncements = useMemo(() => {
     const list = Array.isArray(announcements) ? announcements : [];
@@ -732,8 +730,8 @@ function InscriptionsTabScreenInner() {
       }
     }
 
-    /* 2) Filtres avancés (uniquement si on a chargé les écoles complètes) */
-    if (activeAdvancedFiltersCount > 0 && allEstablishmentsById.size > 0) {
+    /* 2) Filtres structure école (ville, type, frais…) — sans filière profil */
+    if (activeSchoolStructuralFiltersCount > 0 && allEstablishmentsById.size > 0) {
       out = out.filter((a) => {
         const eid = a.establishment?.id;
         if (!eid) return false;
@@ -741,20 +739,22 @@ function InscriptionsTabScreenInner() {
         if (!est) return false;
         return establishmentMatchesAllFilters(est, {
           ...filtersValue,
+          acceptedStudyBacType: '',
+          acceptedStudyValue: '',
+          eligibilityFilter: 'all',
           villesInRegion,
         });
       });
     }
 
-    /* 3) Filtre éligibilité (filière du Bac, depuis Filtres avancés).
-       Silencieusement ignoré si l'utilisateur n'a pas de profil ⇒ on
-       conserve la liste complète pour ne pas piéger un visiteur. */
+    /* 3) Filtre « éligibles » : filière / spécialité / année bac de l’annonce */
     if (filtersValue.eligibilityFilter !== 'all' && eligibilityProfile) {
       out = out.filter((a) => {
-        const verdict = evaluateEligibilityByFiliere(
+        const verdict = evaluateAnnouncementListingEligibility(
           {
             filieresAcceptees: a.filieresAcceptees,
             specialitesBacMissionAcceptees: a.specialitesBacMissionAcceptees,
+            anneesBacAcceptees: a.anneesBacAcceptees,
           },
           eligibilityProfile,
         );
@@ -763,29 +763,23 @@ function InscriptionsTabScreenInner() {
       });
     }
 
+    /* 4) Filière / spécialité choisie dans les filtres — critères annonce seuls */
     const studyBac = filtersValue.acceptedStudyBacType;
     const studyVal = filtersValue.acceptedStudyValue.trim();
-    if (
-      filtersDataLoaded &&
-      (studyBac === 'normal' || studyBac === 'mission') &&
-      studyVal
-    ) {
+    if ((studyBac === 'normal' || studyBac === 'mission') && studyVal) {
       out = out.filter((a) => {
-        const est =
-          a.establishment?.id != null ? allEstablishmentsById.get(a.establishment.id) : undefined;
-        const criteria = mergeEligibilityCriteria(
-          {
-            filieresAcceptees: a.filieresAcceptees,
-            specialitesBacMissionAcceptees: a.specialitesBacMissionAcceptees,
-          },
-          est
-            ? {
-                filieresAcceptees: est.filieresAcceptees ?? null,
-                specialitesBacMissionAcceptees: est.specialitesBacMissionAcceptees ?? null,
-              }
-            : null,
+        const criteria = {
+          filieresAcceptees: a.filieresAcceptees,
+          specialitesBacMissionAcceptees: a.specialitesBacMissionAcceptees,
+          anneesBacAcceptees: a.anneesBacAcceptees,
+        };
+        return (
+          matchesAnnouncementStudyPathFilter(criteria, {
+            bacType: studyBac,
+            value: studyVal,
+          }) &&
+          matchesAnnouncementBacYearFilter(criteria, eligibilityProfile?.bacAnnee)
         );
-        return matchesAcceptedStudyPathFilter(criteria, { bacType: studyBac, value: studyVal });
       });
     }
 
@@ -812,12 +806,11 @@ function InscriptionsTabScreenInner() {
   }, [
     announcements,
     schoolFilterId,
-    activeAdvancedFiltersCount,
+    activeSchoolStructuralFiltersCount,
     allEstablishmentsById,
     filtersValue,
     villesInRegion,
     eligibilityProfile,
-    filtersDataLoaded,
     sortByClosingSoon,
   ]);
 
@@ -832,7 +825,7 @@ function InscriptionsTabScreenInner() {
     setAnnouncementsVisibleEnd(LIST_PAGE_SIZE);
   }, [
     schoolFilterId,
-    activeAdvancedFiltersCount,
+    activeSchoolStructuralFiltersCount,
     filtersValue.eligibilityFilter,
     filtersValue.acceptedStudyBacType,
     filtersValue.acceptedStudyValue,

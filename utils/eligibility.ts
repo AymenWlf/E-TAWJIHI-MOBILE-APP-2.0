@@ -1,13 +1,14 @@
 /**
  * Évaluation locale (côté client) de l'éligibilité d'un étudiant à une annonce
- * ou à une école, à partir des filières acceptées publiées (`filieresAcceptees`)
- * et de la filière du bac renseignée dans le profil (`filiere`).
+ * ou à une école, à partir des critères publiés et du profil.
  *
- * Règles métier :
- *  - Seule la **filière du bac** est prise en compte (spécialités mission, année
- *    du bac et type de bac sont ignorés).
- *  - Si l'école/annonce ne définit aucune filière acceptée ⇒ « unknown ».
- *  - Si l'utilisateur n'a pas renseigné sa filière ⇒ « profile_missing ».
+ * Critères pris en compte (lorsqu'ils sont renseignés côté annonce/école) :
+ *  - filières bac normal (`filieresAcceptees`)
+ *  - spécialités bac Mission (`specialitesBacMissionAcceptees`)
+ *  - année scolaire du bac (`anneesBacAcceptees`)
+ *
+ * Aucun critère défini ⇒ « unknown » (ouvert à tous / pas de badge).
+ * Critère défini mais info profil manquante ⇒ « profile_missing ».
  */
 
 export type EligibilityVerdict =
@@ -114,30 +115,73 @@ export function evaluateEligibility(
   profile: EligibilityProfile | null | undefined,
 ): EligibilityResult {
   const filieres = nonEmpty(criteria.filieresAcceptees);
-  if (filieres.length === 0) return { verdict: 'unknown', checks: [] };
+  const specs = nonEmpty(criteria.specialitesBacMissionAcceptees);
+  const annees = nonEmpty(criteria.anneesBacAcceptees);
+
+  if (filieres.length === 0 && specs.length === 0 && annees.length === 0) {
+    return { verdict: 'unknown', checks: [] };
+  }
 
   if (!profile) return { verdict: 'no_user', checks: [] };
 
-  const userFiliere = (profile.filiere ?? '').trim();
-  if (userFiliere === '') {
-    return {
-      verdict: 'profile_missing',
-      checks: [{ key: 'filiere', ok: null, userValues: [], acceptedValues: filieres }],
-    };
+  const checks: EligibilityCheck[] = [];
+  const bac = (profile.bacType ?? '').trim().toLowerCase();
+  const isMission = bac === 'mission';
+
+  if (filieres.length > 0 && specs.length === 0 && isMission) {
+    checks.push({
+      key: 'bacTypeMismatch',
+      ok: false,
+      userValues: [],
+      acceptedValues: [],
+      acceptedBacType: 'normal',
+    });
+  } else if (specs.length > 0 && filieres.length === 0 && !isMission && bac === 'normal') {
+    checks.push({
+      key: 'bacTypeMismatch',
+      ok: false,
+      userValues: [],
+      acceptedValues: [],
+      acceptedBacType: 'mission',
+    });
   }
 
-  const ok = intersects([userFiliere], filieres);
-  return {
-    verdict: ok ? 'eligible' : 'not_eligible',
-    checks: [
-      {
-        key: 'filiere',
-        ok,
-        userValues: [userFiliere],
-        acceptedValues: filieres,
-      },
-    ],
-  };
+  if (filieres.length > 0 && !isMission) {
+    const userFiliere = (profile.filiere ?? '').trim();
+    checks.push({
+      key: 'filiere',
+      ok: userFiliere === '' ? null : intersects([userFiliere], filieres),
+      userValues: userFiliere ? [userFiliere] : [],
+      acceptedValues: filieres,
+    });
+  }
+
+  if (specs.length > 0 && isMission) {
+    const userSpecs = [profile.specialite1, profile.specialite2, profile.specialite3]
+      .map((s) => (s ?? '').trim())
+      .filter((s) => s !== '');
+    checks.push({
+      key: 'specialiteBacMission',
+      ok: userSpecs.length === 0 ? null : intersects(userSpecs, specs),
+      userValues: userSpecs,
+      acceptedValues: specs,
+    });
+  }
+
+  if (annees.length > 0) {
+    const userAnnee = (profile.bacAnnee ?? '').trim();
+    checks.push({
+      key: 'anneeBac',
+      ok: userAnnee === '' ? null : intersects([userAnnee], annees),
+      userValues: userAnnee ? [userAnnee] : [],
+      acceptedValues: annees,
+    });
+  }
+
+  if (checks.length === 0) return { verdict: 'unknown', checks: [] };
+  if (checks.some((c) => c.ok === false)) return { verdict: 'not_eligible', checks };
+  if (checks.some((c) => c.ok === null)) return { verdict: 'profile_missing', checks };
+  return { verdict: 'eligible', checks };
 }
 
 /**
@@ -181,8 +225,9 @@ export type AcceptedStudyPathFilter = {
 };
 
 /**
- * Filtre listing : l’établissement / l’annonce accepte explicitement la filière
+ * Filtre listing écoles : l’établissement accepte explicitement la filière
  * (bac marocain) ou la spécialité (bac Mission) choisie.
+ * Critères vides ⇒ non retenu (l’école n’a pas déclaré ce parcours).
  */
 export function matchesAcceptedStudyPathFilter(
   criteria: EligibilityCriteria,
@@ -198,4 +243,98 @@ export function matchesAcceptedStudyPathFilter(
 
   const specs = nonEmpty(criteria.specialitesBacMissionAcceptees);
   return specs.length > 0 && intersects([v], specs);
+}
+
+/**
+ * Filtre listing **annonces** : ne s’appuie que sur les critères de l’annonce.
+ * Critères vides (filière / spécialité) ⇒ l’annonce reste visible (ouverte à tous).
+ */
+export function matchesAnnouncementStudyPathFilter(
+  criteria: EligibilityCriteria,
+  filter: AcceptedStudyPathFilter,
+): boolean {
+  const v = filter.value.trim();
+  if (!v) return true;
+
+  if (filter.bacType === 'normal') {
+    const filieres = nonEmpty(criteria.filieresAcceptees);
+    if (filieres.length === 0) return true;
+    return intersects([v], filieres);
+  }
+
+  const specs = nonEmpty(criteria.specialitesBacMissionAcceptees);
+  if (specs.length === 0) return true;
+  return intersects([v], specs);
+}
+
+/**
+ * Année du bac de l’annonce vs profil. Critères vides ou année profil absente ⇒ OK.
+ */
+export function matchesAnnouncementBacYearFilter(
+  criteria: EligibilityCriteria,
+  bacAnnee: string | null | undefined,
+): boolean {
+  const annees = nonEmpty(criteria.anneesBacAcceptees);
+  if (annees.length === 0) return true;
+  const y = (bacAnnee ?? '').trim();
+  if (!y) return true;
+  return intersects([y], annees);
+}
+
+/**
+ * Verdict listing annonces (filtre « éligibles ») : filière/spécialité + année
+ * de l’annonce uniquement. Aucun critère ⇒ `unknown` (on conserve l’annonce).
+ */
+export function evaluateAnnouncementListingEligibility(
+  criteria: EligibilityCriteria,
+  profile: EligibilityProfile | null | undefined,
+): FiliereEligibilityVerdict {
+  const filieres = nonEmpty(criteria.filieresAcceptees);
+  const specs = nonEmpty(criteria.specialitesBacMissionAcceptees);
+  const annees = nonEmpty(criteria.anneesBacAcceptees);
+
+  if (filieres.length === 0 && specs.length === 0 && annees.length === 0) {
+    return 'unknown';
+  }
+  if (!profile) return 'unknown';
+
+  const bac = (profile.bacType ?? '').trim().toLowerCase();
+  const isMission = bac === 'mission';
+  let evaluated = false;
+
+  if (annees.length > 0) {
+    const y = (profile.bacAnnee ?? '').trim();
+    if (y) {
+      evaluated = true;
+      if (!intersects([y], annees)) return 'not_eligible';
+    }
+  }
+
+  if (isMission) {
+    if (specs.length > 0) {
+      const userSpecs = [profile.specialite1, profile.specialite2, profile.specialite3]
+        .map((s) => (s ?? '').trim())
+        .filter((s) => s !== '');
+      if (userSpecs.length > 0) {
+        evaluated = true;
+        if (!intersects(userSpecs, specs)) return 'not_eligible';
+      }
+    } else if (filieres.length > 0) {
+      evaluated = true;
+      return 'not_eligible';
+    }
+  } else {
+    if (filieres.length > 0) {
+      const userFiliere = (profile.filiere ?? '').trim();
+      if (userFiliere) {
+        evaluated = true;
+        if (!intersects([userFiliere], filieres)) return 'not_eligible';
+      }
+    } else if (specs.length > 0) {
+      evaluated = true;
+      return 'not_eligible';
+    }
+  }
+
+  return evaluated ? 'eligible' : 'unknown';
 }

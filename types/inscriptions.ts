@@ -91,6 +91,12 @@ export type AnnouncementBrief = {
   feesMin: string | null;
   feesMax: string | null;
   ogImage: string | null;
+  /** Logo carré optionnel (bourses / messages importants). */
+  logo?: string | null;
+  /** Ville / localisation libre (FR) — bourses / messages importants. */
+  locationLabelFr?: string | null;
+  /** Ville / localisation libre (AR). */
+  locationLabelAr?: string | null;
   /** Liens utiles personnalisés (label + url). */
   liensUtiles?: CustomLink[];
   /** Critères d'éligibilité — Filières Bac Normal acceptées (vide = pas de filtrage). */

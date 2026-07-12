@@ -43,6 +43,7 @@ import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import {
   fallbackEstablishmentAvatarName,
+  getEstablishmentFileUrl,
   getEstablishmentLogoUrl,
 } from '@/constants/establishmentMedia';
 import { useAuth } from '@/contexts/AuthContext';
@@ -62,6 +63,7 @@ import {
   resolveContestDetailBannerFilter,
   type ContestAnnouncementPlacementInfo,
 } from '@/services/contestAnnouncementCampaign';
+import { isTitleFirstContestAnnouncementType } from '@/utils/contestAnnouncementTitleFirst';
 import {
   ensureContestDetailEstablishment,
   fetchContestAnnouncementDetail,
@@ -88,6 +90,7 @@ import {
   formatShortDate,
   getLockedDaysUntilCloseUi,
   pickAnnouncementDescriptionHtml,
+  pickAnnouncementLocationLabel,
   pickAnnouncementTitle,
   pickEstablishmentName,
   pickRegistrationUrlLabel,
@@ -545,6 +548,7 @@ export default function InscriptionDetailScreen() {
   }
 
   const est = data.establishment ?? null;
+  const titleFirst = isTitleFirstContestAnnouncementType(data.announcementType || data.type);
   const estName = pickEstablishmentName(est, locale);
   const title = pickAnnouncementTitle(data, locale) || data.title;
   const descriptionHtml =
@@ -555,11 +559,16 @@ export default function InscriptionDetailScreen() {
 
   const villes = (est?.villes ?? []).filter(Boolean);
   const villeMain = est?.ville?.trim() || '';
-  const villesShort = villes.length > 0 ? villes.join(' · ') : villeMain;
+  const customLocation = pickAnnouncementLocationLabel(data, locale);
+  const villesFromEst = villes.length > 0 ? villes.join(' · ') : villeMain;
+  const villesShort = titleFirst ? customLocation || villesFromEst : villesFromEst;
 
-  const logoUri =
-    getEstablishmentLogoUrl(est?.logo) ??
-    fallbackEstablishmentAvatarName(est?.nom, est?.sigle);
+  const announcementLogoUri = getEstablishmentFileUrl(data.logo);
+  const showAnnouncementLogo = titleFirst && Boolean(announcementLogoUri);
+  const logoUri = titleFirst
+    ? announcementLogoUri
+    : getEstablishmentLogoUrl(est?.logo) ??
+      fallbackEstablishmentAvatarName(est?.nom, est?.sigle);
 
   const deadline = formatDaysUntilClose(data.daysUntilClose, locale);
   const showTassjilServiceBadge = shouldShowTassjilServiceBadge(est);
@@ -692,27 +701,40 @@ export default function InscriptionDetailScreen() {
           </View>
         )}
 
-        {/* ── Header card (logo + identité école) ── */}
+        {/* ── Header card (logo + identité) ── */}
         <View style={[styles.headerCard, isRTL && styles.rowRtl]}>
-          <Image
-            source={{ uri: logoUri }}
-            style={styles.estLogo}
-            resizeMode="contain"
-            accessibilityIgnoresInvertColors
-          />
+          {(!titleFirst || showAnnouncementLogo) && logoUri ? (
+            <Image
+              source={{ uri: logoUri }}
+              style={styles.estLogo}
+              resizeMode="contain"
+              accessibilityIgnoresInvertColors
+            />
+          ) : null}
           <View style={{ flex: 1 }}>
             <Text style={[styles.estName, isRTL && styles.rtl]} numberOfLines={3}>
-              {estName}
+              {titleFirst ? title : estName}
             </Text>
-            <View style={[styles.estMetaRow, isRTL && styles.rowRtl]}>
-              {est?.sigle ? (
-                <View style={styles.siglePill}>
-                  <Text style={styles.siglePillTxt}>{est?.sigle}</Text>
+            {!titleFirst ? (
+              <>
+                <View style={[styles.estMetaRow, isRTL && styles.rowRtl]}>
+                  {est?.sigle ? (
+                    <View style={styles.siglePill}>
+                      <Text style={styles.siglePillTxt}>{est?.sigle}</Text>
+                    </View>
+                  ) : null}
+                  {est?.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
                 </View>
-              ) : null}
-              {est?.type ? <EstablishmentTypeBadge type={est.type} size="xs" /> : null}
-            </View>
-            {!contentLocked && villesShort ? (
+                {!contentLocked && villesShort ? (
+                  <View style={[styles.villeRow, isRTL && styles.rowRtl]}>
+                    <FontAwesome name="map-marker" size={11} color={brand.textMuted} />
+                    <Text style={[styles.villeTxt, isRTL && styles.rtl]} numberOfLines={2}>
+                      {villesShort}
+                    </Text>
+                  </View>
+                ) : null}
+              </>
+            ) : !contentLocked && villesShort ? (
               <View style={[styles.villeRow, isRTL && styles.rowRtl]}>
                 <FontAwesome name="map-marker" size={11} color={brand.textMuted} />
                 <Text style={[styles.villeTxt, isRTL && styles.rtl]} numberOfLines={2}>
@@ -724,7 +746,7 @@ export default function InscriptionDetailScreen() {
         </View>
 
         {/* ── Actions école : voir la fiche / suivre l'école ── */}
-        {est?.id ? (
+        {!titleFirst && est?.id ? (
           <View style={[styles.estActionsRow, isRTL && styles.rowRtl]}>
             <Pressable
               onPress={onPressViewEstablishment}
@@ -784,7 +806,9 @@ export default function InscriptionDetailScreen() {
             size="sm"
             isRTL={isRTL}
           />
-          <Text style={[styles.title, isRTL && styles.rtl]}>{title}</Text>
+          {!titleFirst ? (
+            <Text style={[styles.title, isRTL && styles.rtl]}>{title}</Text>
+          ) : null}
           {showTassjilServiceBadge ? (
             <TassjilServiceBadge included={est?.isServiceTassjil === true} isRTL={isRTL} />
           ) : null}

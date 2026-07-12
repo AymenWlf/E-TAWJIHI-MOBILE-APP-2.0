@@ -80,6 +80,24 @@ export function pickAnnouncementTitle(
   return fr !== '' ? fr : ar;
 }
 
+/** Ville / localisation libre (bourses, messages importants…) selon la locale. */
+export function pickAnnouncementLocationLabel(
+  a:
+    | {
+        locationLabelFr?: string | null;
+        locationLabelAr?: string | null;
+      }
+    | null
+    | undefined,
+  locale: 'fr' | 'ar',
+): string {
+  if (!a) return '';
+  const fr = String(a.locationLabelFr ?? '').trim();
+  const ar = String(a.locationLabelAr ?? '').trim();
+  if (locale === 'ar') return ar !== '' ? ar : fr;
+  return fr !== '' ? fr : ar;
+}
+
 /**
  * Renvoie le libellé du bouton CTA "lien principal" :
  *  1. `customLabel` non vide ⇒ tel quel (saisie admin),
@@ -97,6 +115,14 @@ export function pickRegistrationUrlLabelKey(
   }
   if (t.includes('bourse') || t.includes('منحة') || t.includes('منح')) {
     return 'inscOpenLinkBtnScholarship';
+  }
+  if (
+    t.includes('opportunité') ||
+    t.includes('opportunite') ||
+    t.includes('فرصة') ||
+    t.includes('opportunity')
+  ) {
+    return 'inscOpenLinkBtnOpportunity';
   }
   if (t.includes('offre') || t.includes('عرض')) {
     return 'inscOpenLinkBtnOffer';

@@ -21,6 +21,8 @@ export const STATUT_LABELS: Record<string, string> = {
   annule_par_etudiant: "Annulé par l'étudiant",
   annule_par_etawjihi: 'Annulé par E-TAWJIHI',
   annule_manque_documents: 'Annulé pour manque de documents',
+  annule_probleme_technique_etudiant: 'Annulé pour problème technique (Étudiant)',
+  annule_probleme_technique_ecole: 'Annulé pour problème technique (École)',
   pas_de_reponse_apres_relances: 'Pas de réponse (Après relances)',
   en_cours: 'En cours',
   attente_informations: "Attente d'informations",
@@ -30,6 +32,7 @@ export const STATUT_LABELS: Record<string, string> = {
   inscrit: 'Inscrit',
   rate_concours: 'Raté le concours',
   non_selectionne: 'Non sélectionné',
+  non_inscrit: 'Non inscrit',
   liste_attente: "Liste d'attente",
   en_cours_depot_dossier: 'En cours de dépôt de dossier',
   dossier_depose: 'Dossier déposé',
@@ -55,6 +58,8 @@ const STATUT_LABELS_AR: Record<string, string> = {
   annule_par_etudiant: 'ملغى من طرف التلميذ',
   annule_par_etawjihi: 'ملغى من طرف E-TAWJIHI',
   annule_manque_documents: 'ملغى لعدم كفاية الوثائق',
+  annule_probleme_technique_etudiant: 'ملغى لمشكل تقني (التلميذ)',
+  annule_probleme_technique_ecole: 'ملغى لمشكل تقني (المؤسسة)',
   pas_de_reponse_apres_relances: 'لا رد (بعد التذكيرات)',
   en_cours: 'قيد الإنجاز',
   attente_informations: 'في انتظار المعلومات',
@@ -64,6 +69,7 @@ const STATUT_LABELS_AR: Record<string, string> = {
   inscrit: 'مسجل',
   rate_concours: 'راسب في المباراة',
   non_selectionne: 'غير مختار',
+  non_inscrit: 'غير مسجل',
   liste_attente: 'قائمة الانتظار',
   en_cours_depot_dossier: 'قيد إيداع الملف',
   dossier_depose: 'الملف مودع',
@@ -78,8 +84,8 @@ const STATUT_LABELS_AR: Record<string, string> = {
 
 export function getStatutCategory(value: StatutInscriptionValue | undefined): string {
   if (!value) return 'default';
-  const refus = ['non_eligible', 'ne_veux_pas', 'rate_concours', 'non_selectionne', 'cause_non_eligibilite'];
-  const annule = ['annule_par_etudiant', 'annule_par_etawjihi', 'annule_manque_documents', 'pas_de_reponse_apres_relances'];
+  const refus = ['non_eligible', 'ne_veux_pas', 'rate_concours', 'non_selectionne', 'non_inscrit', 'cause_non_eligibilite'];
+  const annule = ['annule_par_etudiant', 'annule_par_etawjihi', 'annule_manque_documents', 'pas_de_reponse_apres_relances', 'annule_probleme_technique_etudiant', 'annule_probleme_technique_ecole'];
   const ecole_fermee = ['ecole_fermee'];
   const en_attente = [
     'preselectionne', 'selectionne', 'eligible', 'en_cours', 'attente_informations', 'attente_versement',

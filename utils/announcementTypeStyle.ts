@@ -18,6 +18,7 @@ export type AnnouncementVisualKey =
   | 'result'
   | 'scholarshipMa'
   | 'scholarshipForeign'
+  | 'opportunityAbroad'
   | 'message'
   | 'offer'
   | 'other';
@@ -62,6 +63,13 @@ const STYLES: Record<AnnouncementVisualKey, AnnouncementTypeStyle> = {
     border: '#C7D2FE',
     fg: '#4338CA',
     icon: 'plane',
+  },
+  opportunityAbroad: {
+    key: 'opportunityAbroad',
+    bg: '#CCFBF1',
+    border: '#99F6E4',
+    fg: '#0F766E',
+    icon: 'globe',
   },
   message: {
     key: 'message',
@@ -130,6 +138,10 @@ export function getAnnouncementTypeStyle(label: string | null | undefined): Anno
   // Bourse générique (sans précision) → on retombe sur le style « MA ».
   if (n.includes('bourse')) {
     return STYLES.scholarshipMa;
+  }
+  // Opportunité à l'étranger.
+  if (n.includes('opportunite')) {
+    return STYLES.opportunityAbroad;
   }
   if (n.includes('message') || n.includes('important') || n.includes('alerte')) {
     return STYLES.message;

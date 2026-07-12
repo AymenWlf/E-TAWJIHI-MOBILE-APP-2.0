@@ -47,6 +47,9 @@ export type TassjilPanierEcolesResponse = {
     totalCount?: number;
     /** TOP : écoles sélectionnées seulement ; PLUS : catalogue complet. */
     displayMode?: TassjilDisplayMode;
+    /** État dossier Mes étudiants (redoublement, finalisé, …). */
+    etatDossierSuivi?: string | null;
+    etablissementFinalise?: string | null;
     userInfo?: {
       id: number;
       nom?: string;

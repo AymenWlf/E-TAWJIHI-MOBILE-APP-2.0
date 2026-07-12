@@ -59,9 +59,9 @@ export type EstablishmentFiltersValue = {
   /** Borne haute de la fourchette de frais (DH/an). */
   fraisMax: number;
   /**
-   * Filtre d'éligibilité de l'utilisateur connecté (basé sur la filière
-   * du Bac uniquement — l'année du bac n'est volontairement pas prise en
-   * compte ici, c'est un critère trop restrictif pour un filtre rapide).
+   * Filtre d'éligibilité de l'utilisateur connecté.
+   * Sur l’onglet Annonces : filière/spécialité **et** année du bac de l’annonce.
+   * Sur les écoles : filière du Bac uniquement.
    *  - `all`           : aucun filtrage.
    *  - `eligible`      : ne garder que les écoles/annonces éligibles
    *    (défaut — on présuppose que c'est ce qui intéresse l'utilisateur).
@@ -161,6 +161,23 @@ export function countActiveEstablishmentFilters(v: EstablishmentFiltersValue): n
     (v.eligibilityFilter === 'not_eligible' ? 1 : 0) +
     (v.acceptedStudyBacType && v.acceptedStudyValue.trim() ? 1 : 0) +
     (v.statusFilter === 'closed' ? 1 : 0)
+  );
+}
+
+/**
+ * Filtres « structure école » uniquement (type, ville, frais…).
+ * Exclut éligibilité / filière profil — ceux-ci s’appliquent aux critères
+ * de l’annonce, pas via le catalogue établissements.
+ */
+export function countAnnouncementSchoolStructuralFilters(v: EstablishmentFiltersValue): number {
+  return (
+    (v.type.trim() ? 1 : 0) +
+    (v.universite.trim() ? 1 : 0) +
+    (v.regionTitle.trim() ? 1 : 0) +
+    (v.ville.trim() ? 1 : 0) +
+    (v.secteurId.trim() ? 1 : 0) +
+    (v.diplome.trim() ? 1 : 0) +
+    (v.fraisMin > 0 || v.fraisMax < 100_000 ? 1 : 0)
   );
 }
 
@@ -718,10 +735,9 @@ export function EstablishmentFiltersModal({
             ) : null}
 
             {/*
-              Éligibilité — basée sur la filière du bac (cf.
-              `evaluateEligibilityByFiliere` côté parent). On ne tient pas
-              compte de l'année du bac pour ce filtre rapide afin d'éviter
-              une exclusion trop restrictive.
+              Éligibilité — onglet Annonces : filière/spécialité + année bac
+              de l’annonce (`evaluateAnnouncementListingEligibility`).
+              Écoles : filière uniquement (`evaluateEligibilityByFiliere`).
             */}
             <Text style={[styles.modalLabel, isRTL && styles.txtRtl, { marginTop: spacing.md }]}>
               {t('inscFilterEligibilityLabel')}

@@ -36,6 +36,7 @@ import {
   buildTassjilDisplaySchools,
   filterTassjilSchoolsByEligibility,
 } from '@/utils/tassjilDisplaySchools';
+import { getTassjilDossierEtatDisplay } from '@/utils/tassjilDossierEtat';
 
 const H_PAD = spacing.lg;
 
@@ -131,6 +132,8 @@ export default function TassjilSchoolChoicesScreen() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [schools, setSchools] = useState<TassjilSchool[]>([]);
+  const [etatDossierSuivi, setEtatDossierSuivi] = useState<string | null>(null);
+  const [etablissementFinalise, setEtablissementFinalise] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [noTassjilDossier, setNoTassjilDossier] = useState(false);
   const [inscriptionFilter, setInscriptionFilter] = useState('');
@@ -160,6 +163,9 @@ export default function TassjilSchoolChoicesScreen() {
       if (!res.success) {
         if (res.code === 'LEGACY_LINK_REQUIRED') {
           setNoTassjilDossier(true);
+          setSchools([]);
+          setEtatDossierSuivi(null);
+          setEtablissementFinalise(null);
           return;
         }
         throw new Error(res.message ?? t('tassjilSchoolsErrGeneric'));
@@ -172,6 +178,8 @@ export default function TassjilSchoolChoicesScreen() {
         ),
       );
       setSchools(list);
+      setEtatDossierSuivi(res.data?.etatDossierSuivi ?? null);
+      setEtablissementFinalise(res.data?.etablissementFinalise ?? null);
     } catch (e) {
       setError(getUserFacingApiError(e, t, { context: 'generic' }) ?? t('tassjilSchoolsErrGeneric'));
     } finally {
@@ -196,6 +204,17 @@ export default function TassjilSchoolChoicesScreen() {
   const countLabel = useMemo(
     () => t('tassjilSchoolsCount').replace('{count}', String(schools.length)),
     [schools.length, t],
+  );
+
+  const dossierEtatDisplay = useMemo(
+    () =>
+      getTassjilDossierEtatDisplay(
+        etatDossierSuivi,
+        etablissementFinalise,
+        isRTL,
+        t('tassjilDossierEtatPrestationEnCours'),
+      ),
+    [etatDossierSuivi, etablissementFinalise, isRTL, t],
   );
 
   const filteredSchools = useMemo(() => {
@@ -328,6 +347,43 @@ export default function TassjilSchoolChoicesScreen() {
             <Text style={[styles.heroEyebrow, isRTL && styles.rtlHero]}>{t('tassjilSchoolsHeroEyebrow')}</Text>
             <Text style={[styles.heroTitle, isRTL && styles.rtlHero]}>{t('tassjilSchoolsTitle')}</Text>
             <Text style={[styles.heroSub, isRTL && styles.rtlHero]}>{t('tassjilSchoolsSubtitle')}</Text>
+            {!loading && !error && !noTassjilDossier ? (
+              <View
+                style={[
+                  styles.dossierEtatChip,
+                  dossierEtatDisplay.tone === 'success' && styles.dossierEtatChipSuccess,
+                  dossierEtatDisplay.tone === 'warning' && styles.dossierEtatChipWarning,
+                  dossierEtatDisplay.tone === 'danger' && styles.dossierEtatChipDanger,
+                  isRTL && styles.rowRtl,
+                ]}
+              >
+                <FontAwesome
+                  name={dossierEtatDisplay.hasEtat ? 'flag' : 'clock-o'}
+                  size={12}
+                  color={
+                    dossierEtatDisplay.tone === 'success'
+                      ? '#047857'
+                      : dossierEtatDisplay.tone === 'warning'
+                        ? '#b45309'
+                        : dossierEtatDisplay.tone === 'danger'
+                          ? '#b91c1c'
+                          : homeShell.text
+                  }
+                />
+                <Text
+                  style={[
+                    styles.dossierEtatChipTxt,
+                    dossierEtatDisplay.tone === 'success' && styles.dossierEtatChipTxtSuccess,
+                    dossierEtatDisplay.tone === 'warning' && styles.dossierEtatChipTxtWarning,
+                    dossierEtatDisplay.tone === 'danger' && styles.dossierEtatChipTxtDanger,
+                    isRTL && styles.rtlHero,
+                  ]}
+                  numberOfLines={2}
+                >
+                  {dossierEtatDisplay.label}
+                </Text>
+              </View>
+            ) : null}
           </View>
           <View style={[styles.heroAccentBar, isRTL && styles.heroAccentBarRtl]} />
         </View>
@@ -384,6 +440,36 @@ const styles = StyleSheet.create({
     lineHeight: 19,
     marginTop: 2,
   },
+  dossierEtatChip: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: radius.full,
+    backgroundColor: 'rgba(255,255,255,0.16)',
+    maxWidth: '100%',
+  },
+  dossierEtatChipSuccess: {
+    backgroundColor: 'rgba(209, 250, 229, 0.95)',
+  },
+  dossierEtatChipWarning: {
+    backgroundColor: 'rgba(254, 243, 199, 0.95)',
+  },
+  dossierEtatChipDanger: {
+    backgroundColor: 'rgba(254, 226, 226, 0.95)',
+  },
+  dossierEtatChipTxt: {
+    color: homeShell.text,
+    fontSize: fontSize.xs,
+    fontWeight: '800',
+    flexShrink: 1,
+  },
+  dossierEtatChipTxtSuccess: { color: '#047857' },
+  dossierEtatChipTxtWarning: { color: '#b45309' },
+  dossierEtatChipTxtDanger: { color: '#b91c1c' },
   heroAccentBar: {
     height: 3,
     width: 48,

@@ -140,6 +140,10 @@ export async function fetchTassjilPanierEcoles(accessToken: string): Promise<Tas
       ...res.data,
       selectedSchools: selected,
       availableSchools: available,
+      etatDossierSuivi:
+        typeof res.data.etatDossierSuivi === 'string' ? res.data.etatDossierSuivi : null,
+      etablissementFinalise:
+        typeof res.data.etablissementFinalise === 'string' ? res.data.etablissementFinalise : null,
     },
   };
 }

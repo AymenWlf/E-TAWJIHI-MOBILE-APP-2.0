@@ -1437,6 +1437,7 @@ export type HomeCopyKey =
   | 'tassjilNoDossierBody'
   | 'tassjilSchoolsTitle'
   | 'tassjilSchoolsHeroEyebrow'
+  | 'tassjilDossierEtatPrestationEnCours'
   | 'tassjilSchoolsCount'
   | 'tassjilSupportWhatsapp'
   | 'tassjilStatInscription'
@@ -1628,6 +1629,7 @@ export type HomeCopyKey =
   | 'inscOpenLinkA11y'
   | 'inscOpenLinkBtnResult'
   | 'inscOpenLinkBtnScholarship'
+  | 'inscOpenLinkBtnOpportunity'
   | 'inscOpenLinkBtnOffer'
   | 'inscOpenLinkBtnInfo'
   | 'inscOpenLinkBtnRegister'
@@ -1637,6 +1639,7 @@ export type HomeCopyKey =
   | 'inscAnnTypeResult'
   | 'inscAnnTypeScholarshipMa'
   | 'inscAnnTypeScholarshipForeign'
+  | 'inscAnnTypeOpportunityAbroad'
   | 'inscRemoveCandidacy'
   | 'inscRemoveCandidacyConfirmTitle'
   | 'inscRemoveCandidacyConfirmMsg'
@@ -3351,6 +3354,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       'Nous n’avons pas trouvé de dossier TASSJIL actif pour votre numéro. Contactez le support si vous êtes déjà inscrit.',
     tassjilSchoolsTitle: 'Mes écoles TASSJIL',
     tassjilSchoolsHeroEyebrow: 'Service TASSJIL',
+    tassjilDossierEtatPrestationEnCours: 'Prestation en cours',
     tassjilSchoolsCount: '{count} école(s) TASSJIL',
     tassjilSupportWhatsapp: 'Support WhatsApp',
     tassjilStatInscription: "Statut d'inscription",
@@ -3558,6 +3562,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscOpenLinkA11y: 'Ouvrir le lien d\'inscription officiel',
     inscOpenLinkBtnResult: 'Voir le résultat',
     inscOpenLinkBtnScholarship: 'Postuler à la bourse',
+    inscOpenLinkBtnOpportunity: "Découvrir l'opportunité",
     inscOpenLinkBtnOffer: 'Profiter de l\'offre',
     inscOpenLinkBtnInfo: 'En savoir plus',
     inscOpenLinkBtnRegister: "S'inscrire",
@@ -3567,6 +3572,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscAnnTypeResult: 'Résultat d\'inscription',
     inscAnnTypeScholarshipMa: 'Bourse maroc',
     inscAnnTypeScholarshipForeign: 'Bourse étrangère',
+    inscAnnTypeOpportunityAbroad: "Opportunité à l'étranger",
     inscRemoveCandidacy: 'Retirer du suivi',
     inscRemoveCandidacyConfirmTitle: 'Retirer cette candidature ?',
     inscRemoveCandidacyConfirmMsg: 'Le suivi et la timeline de cette candidature seront supprimés.',
@@ -5248,6 +5254,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       'لم نجد ملف TASSJIL نشطًا لرقمك. اتصل بالدعم إذا كنت مسجّلًا بالفعل.',
     tassjilSchoolsTitle: 'مدارسي TASSJIL',
     tassjilSchoolsHeroEyebrow: 'خدمة TASSJIL',
+    tassjilDossierEtatPrestationEnCours: 'الخدمة جارية',
     tassjilSchoolsCount: '{count} مدرسة متابَعة',
     tassjilSupportWhatsapp: 'دعم WhatsApp',
     tassjilStatInscription: 'حالة التسجيل',
@@ -5451,6 +5458,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscOpenLinkA11y: 'فتح رابط التسجيل الرسمي',
     inscOpenLinkBtnResult: 'عرض النتيجة',
     inscOpenLinkBtnScholarship: 'التقديم للمنحة',
+    inscOpenLinkBtnOpportunity: 'اكتشف الفرصة',
     inscOpenLinkBtnOffer: 'الاستفادة من العرض',
     inscOpenLinkBtnInfo: 'معرفة المزيد',
     inscOpenLinkBtnRegister: 'سجّل الآن',
@@ -5460,6 +5468,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     inscAnnTypeResult: 'نتيجة التسجيل',
     inscAnnTypeScholarshipMa: 'منحة المغرب',
     inscAnnTypeScholarshipForeign: 'منحة أجنبية',
+    inscAnnTypeOpportunityAbroad: 'فرصة في الخارج',
     inscRemoveCandidacy: 'إزالة من المتابعة',
     inscRemoveCandidacyConfirmTitle: 'إزالة هذا الترشّح؟',
     inscRemoveCandidacyConfirmMsg: 'ستُحذف المتابعة والسجل الزمني لهذا الترشّح.',
