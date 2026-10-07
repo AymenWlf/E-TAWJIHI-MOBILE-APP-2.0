@@ -10,6 +10,7 @@ import {
   resolveUpgradeSourceName,
 } from '@/utils/platformServiceEntitlementUi';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   entitlement?: PlatformServiceCatalogEntitlement;
   entitlementsLoading?: boolean;
@@ -140,7 +141,7 @@ export function PlatformServiceEntitlementStatus({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm, marginTop: spacing.sm, alignSelf: 'stretch' },
-  wrapRtl: { direction: 'rtl', alignItems: 'flex-end' },
+  wrapRtl: { ...DIR_RTL, alignItems: 'flex-end' },
   pill: {
     flexDirection: 'row',
     alignItems: 'center',

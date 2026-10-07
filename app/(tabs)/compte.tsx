@@ -80,6 +80,7 @@ import { OrderServicePaymentSnippet } from '@/components/shop/OrderServicePaymen
 import { formatShopPrice } from '@/utils/shopFormatPrice';
 import { countOpenShopOrders, isShopOrderClosed, shopOrderStatusUi } from '@/utils/shopOrderStatusUi';
 
+import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 export default function CompteTabScreen() {
   const router = useRouter();
   const { openSimpleAppFeedback } = useSimpleAppFeedback();
@@ -1646,8 +1647,8 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  ltr: { direction: 'ltr' },
-  rtl: { direction: 'rtl' },
+  ltr: DIR_LTR,
+  rtl: DIR_RTL,
   statusBarFill: {
     position: 'absolute',
     top: 0,
@@ -1718,7 +1719,7 @@ const styles = StyleSheet.create({
   },
   /** Renforce l’alignement du contenu scrollé en RTL (Android + iOS). */
   scrollContentRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   refreshBanner: {

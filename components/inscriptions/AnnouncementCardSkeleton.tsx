@@ -3,6 +3,7 @@ import { StyleSheet, View, type StyleProp, type ViewStyle } from 'react-native';
 import { SkeletonBlock, useSkeletonPulse } from '@/components/ui/CardLoadingSkeleton';
 import { brand, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   isRTL?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -161,7 +162,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   bodyRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   schoolBlock: {

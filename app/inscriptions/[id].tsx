@@ -113,6 +113,7 @@ import {
 } from '@/utils/contestRegistrationMethods';
 import { addUtmToUrl, placementTrafficDestinationUrl } from '@/utils/referencingPlacementUi';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 export default function InscriptionDetailScreen() {
   const router = useRouter();
   const { t, locale, isRTL } = useLocale();
@@ -1821,7 +1822,7 @@ const styles = StyleSheet.create({
     gap: 6,
   },
   datePillLockedRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'center',
   },
   datePillLockedValueRow: {
@@ -1856,14 +1857,14 @@ const styles = StyleSheet.create({
     borderColor: brand.border,
   },
   sectionRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   sectionBody: {
     gap: spacing.sm,
   },
   sectionBodyRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   sectionHeader: { flexDirection: 'row', alignItems: 'center', gap: 8 },
@@ -1931,7 +1932,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   presentationBodyRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignSelf: 'stretch',
     width: '100%',
   },
@@ -2114,7 +2115,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#FFFBEB',
   },
   ctaPendingRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'center',
     justifyContent: 'center',
   },

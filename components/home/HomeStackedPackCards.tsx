@@ -61,6 +61,7 @@ import {
   type StackCardLayout,
 } from '@/components/home/stackCardLayout';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 export type { StackCardLayout } from '@/components/home/stackCardLayout';
 export { buildStackCardLayout } from '@/components/home/stackCardLayout';
 
@@ -1675,9 +1676,7 @@ const styles = StyleSheet.create({
     alignItems: 'stretch',
     alignSelf: 'stretch',
   },
-  dailyActionsWrapRtl: {
-    direction: 'rtl',
-  },
+  dailyActionsWrapRtl: DIR_RTL,
   dailyActionsWrapGameOnlyRtl: {
     alignItems: 'stretch',
     alignSelf: 'stretch',

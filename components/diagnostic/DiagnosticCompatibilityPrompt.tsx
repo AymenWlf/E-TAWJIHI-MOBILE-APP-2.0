@@ -12,9 +12,10 @@ import { brand, fontSize, radius } from '@/theme/tokens';
 import { navigateToSchoolDiagnosticWizard } from '@/utils/navigateToSchoolDiagnosticEntry';
 import type { TawjihPlusParcoursGate } from '@/utils/tawjihPlusParcoursGate';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const COPY = {
-  fr: 'Passer le test de compatibilité',
-  ar: 'أجرِ اختبار التوافق',
+  fr: 'Passer le test d’orientation',
+  ar: 'أجرِ اختبار التوجيه',
 } as const;
 
 type Props = {
@@ -85,7 +86,7 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
     maxWidth: '100%',
   },
-  pillRtl: { direction: 'rtl' },
+  pillRtl: DIR_RTL,
   label: {
     fontWeight: '800',
     color: brand.primary,

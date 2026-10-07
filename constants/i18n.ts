@@ -348,9 +348,41 @@ export type HomeCopyKey =
   | 'orientationStepBadgeTodo'
   | 'orientationStepOrientationDiagnostic'
   | 'orientationStepOrientationDiagnosticShort'
+  | 'orientationStepOrientationReport'
+  | 'orientationStepOrientationReportShort'
   | 'orientationStepRecommendation'
   | 'orientationStepRecommendationShort'
   | 'orientationStepRecommendationHint'
+  | 'sidebarSecteursMetiers'
+  | 'secteursTitle'
+  | 'secteursSubtitle'
+  | 'secteursSearchPlaceholder'
+  | 'secteursApplySearch'
+  | 'secteursFavoritesOnlyA11y'
+  | 'secteursFavoritesEmptyTitle'
+  | 'secteursFavoritesEmptyBody'
+  | 'secteursEmptyTitle'
+  | 'secteursEmptyBody'
+  | 'secteursShowAll'
+  | 'secteursClearSearch'
+  | 'secteursMatch'
+  | 'secteursAddFavorite'
+  | 'secteursRemoveFavorite'
+  | 'secteursFavoriteError'
+  | 'secteursDetailNotFound'
+  | 'secteursStatSchools'
+  | 'secteursStatPrograms'
+  | 'secteursStatJobs'
+  | 'secteursSalary'
+  | 'secteursAbout'
+  | 'secteursNoDescription'
+  | 'secteursSoftSkills'
+  | 'secteursPersonalities'
+  | 'secteursBac'
+  | 'secteursJobs'
+  | 'secteursPros'
+  | 'secteursCons'
+  | 'secteursCtaSchools'
   | 'diagnosticRecoFollowBanner'
   | 'diagnosticRecoFollowBannerDone'
   | 'practical_diagnostic_recommandations_follow_hint'
@@ -1928,20 +1960,20 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     home_orientation_access_title: 'Diagnostic et recommandations',
     practical_orientation_section: 'Parcours orientation',
     practical_services_section: 'Services',
-    practical_diagnostic_ecoles: 'Diagnostic écoles',
+    practical_diagnostic_ecoles: "Test d'orientation",
     sidebarOrientation1Bac: 'Test orientation 1ère bac',
-    practical_diagnostic_rapport: 'Rapport diagnostic',
+    practical_diagnostic_rapport: "Rapport d'orientation",
     practical_diagnostic_recommandations: 'Recommandations écoles',
     practical_diagnostic_ecoles_desc:
-      'Questionnaire rapide pour personnaliser vos recommandations d’établissements.',
+      'Test complet (profil, RIASEC, secteurs, métiers, écoles) pour construire ton orientation.',
     practical_diagnostic_rapport_desc:
-      'Parcourez vos réponses et la synthèse étape par étape.',
+      'Consulte ton profil, tes métiers et écoles recommandés après le test.',
     practical_diagnostic_recommandations_desc:
       'Liste personnalisée et suivi d’au moins 3 établissements pour valider le parcours.',
     practical_recommandations_locked_account:
       'Complétez la configuration de votre compte pour voir vos recommandations.',
     practical_recommandations_locked_diagnostic:
-      'Terminez d’abord le diagnostic écoles pour débloquer vos recommandations.',
+      'Terminez d’abord le test et le rapport d’orientation pour débloquer vos recommandations.',
     practical_orientation_locked_title: 'Étape verrouillée',
     practical_orientation_loading: 'Chargement du parcours…',
     practical_diagnostic_locked_account:
@@ -2146,18 +2178,50 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     orientationFranchisedEmpty: 'Aucune étape franchie pour le moment.',
     orientationContinueCta: 'Continuer',
     orientationSeeAllSteps: 'Voir le détail',
-    orientationStepCountLabel: '6 étapes',
+    orientationStepCountLabel: '7 étapes',
     orientationStepAccountSetup: 'Configuration du compte',
     orientationStepAccountSetupShort: 'Compte',
     orientationStepBadgeDone: 'Fait',
     orientationStepBadgeCurrent: 'En cours',
     orientationStepBadgeTodo: 'À faire',
-    orientationStepOrientationDiagnostic: "Diagnostic d'orientation",
-    orientationStepOrientationDiagnosticShort: 'Diagnostic',
-    orientationStepRecommendation: "Recommandation et suivi d'écoles",
-    orientationStepRecommendationShort: 'Reco. & suivi',
+    orientationStepOrientationDiagnostic: "Test d'orientation",
+    orientationStepOrientationDiagnosticShort: 'Test',
+    orientationStepOrientationReport: "Rapport d'orientation",
+    orientationStepOrientationReportShort: 'Rapport',
+    orientationStepRecommendation: "Recommandation d'écoles",
+    orientationStepRecommendationShort: 'Reco. écoles',
     orientationStepRecommendationHint:
       'Suivez 3 écoles recommandées pour valider cette étape.',
+    sidebarSecteursMetiers: 'Secteurs & métiers',
+    secteursTitle: 'Secteurs & métiers',
+    secteursSubtitle: 'Explorez les filières, métiers et écoles par secteur.',
+    secteursSearchPlaceholder: 'Rechercher un secteur…',
+    secteursApplySearch: 'Rechercher',
+    secteursFavoritesOnlyA11y: 'Favoris uniquement',
+    secteursFavoritesEmptyTitle: 'Aucun secteur favori',
+    secteursFavoritesEmptyBody: 'Ajoutez des secteurs en favori pour les retrouver ici.',
+    secteursEmptyTitle: 'Aucun secteur trouvé',
+    secteursEmptyBody: 'Essayez un autre mot-clé ou affichez tous les secteurs.',
+    secteursShowAll: 'Tout afficher',
+    secteursClearSearch: 'Effacer la recherche',
+    secteursMatch: 'compatibilité',
+    secteursAddFavorite: 'Ajouter aux favoris',
+    secteursRemoveFavorite: 'Retirer des favoris',
+    secteursFavoriteError: 'Impossible de mettre à jour le favori. Réessayez.',
+    secteursDetailNotFound: 'Secteur introuvable.',
+    secteursStatSchools: 'Écoles',
+    secteursStatPrograms: 'Filières',
+    secteursStatJobs: 'Métiers',
+    secteursSalary: 'Salaire indicatif',
+    secteursAbout: 'À propos',
+    secteursNoDescription: 'Aucune description disponible pour ce secteur.',
+    secteursSoftSkills: 'Soft skills',
+    secteursPersonalities: 'Personnalités',
+    secteursBac: 'Bac recommandé',
+    secteursJobs: 'Métiers',
+    secteursPros: 'Points forts',
+    secteursCons: 'Points de vigilance',
+    secteursCtaSchools: 'Voir les écoles',
     diagnosticRecoFollowBanner:
       'Pour valider le parcours, suivez 3 écoles recommandées.',
     diagnosticRecoFollowBannerDone:
@@ -3865,20 +3929,20 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     home_orientation_access_title: 'التشخيص والتوصيات',
     practical_orientation_section: 'مسار التوجيه',
     practical_services_section: 'الخدمات',
-    practical_diagnostic_ecoles: 'تشخيص المدارس',
+    practical_diagnostic_ecoles: 'اختبار التوجيه',
     sidebarOrientation1Bac: 'اختبار التوجيه 1ère باك',
-    practical_diagnostic_rapport: 'تقرير التشخيص',
+    practical_diagnostic_rapport: 'تقرير التوجيه',
     practical_diagnostic_recommandations: 'توصيات المدارس',
     practical_diagnostic_ecoles_desc:
-      'استبيان سريع لتخصيص توصيات المؤسسات.',
+      'اختبار كامل (الملف، RIASEC، القطاعات، المهن، المدارس) لبناء توجيهك.',
     practical_diagnostic_rapport_desc:
-      'استعرض إجاباتك والملخص مرحلة بمرحلة.',
+      'اطلع على ملفك ومهنك ومدارسك الموصى بها بعد الاختبار.',
     practical_diagnostic_recommandations_desc:
       'قائمة مخصصة ومتابعة 3 مؤسسات على الأقل لإتمام المسار.',
     practical_recommandations_locked_account:
       'أكمل إعداد حسابك لعرض توصياتك.',
     practical_recommandations_locked_diagnostic:
-      'أنهِ تشخيص المدارس أولاً لفتح التوصيات.',
+      'أنهِ اختبار التوجيه وتقريره أولاً لفتح التوصيات.',
     practical_orientation_locked_title: 'الخطوة مقفلة',
     practical_orientation_loading: 'جاري تحميل المسار…',
     practical_diagnostic_locked_account:
@@ -4079,18 +4143,50 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     orientationFranchisedEmpty: 'لا توجد خطوة مكتملة بعد.',
     orientationContinueCta: 'متابعة',
     orientationSeeAllSteps: 'عرض التفاصيل',
-    orientationStepCountLabel: '6 خطوات',
+    orientationStepCountLabel: '7 خطوات',
     orientationStepAccountSetup: 'إعداد الحساب',
     orientationStepAccountSetupShort: 'الحساب',
     orientationStepBadgeDone: 'مكتمل',
     orientationStepBadgeCurrent: 'جاري',
     orientationStepBadgeTodo: 'للقيام',
-    orientationStepOrientationDiagnostic: 'تشخيص التوجيه',
-    orientationStepOrientationDiagnosticShort: 'تشخيص',
-    orientationStepRecommendation: 'توصية ومتابعة المدارس',
-    orientationStepRecommendationShort: 'توصيات ومتابعة',
+    orientationStepOrientationDiagnostic: 'اختبار التوجيه',
+    orientationStepOrientationDiagnosticShort: 'الاختبار',
+    orientationStepOrientationReport: 'تقرير التوجيه',
+    orientationStepOrientationReportShort: 'التقرير',
+    orientationStepRecommendation: 'توصية المدارس',
+    orientationStepRecommendationShort: 'التوصيات',
     orientationStepRecommendationHint:
       'تابع 3 مؤسسات موصى بها لإتمام هذه الخطوة.',
+    sidebarSecteursMetiers: 'القطاعات والمهن',
+    secteursTitle: 'القطاعات والمهن',
+    secteursSubtitle: 'استكشف المسارات والمهن والمدارس حسب القطاع.',
+    secteursSearchPlaceholder: 'ابحث عن قطاع…',
+    secteursApplySearch: 'بحث',
+    secteursFavoritesOnlyA11y: 'المفضلة فقط',
+    secteursFavoritesEmptyTitle: 'لا توجد قطاعات مفضلة',
+    secteursFavoritesEmptyBody: 'أضف قطاعات إلى المفضلة لتجدها هنا.',
+    secteursEmptyTitle: 'لم يُعثر على أي قطاع',
+    secteursEmptyBody: 'جرّب كلمة أخرى أو اعرض كل القطاعات.',
+    secteursShowAll: 'عرض الكل',
+    secteursClearSearch: 'مسح البحث',
+    secteursMatch: 'توافق',
+    secteursAddFavorite: 'إضافة إلى المفضلة',
+    secteursRemoveFavorite: 'إزالة من المفضلة',
+    secteursFavoriteError: 'تعذّر تحديث المفضلة. حاول مرة أخرى.',
+    secteursDetailNotFound: 'القطاع غير موجود.',
+    secteursStatSchools: 'مدارس',
+    secteursStatPrograms: 'مسارات',
+    secteursStatJobs: 'مهن',
+    secteursSalary: 'راتب تقريبي',
+    secteursAbout: 'نبذة',
+    secteursNoDescription: 'لا يوجد وصف متاح لهذا القطاع.',
+    secteursSoftSkills: 'المهارات الشخصية',
+    secteursPersonalities: 'الشخصيات',
+    secteursBac: 'البكالوريا المناسبة',
+    secteursJobs: 'المهن',
+    secteursPros: 'نقاط القوة',
+    secteursCons: 'نقاط الانتباه',
+    secteursCtaSchools: 'عرض المدارس',
     diagnosticRecoFollowBanner:
       'لإتمام المسار: تابع 3 مؤسسات موصى بها على الأقل.',
     diagnosticRecoFollowBannerDone: 'تمت الخطوة — تتابع مؤسساتك الموصى بها.',

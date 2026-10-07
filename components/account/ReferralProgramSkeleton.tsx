@@ -9,6 +9,7 @@ import {
 import { homeShell } from '@/theme/homeShell';
 import { radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type RtlProps = { isRTL?: boolean; style?: StyleProp<ViewStyle> };
 
 /** Bannière réduction + code + boutons (ReferralShareCodeBlock). */
@@ -171,7 +172,7 @@ export function ReferralProgramPageSkeleton({ isRTL = false, style }: RtlProps) 
 }
 
 const styles = StyleSheet.create({
-  rtlWrap: { direction: 'rtl', alignItems: 'stretch' },
+  rtlWrap: { ...DIR_RTL, alignItems: 'stretch' },
   rowRtl: { flexDirection: 'row-reverse' },
 
   page: { gap: spacing.md, width: '100%' },

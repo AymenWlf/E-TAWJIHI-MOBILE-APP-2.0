@@ -16,6 +16,7 @@ import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
 import { isPlatformServiceCartLine } from '@/utils/platformServiceCart';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 export default function BoutiqueCartScreen() {
   const router = useRouter();
   const { t, isRTL } = useLocale();
@@ -247,7 +248,7 @@ const styles = StyleSheet.create({
   footerSafe: {},
   scrollFill: { flex: 1 },
   screenSafe: { flex: 1 },
-  rtlRoot: { direction: 'rtl' },
+  rtlRoot: DIR_RTL,
   rowRtl: { flexDirection: 'row-reverse' },
   txtRtl: { textAlign: 'right', writingDirection: 'rtl' },
   topBar: {

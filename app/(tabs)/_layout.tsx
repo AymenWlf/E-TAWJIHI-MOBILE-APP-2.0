@@ -264,6 +264,19 @@ export default function TabLayout() {
           headerShown: false,
         }}
       />
+      {/**
+       * Secteurs & métiers : barre d’onglets visible, sans entrée dans la tab bar
+       * (sidebar / liens pratiques). Voir expo-router : `href: null`.
+       */}
+      <Tabs.Screen
+        name="secteurs"
+        options={{
+          href: null,
+          headerShown: false,
+          title: '',
+          tabBarStyle: buildTabBarStyle(insets.bottom),
+        }}
+      />
     </Tabs>
     </TawjihPlusAccessProvider>
   );

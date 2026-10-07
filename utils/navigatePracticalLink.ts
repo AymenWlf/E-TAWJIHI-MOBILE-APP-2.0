@@ -1,7 +1,8 @@
 import {
-  navigateToSchoolDiagnosticEntry,
-  navigateToSchoolDiagnosticWizard,
-} from '@/utils/navigateToSchoolDiagnosticEntry';
+  navigateToOrientationDiagnosticWizard,
+  navigateToOrientationReportEntry,
+} from '@/utils/navigateToOrientationDiagnosticEntry';
+import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
 import type { PlanParcoursNavigationAuth } from '@/utils/planParcoursNavigation';
 import {
   guardTawjihPlusPracticalLink,
@@ -50,9 +51,14 @@ function navigatePracticalLinkUnlocked(
     case 'evenements':
       push('/evenements');
       return;
+    case 'secteurs':
+      push('/secteurs');
+      return;
     case 'diagnostic-ecoles':
+      void navigateToOrientationDiagnosticWizard(auth, push);
+      return;
     case 'diagnostic-rapport':
-      void navigateToSchoolDiagnosticWizard(auth, push, tawjihPlusGate);
+      void navigateToOrientationReportEntry(auth, push);
       return;
     case 'diagnostic-recommandations':
       void navigateToSchoolDiagnosticEntry(auth, push, tawjihPlusGate);

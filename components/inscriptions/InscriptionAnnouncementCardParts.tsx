@@ -11,6 +11,7 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { CandidacyStatusType } from '@/types/inscriptions';
 import type { formatDaysUntilClose } from '@/utils/candidacyStatus';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type FaName = ComponentProps<typeof FontAwesome>['name'];
 
 export type DeadlineUi = ReturnType<typeof formatDaysUntilClose>;
@@ -34,7 +35,7 @@ export const inscriptionCardStyles = StyleSheet.create({
     gap: spacing.sm,
   },
   bodyRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   headerRow: {

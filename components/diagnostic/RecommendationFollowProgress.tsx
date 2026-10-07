@@ -11,6 +11,7 @@ import {
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   followCount: number;
   locale: RecommendationFollowCopyLocale;
@@ -81,7 +82,7 @@ const styles = StyleSheet.create({
     borderColor: `${homeShell.greenDark}55`,
     backgroundColor: homeShell.greenAlpha18,
   },
-  wrapRtl: { direction: 'rtl' },
+  wrapRtl: DIR_RTL,
   headRow: {
     flexDirection: 'row',
     alignItems: 'center',

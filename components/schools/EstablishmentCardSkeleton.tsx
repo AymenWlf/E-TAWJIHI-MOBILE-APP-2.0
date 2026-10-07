@@ -4,6 +4,7 @@ import { SkeletonBlock, useSkeletonPulse } from '@/components/ui/CardLoadingSkel
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_LTR } from '@/utils/layoutDirection';
 type Props = {
   isRTL?: boolean;
   style?: StyleProp<ViewStyle>;
@@ -125,8 +126,7 @@ const styles = StyleSheet.create({
   },
   topRowRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
-  },
+    ...DIR_LTR },
   logo: {
     width: 62,
     height: 62,

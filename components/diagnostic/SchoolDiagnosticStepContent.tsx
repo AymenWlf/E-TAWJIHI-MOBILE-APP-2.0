@@ -39,6 +39,7 @@ import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { brand, fontSize, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 export type DiagnosticStepContext = {
   form: SchoolQuickDiagnosticForm;
   setForm: Dispatch<SetStateAction<SchoolQuickDiagnosticForm>>;
@@ -652,7 +653,7 @@ export function SchoolDiagnosticStepContent({ step, ctx }: { step: number; ctx: 
                 borderWidth: 1,
                 borderColor: 'rgba(51, 62, 143, 0.12)',
                 alignSelf: 'stretch',
-                ...(isRTL ? { direction: 'rtl' as const } : {}),
+                ...(isRTL ? DIR_RTL : {}),
               }}>
               <ActivityIndicator size="small" color={brand.primary} />
               <Text

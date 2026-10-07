@@ -2,6 +2,7 @@ import { StyleSheet } from 'react-native';
 
 import { spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 /** Styles partagés pour carrousels horizontaux des sections accueil. */
 export function homeFeedHorizontalScrollStyles() {
   return {
@@ -24,9 +25,7 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   /** iOS : défilement de droite vers la gauche, premier élément ancré à droite. */
-  scrollTrackRtl: {
-    direction: 'rtl',
-  },
+  scrollTrackRtl: DIR_RTL,
   /**
    * Android : `direction: 'rtl'` est ignoré sur ScrollView horizontal — miroir horizontal
    * (scroll + enfants) pour aligner le premier item à droite comme sur iOS.

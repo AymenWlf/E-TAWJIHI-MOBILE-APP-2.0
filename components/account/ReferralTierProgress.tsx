@@ -14,6 +14,7 @@ import {
   getTierRewardProducts,
 } from '@/utils/referralTierProduct';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   tierProgress: UserReferralProgram['tierProgress'];
   rtl: boolean;
@@ -172,7 +173,7 @@ export function ReferralTierProgress({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm, alignItems: 'stretch' },
-  wrapRtl: { direction: 'rtl' },
+  wrapRtl: DIR_RTL,
   head: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   rowRtl: { flexDirection: 'row-reverse' },
   headTitle: {
@@ -265,7 +266,7 @@ const styles = StyleSheet.create({
   tierCardEmbedded: {
     backgroundColor: '#F8FAFC',
   },
-  tierCardRtl: { direction: 'rtl' },
+  tierCardRtl: DIR_RTL,
   tierCardUnlocked: {
     borderColor: `${homeShell.green}66`,
     backgroundColor: '#F0FDF4',

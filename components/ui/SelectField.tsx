@@ -1,3 +1,4 @@
+import { DIR_RTL } from '@/utils/layoutDirection';
 /**
  * SelectField — champ de sélection unique avec apparence "input" + chevron.
  *
@@ -188,7 +189,7 @@ const styles = StyleSheet.create({
     minHeight: 52,
     overflow: 'hidden',
   },
-  inputRtl: { direction: 'rtl' },
+  inputRtl: DIR_RTL,
   /** RTL sans `direction` sur le conteneur — évite les taps manqués sur Android. */
   inputRtlTextOnly: {},
   inputError: {

@@ -10,6 +10,7 @@ import { useAppColors } from '@/hooks/useAppColors';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const RING = 72;
 const AVATAR = RING - 12;
 
@@ -133,9 +134,7 @@ export function StoriesRow({
 
 const styles = StyleSheet.create({
   /** RTL : ordre des vignettes depuis la droite (inline-start). */
-  scrollRtl: {
-    direction: 'rtl',
-  },
+  scrollRtl: DIR_RTL,
   /** Retire le gutter côté fin (droite LTR / gauche RTL) appliqué par le parent. */
   scrollTrack: {
     marginEnd: -spacing.xl,

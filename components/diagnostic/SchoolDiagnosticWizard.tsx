@@ -90,6 +90,7 @@ import {
   enrichSchoolDiagnosticSubmitPayload,
 } from '@/utils/schoolDiagnosticPayloadDisplayContext';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type PickerKey =
   | 'city'
   | 'gender'
@@ -696,10 +697,7 @@ export function SchoolDiagnosticWizard() {
       afterSuccess: async () => {
         const token = await getValidAccessToken();
         if (token) {
-          await Promise.all([
-            postPlanReussiteStep(token, 'quickDiagnosticCompleted'),
-            postPlanReussiteStep(token, 'orientationDiagnostic'),
-          ]).catch(() => undefined);
+          await postPlanReussiteStep(token, 'quickDiagnosticCompleted').catch(() => undefined);
         }
         await clearDiagnosticDraft();
       },
@@ -855,7 +853,7 @@ export function SchoolDiagnosticWizard() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: diagnosticTheme.surfaceSoft },
-  rootRtl: { direction: 'rtl' },
+  rootRtl: DIR_RTL,
   rtlText: { writingDirection: 'rtl', textAlign: 'right' },
   btnSavingInner: {
     flexDirection: 'row',
@@ -915,7 +913,7 @@ const styles = StyleSheet.create({
     elevation: 3,
   },
   formCardRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   footerSafe: {

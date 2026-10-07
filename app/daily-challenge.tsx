@@ -50,6 +50,7 @@ import { useShopFlowSystemBars } from '@/hooks/useShopFlowSystemBars';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_LTR } from '@/utils/layoutDirection';
 /** Largeur disponible pour la grille SNAKE (marges scroll + carte quiz à padding horizontal réduit). */
 function zipQuizGridInnerWidth(screenWidth: number): number {
   return screenWidth - spacing.lg * 2 - spacing.xs;
@@ -2282,7 +2283,7 @@ const styles = StyleSheet.create({
     borderRadius: 6,
     backgroundColor: brand.borderLight,
     overflow: 'hidden',
-    direction: 'ltr',
+    ...DIR_LTR,
     position: 'relative',
   },
   progressXpFill: {

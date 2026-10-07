@@ -4,6 +4,7 @@ import { SkeletonBlock, useSkeletonPulse } from '@/components/ui/CardLoadingSkel
 import { brand, radius, spacing } from '@/theme/tokens';
 import { platformServiceCarouselCardWidth } from '@/utils/platformServiceBrandIcon';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const H_PAD = spacing.md;
 
 type Props = {
@@ -129,7 +130,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   stackRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   rowOuter: {

@@ -1,10 +1,5 @@
 import { ANNEES_BAC_OPTIONS, type LabeledOption } from '@/constants/academicSetup';
-
-/** Année scolaire en cours (terminale / 2ème année bac). À mettre à jour en début de rentrée si besoin. */
-export const CURRENT_BAC_SCHOOL_YEAR = '2025-2026';
-
-/** Rentrée suivante : 1ère année Baccalauréat. */
-export const FIRST_BAC_SCHOOL_YEAR = '2026-2027';
+import { CURRENT_BAC_SCHOOL_YEAR, FIRST_BAC_SCHOOL_YEAR } from '@/utils/academicProfileLevels';
 
 export type BacSchoolYearLocale = 'fr' | 'ar';
 
@@ -32,7 +27,7 @@ export function formatBacAnneePickerLabel(value: string, locale: BacSchoolYearLo
   return `${phrase} · ${value}`;
 }
 
-/** Options année du bac avec libellés pédagogiques (setup mobile, compte). */
+/** Options année du bac avec libellés pédagogiques (setup mobile, compte, diagnostic). */
 export function anneesBacOptionsForLocale(locale: BacSchoolYearLocale): LabeledOption[] {
   return ANNEES_BAC_OPTIONS.map((o) => {
     if (!o.value) {

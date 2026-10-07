@@ -3,7 +3,7 @@
   "main": "expo-router/entry",
   "version": "1.5.0",
   "scripts": {
-    "postinstall": "node ./scripts/patch-metro-node18.cjs",
+    "postinstall": "node ./scripts/patch-metro-node18.cjs && node ./scripts/patch-rnw-shadow-warnings.cjs",
     "start": "expo start",
     "android": "expo run:android",
     "ios": "expo run:ios",

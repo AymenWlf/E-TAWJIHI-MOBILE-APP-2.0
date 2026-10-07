@@ -103,6 +103,7 @@ import {
 } from '@/services/establishmentFreePreview';
 import { normalizeWebsiteHref } from '@/utils/websiteLink';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 export default function EstablishmentDetailScreen() {
   const router = useRouter();
   const { isRTL, t, locale } = useLocale();
@@ -1591,7 +1592,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   presentationBodyRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignSelf: 'stretch',
     width: '100%',
   },

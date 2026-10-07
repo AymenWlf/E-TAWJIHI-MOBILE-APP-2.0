@@ -48,6 +48,7 @@ import { getUserFacingApiError } from '@/utils/apiError';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const SHEET_SLIDE_MS = 320;
 const TOTAL_RATINGS = APP_FEEDBACK_RATING_KEYS.length;
 const SCROLL_FOCUS_PADDING = 96;
@@ -541,9 +542,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: radius.xl,
     overflow: 'hidden',
   },
-  sheetRtl: {
-    direction: 'rtl',
-  },
+  sheetRtl: DIR_RTL,
   sheetTop: {
     backgroundColor: brand.white,
     borderBottomWidth: StyleSheet.hairlineWidth,
@@ -664,9 +663,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0',
     overflow: 'hidden',
   },
-  progressTrackRtl: {
-    direction: 'rtl',
-  },
+  progressTrackRtl: DIR_RTL,
   progressFill: {
     height: 6,
     borderRadius: radius.full,
@@ -842,9 +839,7 @@ const styles = StyleSheet.create({
     borderTopWidth: StyleSheet.hairlineWidth,
     borderTopColor: homeShell.borderOnWhite,
   },
-  footerRtl: {
-    direction: 'rtl',
-  },
+  footerRtl: DIR_RTL,
   submitBtn: {
     flexDirection: 'row',
     alignItems: 'center',

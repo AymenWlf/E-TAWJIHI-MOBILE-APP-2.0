@@ -21,7 +21,7 @@ const stepBool = (steps: Record<string, boolean | string | number>, key: string)
   steps[key] === true;
 
 /**
- * Progression du parcours mobile (6 étapes).
+ * Progression du parcours mobile (7 étapes).
  * Clés dédiées mobile dans `planReussiteSteps` — pas de mélange avec le plan web.
  */
 export async function fetchPlanParcoursCompletion(
@@ -56,9 +56,14 @@ export async function fetchPlanParcoursCompletion(
 
   return {
     accountSetupComplete: Boolean(accountSetupComplete),
-    orientationDiagnosticComplete:
-      stepBool(steps, PLAN_PARCOURS_MOBILE_STEP_KEYS.orientationDiagnostic) ||
-      stepBool(steps, 'quickDiagnosticCompleted'),
+    orientationDiagnosticComplete: stepBool(
+      steps,
+      PLAN_PARCOURS_MOBILE_STEP_KEYS.orientationDiagnostic,
+    ),
+    orientationReportComplete: stepBool(
+      steps,
+      PLAN_PARCOURS_MOBILE_STEP_KEYS.orientationReport,
+    ),
     recommendationComplete:
       recommendationStepMarked && followCount >= RECOMMENDATION_FOLLOW_MIN_COUNT,
     recommendationFollowCount: followCount,

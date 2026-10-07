@@ -1,3 +1,4 @@
+import { DIR_RTL } from '@/utils/layoutDirection';
 /**
  * BirthDateField — champ de saisie de date cross-platform.
  *
@@ -256,7 +257,7 @@ function BirthDateNativePicker({
               minimumDate={minDate}
               onChange={(_e, d) => d && setTemp(d)}
               themeVariant="light"
-              {...(rtl ? { style: { direction: 'rtl' as const } } : {})}
+              {...(rtl ? { style: DIR_RTL } : {})}
             />
           </View>
 

@@ -35,6 +35,7 @@ import { formatShopPrice } from '@/utils/shopFormatPrice';
 import { getShopOrderAccessToken } from '@/utils/shopOrderTokenStorage';
 import { getUserFacingApiError } from '@/utils/apiError';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 function fillThankTpl(template: string, vars: Record<string, string>): string {
   let s = template;
   for (const [k, v] of Object.entries(vars)) {
@@ -968,7 +969,7 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: brand.backgroundSoft },
   screenSafe: { flex: 1 },
   root: { flex: 1, backgroundColor: brand.backgroundSoft },
-  rtlRoot: { direction: 'rtl' },
+  rtlRoot: DIR_RTL,
   rowRtl: { flexDirection: 'row-reverse' },
   center: {
     flex: 1,

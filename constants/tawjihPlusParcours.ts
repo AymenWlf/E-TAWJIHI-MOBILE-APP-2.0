@@ -6,6 +6,7 @@ import {
 /** Étapes du parcours orientation réservées aux clients TAWJIH PLUS (ou pack TASSJIL). */
 export const TAWJIH_PLUS_GATED_PLAN_STEP_IDS: readonly PlanParcoursStepId[] = [
   PLAN_PARCOURS_STEP_IDS.orientationDiagnostic,
+  PLAN_PARCOURS_STEP_IDS.orientationReport,
   PLAN_PARCOURS_STEP_IDS.recommendation,
   PLAN_PARCOURS_STEP_IDS.feedback,
   PLAN_PARCOURS_STEP_IDS.applyToSchools,

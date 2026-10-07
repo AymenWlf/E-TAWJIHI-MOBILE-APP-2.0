@@ -48,6 +48,7 @@ import {
   splitEstablishmentsByDisplayCategory,
 } from '@/utils/establishmentDisplayCategories';
 
+import { DIR_LTR } from '@/utils/layoutDirection';
 export default function ProductDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -1047,8 +1048,7 @@ const styles = StyleSheet.create({
   },
   packLineRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
-  },
+    ...DIR_LTR },
   packThumb: {
     width: 54,
     height: 54,

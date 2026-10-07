@@ -48,6 +48,7 @@ import { contactStatusLabelMobile } from '@/utils/platformEventRegistrationLabel
 import { formatPlatformEventDurationMobile } from '@/utils/eventDuration';
 import { classifyApiError, getUserFacingApiError, getUserFacingLoadError } from '@/utils/apiError';
 import { formatPlatformEventDetailDateTime } from '@/utils/platformEventFormat';
+import { DIR_RTL } from '@/utils/layoutDirection';
 function InfoRow({
   icon,
   label,
@@ -407,7 +408,7 @@ export default function EvenementDetailScreen() {
       <View style={styles.mainColumn}>
       <ScrollView
         ref={scrollRef}
-        style={[styles.body, isRTL && { direction: 'rtl' }]}
+        style={[styles.body, isRTL && DIR_RTL]}
         contentContainerStyle={[styles.scrollContent, { paddingBottom: spacing.section * 2 + spacing.xxl }]}
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
@@ -1062,7 +1063,7 @@ const styles = StyleSheet.create({
   btnDisabled: { opacity: 0.5 },
   htmlWrap: { marginTop: spacing.sm },
   htmlWrapRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignSelf: 'stretch',
     width: '100%',
   },

@@ -36,6 +36,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const SHEET_MS = 300;
 /** Hauteur du sheet : ~78 % de l’écran pour laisser place au CTA bas. */
 const SHEET_HEIGHT_RATIO = 0.78;
@@ -656,9 +657,7 @@ const styles = StyleSheet.create({
       default: {},
     }),
   },
-  footerRtl: {
-    direction: 'rtl',
-  },
+  footerRtl: DIR_RTL,
   btnOpen: {
     flexDirection: 'row',
     alignItems: 'center',

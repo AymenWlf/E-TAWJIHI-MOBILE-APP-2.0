@@ -11,6 +11,7 @@ import { recordReferralProgramCodeCopy } from '@/services/referralProgramAnalyti
 import { openWhatsAppChat } from '@/utils/openWhatsApp';
 import { fillReferralPercentPlaceholder } from '@/utils/referralDiscountDisplay';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   referralCode: string;
   referralLink?: string | null;
@@ -134,7 +135,7 @@ export function ReferralShareCodeBlock({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm },
-  wrapRtl: { direction: 'rtl', alignItems: 'stretch' },
+  wrapRtl: { ...DIR_RTL, alignItems: 'stretch' },
   rowRtl: { flexDirection: 'row-reverse' },
   labelTeaser: {
     fontSize: 10,

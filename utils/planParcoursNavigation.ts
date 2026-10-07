@@ -4,9 +4,10 @@ import { PLAN_PARCOURS_STEP_IDS, type PlanParcoursStepId } from '@/constants/ori
 import { triggerParcoursFeedback } from '@/contexts/ParcoursFeedbackContext';
 import { openApplyToSchoolsTour } from '@/utils/applyToSchoolsTourNavigation';
 import {
-  navigateToSchoolDiagnosticEntry,
-  navigateToSchoolDiagnosticWizard,
-} from '@/utils/navigateToSchoolDiagnosticEntry';
+  navigateToOrientationDiagnosticWizard,
+  navigateToOrientationReportEntry,
+} from '@/utils/navigateToOrientationDiagnosticEntry';
+import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
 import {
   guardTawjihPlusParcoursStep,
   type TawjihPlusParcoursGate,
@@ -39,13 +40,14 @@ function navigatePlanParcoursStepUnlocked(
       router.push('/account-setup' as never);
       return;
     case PLAN_PARCOURS_STEP_IDS.orientationDiagnostic:
-      void navigateToSchoolDiagnosticWizard(
-        auth,
-        (href) => {
-          router.push(href as never);
-        },
-        tawjihPlusGate,
-      );
+      void navigateToOrientationDiagnosticWizard(auth, (href) => {
+        router.push(href as never);
+      });
+      return;
+    case PLAN_PARCOURS_STEP_IDS.orientationReport:
+      void navigateToOrientationReportEntry(auth, (href) => {
+        router.push(href as never);
+      });
       return;
     case PLAN_PARCOURS_STEP_IDS.recommendation:
       void navigateToSchoolDiagnosticEntry(

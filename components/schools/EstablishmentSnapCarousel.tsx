@@ -14,6 +14,7 @@ import {
 import { brand, spacing } from '@/theme/tokens';
 import { programmeCarouselCardsPerView } from '@/utils/programmeCarouselLayout';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 export type EstablishmentSnapCarouselProps<T> = {
   data: T[];
   keyExtractor: (item: T, index: number) => string;
@@ -173,9 +174,7 @@ const styles = StyleSheet.create({
   track: {
     width: '100%',
   },
-  listRtl: {
-    direction: 'rtl',
-  },
+  listRtl: DIR_RTL,
   slide: {
     alignItems: 'flex-start',
   },

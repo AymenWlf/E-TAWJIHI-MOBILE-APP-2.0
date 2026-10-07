@@ -62,6 +62,7 @@ import { addUtmToUrl } from '@/utils/referencingPlacementUi';
 import { trackContestListingRegistrationClick } from '@/services/contestAnnouncements';
 import { shouldShowTassjilServiceBadge } from '@/utils/tassjilServiceIncludedNotice';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   item: ContestAnnouncementCard;
   isFollowed: boolean;
@@ -331,8 +332,17 @@ export function AnnouncementCard({
     est,
     locale,
   );
-  const identityPrimary = titleFirst ? announcementTitle : estNamePrimary;
-  const identitySecondary = titleFirst ? null : estNameSecondary;
+  /** Toujours afficher le titre d’annonce sur la carte (école + titre, ou titre + école). */
+  const identityPrimary = titleFirst
+    ? announcementTitle || estNamePrimary
+    : estNamePrimary || announcementTitle;
+  const identitySecondary = titleFirst
+    ? estNamePrimary && estNamePrimary !== identityPrimary
+      ? estNamePrimary
+      : null
+    : announcementTitle && announcementTitle !== identityPrimary
+      ? announcementTitle
+      : estNameSecondary;
   const customLocation = pickAnnouncementLocationLabel(item, locale);
   const villes = (est?.villes ?? []).filter(Boolean);
   const villeMain = est?.ville?.trim() || '';
@@ -1071,7 +1081,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   bodyRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   headerRow: {

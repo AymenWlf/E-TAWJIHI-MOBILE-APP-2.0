@@ -18,6 +18,7 @@ import {
 } from '@/utils/schoolDiagnosticSeuilCompatibility';
 import { tierColor } from '@/utils/schoolDiagnosticTier';
 
+import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 const IA_LABEL = { fr: 'IA', ar: 'ذكاء اصطناعي' } as const;
 
 function iaScoreAccent(score: number): string {
@@ -232,7 +233,7 @@ const styles = StyleSheet.create({
       android: { elevation: 0 },
     }),
   },
-  cardRtl: { direction: 'rtl' },
+  cardRtl: DIR_RTL,
   rtlText: { writingDirection: 'rtl', textAlign: 'right' },
   topRow: {
     flexDirection: 'row',
@@ -241,7 +242,7 @@ const styles = StyleSheet.create({
     padding: spacing.sm,
     paddingStart: spacing.md,
   },
-  topRowRtl: { direction: 'rtl' },
+  topRowRtl: DIR_RTL,
   body: { flex: 1, minWidth: 0, gap: 4 },
   title: { fontWeight: '800', fontSize: fontSize.sm, color: brand.text, lineHeight: 20 },
   metaRow: {
@@ -250,7 +251,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 6,
   },
-  metaRowRtl: { direction: 'rtl' },
+  metaRowRtl: DIR_RTL,
   ville: { fontSize: fontSize.xs, color: brand.textMuted, flexShrink: 1 },
   seuilBadge: {
     flexDirection: 'row',
@@ -259,7 +260,7 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 2,
   },
-  seuilBadgeRtl: { direction: 'rtl' },
+  seuilBadgeRtl: DIR_RTL,
   seuilBadgePill: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -286,7 +287,7 @@ const styles = StyleSheet.create({
     gap: 6,
     marginTop: 2,
   },
-  iaBadgeRtl: { direction: 'rtl' },
+  iaBadgeRtl: DIR_RTL,
   iaBadgeLead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -307,8 +308,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     minWidth: 44,
     alignItems: 'center',
-    direction: 'ltr',
-  },
+    ...DIR_LTR },
   iaPctValue: {
     fontSize: 12,
     fontWeight: '900',
@@ -324,7 +324,7 @@ const styles = StyleSheet.create({
     borderRadius: radius.md,
     borderWidth: 2,
   },
-  scoreWrapRtl: { direction: 'ltr' },
+  scoreWrapRtl: DIR_LTR,
   scoreLabel: {
     fontSize: 18,
     fontWeight: '900',
@@ -340,7 +340,7 @@ const styles = StyleSheet.create({
     backgroundColor: brand.white,
     alignItems: 'stretch',
   },
-  followBarRtl: { direction: 'rtl' },
+  followBarRtl: DIR_RTL,
   /** Non suivi = fond bleu ; suivi = fond blanc + contour (comme Écoles / Inscriptions). */
   followBtn: {
     flexDirection: 'row',

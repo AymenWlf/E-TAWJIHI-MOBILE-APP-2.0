@@ -15,6 +15,7 @@ import {
   type OrientationPracticalLinkId,
 } from '@/utils/practicalLinkParcoursLock';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const CARD_GAP = spacing.sm;
 /** Aligné sur les tuiles « Liens pratiques », légèrement plus grand (cartes 2×2). */
 const ICON_BOX = 52;
@@ -68,6 +69,7 @@ export function HomeOrientationAccessSection({
   const completion = planParcoursCompletion ?? {
     accountSetupComplete: false,
     orientationDiagnosticComplete: false,
+    orientationReportComplete: false,
     recommendationComplete: false,
     recommendationFollowCount: 0,
     feedbackComplete: false,
@@ -232,9 +234,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: CARD_GAP,
   },
-  gridRtl: {
-    direction: 'rtl',
-  },
+  gridRtl: DIR_RTL,
   tile: {
     borderRadius: radius.lg,
     backgroundColor: brand.white,
@@ -247,9 +247,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     overflow: 'hidden',
   },
-  tileRtl: {
-    direction: 'rtl',
-  },
+  tileRtl: DIR_RTL,
   tileContent: {
     flex: 1,
     width: '100%',
@@ -258,9 +256,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: 2,
   },
-  tileContentRtl: {
-    direction: 'rtl',
-  },
+  tileContentRtl: DIR_RTL,
   tileLocked: {
     backgroundColor: '#F8FAFC',
   },

@@ -12,6 +12,7 @@ import {
   shopPromoCampaignTickIntervalMs,
 } from '@/utils/shopPromoCampaignDeadline';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   /** Incrémenter après un pull-to-refresh boutique pour recharger la campagne. */
   refreshKey?: number;
@@ -106,9 +107,7 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     elevation: 4,
   },
-  wrapRtl: {
-    direction: 'rtl',
-  },
+  wrapRtl: DIR_RTL,
   mainRow: {
     flexDirection: 'row',
     alignItems: 'center',

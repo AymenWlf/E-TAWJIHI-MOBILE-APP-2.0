@@ -16,6 +16,7 @@ import {
 } from '@/utils/applyToSchoolsTourProgress';
 import { formatArabicParagraph } from '@/utils/bidiText';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   step: ApplyToSchoolsTourStepId;
   stepIndex: number;
@@ -114,7 +115,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   wrapRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   stepRow: {
@@ -123,9 +124,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: spacing.sm,
   },
-  stepRowRtl: {
-    direction: 'rtl',
-  },
+  stepRowRtl: DIR_RTL,
   stepCounter: {
     fontSize: fontSize.xs,
     fontWeight: '800',
@@ -137,9 +136,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 4,
   },
-  dotsRowRtl: {
-    direction: 'rtl',
-  },
+  dotsRowRtl: DIR_RTL,
   dot: {
     width: 6,
     height: 6,
@@ -166,7 +163,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   actionCardRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   actionCardDone: {
@@ -194,9 +191,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: spacing.sm,
   },
-  actionHeaderRtl: {
-    direction: 'rtl',
-  },
+  actionHeaderRtl: DIR_RTL,
   actionTitle: {
     fontSize: fontSize.xs,
     fontWeight: '800',

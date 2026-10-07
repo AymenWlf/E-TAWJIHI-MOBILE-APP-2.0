@@ -32,6 +32,7 @@ import type { DiagnosticReportLocale } from '@/utils/schoolDiagnosticPayloadDisp
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 const { width: SCREEN_W, height: SCREEN_H } = Dimensions.get('window');
 const CARD_GAP = spacing.md;
 const CARD_W = SCREEN_W - spacing.md * 2;
@@ -780,13 +781,13 @@ export function SchoolDiagnosticStoryCarousel({
 
 const styles = StyleSheet.create({
   root: { flex: 1 },
-  rootRtl: { direction: 'rtl' },
-  listRtl: { direction: 'rtl' },
+  rootRtl: DIR_RTL,
+  listRtl: DIR_RTL,
   listContent: {
     paddingHorizontal: spacing.md,
     paddingBottom: spacing.md,
   },
-  listContentRtl: { direction: 'rtl' },
+  listContentRtl: DIR_RTL,
   cardShell: {
     borderRadius: radius.xl,
     backgroundColor: brand.white,
@@ -872,7 +873,7 @@ const styles = StyleSheet.create({
   },
   cardScroll: { flex: 1, backgroundColor: '#F8FAFC' },
   cardScrollContent: { padding: spacing.md, paddingBottom: spacing.xl },
-  cardScrollContentRtl: { direction: 'rtl', alignItems: 'stretch' },
+  cardScrollContentRtl: { ...DIR_RTL, alignItems: 'stretch' },
   highlight: {
     padding: spacing.md,
     borderRadius: radius.lg,
@@ -928,7 +929,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: homeShell.borderOnWhite,
   },
-  chipSectionRtl: { direction: 'rtl', alignItems: 'stretch' },
+  chipSectionRtl: { ...DIR_RTL, alignItems: 'stretch' },
   chipSectionTitle: {
     fontSize: fontSize.xs,
     fontWeight: '800',
@@ -987,8 +988,8 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
     gap: spacing.sm,
   },
-  answersSectionRtl: { direction: 'rtl', alignItems: 'stretch' },
-  answersSectionHeadRtl: { direction: 'rtl' },
+  answersSectionRtl: { ...DIR_RTL, alignItems: 'stretch' },
+  answersSectionHeadRtl: DIR_RTL,
   answersSectionHead: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1043,7 +1044,7 @@ const styles = StyleSheet.create({
     color: brand.textMuted,
   },
   ctaBlock: { marginTop: spacing.lg, gap: spacing.sm },
-  ctaPrimaryRtl: { direction: 'rtl' },
+  ctaPrimaryRtl: DIR_RTL,
   ctaPrimary: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1075,7 +1076,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingVertical: spacing.md,
   },
-  hintRowRtl: { direction: 'rtl' },
+  hintRowRtl: DIR_RTL,
   hintTxt: { fontSize: fontSize.xs, color: brand.primary, fontWeight: '700' },
   statsGrid: {
     flexDirection: 'row',
@@ -1117,7 +1118,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: homeShell.borderOnWhite,
   },
-  profileHeroRtl: { direction: 'rtl' },
+  profileHeroRtl: DIR_RTL,
   profileAvatar: {
     width: 48,
     height: 48,
@@ -1296,7 +1297,7 @@ const styles = StyleSheet.create({
     minWidth: 56,
     alignItems: 'center',
   },
-  scorePillRtl: { direction: 'ltr' },
+  scorePillRtl: DIR_LTR,
   scorePillValue: {
     fontSize: fontSize.md,
     fontWeight: '900',

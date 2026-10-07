@@ -35,6 +35,7 @@ import {
   withAlpha,
 } from '@/utils/platformServiceBrandIcon';
 
+import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 const H_PAD = spacing.md;
 
 type LocaleT = (key: HomeCopyKey, ...args: never[]) => string;
@@ -343,9 +344,7 @@ const styles = StyleSheet.create({
   outerInactive: {
     opacity: 0.92,
   },
-  outerRtl: {
-    direction: 'rtl',
-  },
+  outerRtl: DIR_RTL,
   header: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
@@ -434,8 +433,7 @@ const styles = StyleSheet.create({
   },
   badgePopularRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
-  },
+    ...DIR_LTR },
   badgePopularTxt: {
     fontSize: 9,
     fontWeight: '800',
@@ -521,8 +519,7 @@ const styles = StyleSheet.create({
   },
   featRowRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
-  },
+    ...DIR_LTR },
   featCheck: {
     width: 16,
     height: 16,

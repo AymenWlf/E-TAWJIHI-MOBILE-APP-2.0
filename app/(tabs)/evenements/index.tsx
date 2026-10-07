@@ -40,6 +40,7 @@ import { formatPlatformEventDurationMobile } from '@/utils/eventDuration';
 import { formatPlatformEventCardRange } from '@/utils/platformEventFormat';
 import { platformEventDisplayTitle, platformEventKindBadgeText } from '@/utils/platformEventLocale';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type TabScope = 'upcoming' | 'live' | 'past';
 
 function kindBadgeColors(kind: PlatformEventKind): { bg: string; text: string } {
@@ -170,7 +171,7 @@ export default function EvenementsScreen() {
             <FlatList
               data={items}
               keyExtractor={(item) => `ev-${item.id}`}
-              style={[styles.bodyFill, isRTL ? { direction: 'rtl' } : undefined]}
+              style={[styles.bodyFill, isRTL ? DIR_RTL : undefined]}
               contentContainerStyle={styles.list}
               refreshControl={
                 <AppRefreshControl refreshing={refreshing} onRefresh={onRefresh} />

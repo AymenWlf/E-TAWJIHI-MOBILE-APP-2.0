@@ -5,10 +5,14 @@ import {
   type PlanParcoursCompletion,
 } from '@/constants/orientationParcours';
 
-export type OrientationPracticalLinkId = 'diagnostic-ecoles' | 'diagnostic-recommandations';
+export type OrientationPracticalLinkId =
+  | 'diagnostic-ecoles'
+  | 'diagnostic-rapport'
+  | 'diagnostic-recommandations';
 
 export const ORIENTATION_PRACTICAL_LINK_IDS: OrientationPracticalLinkId[] = [
   'diagnostic-ecoles',
+  'diagnostic-rapport',
   'diagnostic-recommandations',
 ];
 
@@ -47,11 +51,24 @@ export function getOrientationPracticalLinkLock(
     };
   }
 
+  if (linkId === 'diagnostic-rapport') {
+    if (!accountDone) {
+      return { locked: true, reasonKey: 'practical_diagnostic_locked_account' };
+    }
+    if (!isPlanStepComplete(PLAN_PARCOURS_STEP_IDS.orientationDiagnostic, completion)) {
+      return { locked: true, reasonKey: 'practical_recommandations_locked_diagnostic' };
+    }
+    return {
+      locked: false,
+      done: isPlanStepComplete(PLAN_PARCOURS_STEP_IDS.orientationReport, completion),
+    };
+  }
+
   if (linkId === 'diagnostic-recommandations') {
     if (!accountDone) {
       return { locked: true, reasonKey: 'practical_recommandations_locked_account' };
     }
-    if (!isPlanStepComplete(PLAN_PARCOURS_STEP_IDS.orientationDiagnostic, completion)) {
+    if (!isPlanStepComplete(PLAN_PARCOURS_STEP_IDS.orientationReport, completion)) {
       return { locked: true, reasonKey: 'practical_recommandations_locked_diagnostic' };
     }
     return {

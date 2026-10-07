@@ -1,3 +1,4 @@
+import { DIR_RTL } from '@/utils/layoutDirection';
 /**
  * EstablishmentFiltersModal — modale de filtres avancés pour le listing
  * d'établissements (« Écoles supérieures ») et tout autre écran qui
@@ -878,7 +879,7 @@ const styles = StyleSheet.create({
   },
   rowRtl: { flexDirection: 'row-reverse' },
   txtRtl: { textAlign: 'right', writingDirection: 'rtl' },
-  hScrollRtl: { direction: 'rtl' },
+  hScrollRtl: DIR_RTL,
   hScrollTight: { paddingEnd: spacing.lg, alignItems: 'center', gap: 0 },
   modalTitle: {
     color: homeShell.cardText,

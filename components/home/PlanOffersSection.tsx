@@ -6,6 +6,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 /** Carte pack inscription / accès écoles (données type CDC Simple · Standard · Premium). */
 export type PackOffer = {
   id: string;
@@ -138,9 +139,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -spacing.xl,
     overflow: 'visible',
   },
-  scrollRtl: {
-    direction: 'rtl',
-  },
+  scrollRtl: DIR_RTL,
   scrollContent: {
     paddingVertical: 4,
     /** Aligne au début (start) mais pas de marge côté fin (end). */

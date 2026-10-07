@@ -18,6 +18,7 @@ import type { ApplyToSchoolsTourGate } from '@/utils/applyToSchoolsTourProgress'
 import { pickEstablishmentName } from '@/utils/candidacyStatus';
 import { followStatusesForLatestAnnouncementAction } from '@/utils/followLatestAnnouncementSeen';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   follow: EstablishmentFollow;
   actionRequired?: boolean;
@@ -280,9 +281,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: spacing.sm,
   },
-  bodyRtl: {
-    direction: 'rtl',
-  },
+  bodyRtl: DIR_RTL,
   rowRtl: {
     flexDirection: 'row-reverse',
   },

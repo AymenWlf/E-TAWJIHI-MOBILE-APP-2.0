@@ -13,6 +13,7 @@ import type { SeuilComparisonSource } from '@/utils/seuilBacComparisonNote';
 import { getDiagnosticTier, tierColor } from '@/utils/schoolDiagnosticTier';
 import { fontSize, radius } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Locale = 'fr' | 'ar';
 
 type Props = {
@@ -131,7 +132,7 @@ const styles = StyleSheet.create({
     gap: 6,
     maxWidth: '100%',
   },
-  wrapRtl: { direction: 'rtl' },
+  wrapRtl: DIR_RTL,
   pill: {
     flexDirection: 'row',
     alignItems: 'center',

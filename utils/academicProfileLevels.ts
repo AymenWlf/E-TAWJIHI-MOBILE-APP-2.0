@@ -1,18 +1,16 @@
 import { NIVEAU_ETUDE_OPTIONS } from '@/constants/academicSetup';
-export const CURRENT_BAC_SCHOOL_YEAR = '2025-2026';
-export const FIRST_BAC_SCHOOL_YEAR = '2026-2027';
+import {
+  buildAnneesBacValues,
+  getCurrentBacSchoolYear,
+  getFirstBacSchoolYear,
+} from '@/utils/bacSchoolYears';
 
-export const ANNEES_BAC_VALUES = [
-  '2026-2027',
-  '2025-2026',
-  '2024-2025',
-  '2023-2024',
-  '2022-2023',
-  '2021-2022',
-  '2020-2021',
-  '2019-2020',
-  'Autre',
-] as const;
+/** Aligné web — recalculé dès septembre (ex. 2026-2027 en rentrée 2026). */
+export const CURRENT_BAC_SCHOOL_YEAR = getCurrentBacSchoolYear();
+export const FIRST_BAC_SCHOOL_YEAR = getFirstBacSchoolYear();
+
+/** Années du bac : 1ère année, année en cours, puis antérieures + Autre. */
+export const ANNEES_BAC_VALUES = buildAnneesBacValues();
 
 export function normalizeBacAnneeValue(stored: string | null | undefined): string {
   let s = (stored ?? '').trim();
@@ -125,7 +123,7 @@ export function resolveBacAnneeForAdminForm(sources: {
 }): string {
   for (const raw of [sources.bacAnnee, sources.crmAnnee]) {
     const canonical = matchCanonicalBacAnneeValue(raw);
-    if (canonical && ANNEES_BAC_VALUES.includes(canonical as (typeof ANNEES_BAC_VALUES)[number])) {
+    if (canonical && ANNEES_BAC_VALUES.includes(canonical)) {
       return canonical;
     }
     if (canonical === 'Autre') return 'Autre';

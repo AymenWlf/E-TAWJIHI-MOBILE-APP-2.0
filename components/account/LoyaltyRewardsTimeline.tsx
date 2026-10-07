@@ -8,6 +8,7 @@ import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { LoyaltyRewardTier } from '@/utils/loyaltyCatalogRewards';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   tiers: LoyaltyRewardTier[];
   balance: number;
@@ -135,7 +136,7 @@ export function LoyaltyRewardsTimeline({
 
 const styles = StyleSheet.create({
   wrap: { gap: 0 },
-  wrapRtl: { direction: 'rtl', alignItems: 'stretch' },
+  wrapRtl: { ...DIR_RTL, alignItems: 'stretch' },
   timelineRow: {
     flexDirection: 'row',
     alignItems: 'stretch',

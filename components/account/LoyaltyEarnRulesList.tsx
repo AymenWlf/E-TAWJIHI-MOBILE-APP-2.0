@@ -5,6 +5,7 @@ import type { LoyaltyEarnRule } from '@/services/loyalty';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   rules: LoyaltyEarnRule[];
   rtl: boolean;
@@ -69,7 +70,7 @@ export function LoyaltyEarnRulesList({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.xs },
-  wrapRtl: { direction: 'rtl', alignItems: 'stretch' },
+  wrapRtl: { ...DIR_RTL, alignItems: 'stretch' },
   title: {
     fontSize: fontSize.sm,
     fontWeight: '800',

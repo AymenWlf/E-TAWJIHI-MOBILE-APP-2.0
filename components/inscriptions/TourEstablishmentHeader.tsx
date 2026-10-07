@@ -10,6 +10,7 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { EstablishmentBrief } from '@/types/inscriptions';
 import { pickEstablishmentNamesPair } from '@/utils/candidacyStatus';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   establishment: EstablishmentBrief | null | undefined;
   /** Variante compacte (carte alerte étape 1). */
@@ -73,7 +74,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   wrapRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   logo: {

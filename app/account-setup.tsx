@@ -67,6 +67,7 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { errorMessage } from '@/utils/errorMessage';
 import { isValidEmail } from '@/utils/isValidEmail';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const BLUE = brand.primary;
 
 type StepId = 1 | 2;
@@ -1122,7 +1123,7 @@ function BirthDateNativePicker({
               minimumDate={minDate}
               onChange={(_e, d) => d && setTemp(d)}
               themeVariant="light"
-              {...(rtl ? { style: { direction: 'rtl' as const } } : {})}
+              {...(rtl ? { style: DIR_RTL } : {})}
             />
           </View>
 
@@ -1459,7 +1460,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   progressWrap: { paddingHorizontal: spacing.lg, paddingBottom: spacing.lg, marginTop: -4 },
-  progressWrapRtl: { direction: 'rtl' },
+  progressWrapRtl: DIR_RTL,
   progressTrack: {
     height: 8,
     borderRadius: 999,
@@ -1506,7 +1507,7 @@ const styles = StyleSheet.create({
   scroll: { flex: 1 },
   content: { padding: spacing.lg, flexGrow: 1 },
   contentPadDefault: { paddingBottom: 120 },
-  contentRtl: { direction: 'rtl' },
+  contentRtl: DIR_RTL,
   rtl: { writingDirection: 'rtl', textAlign: 'right' as const },
 
   stepHeader: {

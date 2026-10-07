@@ -32,6 +32,7 @@ import {
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 export type DiagnosticLoadingVariant = 'boot' | 'analysis' | 'ia' | 'results' | 'report' | 'saving';
 
 export type DiagnosticLoadingFooterAction = {
@@ -506,9 +507,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: diagnosticTheme.surfaceSoft,
   },
-  screenRtl: {
-    direction: 'rtl',
-  },
+  screenRtl: DIR_RTL,
   headerShell: {
     backgroundColor: diagnosticTheme.headerBg,
   },
@@ -699,7 +698,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#E2E8F0',
     overflow: 'hidden',
   },
-  analysisTrackRtl: { direction: 'rtl' },
+  analysisTrackRtl: DIR_RTL,
   analysisFill: {
     height: 8,
     borderRadius: radius.full,

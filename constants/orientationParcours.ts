@@ -18,6 +18,7 @@ export type OrientationParcoursTask = {
 export const PLAN_PARCOURS_STEP_IDS = {
   accountSetup: 'accountSetup',
   orientationDiagnostic: 'orientationDiagnostic',
+  orientationReport: 'orientationReport',
   recommendation: 'recommendation',
   feedback: 'feedback',
   applyToSchools: 'applyToSchools',
@@ -27,6 +28,7 @@ export const PLAN_PARCOURS_STEP_IDS = {
 /** Clés JSON `planReussiteSteps` pour le parcours mobile (≠ plan web). */
 export const PLAN_PARCOURS_MOBILE_STEP_KEYS = {
   orientationDiagnostic: 'orientationDiagnostic',
+  orientationReport: 'orientationReport',
   recommendation: 'recommendation',
   feedback: 'feedback',
   applyToSchools: 'applyToSchools',
@@ -38,6 +40,7 @@ export type PlanParcoursStepId = (typeof PLAN_PARCOURS_STEP_IDS)[keyof typeof PL
 export type PlanParcoursCompletion = {
   accountSetupComplete: boolean;
   orientationDiagnosticComplete: boolean;
+  orientationReportComplete: boolean;
   recommendationComplete: boolean;
   /** Nombre d’écoles suivies (API establishment-follows). */
   recommendationFollowCount: number;
@@ -52,6 +55,7 @@ export type PlanParcoursCompletion = {
 export const EMPTY_PLAN_PARCOURS_COMPLETION: PlanParcoursCompletion = {
   accountSetupComplete: false,
   orientationDiagnosticComplete: false,
+  orientationReportComplete: false,
   recommendationComplete: false,
   recommendationFollowCount: 0,
   feedbackComplete: false,
@@ -84,6 +88,13 @@ export const PLAN_PARCOURS_STEPS: readonly PlanParcoursStepDef[] = [
     labelKey: 'orientationStepOrientationDiagnostic',
     shortLabelKey: 'orientationStepOrientationDiagnosticShort',
     icon: 'compass',
+  },
+  {
+    id: PLAN_PARCOURS_STEP_IDS.orientationReport,
+    stepKey: PLAN_PARCOURS_STEP_IDS.orientationReport,
+    labelKey: 'orientationStepOrientationReport',
+    shortLabelKey: 'orientationStepOrientationReportShort',
+    icon: 'file-text-o',
   },
   {
     id: PLAN_PARCOURS_STEP_IDS.recommendation,
@@ -160,6 +171,8 @@ export function isPlanStepComplete(
       return completion.accountSetupComplete;
     case PLAN_PARCOURS_STEP_IDS.orientationDiagnostic:
       return completion.orientationDiagnosticComplete;
+    case PLAN_PARCOURS_STEP_IDS.orientationReport:
+      return completion.orientationReportComplete;
     case RECOMMENDATION_PARCOURS_STEP_ID:
       return isRecommendationParcoursStepComplete(completion);
     case PLAN_PARCOURS_STEP_IDS.feedback:
@@ -238,10 +251,12 @@ export function getPlanParcoursDevResetPayload(stepId: PlanParcoursStepId): {
     case PLAN_PARCOURS_STEP_IDS.orientationDiagnostic:
       return {
         resetAccountSetup: false,
-        planStepKeys: [
-          PLAN_PARCOURS_MOBILE_STEP_KEYS.orientationDiagnostic,
-          'quickDiagnosticCompleted',
-        ],
+        planStepKeys: [PLAN_PARCOURS_MOBILE_STEP_KEYS.orientationDiagnostic],
+      };
+    case PLAN_PARCOURS_STEP_IDS.orientationReport:
+      return {
+        resetAccountSetup: false,
+        planStepKeys: [PLAN_PARCOURS_MOBILE_STEP_KEYS.orientationReport],
       };
     case RECOMMENDATION_PARCOURS_STEP_ID:
       return {

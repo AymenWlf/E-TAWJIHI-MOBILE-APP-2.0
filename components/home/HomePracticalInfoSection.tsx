@@ -14,6 +14,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 export type PracticalInfoItem = {
   id: string;
   label: string;
@@ -213,9 +214,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: 'space-between',
   },
-  cardBodyRtl: {
-    direction: 'rtl',
-  },
+  cardBodyRtl: DIR_RTL,
   heroRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

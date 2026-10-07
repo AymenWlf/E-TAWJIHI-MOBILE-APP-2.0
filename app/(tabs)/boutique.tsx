@@ -100,6 +100,7 @@ import {
   platformServiceCurrency,
   platformServiceEffectiveUnitPriceString,
 } from '@/utils/platformServicePrice';
+import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 const PAGE_SIZE = 20;
 const { width: SCREEN_W } = Dimensions.get('window');
 const GUTTER = spacing.md;
@@ -1479,8 +1480,8 @@ const styles = StyleSheet.create({
   flatListServices: {
     backgroundColor: brand.chatSurface,
   },
-  ltr: { direction: 'ltr' },
-  rtl: { direction: 'rtl' },
+  ltr: DIR_LTR,
+  rtl: DIR_RTL,
   txtRtl: {
     textAlign: 'right',
     writingDirection: 'rtl',
@@ -1493,7 +1494,7 @@ const styles = StyleSheet.create({
     writingDirection: 'rtl',
   },
   listHeaderRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignSelf: 'stretch',
   },
 
@@ -1511,7 +1512,7 @@ const styles = StyleSheet.create({
     backgroundColor: brand.chatSurface,
   },
   listServicesStackRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   /* ── Hero ── */
@@ -1722,7 +1723,7 @@ const styles = StyleSheet.create({
   },
   servicesPreviewTitleBlockRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
+    ...DIR_LTR,
     alignSelf: 'stretch',
     justifyContent: 'flex-end',
   },
@@ -1775,9 +1776,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.md,
     paddingBottom: spacing.md,
   },
-  servicesPreviewScrollViewRtl: {
-    direction: 'rtl',
-  },
+  servicesPreviewScrollViewRtl: DIR_RTL,
 
   svcCompactOuter: {
     borderRadius: radius.lg,
@@ -1791,9 +1790,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 4 },
     elevation: 2,
   },
-  svcCompactOuterRtl: {
-    direction: 'rtl',
-  },
+  svcCompactOuterRtl: DIR_RTL,
   svcCompactOuterCarousel: {
     maxWidth: '100%',
     flexShrink: 0,
@@ -1831,7 +1828,7 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.sm + 4,
   },
   svcCompactBodyRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   svcCompactPriceBlockStack: {
@@ -1844,8 +1841,7 @@ const styles = StyleSheet.create({
   },
   svcCompactHeroRowRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
-  },
+    ...DIR_LTR },
   svcCompactIconCircle: {
     width: 40,
     height: 40,
@@ -1907,8 +1903,7 @@ const styles = StyleSheet.create({
   },
   svcCompactPopularChipRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
-  },
+    ...DIR_LTR },
   svcCompactPopularChipTxt: {
     fontSize: 9,
     fontWeight: '700',
@@ -1928,8 +1923,7 @@ const styles = StyleSheet.create({
   },
   svcCompactBestsellerChipRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
-  },
+    ...DIR_LTR },
   svcCompactBestsellerChipTxt: {
     fontSize: 9,
     fontWeight: '700',
@@ -1977,9 +1971,7 @@ const styles = StyleSheet.create({
     width: '100%',
     marginTop: spacing.sm,
   },
-  svcCompactDescWrapRtl: {
-    direction: 'rtl',
-  },
+  svcCompactDescWrapRtl: DIR_RTL,
   svcCompactDesc: {
     fontSize: 12,
     color: brand.textMuted,
@@ -2013,8 +2005,7 @@ const styles = StyleSheet.create({
   },
   svcCompactFeatRowRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
-  },
+    ...DIR_LTR },
   svcCompactFeatDot: {
     width: 15,
     height: 15,

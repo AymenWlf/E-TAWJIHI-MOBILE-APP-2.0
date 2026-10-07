@@ -73,6 +73,7 @@ import { resolveEstablishmentLockedVariant } from '@/utils/establishmentLockDisp
 import { establishmentListingPlacement } from '@/utils/establishmentListingPlacement';
 import { placementIsActivelySponsored } from '@/utils/referencingPlacementUi';
 
+import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 const PAGE_SIZE = 18;
 /** Bannière `mid` : une seule fois, après la 3e fiche (index 0-based = 2). */
 /** Bannière milieu de liste — après la 6ᵉ fiche (aligné web EcolesSupérieures). */
@@ -1019,8 +1020,8 @@ const styles = StyleSheet.create({
     backgroundColor: homeShell.bg,
     zIndex: 10,
   },
-  ltr: { direction: 'ltr' },
-  rtl: { direction: 'rtl' },
+  ltr: DIR_LTR,
+  rtl: DIR_RTL,
   hero: {
     backgroundColor: homeShell.bg,
     paddingHorizontal: spacing.xl,

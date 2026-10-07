@@ -70,6 +70,7 @@ import {
   platformServiceShouldShowCatalogPrice,
 } from '@/utils/platformServiceEntitlementUi';
 
+import { DIR_LTR } from '@/utils/layoutDirection';
 export default function PlatformServiceDetailScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -869,7 +870,7 @@ const styles = StyleSheet.create({
   descRtl: { textAlign: 'right', writingDirection: 'rtl' },
   sectionTitle: { fontSize: 15, fontWeight: '900', color: brand.text, marginTop: 8 },
   featRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 4 },
-  featRowRtl: { flexDirection: 'row-reverse', direction: 'ltr' },
+  featRowRtl: { flexDirection: 'row-reverse', ...DIR_LTR },
   featTxt: { flex: 1, fontSize: 14, fontWeight: '600', color: brand.text, lineHeight: 20 },
   featTxtRtl: { textAlign: 'right', writingDirection: 'rtl' },
   establishmentsBlock: { marginTop: 4, gap: 6 },

@@ -5,6 +5,7 @@ import { ORIENTATION_PRACTICAL_LINK_DEFS } from '@/constants/practicalLinks';
 import { SkeletonBlock, useSkeletonPulse } from '@/components/ui/CardLoadingSkeleton';
 import { brand, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const CARD_GAP = spacing.sm;
 const ICON_BOX = 52;
 const TILE_COUNT = ORIENTATION_PRACTICAL_LINK_DEFS.length;
@@ -97,9 +98,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: CARD_GAP,
   },
-  gridRtl: {
-    direction: 'rtl',
-  },
+  gridRtl: DIR_RTL,
   tile: {
     borderRadius: radius.lg,
     backgroundColor: brand.white,
@@ -119,9 +118,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: 2,
   },
-  tileContentRtl: {
-    direction: 'rtl',
-  },
+  tileContentRtl: DIR_RTL,
   labelCol: {
     width: '100%',
     alignItems: 'center',

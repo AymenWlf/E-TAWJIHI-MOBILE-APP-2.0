@@ -4,6 +4,7 @@ import { ShopServiceCompactCardSkeletonRow } from '@/components/shop/ShopService
 import { SkeletonBlock, useSkeletonPulse } from '@/components/ui/CardLoadingSkeleton';
 import { brand, radius, spacing } from '@/theme/tokens';
 
+import { DIR_LTR } from '@/utils/layoutDirection';
 const H_PAD = spacing.md;
 
 type Props = {
@@ -55,7 +56,7 @@ const styles = StyleSheet.create({
   },
   titleBlockRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
+    ...DIR_LTR,
     alignSelf: 'stretch',
     justifyContent: 'flex-end',
   },

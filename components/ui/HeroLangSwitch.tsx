@@ -6,6 +6,7 @@ import { homeShell } from '@/theme/homeShell';
 import { radius } from '@/theme/tokens';
 import { heroShellHeaderUi, useHeroShellHeaderWide } from '@/utils/heroShellHeaderUi';
 
+import { DIR_LTR } from '@/utils/layoutDirection';
 type Props = {
   style?: StyleProp<ViewStyle>;
 };
@@ -68,7 +69,7 @@ export function HeroLangSwitch({ style }: Props = {}) {
 const styles = StyleSheet.create({
   langSwitch: {
     flexDirection: 'row',
-    direction: 'ltr',
+    ...DIR_LTR,
     alignItems: 'center',
     flexShrink: 0,
     backgroundColor: 'rgba(255,255,255,0.12)',

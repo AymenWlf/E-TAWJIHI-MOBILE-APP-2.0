@@ -25,6 +25,7 @@ import { placementIsActivelySponsored, placementShowsContactForm, placementTraff
 import { stripHtmlToText } from '@/utils/sanitizeRichHtml';
 import type { EstablishmentLockedVariant } from '@/utils/establishmentLockDisplay';
 
+import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   item: EstablishmentNormalized;
   /** `compact` = même carte, contenu sensible masqué + zones désactivées. */
@@ -637,8 +638,7 @@ const styles = StyleSheet.create({
   },
   topRowRtl: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
-  },
+    ...DIR_LTR },
   logoOuter: {
     width: 62,
     height: 62,
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   descWrapRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignSelf: 'stretch',
     width: '100%',
   },
@@ -927,9 +927,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     gap: spacing.sm,
   },
-  cardActionsRtl: {
-    direction: 'ltr',
-  },
+  cardActionsRtl: DIR_LTR,
   cardActionsRow: {
     flexDirection: 'row',
     alignItems: 'stretch',

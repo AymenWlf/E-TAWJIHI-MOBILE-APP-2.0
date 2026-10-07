@@ -6,6 +6,7 @@ import type { HomeCopyKey } from '@/constants/i18n';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   requiredServiceName: string;
   rtl: boolean;
@@ -70,7 +71,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
   },
-  wrapRtl: { direction: 'rtl' },
+  wrapRtl: DIR_RTL,
   rowRtl: { flexDirection: 'row-reverse' },
   iconCircle: {
     width: 44,

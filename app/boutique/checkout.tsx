@@ -81,6 +81,7 @@ import {
 } from '@/utils/academicFiliere';
 import { getActiveShopVilles, parseShopVillePriceAmount, shopVilleListLabel, type ShopVilleRow } from '@/utils/shopVilles';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type ServicePaymentChoice = NonNullable<CreateShopOrderInput['servicePaymentModality']>;
 
 const ACTIVE_VILLES = getActiveShopVilles();
@@ -1475,7 +1476,7 @@ const styles = StyleSheet.create({
   headerSafe: {},
   footerSafe: {},
   root: { flex: 1, backgroundColor: brand.backgroundSoft },
-  rtlRoot: { direction: 'rtl' },
+  rtlRoot: DIR_RTL,
   rowRtl: { flexDirection: 'row-reverse' },
   txtRtl: { textAlign: 'right', writingDirection: 'rtl' },
   headerTxtRtl: { writingDirection: 'rtl', textAlign: 'center' },

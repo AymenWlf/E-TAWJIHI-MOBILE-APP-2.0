@@ -347,6 +347,7 @@ function HomeTabScreen() {
     return {
       ...(planParcoursCompletion ?? {
         orientationDiagnosticComplete: false,
+        orientationReportComplete: false,
         recommendationComplete: false,
         recommendationFollowCount: 0,
         feedbackComplete: false,

@@ -12,6 +12,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   rtl?: boolean;
   onBack?: () => void;
@@ -142,8 +143,8 @@ export function DiagnosticRecommendationsTawjihPlusGate({ rtl = false, onBack }:
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: brand.primary },
-  rootRtl: { direction: 'rtl' },
-  headerRtl: { direction: 'rtl' },
+  rootRtl: DIR_RTL,
+  headerRtl: DIR_RTL,
   headerSafe: {
     backgroundColor: brand.primary,
     paddingBottom: spacing.md,
@@ -155,7 +156,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     gap: spacing.sm,
   },
-  headerRowRtl: { direction: 'rtl' },
+  headerRowRtl: DIR_RTL,
   headerCenter: { flex: 1, minWidth: 0, gap: 4 },
   headerCenterRtl: { alignItems: 'flex-end' },
   backBtn: {
@@ -201,7 +202,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F8FAFC',
   },
-  bodyRtl: { direction: 'rtl' },
+  bodyRtl: DIR_RTL,
   bodyContent: {
     padding: spacing.md,
     paddingBottom: spacing.xxl * 2,

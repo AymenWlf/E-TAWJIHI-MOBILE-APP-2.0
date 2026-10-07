@@ -199,6 +199,7 @@ function RootLayoutNav({ onBootstrapComplete }: { onBootstrapComplete: () => voi
               <Stack.Screen name="communaute" options={{ headerShown: false }} />
               <Stack.Screen name="daily-challenge" options={{ headerShown: false }} />
               <Stack.Screen name="diagnostic-ecoles" options={{ headerShown: false }} />
+              <Stack.Screen name="diagnostic-orientation" options={{ headerShown: false }} />
               {ORIENTATION_1BAC_MOBILE_ENABLED ? (
                 <Stack.Screen name="orientation-1bac" options={{ headerShown: false }} />
               ) : null}

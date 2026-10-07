@@ -7,6 +7,7 @@ import { SkeletonBlock, useSkeletonPulse } from '@/components/ui/CardLoadingSkel
 import { homeShell } from '@/theme/homeShell';
 import { brand, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const CARD_W = 144;
 const CARD_H = 112;
 const PLACEHOLDER_COUNT = 4;
@@ -95,9 +96,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     justifyContent: 'space-between',
   },
-  cardBodyRtl: {
-    direction: 'rtl',
-  },
+  cardBodyRtl: DIR_RTL,
   heroRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',

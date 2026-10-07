@@ -23,6 +23,7 @@ import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { pickEstablishmentName } from '@/utils/candidacyStatus';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const CARD_W = 188;
 const CARD_H = 100;
 const LOGO = 44;
@@ -345,9 +346,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   /** Logo à droite, chevron à gauche ; ordre DOM inchangé (logo · texte · chevron). */
-  cardBodyRtl: {
-    direction: 'rtl',
-  },
+  cardBodyRtl: DIR_RTL,
   logoWrap: {
     position: 'relative',
     flexShrink: 0,

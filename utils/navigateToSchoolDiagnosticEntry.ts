@@ -1,6 +1,8 @@
 import { router } from 'expo-router';
 
+import { readOrientationDiagnosticPrototypeDraft } from '@/features/orientationDiagnostic/constants/orientationDiagnosticPrototypeStorage';
 import { resolveUserDiagnosticPublicCode } from '@/utils/resolveSchoolDiagnosticNavigation';
+import { ensureSchoolRecommendationsFromOrientation } from '@/utils/syncOrientationToSchoolRecommendations';
 import type { PlanParcoursNavigationAuth } from '@/utils/planParcoursNavigation';
 import {
   isTawjihPlusParcoursBlocked,
@@ -10,29 +12,44 @@ import {
 
 type NavigateFn = (href: string) => void;
 
-async function resolveDiagnosticWizardAccess(
-  auth: PlanParcoursNavigationAuth | undefined,
-  tawjihPlusGate?: TawjihPlusParcoursGate,
-): Promise<{ blocked: boolean; code: string | null }> {
-  const blocked =
-    tawjihPlusGate != null &&
-    isTawjihPlusParcoursBlocked({ practicalLinkId: 'diagnostic-ecoles' }, tawjihPlusGate);
+function isValidPublicCode(code: string | null | undefined): code is string {
+  return typeof code === 'string' && /^[a-f0-9]{32}$/.test(code.trim().toLowerCase());
+}
 
-  if (!auth?.getValidAccessToken) {
-    return { blocked, code: null };
+/**
+ * Priorité : code lié au rapport d’orientation courant → sync depuis le test →
+ * diagnostic serveur existant (legacy).
+ */
+async function resolveSchoolRecoPublicCode(
+  auth: PlanParcoursNavigationAuth | undefined,
+): Promise<string | null> {
+  if (!auth?.getValidAccessToken) return null;
+
+  const draft = await readOrientationDiagnosticPrototypeDraft(auth.userId ?? null);
+  const linked = draft?.schoolRecoPublicCode?.trim().toLowerCase() ?? '';
+  if (draft?.phase === 'report' && draft.report && isValidPublicCode(linked)) {
+    return linked;
   }
 
-  const code = await resolveUserDiagnosticPublicCode(
+  if (draft?.phase === 'report' && draft.report) {
+    const fromOrientation = await ensureSchoolRecommendationsFromOrientation({
+      getValidAccessToken: auth.getValidAccessToken,
+      userId: auth.userId ?? null,
+      uiLocale: auth.uiLocale,
+    });
+    if (fromOrientation) return fromOrientation;
+  }
+
+  return resolveUserDiagnosticPublicCode(
     auth.getValidAccessToken,
     auth.userId ?? null,
     { uiLocale: auth.uiLocale },
   );
-
-  return { blocked, code };
 }
 
 /**
- * Ouvre le questionnaire diagnostic écoles (wizard), même si un diagnostic est déjà terminé.
+ * @deprecated L’ancien questionnaire 7 étapes est retiré.
+ * Redirige vers le test d’orientation (source des recommandations).
  */
 export async function navigateToSchoolDiagnosticWizard(
   auth?: PlanParcoursNavigationAuth,
@@ -45,18 +62,26 @@ export async function navigateToSchoolDiagnosticWizard(
       router.push(href as never);
     });
 
-  const { blocked, code } = await resolveDiagnosticWizardAccess(auth, tawjihPlusGate);
+  const blocked =
+    tawjihPlusGate != null &&
+    isTawjihPlusParcoursBlocked({ practicalLinkId: 'diagnostic-ecoles' }, tawjihPlusGate);
 
-  if (blocked && !code) {
-    promptTawjihPlusParcoursLock(tawjihPlusGate!);
+  if (blocked) {
+    const code = auth ? await resolveSchoolRecoPublicCode(auth) : null;
+    if (!code) {
+      promptTawjihPlusParcoursLock(tawjihPlusGate!);
+      return;
+    }
+    go(`/diagnostic-ecoles/resultats?c=${encodeURIComponent(code)}`);
     return;
   }
 
-  go('/diagnostic-ecoles');
+  go('/diagnostic-orientation');
 }
 
 /**
- * Ouvre les recommandations : page résultats si diagnostic terminé, sinon le wizard.
+ * Ouvre la page de recommandations écoles.
+ * Crée le diagnostic serveur depuis le test d’orientation si besoin.
  */
 export async function navigateToSchoolDiagnosticEntry(
   auth?: PlanParcoursNavigationAuth,
@@ -69,16 +94,11 @@ export async function navigateToSchoolDiagnosticEntry(
       router.push(href as never);
     });
 
-  const { blocked, code } = await resolveDiagnosticWizardAccess(auth, tawjihPlusGate);
+  const blocked =
+    tawjihPlusGate != null &&
+    isTawjihPlusParcoursBlocked({ practicalLinkId: 'diagnostic-recommandations' }, tawjihPlusGate);
 
-  if (!auth?.getValidAccessToken) {
-    if (blocked) {
-      promptTawjihPlusParcoursLock(tawjihPlusGate!);
-      return;
-    }
-    go('/diagnostic-ecoles');
-    return;
-  }
+  const code = auth ? await resolveSchoolRecoPublicCode(auth) : null;
 
   if (blocked && !code) {
     promptTawjihPlusParcoursLock(tawjihPlusGate!);
@@ -90,7 +110,7 @@ export async function navigateToSchoolDiagnosticEntry(
     return;
   }
 
-  go('/diagnostic-ecoles');
+  go('/diagnostic-orientation');
 }
 
 /** Même logique que {@link navigateToSchoolDiagnosticEntry}, en remplacement de route. */
@@ -101,11 +121,7 @@ export async function replaceToSchoolDiagnosticEntry(
     return false;
   }
 
-  const code = await resolveUserDiagnosticPublicCode(
-    auth.getValidAccessToken,
-    auth.userId ?? null,
-    { uiLocale: auth.uiLocale },
-  );
+  const code = await resolveSchoolRecoPublicCode(auth);
 
   if (!code) {
     return false;

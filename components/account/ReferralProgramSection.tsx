@@ -13,6 +13,7 @@ import {
 } from '@/services/userReferral';
 import { referredUserDisplayName } from '@/utils/referralDisplayName';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   program: UserReferralProgram | null;
   loading: boolean;
@@ -125,7 +126,7 @@ export function ReferralProgramSection({
 
 const styles = StyleSheet.create({
   wrap: { gap: spacing.sm, alignItems: 'stretch' },
-  wrapRtl: { direction: 'rtl' },
+  wrapRtl: DIR_RTL,
   head: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -17,6 +17,7 @@ import { Text } from '@/components/ui/Text';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type FaName = ComponentProps<typeof FontAwesome>['name'];
 
 function StatusPickSwatch({
@@ -183,7 +184,7 @@ export function SearchablePickPanel({
       </View>
 
       <FlatList
-        {...(rtl ? { style: { direction: 'rtl' as const, height: listHeight } } : { style: { height: listHeight } })}
+        {...(rtl ? { style: { ...DIR_RTL, height: listHeight } } : { style: { height: listHeight } })}
         data={filtered}
         keyExtractor={(it) => it.id}
         keyboardShouldPersistTaps="always"

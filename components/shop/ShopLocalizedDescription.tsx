@@ -3,6 +3,7 @@ import { StyleSheet, View, type StyleProp, type TextStyle, type ViewStyle } from
 import { EstablishmentDescriptionHtml } from '@/components/schools/EstablishmentDescriptionHtml';
 import { Text } from '@/components/ui/Text';
 
+import { DIR_LTR } from '@/utils/layoutDirection';
 const BULLET_LINE_RE = /^[\s]*([-–•*·])\s+(.*)$/u;
 
 function looksLikeHtml(value: string): boolean {
@@ -125,7 +126,7 @@ const styles = StyleSheet.create({
   },
   bulletRow: {
     flexDirection: 'row-reverse',
-    direction: 'ltr',
+    ...DIR_LTR,
     alignItems: 'flex-start',
     gap: 6,
     alignSelf: 'stretch',

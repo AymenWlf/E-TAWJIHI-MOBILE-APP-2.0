@@ -12,6 +12,7 @@ import { getTierDisplayProduct, getTierRewardProducts } from '@/utils/referralTi
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   rtl: boolean;
   locale: 'fr' | 'ar';
@@ -163,7 +164,7 @@ export function LoyaltyTeaserCard({
 
 const styles = StyleSheet.create({
   wrap: {},
-  wrapRtl: { direction: 'rtl' },
+  wrapRtl: DIR_RTL,
   cardPress: {
     borderRadius: radius.xl,
     overflow: 'hidden',

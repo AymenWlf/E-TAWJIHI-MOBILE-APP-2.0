@@ -300,7 +300,9 @@ export function OrientationParcoursSheet({
                         {showDevReset && done ? (
                           <Pressable
                             disabled={devResetStepId != null}
-                            onPress={() => {
+                            onPress={(e) => {
+                              // Évite d’ouvrir l’étape (Pressable parent) en même temps.
+                              e?.stopPropagation?.();
                               Alert.alert(
                                 'Réinitialiser (dev)',
                                 `Remettre « ${t(step.labelKey)} » comme non franchie ?`,
@@ -314,10 +316,10 @@ export function OrientationParcoursSheet({
                                         try {
                                           setDevResetStepId(step.id);
                                           await onDevResetStep!(step.id);
-                                        } catch (e) {
+                                        } catch (err) {
                                           Alert.alert(
                                             'Erreur',
-                                            getUserFacingApiError(e, t, { context: 'generic' }),
+                                            getUserFacingApiError(err, t, { context: 'generic' }),
                                           );
                                         } finally {
                                           setDevResetStepId(null);
@@ -418,7 +420,9 @@ export function OrientationParcoursSheet({
                           current && styles.timelineCardCurrent,
                           pressed && { opacity: 0.9 },
                         ]}
-                        accessibilityRole="button"
+                        // Sur web, un Pressable role=button devient <button> : ne pas imbriquer
+                        // le bouton « Réinitialiser (dev) » dans un autre <button>.
+                        accessibilityRole={showDevReset && done ? undefined : 'button'}
                         accessibilityLabel={`${t(step.labelKey)} — ${badge}`}>
                         {cardBody}
                       </Pressable>
@@ -434,7 +438,7 @@ export function OrientationParcoursSheet({
                           current && styles.timelineCardCurrent,
                           pressed && { opacity: 0.9 },
                         ]}
-                        accessibilityRole="button"
+                        accessibilityRole={showDevReset && done ? undefined : 'button'}
                         accessibilityLabel={`${t(step.labelKey)} — ${t('inscTawjihPlusLockTitle')}`}>
                         {cardBody}
                       </Pressable>

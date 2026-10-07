@@ -7,6 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { useLocale } from '@/contexts/LocaleContext';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 export type InscriptionsTourTabId = 'announcements' | 'candidacies';
 
 type ShellProps = {
@@ -271,7 +272,7 @@ const styles = StyleSheet.create({
     borderColor: 'rgba(51, 62, 143, 0.12)',
   },
   shellRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   hero: {
@@ -321,12 +322,8 @@ const styles = StyleSheet.create({
     padding: 4,
     borderRadius: radius.full,
   },
-  tabRtl: {
-    direction: 'rtl',
-  },
-  dirRtl: {
-    direction: 'rtl',
-  },
+  tabRtl: DIR_RTL,
+  dirRtl: DIR_RTL,
   tabSlot: {
     flex: 1,
     minWidth: 0,
@@ -421,14 +418,14 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(51, 62, 143, 0.08)',
   },
   panelRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   filterWrap: {
     gap: spacing.xs,
   },
   filterWrapRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   attentionFilterRow: {

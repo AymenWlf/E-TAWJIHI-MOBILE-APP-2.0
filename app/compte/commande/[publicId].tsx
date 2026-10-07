@@ -37,6 +37,7 @@ import {
   shopOrderStatusUi,
 } from '@/utils/shopOrderStatusUi';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 function receiptAbsoluteUrl(path: string | null | undefined): string | null {
   if (!path || !path.startsWith('/')) return null;
   return `${getApiBaseUrl().replace(/\/$/, '')}${path}`;
@@ -395,7 +396,7 @@ function LineRow({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F8FAFC' },
-  rtlRoot: { direction: 'rtl' },
+  rtlRoot: DIR_RTL,
   rowRtl: { flexDirection: 'row-reverse' },
   txtRtl: { writingDirection: 'rtl', textAlign: 'right' },
   center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.lg },

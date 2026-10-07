@@ -16,6 +16,7 @@ import {
 } from '@/utils/rtlDescriptionWebHtml';
 import { safeOpenUrl } from '@/utils/safeOpenUrl';
 
+import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   /** Peut contenir du HTML (admin / CMS) ou du texte brut. */
   description: string | null | undefined;
@@ -105,14 +106,14 @@ export function EstablishmentDescriptionHtml({
         ? ({
             textAlign: 'right' as const,
             writingDirection: 'rtl' as const,
-            direction: 'rtl' as const,
+            ...DIR_RTL,
             width: '100%' as const,
             alignSelf: 'stretch' as const,
           })
         : ({
             textAlign: 'left' as const,
             writingDirection: 'ltr' as const,
-            direction: 'ltr' as const,
+            ...DIR_LTR,
           }),
     [rtl],
   );
@@ -148,7 +149,7 @@ export function EstablishmentDescriptionHtml({
     const rtlBlock = {
       textAlign: 'right' as const,
       writingDirection: 'rtl' as const,
-      direction: 'rtl' as const,
+      ...DIR_RTL,
       width: '100%' as const,
     };
     return {
@@ -348,7 +349,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   wrapRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignSelf: 'stretch',
     width: '100%',
   },

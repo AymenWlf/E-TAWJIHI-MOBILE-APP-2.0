@@ -15,6 +15,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 export type TourFocusWrapProps = {
   active: boolean;
   label?: string;
@@ -138,8 +139,7 @@ const styles = StyleSheet.create({
   },
   labelChipRtl: {
     alignSelf: 'flex-start',
-    direction: 'rtl',
-  },
+    ...DIR_RTL },
   labelTxt: {
     fontSize: fontSize.xs,
     fontWeight: '800',

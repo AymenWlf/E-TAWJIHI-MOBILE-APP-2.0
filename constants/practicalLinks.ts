@@ -23,6 +23,13 @@ export const ORIENTATION_PRACTICAL_LINK_DEFS: (PracticalLinkDef & { id: Orientat
     accent: homeShell.green,
   },
   {
+    id: 'diagnostic-rapport',
+    labelKey: 'practical_diagnostic_rapport',
+    descriptionKey: 'practical_diagnostic_rapport_desc',
+    icon: 'file-text',
+    accent: homeShell.blue,
+  },
+  {
     id: 'diagnostic-recommandations',
     labelKey: 'practical_diagnostic_recommandations',
     descriptionKey: 'practical_diagnostic_recommandations_desc',

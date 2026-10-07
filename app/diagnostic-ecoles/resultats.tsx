@@ -26,6 +26,7 @@ import {
   type SchoolDiagnosticRecommendationItem,
 } from '@/services/schoolRecommendationDiagnostic';
 import { resolveUserDiagnosticPublicCode } from '@/utils/resolveSchoolDiagnosticNavigation';
+import { ensureSchoolRecommendationsFromOrientation } from '@/utils/syncOrientationToSchoolRecommendations';
 import { RECOMMENDATION_FOLLOW_MIN_COUNT } from '@/constants/recommendationParcours';
 import { RecommendationFollowProgress } from '@/components/diagnostic/RecommendationFollowProgress';
 import { useSchoolDiagnosticGrokEnrichment } from '@/hooks/useSchoolDiagnosticGrokEnrichment';
@@ -51,16 +52,25 @@ import {
   sortSchoolDiagnosticRecommendationsWithSeuil,
   type SeuilCompatibilityInfo,
 } from '@/utils/schoolDiagnosticSeuilCompatibility';
+import { partitionFacultePublique } from '@/features/orientationDiagnostic/utils/orientationFacultePubliqueGroup';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const COPY = {
   fr: {
-    eyebrow: 'Diagnostic écoles',
+    eyebrow: 'Orientation',
     title: 'Vos recommandations',
-    subtitle: 'Classement : notes vs seuils, puis score de compatibilité',
+    subtitle: 'Classement issu de votre test d’orientation',
     synthesis: 'Synthèse IA',
     profile: 'Votre profil',
-    edit: 'Modifier mes réponses',
+    edit: 'Refaire le test d’orientation',
     schools: 'Voir les écoles recommandées',
+    emptyNoOrientation:
+      'Terminez d’abord le test d’orientation pour générer vos recommandations d’écoles.',
+    emptyGoOrientation: 'Ouvrir le test d’orientation',
+    facultesTitle: 'Universités et facultés publiques',
+    facultesHint: 'Accès ouvert — ouvrir pour voir la liste',
+    facultesCount: (n: number) => `${n} établissement${n > 1 ? 's' : ''}`,
+    facultesClosed: 'Voir toutes les facultés',
     establishments: (n: number) =>
       `${n} établissement${n > 1 ? 's' : ''} analysé${n > 1 ? 's' : ''}`,
     tierEstablishments: (n: number) =>
@@ -73,13 +83,19 @@ const COPY = {
     } as Record<DiagnosticTier, string>,
   },
   ar: {
-    eyebrow: 'تشخيص المدارس',
+    eyebrow: 'التوجيه',
     title: 'توصياتك',
-    subtitle: 'الترتيب: النقط مقابل عتبة النقط، ثم نسبة التوافق',
+    subtitle: 'الترتيب مستمد من اختبار التوجيه',
     synthesis: 'ملخص الذكاء الاصطناعي',
     profile: 'ملفك',
-    edit: 'تعديل إجاباتي',
+    edit: 'إعادة اختبار التوجيه',
     schools: 'عرض المدارس الموصى بها',
+    emptyNoOrientation: 'أنهِ أولاً اختبار التوجيه لإنشاء توصيات المدارس.',
+    emptyGoOrientation: 'فتح اختبار التوجيه',
+    facultesTitle: 'الجامعات والكليات العمومية',
+    facultesHint: 'ولوج مفتوح — افتح لعرض القائمة',
+    facultesCount: (n: number) => `${n} مؤسسة`,
+    facultesClosed: 'عرض كل الكليات',
     establishments: (n: number) => `${n} مؤسسة محللة`,
     tierEstablishments: (n: number) => `${n} مؤسسة`,
     tiers: {
@@ -149,6 +165,7 @@ export default function DiagnosticResultatsScreen() {
   const [followedIds, setFollowedIds] = useState<Set<number>>(() => new Set());
   const [followBusyIds, setFollowBusyIds] = useState<Set<number>>(() => new Set());
   const [followCount, setFollowCount] = useState(0);
+  const [facultesOpen, setFacultesOpen] = useState(false);
 
   const followProgress = useMemo(
     () => ({
@@ -269,25 +286,43 @@ export default function DiagnosticResultatsScreen() {
         let codeToLoad = urlCode;
 
         if (user) {
-          const ownedCode = await resolveUserDiagnosticPublicCode(
+          const fromOrientation = await ensureSchoolRecommendationsFromOrientation({
             getValidAccessToken,
-            user.id,
-            { uiLocale },
-          );
+            userId: user.id,
+            uiLocale,
+          });
           if (!alive) return;
-          if (ownedCode) {
-            if (ownedCode !== urlCode) {
+
+          if (fromOrientation) {
+            if (fromOrientation !== urlCode) {
               router.replace({
                 pathname: '/diagnostic-ecoles/resultats',
-                params: { c: ownedCode },
+                params: { c: fromOrientation },
               } as never);
               return;
             }
-            codeToLoad = ownedCode;
-          } else if (!/^[a-f0-9]{32}$/.test(urlCode)) {
-            setErr('Aucun diagnostic terminé pour ce compte.');
-            setLoading(false);
-            return;
+            codeToLoad = fromOrientation;
+          } else {
+            const ownedCode = await resolveUserDiagnosticPublicCode(
+              getValidAccessToken,
+              user.id,
+              { uiLocale },
+            );
+            if (!alive) return;
+            if (ownedCode) {
+              if (ownedCode !== urlCode) {
+                router.replace({
+                  pathname: '/diagnostic-ecoles/resultats',
+                  params: { c: ownedCode },
+                } as never);
+                return;
+              }
+              codeToLoad = ownedCode;
+            } else if (!/^[a-f0-9]{32}$/.test(urlCode)) {
+              setErr(COPY[uiLocale].emptyNoOrientation);
+              setLoading(false);
+              return;
+            }
           }
         } else if (!/^[a-f0-9]{32}$/.test(urlCode)) {
           setErr('Lien de résultats invalide.');
@@ -405,6 +440,16 @@ export default function DiagnosticResultatsScreen() {
     [diagnosticPayload],
   );
 
+  const { facultes, others: nonFaculteRows } = useMemo(
+    () => partitionFacultePublique(rows),
+    [rows],
+  );
+
+  const facultesSorted = useMemo(
+    () => sortSchoolDiagnosticRecommendationsWithSeuil(facultes, bacComparison),
+    [facultes, bacComparison],
+  );
+
   const grouped = useMemo(() => {
     const map: Record<DiagnosticTier, SchoolDiagnosticRecommendationItem[]> = {
       recommended: [],
@@ -412,14 +457,14 @@ export default function DiagnosticResultatsScreen() {
       last: [],
       avoid: [],
     };
-    for (const r of rows) {
+    for (const r of nonFaculteRows) {
       map[getDiagnosticTier(r)].push(r);
     }
     for (const tier of TIER_ORDER) {
       map[tier] = sortSchoolDiagnosticRecommendationsWithSeuil(map[tier], bacComparison);
     }
     return map;
-  }, [rows, bacComparison]);
+  }, [nonFaculteRows, bacComparison]);
 
   const tierCounts = useMemo(
     () =>
@@ -556,30 +601,106 @@ export default function DiagnosticResultatsScreen() {
 
   const recommendationListFooter = useMemo(
     () => (
-      <View style={[styles.footerActions, isRTL && styles.footerActionsRtl]}>
-        <Pressable
-          style={({ pressed }) => [
-            styles.ctaSecondary,
-            isRTL && styles.ctaSecondaryRtl,
-            pressed && { opacity: 0.9 },
-          ]}
-          onPress={() => router.replace('/diagnostic-ecoles' as never)}>
-          <FontAwesome name="pencil" size={14} color={brand.primary} />
-          <Text style={[styles.ctaSecondaryTxt, isRTL && styles.rtlText]}>{cpy.edit}</Text>
-        </Pressable>
-        <Pressable
-          style={({ pressed }) => [
-            styles.ctaPrimary,
-            isRTL && styles.ctaPrimaryRtl,
-            pressed && { opacity: 0.92 },
-          ]}
-          onPress={() => router.push('/(tabs)/ecoles' as never)}>
-          <Text style={[styles.ctaPrimaryTxt, isRTL && styles.rtlText]}>{cpy.schools}</Text>
-          <FontAwesome name="graduation-cap" size={14} color={brand.white} />
-        </Pressable>
+      <View style={styles.listFooterWrap}>
+        {facultesSorted.length > 0 ? (
+          <View style={styles.facultesAccordion}>
+            <Pressable
+              onPress={() => setFacultesOpen((v) => !v)}
+              style={[styles.facultesTrigger, isRTL && styles.facultesTriggerRtl]}
+              accessibilityRole="button"
+              accessibilityState={{ expanded: facultesOpen }}
+              accessibilityLabel={cpy.facultesTitle}>
+              <View style={styles.facultesIcon}>
+                <FontAwesome name="university" size={15} color={brand.primary} />
+              </View>
+              <View style={styles.facultesCopy}>
+                <Text style={[styles.facultesTitle, isRTL && styles.rtlText]}>
+                  {cpy.facultesTitle}
+                </Text>
+                <Text style={[styles.facultesHint, isRTL && styles.rtlText]}>
+                  {cpy.facultesHint}
+                </Text>
+              </View>
+              <View style={styles.facultesMeta}>
+                <Text style={styles.facultesCount}>{cpy.facultesCount(facultesSorted.length)}</Text>
+                <FontAwesome
+                  name={facultesOpen ? 'chevron-up' : 'chevron-down'}
+                  size={12}
+                  color={brand.primary}
+                />
+              </View>
+            </Pressable>
+            {facultesOpen ? (
+              <View style={styles.facultesBody}>
+                {facultesSorted.map((row, index) => {
+                  const tier = getDiagnosticTier(row);
+                  return (
+                    <View key={`faculte-${row.establishmentId}`}>
+                      {index > 0 ? <View style={styles.tierItemSeparator} /> : null}
+                      <DiagnosticRecommendationRow
+                        row={row}
+                        tier={tier}
+                        isRTL={isRTL}
+                        reportLocale={reportLocale}
+                        seuilCompatibility={getSeuilCompatibilityForRow(bacComparison, row)}
+                        showFollowAction={isLoggedIn}
+                        isFollowing={followedIds.has(row.establishmentId)}
+                        followBusy={followBusyIds.has(row.establishmentId)}
+                        onToggleFollow={() => void toggleFollow(row.establishmentId)}
+                        followLabelFollow={t('inscAnnouncementsFollow')}
+                        followLabelFollowing={t('inscAnnouncementsFollowing')}
+                        onPress={() => openEstablishment(row.establishmentId, row.slug)}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            ) : (
+              <Text style={[styles.facultesClosed, isRTL && styles.rtlText]}>
+                {cpy.facultesClosed}
+              </Text>
+            )}
+          </View>
+        ) : null}
+
+        <View style={[styles.footerActions, isRTL && styles.footerActionsRtl]}>
+          <Pressable
+            style={({ pressed }) => [
+              styles.ctaSecondary,
+              isRTL && styles.ctaSecondaryRtl,
+              pressed && { opacity: 0.9 },
+            ]}
+            onPress={() => router.replace('/diagnostic-orientation' as never)}>
+            <FontAwesome name="refresh" size={14} color={brand.primary} />
+            <Text style={[styles.ctaSecondaryTxt, isRTL && styles.rtlText]}>{cpy.edit}</Text>
+          </Pressable>
+          <Pressable
+            style={({ pressed }) => [
+              styles.ctaPrimary,
+              isRTL && styles.ctaPrimaryRtl,
+              pressed && { opacity: 0.92 },
+            ]}
+            onPress={() => router.push('/(tabs)/ecoles' as never)}>
+            <Text style={[styles.ctaPrimaryTxt, isRTL && styles.rtlText]}>{cpy.schools}</Text>
+            <FontAwesome name="graduation-cap" size={14} color={brand.white} />
+          </Pressable>
+        </View>
       </View>
     ),
-    [cpy, isRTL],
+    [
+      bacComparison,
+      cpy,
+      facultesOpen,
+      facultesSorted,
+      followBusyIds,
+      followedIds,
+      isLoggedIn,
+      isRTL,
+      openEstablishment,
+      reportLocale,
+      t,
+      toggleFollow,
+    ],
   );
 
   /** Non-client ayant terminé le diagnostic : toujours l’écran d’achat TAWJIH PLUS. */
@@ -602,8 +723,10 @@ export default function DiagnosticResultatsScreen() {
         <DiagnosticStatusBar />
         <SafeAreaView style={styles.center} edges={['top', 'bottom']}>
           <Text style={[styles.err, isRTL && styles.rtlText]}>{err}</Text>
-          <Pressable onPress={() => router.replace('/diagnostic-ecoles' as never)} style={styles.errBtn}>
-            <Text style={styles.errBtnTxt}>{cpy.edit}</Text>
+          <Pressable
+            onPress={() => router.replace('/diagnostic-orientation' as never)}
+            style={styles.errBtn}>
+            <Text style={styles.errBtnTxt}>{cpy.emptyGoOrientation}</Text>
           </Pressable>
         </SafeAreaView>
       </View>
@@ -719,10 +842,10 @@ export default function DiagnosticResultatsScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: brand.primary },
-  rootRtl: { direction: 'rtl' },
-  headerRtl: { direction: 'rtl' },
+  rootRtl: DIR_RTL,
+  headerRtl: DIR_RTL,
   headerCenterRtl: { alignItems: 'flex-end' },
-  headerRowRtl: { direction: 'rtl' },
+  headerRowRtl: DIR_RTL,
   rtlNoTransform: { textTransform: 'none', letterSpacing: 0 },
   headerSafe: {
     backgroundColor: brand.primary,
@@ -799,7 +922,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
   },
-  statsRowRtl: { direction: 'rtl' },
+  statsRowRtl: DIR_RTL,
   statChip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -838,21 +961,21 @@ const styles = StyleSheet.create({
       android: { elevation: 2 },
     }),
   },
-  followStickyBarRtl: { direction: 'rtl' },
+  followStickyBarRtl: DIR_RTL,
   followStickyCard: { marginBottom: 0 },
   rtlText: { writingDirection: 'rtl', textAlign: 'right' },
   scroll: { flex: 1, backgroundColor: '#F8FAFC' },
-  scrollRtl: { direction: 'rtl' },
+  scrollRtl: DIR_RTL,
   scrollContent: {
     padding: spacing.md,
     paddingBottom: spacing.xxl * 2,
     gap: spacing.md,
   },
-  scrollContentRtl: { direction: 'rtl', alignItems: 'stretch' },
+  scrollContentRtl: { ...DIR_RTL, alignItems: 'stretch' },
   listHeaderWrap: { gap: spacing.md, marginBottom: spacing.md },
-  centerRtl: { direction: 'rtl' },
-  footerActionsRtl: { direction: 'rtl', alignItems: 'stretch' },
-  ctaPrimaryRtl: { direction: 'rtl' },
+  centerRtl: DIR_RTL,
+  footerActionsRtl: { ...DIR_RTL, alignItems: 'stretch' },
+  ctaPrimaryRtl: DIR_RTL,
   bottomSafe: { backgroundColor: '#F8FAFC' },
   center: {
     flex: 1,
@@ -888,7 +1011,7 @@ const styles = StyleSheet.create({
       android: { elevation: 0 },
     }),
   },
-  insightCardRtl: { direction: 'rtl' },
+  insightCardRtl: DIR_RTL,
   synthesisCard: {
     borderColor: 'rgba(47,206,148,0.35)',
     backgroundColor: 'rgba(47,206,148,0.06)',
@@ -922,7 +1045,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingVertical: spacing.xs,
   },
-  tierHeaderRtl: { direction: 'rtl' },
+  tierHeaderRtl: DIR_RTL,
   tierIconWrap: {
     width: 36,
     height: 36,
@@ -957,7 +1080,43 @@ const styles = StyleSheet.create({
   tierList: { gap: spacing.sm },
   tierItemSeparator: { height: spacing.sm },
   tierSectionSeparator: { height: spacing.md },
-  footerActions: { gap: spacing.sm, marginTop: spacing.md },
+  listFooterWrap: { gap: spacing.md, marginTop: spacing.sm },
+  facultesAccordion: {
+    borderWidth: 1,
+    borderColor: 'rgba(51,62,143,0.12)',
+    borderRadius: radius.lg,
+    backgroundColor: brand.white,
+    overflow: 'hidden',
+  },
+  facultesTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+  },
+  facultesTriggerRtl: DIR_RTL,
+  facultesIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 12,
+    backgroundColor: diagnosticTheme.primarySoft,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  facultesCopy: { flex: 1, minWidth: 0, gap: 2 },
+  facultesTitle: { fontSize: fontSize.sm, fontWeight: '800', color: brand.primary },
+  facultesHint: { fontSize: fontSize.xs, color: brand.textMuted, lineHeight: 16 },
+  facultesMeta: { alignItems: 'flex-end', gap: 4 },
+  facultesCount: { fontSize: 11, fontWeight: '700', color: brand.textMuted },
+  facultesBody: { paddingHorizontal: spacing.sm, paddingBottom: spacing.sm },
+  facultesClosed: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+    fontSize: fontSize.xs,
+    color: brand.textMuted,
+  },
+  footerActions: { gap: spacing.sm },
   ctaSecondary: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -970,7 +1129,7 @@ const styles = StyleSheet.create({
     borderWidth: 1.5,
     borderColor: 'rgba(51, 62, 143, 0.25)',
   },
-  ctaSecondaryRtl: { direction: 'rtl' },
+  ctaSecondaryRtl: DIR_RTL,
   ctaSecondaryTxt: {
     color: brand.primary,
     fontWeight: '700',

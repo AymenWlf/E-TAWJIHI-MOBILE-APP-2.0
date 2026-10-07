@@ -30,6 +30,7 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { homeShell } from '@/theme/homeShell';
 import { recordReferralProgramPageView } from '@/services/referralProgramAnalytics';
 
+import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 export default function ReferralScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
@@ -202,8 +203,8 @@ export default function ReferralScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F8FAFC' },
-  ltr: { direction: 'ltr' },
-  rtl: { direction: 'rtl' },
+  ltr: DIR_LTR,
+  rtl: DIR_RTL,
   hero: {
     backgroundColor: homeShell.bg,
     paddingHorizontal: spacing.md,
@@ -248,11 +249,9 @@ const styles = StyleSheet.create({
     writingDirection: 'rtl',
     textAlign: 'center',
   },
-  scrollRtl: {
-    direction: 'rtl',
-  },
+  scrollRtl: DIR_RTL,
   scrollContentRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   scroll: {
@@ -271,7 +270,7 @@ const styles = StyleSheet.create({
     borderColor: homeShell.borderOnWhite,
   },
   panelRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   tawjihPlusPanel: {

@@ -34,6 +34,7 @@ import { markSimpleFeedbackSubmitted } from '@/utils/simpleAppFeedbackStorage';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const SHEET_SLIDE_MS = 320;
 const STAR_COUNT = 5;
 /** Hauteur approx. du pied fixe (boutons + padding) pour le spacer clavier. */
@@ -424,7 +425,7 @@ const styles = StyleSheet.create({
     marginHorizontal: -spacing.lg,
     paddingHorizontal: spacing.lg,
   },
-  sheetRtl: { direction: 'rtl' },
+  sheetRtl: DIR_RTL,
   handleWrap: { alignItems: 'center', paddingVertical: spacing.sm },
   handle: { width: 40, height: 4, borderRadius: 999, backgroundColor: '#E2E8F0' },
   header: { flexDirection: 'row', alignItems: 'flex-start', gap: spacing.md, marginBottom: spacing.md },

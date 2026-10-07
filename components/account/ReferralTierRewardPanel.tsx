@@ -26,6 +26,7 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { getTierRewardProducts } from '@/utils/referralTierProduct';
 import { getUserFacingApiError } from '@/utils/apiError';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 type Props = {
   tier: ReferralTierInfo;
   rtl: boolean;
@@ -258,9 +259,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
     alignItems: 'stretch',
   },
-  wrapRtl: {
-    direction: 'rtl',
-  },
+  wrapRtl: DIR_RTL,
   confettiOverlay: {
     ...StyleSheet.absoluteFillObject,
     zIndex: 10,

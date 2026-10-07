@@ -19,6 +19,7 @@ import { homeShell } from '@/theme/homeShell';
 import { labelContainsDigits, preserveLtrDigitsInRtlLabel } from '@/utils/bidiText';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 /** Barre système (heure, batterie) — fond bleu charte, icônes claires. */
 export function DiagnosticStatusBar() {
   return (
@@ -672,7 +673,7 @@ export function DiagnosticStepProgressBar({
 
 const styles = StyleSheet.create({
   formBlock: { gap: spacing.md, width: '100%' },
-  formBlockRtl: { direction: 'rtl', alignItems: 'stretch' },
+  formBlockRtl: { ...DIR_RTL, alignItems: 'stretch' },
   label: {
     fontSize: fontSize.sm,
     fontWeight: '700',
@@ -685,7 +686,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
   },
   required: { color: diagnosticTheme.accentDark },
-  hintBoxRtl: { direction: 'rtl' },
+  hintBoxRtl: DIR_RTL,
   hintBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -720,7 +721,7 @@ const styles = StyleSheet.create({
   },
   inputRtl: { textAlign: 'right', writingDirection: 'rtl', alignSelf: 'stretch' },
   inputMultiline: { minHeight: 140, maxHeight: 220, textAlignVertical: 'top', paddingTop: spacing.md },
-  choiceRowRtl: { direction: 'rtl' },
+  choiceRowRtl: DIR_RTL,
   choiceRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -775,7 +776,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     alignSelf: 'stretch',
   },
-  chipGridRtl: { direction: 'rtl' },
+  chipGridRtl: DIR_RTL,
   chip: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -793,14 +794,14 @@ const styles = StyleSheet.create({
   },
   chipCheck: { marginRight: 6 },
   chipCheckRtl: { marginRight: 0, marginLeft: 6 },
-  chipRtl: { direction: 'rtl' },
+  chipRtl: DIR_RTL,
   chipText: { fontSize: fontSize.xs, color: brand.textMuted, fontWeight: '600', flexShrink: 1 },
   chipTextRtl: { writingDirection: 'rtl', textAlign: 'right' },
   chipTextSelected: { color: diagnosticTheme.accentDark, fontWeight: '800' },
   yesNoBlock: { marginTop: spacing.xs, alignSelf: 'stretch' },
-  yesNoBlockRtl: { direction: 'rtl' },
+  yesNoBlockRtl: DIR_RTL,
   yesNoRow: { flexDirection: 'row', gap: spacing.sm },
-  yesNoRowRtl: { direction: 'rtl' },
+  yesNoRowRtl: DIR_RTL,
   yesNoPill: {
     flex: 1,
     paddingVertical: 12,
@@ -826,7 +827,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
     alignSelf: 'stretch',
   },
-  sectionCardRtl: { direction: 'rtl', alignItems: 'stretch' },
+  sectionCardRtl: { ...DIR_RTL, alignItems: 'stretch' },
   sectionCardTitle: {
     fontSize: fontSize.xs,
     fontWeight: '800',
@@ -859,9 +860,9 @@ const styles = StyleSheet.create({
     alignItems: 'flex-end',
     gap: spacing.sm,
   },
-  noteRangeRowRtl: { direction: 'rtl' },
+  noteRangeRowRtl: DIR_RTL,
   /** Notes /20 : champ à gauche, suffixe à droite (même en RTL arabe). */
-  noteRangeInputRowForceLtr: { direction: 'ltr' },
+  noteRangeInputRowForceLtr: DIR_LTR,
   noteRangeCol: { flex: 1, minWidth: 0, gap: spacing.xs },
   noteRangeLabel: {
     fontSize: fontSize.xs,
@@ -885,7 +886,7 @@ const styles = StyleSheet.create({
     paddingBottom: 12,
   },
   noteRangeHint: { fontSize: fontSize.xs, color: brand.textMuted, lineHeight: 16 },
-  errorBannerRtl: { direction: 'rtl' },
+  errorBannerRtl: DIR_RTL,
   errorBanner: {
     flexDirection: 'row',
     alignItems: 'flex-start',
@@ -905,7 +906,7 @@ const styles = StyleSheet.create({
     color: '#B91C1C',
     lineHeight: 20,
   },
-  stepHeaderRtl: { direction: 'rtl' },
+  stepHeaderRtl: DIR_RTL,
   stepHeader: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -966,7 +967,7 @@ const styles = StyleSheet.create({
     backgroundColor: diagnosticTheme.trackBg,
     overflow: 'hidden',
   },
-  progressTrackRtl: { direction: 'rtl' },
+  progressTrackRtl: DIR_RTL,
   progressFill: {
     height: 8,
     borderRadius: radius.full,
@@ -978,7 +979,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'flex-start',
   },
-  progressStepsRtl: { direction: 'rtl' },
+  progressStepsRtl: DIR_RTL,
   progressStepCol: { alignItems: 'center', flex: 1, minWidth: 0 },
   progressDot: {
     width: 28,

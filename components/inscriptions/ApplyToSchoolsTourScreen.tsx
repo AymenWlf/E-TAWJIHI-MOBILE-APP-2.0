@@ -70,6 +70,7 @@ import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import type { CandidacyStatusType } from '@/types/inscriptions';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 function stepTitleKey(step: ApplyToSchoolsTourStepId): HomeCopyKey {
   return `applySchoolsTourStep_${step}_title` as HomeCopyKey;
 }
@@ -764,9 +765,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: brand.primary,
   },
-  rootRtl: {
-    direction: 'rtl',
-  },
+  rootRtl: DIR_RTL,
   hero: {
     backgroundColor: brand.primary,
     paddingHorizontal: spacing.lg,
@@ -825,9 +824,7 @@ const styles = StyleSheet.create({
     gap: 6,
     paddingTop: spacing.xs,
   },
-  progressRowRtl: {
-    direction: 'rtl',
-  },
+  progressRowRtl: DIR_RTL,
   progressDot: {
     width: 8,
     height: 8,
@@ -846,15 +843,13 @@ const styles = StyleSheet.create({
     backgroundColor: brand.backgroundSoft,
   },
   bodyRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   scroll: {
     flex: 1,
   },
-  scrollRtl: {
-    direction: 'rtl',
-  },
+  scrollRtl: DIR_RTL,
   scrollContent: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.md,
@@ -862,7 +857,7 @@ const styles = StyleSheet.create({
     gap: spacing.md,
   },
   scrollContentRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
     width: '100%',
   },
@@ -871,7 +866,7 @@ const styles = StyleSheet.create({
     gap: spacing.xs,
   },
   stepBlockRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     width: '100%',
   },
   stepTitle: {
@@ -895,9 +890,7 @@ const styles = StyleSheet.create({
     textAlign: 'right',
     writingDirection: 'rtl',
   },
-  dirRtl: {
-    direction: 'rtl',
-  },
+  dirRtl: DIR_RTL,
   previewBlock: {
     gap: spacing.sm,
   },
@@ -1066,8 +1059,7 @@ const styles = StyleSheet.create({
   },
   footerActionChipRtl: {
     alignSelf: 'flex-end',
-    direction: 'rtl',
-  },
+    ...DIR_RTL },
   footerActionChipTxt: {
     fontSize: fontSize.xs,
     fontWeight: '800',
@@ -1160,7 +1152,7 @@ const styles = StyleSheet.create({
     borderTopColor: 'rgba(255,255,255,0.12)',
   },
   footerRtl: {
-    direction: 'rtl',
+    ...DIR_RTL,
     alignItems: 'stretch',
   },
   footerSpacer: {

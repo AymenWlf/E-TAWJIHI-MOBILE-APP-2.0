@@ -29,6 +29,9 @@ export type SchoolDiagnosticRecommendationItem = {
   slug: string;
   ville: string;
   typeEcole?: string;
+  admissionType?: string | null;
+  /** Flag admin : université / faculté publique à accès ouvert. */
+  facultePubliqueAccesOuvert?: boolean | null;
   anneesEtudes?: number | null;
   dureeEtudesMax?: number | null;
   diplomesDelivres?: string;

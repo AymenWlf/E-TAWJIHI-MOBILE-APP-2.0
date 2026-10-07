@@ -7,6 +7,7 @@ import {
   type ShopPriceIntlOptions,
 } from '@/utils/shopFormatPrice';
 
+import { DIR_LTR } from '@/utils/layoutDirection';
 type Props = {
   amount: string | number;
   currency?: string;
@@ -44,7 +45,7 @@ const styles = StyleSheet.create({
   wrap: {
     flexDirection: 'row',
     alignItems: 'baseline',
-    direction: 'ltr',
+    ...DIR_LTR,
     gap: 4,
   },
 });

@@ -17,7 +17,7 @@ export type HomePlanParcoursData = {
   completion: PlanParcoursCompletion;
 };
 
-/** Données parcours pour la carte accueil (6 étapes du plan). */
+/** Données parcours pour la carte accueil (7 étapes du plan). */
 export function buildHomePlanParcoursData(
   input: BuildHomePlanParcoursInput,
   t?: (key: HomeCopyKey) => string,
@@ -52,6 +52,7 @@ export function buildHomeOrientationParcoursData(
   const completion: PlanParcoursCompletion = {
     accountSetupComplete: input.accountSetupComplete,
     orientationDiagnosticComplete: input.testPercent >= 100,
+    orientationReportComplete: false,
     recommendationComplete: false,
     recommendationFollowCount: 0,
     feedbackComplete: false,

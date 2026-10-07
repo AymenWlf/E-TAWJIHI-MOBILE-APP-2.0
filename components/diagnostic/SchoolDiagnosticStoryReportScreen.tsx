@@ -39,6 +39,7 @@ import { computeDiagnosticBacComparisonNote } from '@/utils/diagnosticBacCompari
 import { notifySchoolDiagnosticRecommendationsRefresh } from '@/utils/schoolDiagnosticRecommendationsNotify';
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 function fallbackAcademicYearLabel(): string {
   const y = new Date().getFullYear();
   const m = new Date().getMonth();
@@ -288,7 +289,7 @@ export function SchoolDiagnosticStoryReportScreen() {
         <DiagnosticStatusBar />
         <SafeAreaView style={styles.errSafe}>
           <Text style={styles.errTxt}>{error}</Text>
-          <Pressable onPress={() => router.replace('/diagnostic-ecoles' as never)} style={styles.errBtn}>
+          <Pressable onPress={() => router.replace('/diagnostic-orientation' as never)} style={styles.errBtn}>
             <Text style={styles.errBtnTxt}>Retour</Text>
           </Pressable>
         </SafeAreaView>
@@ -355,7 +356,7 @@ export function SchoolDiagnosticStoryReportScreen() {
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#F8FAFC' },
-  rootRtl: { direction: 'rtl' },
+  rootRtl: DIR_RTL,
   safe: { flex: 1 },
   header: {
     flexDirection: 'row',

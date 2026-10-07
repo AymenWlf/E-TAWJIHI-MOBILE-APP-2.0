@@ -15,6 +15,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, radius, spacing } from '@/theme/tokens';
 
+import { DIR_RTL } from '@/utils/layoutDirection';
 const SCREEN_W = Dimensions.get('window').width;
 
 const carouselShadow =
@@ -122,9 +123,7 @@ const styles = StyleSheet.create({
     alignSelf: 'stretch',
     width: '100%',
   },
-  scrollRtl: {
-    direction: 'rtl',
-  },
+  scrollRtl: DIR_RTL,
   slide: {
     height: 168,
     paddingHorizontal: spacing.xl,

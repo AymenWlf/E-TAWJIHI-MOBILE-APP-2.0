@@ -32,7 +32,7 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
-import { navigateToSchoolDiagnosticWizard } from '@/utils/navigateToSchoolDiagnosticEntry';
+import { navigateToOrientationDiagnosticWizard } from '@/utils/navigateToOrientationDiagnosticEntry';
 import { hasLegacyTassjilAccess } from '@/utils/tassjilPracticalLinkLock';
 import {
   guardDailyChallengeAccess,
@@ -198,11 +198,20 @@ export function AppSidebarPanel() {
     const tools: SidebarLink[] = [
       {
         id: 'diagnostic',
-        icon: 'graduation-cap',
+        icon: 'compass',
         iconKind: 'fa',
         labelKey: 'practical_diagnostic_ecoles',
         iconBg: 'rgba(14, 116, 144, 0.12)',
         iconColor: brand.cyan,
+      },
+      {
+        id: 'secteurs',
+        href: '/secteurs',
+        icon: 'briefcase',
+        iconKind: 'fa',
+        labelKey: 'sidebarSecteursMetiers',
+        iconBg: 'rgba(47, 206, 148, 0.14)',
+        iconColor: homeShell.greenDark,
       },
       ...(ORIENTATION_1BAC_SIDEBAR_ENABLED
         ? ([
@@ -339,7 +348,9 @@ export function AppSidebarPanel() {
       return;
     }
     if (link.id === 'diagnostic') {
-      void navigateToSchoolDiagnosticWizard(diagnosticNavAuth, (href) => router.push(href as Href), tawjihPlusGate);
+      void navigateToOrientationDiagnosticWizard(diagnosticNavAuth, (href) =>
+        router.push(href as Href),
+      );
       return;
     }
     if (link.id === 'daily') {

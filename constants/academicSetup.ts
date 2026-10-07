@@ -1,3 +1,5 @@
+import { buildAnneesBacValues } from '@/utils/bacSchoolYears';
+
 export type LabeledOption = { value: string; label: string; labelAr?: string };
 
 export const NIVEAU_ETUDE_OPTIONS: LabeledOption[] = [
@@ -55,24 +57,16 @@ export const FILIERE_BAC_OPTIONS: LabeledOption[] = [
 ];
 
 /**
- * Années scolaires d'obtention (ou en cours d'obtention) du baccalauréat,
- * proposées dans le setup et utilisées pour évaluer l'éligibilité aux annonces.
- * Aligné avec la liste du web admin (`E-TAWJIHI-GLOBAL-FRONT/constants/academicSetup.ts`).
- */
-/**
- * Années scolaires du bac — alignées sur `E-TAWJIHI-GLOBAL-FRONT/src/constants/academicSetup.ts`.
+ * Années scolaires du bac — dynamiques dès septembre (aligné web `buildAnneesBacValues`).
+ * Ex. dès sept. 2026 : 2027-2028, 2026-2027, 2025-2026, …
  */
 export const ANNEES_BAC_OPTIONS: LabeledOption[] = [
   { value: '', label: 'Sélectionnez une année...', labelAr: 'اختر السنة...' },
-  { value: '2026-2027', label: '2026-2027', labelAr: '2026-2027' },
-  { value: '2025-2026', label: '2025-2026', labelAr: '2025-2026' },
-  { value: '2024-2025', label: '2024-2025', labelAr: '2024-2025' },
-  { value: '2023-2024', label: '2023-2024', labelAr: '2023-2024' },
-  { value: '2022-2023', label: '2022-2023', labelAr: '2022-2023' },
-  { value: '2021-2022', label: '2021-2022', labelAr: '2021-2022' },
-  { value: '2020-2021', label: '2020-2021', labelAr: '2020-2021' },
-  { value: '2019-2020', label: '2019-2020', labelAr: '2019-2020' },
-  { value: 'Autre', label: 'Autre', labelAr: 'أخرى' },
+  ...buildAnneesBacValues().map((y) => ({
+    value: y,
+    label: y,
+    labelAr: y === 'Autre' ? 'أخرى' : y,
+  })),
 ];
 
 export const SPECIALITES_MISSION = [

@@ -118,6 +118,7 @@ export default function InscriptionsTabScreen() {
 
 function InscriptionsTabScreenInner() {
   const router = useRouter();
+  const { t, isRTL, locale } = useLocale();
   const {
     isInscriptionsLocked,
     isInscriptionsPartialAccess,
@@ -155,7 +156,6 @@ function InscriptionsTabScreenInner() {
     tab?: string | string[];
     clearFilters?: string | string[];
   }>();
-  const { t, isRTL, locale } = useLocale();
   const { user, getValidAccessToken, isLoading: authLoading } = useAuth();
   const {
     refreshUnread,
