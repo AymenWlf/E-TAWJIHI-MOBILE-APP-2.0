@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Platform, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import RenderHTML from 'react-native-render-html';
 import { WebView } from 'react-native-webview';
 
@@ -26,8 +26,13 @@ type Props = {
   contentWidth?: number;
   /** Force RTL + Cairo même si le conteneur parent est LTR (défaut : locale ar). */
   forceRtl?: boolean;
-  /** Limite la hauteur (aperçu verrouillé) — indispensable pour la WebView RTL. */
+  /** Limite la hauteur (aperçu verrouillé, sans défilement). */
   maxHeight?: number;
+  /**
+   * Hauteur max avec défilement interne.
+   * Le bloc se réduit si le texte est plus court.
+   */
+  boundedHeight?: number;
 };
 
 const MIN_RTL_WEBVIEW_HEIGHT = 120;
@@ -38,6 +43,7 @@ export function EstablishmentDescriptionHtml({
   contentWidth: contentWidthProp,
   forceRtl,
   maxHeight,
+  boundedHeight,
 }: Props) {
   const { isRTL: localeRtl } = useLocale();
   const rtl = forceRtl ?? localeRtl;
@@ -82,7 +88,12 @@ export function EstablishmentDescriptionHtml({
   );
 
   const resolvedWebViewHeight =
-    maxHeight != null ? Math.min(webViewHeight, maxHeight) : webViewHeight;
+    boundedHeight != null
+      ? Math.min(webViewHeight, boundedHeight)
+      : maxHeight != null
+        ? Math.min(webViewHeight, maxHeight)
+        : webViewHeight;
+  const webViewScrolls = boundedHeight != null && webViewHeight > boundedHeight + 8;
 
   const defaultTextProps = useMemo(
     () => ({
@@ -281,7 +292,8 @@ export function EstablishmentDescriptionHtml({
         style={[
           styles.wrap,
           styles.wrapRtl,
-          maxHeight != null && { maxHeight, overflow: 'hidden' as const },
+          boundedHeight != null && { height: resolvedWebViewHeight, overflow: 'hidden' as const },
+          boundedHeight == null && maxHeight != null && { maxHeight, overflow: 'hidden' as const },
         ]}
       >
         <WebView
@@ -289,9 +301,9 @@ export function EstablishmentDescriptionHtml({
           originWhitelist={['*']}
           source={{ html: htmlDocument, baseUrl: RTL_DESCRIPTION_WEBVIEW_BASE_URL }}
           style={[styles.webView, { height: resolvedWebViewHeight }]}
-          scrollEnabled={false}
-          nestedScrollEnabled={false}
-          showsVerticalScrollIndicator={false}
+          scrollEnabled={webViewScrolls}
+          nestedScrollEnabled={webViewScrolls}
+          showsVerticalScrollIndicator={webViewScrolls}
           showsHorizontalScrollIndicator={false}
           javaScriptEnabled
           opaque={false}
@@ -314,8 +326,8 @@ export function EstablishmentDescriptionHtml({
     );
   }
 
-  return (
-    <View style={[styles.wrap, maxHeight != null && { maxHeight, overflow: 'hidden' as const }]}>
+  const richText = (
+    <View style={styles.wrap}>
       <RenderHTML
         contentWidth={contentWidth}
         source={source}
@@ -339,6 +351,24 @@ export function EstablishmentDescriptionHtml({
         }}
         enableExperimentalGhostLinesPrevention
       />
+    </View>
+  );
+
+  if (boundedHeight != null) {
+    return (
+      <ScrollView
+        style={{ maxHeight: boundedHeight, alignSelf: 'stretch' }}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator
+      >
+        {richText}
+      </ScrollView>
+    );
+  }
+
+  return (
+    <View style={[styles.wrap, maxHeight != null && { maxHeight, overflow: 'hidden' as const }]}>
+      {richText}
     </View>
   );
 }

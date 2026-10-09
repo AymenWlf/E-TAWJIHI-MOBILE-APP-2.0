@@ -55,6 +55,7 @@ import {
 import { partitionFacultePublique } from '@/features/orientationDiagnostic/utils/orientationFacultePubliqueGroup';
 
 import { DIR_RTL } from '@/utils/layoutDirection';
+import { CAIRO } from '@/theme/arabicTypography';
 const COPY = {
   fr: {
     eyebrow: 'Orientation',
@@ -129,6 +130,61 @@ type RecommendationSection = {
   data: RecommendationListItem[];
 };
 
+const PROFILE_SUMMARY_FR =
+  'Classement basé sur ton profil (secteurs, villes, bac, budget, type d’école).';
+const PROFILE_SUMMARY_AR =
+  'الترتيب مبني على ملفك (القطاعات، المدن، الباك، الميزانية، نوع المدرسة).';
+const GLOBAL_COMMENT_FR =
+  'Les scores sont calculés instantanément par l’algorithme E-TAWJIHI. Suis au moins 3 écoles pour valider l’étape du parcours.';
+const GLOBAL_COMMENT_AR =
+  'تُحسب النقط فوراً بخوارزمية E-TAWJIHI. تابع 3 مدارس على الأقل لإتمام مرحلة المسار.';
+
+function topRecommendationScore(rows: SchoolDiagnosticRecommendationItem[]): number {
+  return rows.reduce((max, row) => Math.max(max, Math.round(row.combinedScore || 0)), 0);
+}
+
+function BilingualParagraph({
+  fr,
+  ar,
+  locale,
+}: {
+  fr: string;
+  ar: string;
+  locale: 'fr' | 'ar';
+}) {
+  const primaryIsAr = locale === 'ar';
+  return (
+    <View style={styles.bilingualBlock}>
+      <Text
+        style={[
+          styles.insightTxt,
+          primaryIsAr ? styles.rtlText : styles.ltrText,
+          primaryIsAr && styles.arabicFace,
+        ]}>
+        {primaryIsAr ? ar : fr}
+      </Text>
+      <Text
+        style={[
+          styles.insightSecondary,
+          primaryIsAr ? styles.secondaryUnderRtl : styles.secondaryUnderLtr,
+          !primaryIsAr && styles.arabicFace,
+        ]}>
+        {primaryIsAr ? fr : ar}
+      </Text>
+    </View>
+  );
+}
+
+function profileSummaryPair(summary: string | null, count: number, topScore: number): { fr: string; ar: string } {
+  const match = summary?.match(/(\d+)[^\d]+(\d+)\s*%/);
+  const n = match ? Number(match[1]) : count;
+  const score = match ? Number(match[2]) : topScore;
+  return {
+    fr: `${PROFILE_SUMMARY_FR} ${n} établissements scorés — meilleur score ${score}%.`,
+    ar: `${PROFILE_SUMMARY_AR} تم تقييم ${n} مؤسسة — أعلى نقطة ${score}٪.`,
+  };
+}
+
 function RecommendationItemSeparator() {
   return <View style={styles.tierItemSeparator} />;
 }
@@ -161,7 +217,8 @@ export default function DiagnosticResultatsScreen() {
   const generateStartedRef = useRef(false);
   const [grokPending, setGrokPending] = useState(false);
   const [grokMsg, setGrokMsg] = useState(0);
-  const [reportLocale, setReportLocale] = useState<'fr' | 'ar'>('fr');
+  const [reportLocale, setReportLocale] = useState<'fr' | 'ar'>(appLocale === 'ar' ? 'ar' : 'fr');
+  const reportLocaleLocked = useRef(false);
   const [followedIds, setFollowedIds] = useState<Set<number>>(() => new Set());
   const [followBusyIds, setFollowBusyIds] = useState<Set<number>>(() => new Set());
   const [followCount, setFollowCount] = useState(0);
@@ -260,7 +317,9 @@ export default function DiagnosticResultatsScreen() {
     if (deferred) generateStartedRef.current = false;
     const pl = (data.payload ?? {}) as Record<string, unknown>;
     setDiagnosticPayload(pl);
-    setReportLocale(resolveDiagnosticReportLocale(pl, appLocale === 'ar' ? 'ar' : 'fr'));
+    if (!reportLocaleLocked.current) {
+      setReportLocale(resolveDiagnosticReportLocale(pl, appLocale === 'ar' ? 'ar' : 'fr'));
+    }
     const bacSummary = computeDiagnosticBacComparisonNote(pl);
     const normalized = (data.recommendations ?? []).map((row) =>
       applyDiagnosticHardBlocksToRow(row, pl, bacSummary),
@@ -419,7 +478,8 @@ export default function DiagnosticResultatsScreen() {
     return () => clearInterval(t);
   }, [grokPending, reportLocale]);
 
-  const isRTL = reportLocale === 'ar' || appLocale === 'ar';
+  const isRTL = reportLocale === 'ar';
+  const alignText = isRTL ? styles.rtlText : styles.ltrText;
   const loadingRtl = appLocale === 'ar';
   const cpy = COPY[reportLocale];
 
@@ -534,8 +594,8 @@ export default function DiagnosticResultatsScreen() {
               <FontAwesome name={TIER_ICONS[tier]} size={14} color={color} />
             </View>
             <View style={styles.tierHeaderText}>
-              <Text style={[styles.tierTitle, isRTL && styles.rtlText]}>{cpy.tiers[tier]}</Text>
-              <Text style={[styles.tierSub, isRTL && styles.rtlText]}>
+              <Text style={[styles.tierTitle, alignText, isRTL && styles.arabicFace]}>{cpy.tiers[tier]}</Text>
+              <Text style={[styles.tierSub, alignText, isRTL && styles.arabicFace]}>
                 {cpy.tierEstablishments(count)}
               </Text>
             </View>
@@ -551,6 +611,7 @@ export default function DiagnosticResultatsScreen() {
 
   const recommendationListHeader = useMemo(() => {
     if (!profileSummary && !globalComment) return null;
+    const profilePair = profileSummaryPair(profileSummary, rows.length, topRecommendationScore(rows));
     return (
       <View style={styles.listHeaderWrap}>
         {profileSummary ? (
@@ -560,10 +621,10 @@ export default function DiagnosticResultatsScreen() {
             </View>
             <View style={styles.insightBody}>
               <Text
-                style={[styles.insightLabel, isRTL && styles.rtlText, isRTL && styles.rtlNoTransform]}>
+                style={[styles.insightLabel, alignText, isRTL && styles.rtlNoTransform]}>
                 {cpy.profile}
               </Text>
-              <Text style={[styles.insightTxt, isRTL && styles.rtlText]}>{profileSummary}</Text>
+              <BilingualParagraph fr={profilePair.fr} ar={profilePair.ar} locale={reportLocale} />
             </View>
           </View>
         ) : null}
@@ -588,16 +649,16 @@ export default function DiagnosticResultatsScreen() {
             </View>
             <View style={styles.insightBody}>
               <Text
-                style={[styles.insightLabel, isRTL && styles.rtlText, isRTL && styles.rtlNoTransform]}>
+                style={[styles.insightLabel, alignText, isRTL && styles.rtlNoTransform]}>
                 {cpy.synthesis}
               </Text>
-              <Text style={[styles.insightTxt, isRTL && styles.rtlText]}>{globalComment}</Text>
+              <BilingualParagraph fr={GLOBAL_COMMENT_FR} ar={GLOBAL_COMMENT_AR} locale={reportLocale} />
             </View>
           </View>
         ) : null}
       </View>
     );
-  }, [cpy, globalComment, isRTL, profileSummary]);
+  }, [alignText, cpy, globalComment, isRTL, profileSummary, reportLocale, rows]);
 
   const recommendationListFooter = useMemo(
     () => (
@@ -771,21 +832,43 @@ export default function DiagnosticResultatsScreen() {
           </Pressable>
           <View style={[styles.headerCenter, isRTL && styles.headerCenterRtl]}>
             <Text
-              style={[styles.headerEyebrow, isRTL && styles.rtlText, isRTL && styles.rtlNoTransform]}>
+              style={[styles.headerEyebrow, alignText, isRTL && styles.rtlNoTransform]}>
               {cpy.eyebrow}
             </Text>
-            <Text style={[styles.headerTitle, isRTL && styles.rtlText]}>{cpy.title}</Text>
+            <Text style={[styles.headerTitle, alignText, isRTL && styles.arabicFace]}>{cpy.title}</Text>
             {academicYearLabel ? (
               <View style={[styles.yearPill, isRTL && styles.yearPillRtl]}>
                 <FontAwesome name="calendar" size={11} color={homeShell.greenDark} />
-                <Text style={[styles.yearPillTxt, isRTL && styles.rtlText]}>{academicYearLabel}</Text>
+                <Text style={[styles.yearPillTxt, styles.ltrText]} latinDigits>
+                  {academicYearLabel}
+                </Text>
               </View>
             ) : null}
             {rows.length > 0 ? (
-              <Text style={[styles.headerCount, isRTL && styles.rtlText]}>
+              <Text style={[styles.headerCount, alignText]}>
                 {cpy.establishments(rows.length)}
               </Text>
             ) : null}
+          </View>
+          <View style={styles.langSwitch}>
+            {(['fr', 'ar'] as const).map((code) => {
+              const on = reportLocale === code;
+              return (
+                <Pressable
+                  key={code}
+                  onPress={() => {
+                    reportLocaleLocked.current = true;
+                    setReportLocale(code);
+                  }}
+                  style={[styles.langBtn, on && styles.langBtnOn]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: on }}>
+                  <Text style={[styles.langBtnTxt, on && styles.langBtnTxtOn, styles.ltrText]}>
+                    {code === 'fr' ? 'FR' : 'AR'}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
         </View>
         <View style={styles.headerAccentLine} />
@@ -797,7 +880,7 @@ export default function DiagnosticResultatsScreen() {
             {tierCounts.map(({ tier, count, color }) => (
               <View key={tier} style={[styles.statChip, { borderColor: color }]}>
                 <View style={[styles.statDot, { backgroundColor: color }]} />
-                <Text style={[styles.statChipTxt, isRTL && styles.rtlText]}>
+                <Text style={[styles.statChipTxt, alignText]}>
                   {cpy.tiers[tier]} · {count}
                 </Text>
               </View>
@@ -810,7 +893,7 @@ export default function DiagnosticResultatsScreen() {
         <View style={[styles.followStickyBar, isRTL && styles.followStickyBarRtl]}>
           <RecommendationFollowProgress
             followCount={followProgress.current}
-            locale={appLocale === 'ar' ? 'ar' : 'fr'}
+            locale={reportLocale}
             isRTL={isRTL}
             style={styles.followStickyCard}
           />
@@ -844,7 +927,7 @@ const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: brand.primary },
   rootRtl: DIR_RTL,
   headerRtl: DIR_RTL,
-  headerCenterRtl: { alignItems: 'flex-end' },
+  headerCenterRtl: { alignItems: 'stretch' },
   headerRowRtl: DIR_RTL,
   rtlNoTransform: { textTransform: 'none', letterSpacing: 0 },
   headerSafe: {
@@ -897,7 +980,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: homeShell.greenAlpha28,
   },
-  yearPillRtl: { flexDirection: 'row-reverse' },
+  yearPillRtl: { alignSelf: 'flex-start' },
   yearPillTxt: {
     fontSize: fontSize.xs,
     fontWeight: '700',
@@ -964,6 +1047,36 @@ const styles = StyleSheet.create({
   followStickyBarRtl: DIR_RTL,
   followStickyCard: { marginBottom: 0 },
   rtlText: { writingDirection: 'rtl', textAlign: 'right' },
+  ltrText: { writingDirection: 'ltr', textAlign: 'left' },
+  bilingualBlock: { gap: 3, alignSelf: 'stretch' },
+  insightSecondary: {
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    color: brand.textMuted,
+    lineHeight: 18,
+  },
+  secondaryUnderRtl: { writingDirection: 'ltr', textAlign: 'right' },
+  secondaryUnderLtr: { writingDirection: 'rtl', textAlign: 'left' },
+  langSwitch: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: radius.full,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.45)',
+    overflow: 'hidden',
+    marginTop: 2,
+  },
+  langBtn: {
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+  },
+  langBtnOn: { backgroundColor: brand.white },
+  langBtnTxt: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: 'rgba(255,255,255,0.9)',
+  },
+  langBtnTxtOn: { color: brand.primary },
   scroll: { flex: 1, backgroundColor: '#F8FAFC' },
   scrollRtl: DIR_RTL,
   scrollContent: {
@@ -1038,7 +1151,7 @@ const styles = StyleSheet.create({
     letterSpacing: 0.35,
   },
   insightTxt: { fontSize: fontSize.sm, color: brand.text, lineHeight: 21 },
-  section: { gap: spacing.sm },
+  arabicFace: { fontFamily: CAIRO.bold },
   tierHeader: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -68,6 +68,7 @@ export function AnimatedSplash({
       false,
     );
 
+    const holdMs = Math.max(800, durationMs);
     const t = setTimeout(() => {
       exit.value = withTiming(
         1,
@@ -78,9 +79,13 @@ export function AnimatedSplash({
           }
         },
       );
-    }, Math.max(800, durationMs));
+    }, holdMs);
+    const hardStop = setTimeout(() => completeSplash(), holdMs + 500);
 
-    return () => clearTimeout(t);
+    return () => {
+      clearTimeout(t);
+      clearTimeout(hardStop);
+    };
   }, [completeSplash, durationMs, enter, exit, orbit]);
 
   const rootStyle = useAnimatedStyle(() => ({

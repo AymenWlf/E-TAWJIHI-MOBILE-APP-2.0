@@ -16,9 +16,8 @@ import {
   ORIENTATION_DIAGNOSTIC_STEPS,
   RIASEC_LABELS,
   SCHOOLS_PER_TYPE_MAX,
-  SCHOOLS_TOTAL_MAX,
 } from '../data/orientationDiagnosticQuestions';
-import { extractVersusSignals } from './orientationDiagnosticVersus';
+import { extractVersusSignals, VERSUS_FACULTES_PUBLIQUES_ID } from './orientationDiagnosticVersus';
 import type { DiagnosticStep } from '../types/orientationDiagnosticPrototype';
 import { getPersonaById } from '../data/orientationDiagnosticPersonas';
 import {
@@ -395,6 +394,42 @@ function recommendMetiers(
     .slice(0, 6);
 }
 
+function sortRadarSchools<T extends { id: string }>(
+  schools: T[],
+  answers: DiagnosticAnswers,
+): Array<T & { versusRank: number | null }> {
+  const rankOf = new Map(
+    (answers.versusRankings?.ecoles ?? []).map((item) => [item.id, item.rank]),
+  );
+  return schools
+    .map((school, index) => ({
+      school,
+      index,
+      versusRank: radarSchoolVersusRank(school.id, answers, rankOf),
+    }))
+    .sort((a, b) => {
+      if (a.versusRank != null && b.versusRank != null && a.versusRank !== b.versusRank) {
+        return a.versusRank - b.versusRank;
+      }
+      if (a.versusRank != null && b.versusRank == null) return -1;
+      if (a.versusRank == null && b.versusRank != null) return 1;
+      return a.index - b.index;
+    })
+    .map((row) => ({ ...row.school, versusRank: row.versusRank }));
+}
+
+function radarSchoolVersusRank(
+  id: string,
+  answers: DiagnosticAnswers,
+  rankOf: Map<string, number>,
+): number | null {
+  const direct = rankOf.get(id);
+  if (direct != null) return direct;
+  const groupRank = rankOf.get(VERSUS_FACULTES_PUBLIQUES_ID);
+  if (groupRank != null && answers.schoolMeta?.[id]?.facultePubliqueAccesOuvert) return groupRank;
+  return null;
+}
+
 function buildPreferences(answers: DiagnosticAnswers): OrientationReport['preferences'] {
   const labelOf = (id: string, fallback: (x: string) => string) =>
     answers.labels?.[id] || fallback(id) || id;
@@ -432,20 +467,24 @@ function buildPreferences(answers: DiagnosticAnswers): OrientationReport['prefer
     salary: answers.single.car_salaire
       ? salaryLabel(answers.single.car_salaire)
       : 'Non renseigné',
-    ecoles: flattenSelectedEcoleIds(answers.multi).map((id) => {
-      const meta = answers.schoolMeta?.[id];
-      return {
-        id,
-        label: labelOf(id, ecoleLabel),
-        orientationPlan: meta?.orientationPlan ?? null,
-        admissionType: meta?.admissionType ?? null,
-        admissionLabel: meta?.admissionLabel ?? null,
-        ville: meta?.ville ?? null,
-        villes: meta?.villes ?? (meta?.ville ? [meta.ville] : []),
-        dureeEtudes: meta?.dureeEtudes ?? null,
-        diplomes: meta?.diplomes ?? [],
-      };
-    }),
+    ecoles: sortRadarSchools(
+      flattenSelectedEcoleIds(answers.multi).map((id) => {
+        const meta = answers.schoolMeta?.[id];
+        return {
+          id,
+          label: labelOf(id, ecoleLabel),
+          orientationPlan: meta?.orientationPlan ?? null,
+          admissionType: meta?.admissionType ?? null,
+          admissionLabel: meta?.admissionLabel ?? null,
+          ville: meta?.ville ?? null,
+          villes: meta?.villes ?? (meta?.ville ? [meta.ville] : []),
+          dureeEtudes: meta?.dureeEtudes ?? null,
+          diplomes: meta?.diplomes ?? [],
+          logo: meta?.logo ?? null,
+        };
+      }),
+      answers,
+    ),
     versus,
     versusRankings: {
       metiers: (answers.versusRankings?.metiers ?? []).map((r) => ({
@@ -778,10 +817,12 @@ function studentSummaryFromAnswers(answers: DiagnosticAnswers) {
         ? `Marocain · ${formatProfileBacFiliereLabel(p.bacFiliere)}`
         : p.studyLevel || '—';
   let notesLabel = 'Non renseignées';
-  if (p.bacType === 'marocain' && p.noteNational) {
-    notesLabel = `1ère ${p.noteGenerale1ereBac} · CC ${p.noteControleContinu} · Nat. ${p.noteNational}${
-      p.noteAvailability === 'estimation' ? ' (estim.)' : ''
-    }`;
+  if (p.bacType === 'marocain' && p.noteAvailability === 'estimation') {
+    if (p.noteControleContinu || p.noteNational) {
+      notesLabel = `Estimation ${p.noteControleContinu || '—'}–${p.noteNational || '—'}/20`;
+    }
+  } else if (p.bacType === 'marocain' && p.noteGenerale1ereBac) {
+    notesLabel = `${p.noteGenerale1ereBac}/20`;
   } else if (p.bacType === 'mission' && (p.noteGeneralePremiere || p.noteGeneraleBac)) {
     notesLabel = `1ère ${p.noteGeneralePremiere || '—'} · Term. ${p.noteGeneraleTerminale || '—'} · Bac ${
       p.noteGeneraleBac || '—'
@@ -952,7 +993,6 @@ export function isStepAnswered(
       const max = step.maxSelect ?? SCHOOLS_PER_TYPE_MAX;
       if (n > max) return false;
       const total = flattenSelectedEcoleIds(answers.multi).length;
-      if (total > SCHOOLS_TOTAL_MAX) return false;
       // Catalogue vide pour ce type → étape traversable
       if (answers.single[`${stepId}__empty`] === '1') return true;
       // Au moins 1 école au total (les pages type suivantes peuvent rester vides)

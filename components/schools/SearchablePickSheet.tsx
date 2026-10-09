@@ -95,6 +95,8 @@ type PanelProps = {
   selectedValues?: readonly string[];
   /** Ferme la feuille après `onPick` (défaut `true`). */
   closeOnPick?: boolean;
+  /** Bouton fixe en bas de la feuille (sélection multiple). */
+  confirmLabel?: string;
 };
 
 /**
@@ -345,6 +347,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: '#F1F5F9',
   },
+  confirmBtn: {
+    marginTop: spacing.sm,
+    backgroundColor: homeShell.blue,
+    borderRadius: radius.lg,
+    minHeight: 48,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.md,
+  },
+  confirmTxt: {
+    color: '#fff',
+    fontSize: fontSize.md,
+    fontWeight: '800',
+  },
   searchWrap: {
     marginBottom: spacing.sm,
     borderRadius: radius.lg,
@@ -411,8 +427,18 @@ const styles = StyleSheet.create({
   rowMeta: { color: homeShell.cardMuted, fontSize: 12, marginTop: 4 },
   sep: {
     height: StyleSheet.hairlineWidth,
-    backgroundColor: 'rgba(15,23,42,0.08)',
+    backgroundColor: homeShell.borderOnWhite,
   },
-  empty: { alignItems: 'center', paddingVertical: spacing.xl, gap: spacing.sm },
-  emptyText: { color: homeShell.cardMuted, fontWeight: '600' },
+  empty: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.xl,
+  },
+  emptyText: {
+    color: homeShell.cardMuted,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    textAlign: 'center',
+  },
 });

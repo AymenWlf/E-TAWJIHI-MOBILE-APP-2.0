@@ -11,7 +11,6 @@ import { resolveFiliereDisplayLabel } from '../utils/academicFiliere';
 export type DiagnosticProfile = {
   firstName: string;
   lastName: string;
-  dateNaissance: string;
   phoneNumber: string;
   city: string;
   cityId: string;
@@ -34,7 +33,6 @@ export type DiagnosticProfile = {
 export const EMPTY_DIAGNOSTIC_PROFILE: DiagnosticProfile = {
   firstName: '',
   lastName: '',
-  dateNaissance: '',
   phoneNumber: '',
   city: '',
   cityId: '',
@@ -153,7 +151,6 @@ export function formatProfileBacFiliereLabel(filiere: string): string {
 
 export function validateProfileIdentity(p: DiagnosticProfile): string | null {
   if (!p.firstName.trim() || !p.lastName.trim()) return 'Indique ton prénom et ton nom.';
-  if (!p.dateNaissance) return 'Indique ta date de naissance.';
   if (!p.city.trim() && !p.cityId) return 'Indique ta ville.';
   return null;
 }
@@ -171,12 +168,17 @@ export function validateProfileSchool(p: DiagnosticProfile): string | null {
   return null;
 }
 
+function hasNote(value: string | undefined): boolean {
+  return Boolean(value && value.trim());
+}
+
 export function validateProfileGrades(p: DiagnosticProfile): string | null {
   if (!needsNotes(p.studyLevel)) return null;
   if (!p.noteAvailability) return 'Indique si tes notes sont disponibles ou estimées.';
   if (p.bacType === 'marocain') {
-    if (!p.noteGenerale1ereBac || !p.noteControleContinu || !p.noteNational) {
-      return 'Renseigne les 3 notes (1ère Bac / CC / National).';
+    const definitive = p.noteAvailability === 'real' || p.noteAvailability === 'disponible';
+    if (definitive && !hasNote(p.noteGenerale1ereBac)) {
+      return 'Renseigne ta note définitive.';
     }
   }
   if (p.bacType === 'mission') {

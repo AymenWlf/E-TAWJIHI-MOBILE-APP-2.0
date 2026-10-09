@@ -7,6 +7,7 @@ import {
   DiagnosticStatusBar,
   diagnosticTheme,
 } from '@/components/diagnostic/DiagnosticUi';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { ORIENTATION_MODULE_ORDER } from '../constants/orientationDiagnosticPrototypeStorage';
 import type { ModuleId } from '../types/orientationDiagnosticPrototype';
@@ -49,7 +50,6 @@ export function OrientationDiagnosticWizardShell({
   backLabel,
   busy,
   children,
-  moduleFlash,
 }: {
   uiLocale: OrientationUiLocale;
   rtl?: boolean;
@@ -67,9 +67,7 @@ export function OrientationDiagnosticWizardShell({
   backLabel?: string;
   busy?: boolean;
   children: ReactNode;
-  moduleFlash?: string | null;
 }) {
-  const moduleMeta = localizeModuleMeta(currentModule, uiLocale);
   const doneSet = new Set(completedModules);
   const progressPct = totalSteps > 0 ? ((stepIndex + 1) / totalSteps) * 100 : 0;
 
@@ -81,7 +79,7 @@ export function OrientationDiagnosticWizardShell({
           onPress={onQuit}
           accessibilityRole="button"
           accessibilityLabel={tOd(uiLocale, 'topQuit')}
-          style={({ pressed }) => [styles.quitBtn, pressed && { opacity: 0.85 }]}>
+          style={({ pressed }) => [styles.quitBtn, rtl && styles.btnRtl, pressed && { opacity: 0.85 }]}>
           <FontAwesome name="times" size={14} color={brand.white} />
           <Text style={styles.quitTxt}>{tOd(uiLocale, 'topQuit')}</Text>
         </Pressable>
@@ -93,13 +91,17 @@ export function OrientationDiagnosticWizardShell({
             onPress={onRetake}
             accessibilityRole="button"
             accessibilityLabel={tOd(uiLocale, 'topResetTitle')}
-            style={({ pressed }) => [styles.resetBtn, pressed && { opacity: 0.85 }]}>
+            style={({ pressed }) => [styles.resetBtn, rtl && styles.btnRtl, pressed && { opacity: 0.85 }]}>
             <FontAwesome name="refresh" size={13} color={brand.white} />
             <Text style={styles.resetTxt}>{tOd(uiLocale, 'topReset')}</Text>
           </Pressable>
         ) : (
           <View style={styles.headerSpacer} />
         )}
+      </View>
+
+      <View style={styles.langRow}>
+        <HeroLangSwitch />
       </View>
 
       <View style={styles.moduleTrack}>
@@ -130,19 +132,6 @@ export function OrientationDiagnosticWizardShell({
         <View style={[styles.progressFill, { width: `${Math.min(100, progressPct)}%` }]} />
       </View>
 
-      <View style={styles.moduleBanner}>
-        <Text style={[styles.moduleLabel, rtl && styles.rtlText]}>{moduleMeta.label}</Text>
-        <Text style={[styles.moduleObjective, rtl && styles.rtlText]} numberOfLines={2}>
-          {moduleMeta.objective}
-        </Text>
-        {moduleFlash ? (
-          <View style={styles.flash}>
-            <FontAwesome name="check-circle" size={14} color={homeShell.greenDark} />
-            <Text style={[styles.flashTxt, rtl && styles.rtlText]}>{moduleFlash}</Text>
-          </View>
-        ) : null}
-      </View>
-
       <View style={styles.body}>{children}</View>
 
       <View style={[styles.footer, rtl && styles.footerRtl]}>
@@ -152,6 +141,7 @@ export function OrientationDiagnosticWizardShell({
           accessibilityRole="button"
           style={({ pressed }) => [
             styles.backBtn,
+            rtl && styles.btnRtl,
             (backDisabled || busy) && styles.backBtnDisabled,
             pressed && !backDisabled && !busy && { opacity: 0.9 },
           ]}>
@@ -201,6 +191,7 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   headerRtl: { flexDirection: 'row-reverse' },
+  btnRtl: { flexDirection: 'row-reverse' },
   quitBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -222,6 +213,11 @@ const styles = StyleSheet.create({
     fontWeight: '800',
   },
   headerSpacer: { minWidth: 88 },
+  langRow: {
+    alignItems: 'center',
+    backgroundColor: brand.primary,
+    paddingBottom: spacing.sm,
+  },
   resetBtn: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -264,26 +260,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', backgroundColor: brand.white },
-  moduleBanner: {
-    marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
-    padding: spacing.md,
-    backgroundColor: brand.white,
-    borderRadius: radius.lg,
-    borderWidth: 1,
-    borderColor: homeShell.borderOnWhite,
-    gap: 4,
-  },
-  moduleLabel: { fontSize: fontSize.md, fontWeight: '800', color: brand.primary },
-  moduleObjective: { fontSize: fontSize.sm, color: brand.textMuted, lineHeight: 20 },
-  flash: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    marginTop: 4,
-    paddingVertical: 4,
-  },
-  flashTxt: { fontSize: fontSize.xs, color: homeShell.greenDark, fontWeight: '600' },
   body: { flex: 1, paddingHorizontal: spacing.md },
   footer: {
     flexDirection: 'row',

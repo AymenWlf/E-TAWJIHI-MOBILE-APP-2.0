@@ -53,6 +53,16 @@ export type EstablishmentFollowsPayload = {
  * et la liste `availableStatuses` (union des annonces de l'école) pour
  * piloter le sheet de modification de statut.
  */
+/** Compte les suivis sans charger les fiches écoles. */
+export async function fetchEstablishmentFollowCount(accessToken: string): Promise<number> {
+  const url = buildApiUrl('/api/establishment-follows', { countOnly: '1' });
+  const res = await httpGetJson<{ success?: boolean; data?: { count?: number } }>(url, {
+    headers: bearerHeaders(accessToken),
+  });
+  const count = res.data?.count;
+  return typeof count === 'number' && Number.isFinite(count) ? count : 0;
+}
+
 export async function fetchEstablishmentFollows(
   accessToken: string,
   options?: { throwOnError?: boolean },

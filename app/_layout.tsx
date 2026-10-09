@@ -78,6 +78,8 @@ export default function RootLayout() {
   const [showSplashOverlay, setShowSplashOverlay] = useState(true);
   const [splashAnimDone, setSplashAnimDone] = useState(false);
   const [bootstrapDone, setBootstrapDone] = useState(false);
+  const [fontsTimedOut, setFontsTimedOut] = useState(false);
+  const markBootstrapDone = useCallback(() => setBootstrapDone(true), []);
   const nativeSplashHiddenRef = useRef(false);
 
   const hideNativeSplashOnce = useCallback(async () => {
@@ -91,10 +93,15 @@ export default function RootLayout() {
   }, []);
 
   useEffect(() => {
-    if (!loaded) return;
+    const t = setTimeout(() => setFontsTimedOut(true), 4000);
+    return () => clearTimeout(t);
+  }, []);
+
+  useEffect(() => {
+    if (!loaded && !fontsTimedOut) return;
     void hideNativeSplashOnce();
     void resolveAppLaunchIntent();
-  }, [loaded, hideNativeSplashOnce]);
+  }, [loaded, fontsTimedOut, hideNativeSplashOnce]);
 
   useEffect(() => {
     if (splashAnimDone && bootstrapDone) {
@@ -102,7 +109,12 @@ export default function RootLayout() {
     }
   }, [splashAnimDone, bootstrapDone]);
 
-  if (!loaded) {
+  useEffect(() => {
+    const t = setTimeout(() => setShowSplashOverlay(false), 4500);
+    return () => clearTimeout(t);
+  }, []);
+
+  if (!loaded && !fontsTimedOut) {
     return <View style={splashStyles.bootPlaceholder} />;
   }
 
@@ -118,7 +130,7 @@ export default function RootLayout() {
                   <SchoolDiagnosticRecommendationsProvider>
                     <GlobalWallUnreadProvider>
                       <ShopCartProvider>
-                        <RootLayoutNav onBootstrapComplete={() => setBootstrapDone(true)} />
+                        <RootLayoutNav onBootstrapComplete={markBootstrapDone} />
                       </ShopCartProvider>
                     </GlobalWallUnreadProvider>
                   </SchoolDiagnosticRecommendationsProvider>

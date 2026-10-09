@@ -100,6 +100,16 @@ type ClaimPromoResponse = {
   message?: string;
 };
 
+/** Nombre de parrainages qualifiés, sans reconstruire le programme. */
+export async function fetchReferralQualifiedCount(accessToken: string): Promise<number> {
+  const url = buildApiUrl('/api/user/referral/summary');
+  const res = await httpGetJson<{ success?: boolean; data?: { qualifiedAffiliateCount?: number } }>(url, {
+    headers: { Authorization: `Bearer ${accessToken}` },
+  });
+  const count = res.data?.qualifiedAffiliateCount;
+  return typeof count === 'number' && Number.isFinite(count) ? count : 0;
+}
+
 export async function fetchUserReferralProgram(accessToken: string): Promise<UserReferralProgram | null> {
   const url = buildApiUrl('/api/user/referral');
   const res = await httpGetJson<ReferralResponse>(url, {

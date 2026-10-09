@@ -35,14 +35,14 @@ export function OrientationDiagnosticBriefScreen({
   if (kind === 'situation') {
     return (
       <View style={[styles.wrap, rtl && styles.wrapRtl]}>
-        <View style={styles.hero}>
+        <View style={[styles.hero, rtl && styles.heroRtl]}>
           <View style={styles.iconCircle}>
             <FontAwesome name="balance-scale" size={26} color={brand.primary} />
           </View>
-          <Text style={[styles.title, rtl && styles.rtlText]}>
+          <Text style={[styles.title, rtl && styles.rtlBlock]}>
             {tOd(uiLocale, 'situationBriefTitle')}
           </Text>
-          <Text style={[styles.sub, rtl && styles.rtlText]}>
+          <Text style={[styles.sub, rtl && styles.rtlBlock]}>
             {tOd(uiLocale, 'situationBriefSub')}
           </Text>
         </View>
@@ -66,7 +66,7 @@ export function OrientationDiagnosticBriefScreen({
 
         <View style={[styles.tipBox, rtl && styles.tipBoxRtl]}>
           <FontAwesome name="lightbulb-o" size={16} color={brand.primary} />
-          <Text style={[styles.tipTxt, rtl && styles.rtlText]}>{tOd(uiLocale, 'briefTip')}</Text>
+          <Text style={[styles.tipTxt, rtl && styles.rtlBlock]}>{tOd(uiLocale, 'briefTip')}</Text>
         </View>
       </View>
     );
@@ -74,14 +74,14 @@ export function OrientationDiagnosticBriefScreen({
 
   return (
     <View style={[styles.wrap, rtl && styles.wrapRtl]}>
-      <View style={styles.hero}>
+      <View style={[styles.hero, rtl && styles.heroRtl]}>
         <View style={styles.iconCircle}>
           <FontAwesome name="random" size={26} color={brand.primary} />
         </View>
-        <Text style={[styles.title, rtl && styles.rtlText]}>
+        <Text style={[styles.title, rtl && styles.rtlBlock]}>
           {tOd(uiLocale, 'versusBriefTitle')}
         </Text>
-        <Text style={[styles.sub, rtl && styles.rtlText]}>
+        <Text style={[styles.sub, rtl && styles.rtlBlock]}>
           {tOd(uiLocale, 'versusBriefSub')}
         </Text>
       </View>
@@ -105,7 +105,7 @@ export function OrientationDiagnosticBriefScreen({
 
       <View style={[styles.tipBox, rtl && styles.tipBoxRtl]}>
         <FontAwesome name="info-circle" size={16} color={brand.primary} />
-        <Text style={[styles.tipTxt, rtl && styles.rtlText]}>{tOd(uiLocale, 'versusNote')}</Text>
+        <Text style={[styles.tipTxt, rtl && styles.rtlBlock]}>{tOd(uiLocale, 'versusNote')}</Text>
       </View>
     </View>
   );
@@ -137,12 +137,12 @@ function BriefCard({
           { backgroundColor: palette.badge },
           rtl && styles.badgeRtl,
         ]}>
-        <Text style={styles.badgeTxt}>{badge}</Text>
+        <Text style={[styles.badgeTxt, rtl && styles.badgeTxtRtl]}>{badge}</Text>
       </View>
-      <Text style={[styles.cardTitle, { color: palette.text }, rtl && styles.rtlText]}>
+      <Text style={[styles.cardTitle, { color: palette.text }, rtl && styles.rtlBlock]}>
         {title}
       </Text>
-      <Text style={[styles.cardBody, { color: palette.text }, rtl && styles.rtlText]}>{body}</Text>
+      <Text style={[styles.cardBody, { color: palette.text }, rtl && styles.rtlBlock]}>{body}</Text>
     </View>
   );
 }
@@ -159,12 +159,14 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
     paddingHorizontal: spacing.xs,
   },
+  heroRtl: { ...DIR_RTL, alignItems: 'stretch' },
   iconCircle: {
     width: 64,
     height: 64,
     borderRadius: 32,
     backgroundColor: diagnosticTheme.primarySoft,
     alignItems: 'center',
+    alignSelf: 'center',
     justifyContent: 'center',
     marginBottom: 4,
   },
@@ -188,7 +190,7 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     gap: 6,
   },
-  cardRtl: { alignItems: 'flex-end' },
+  cardRtl: { ...DIR_RTL, alignItems: 'stretch' },
   badge: {
     alignSelf: 'flex-start',
     paddingHorizontal: 10,
@@ -196,13 +198,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     marginBottom: 2,
   },
-  badgeRtl: { alignSelf: 'flex-end' },
+  badgeRtl: { alignSelf: 'flex-start' },
   badgeTxt: {
     color: brand.white,
     fontSize: 11,
     fontWeight: '800',
     letterSpacing: 0.8,
   },
+  badgeTxtRtl: { writingDirection: 'rtl', textAlign: 'right', letterSpacing: 0 },
   cardTitle: {
     fontSize: fontSize.md,
     fontWeight: '800',
@@ -230,5 +233,10 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     fontWeight: '600',
   },
-  rtlText: { writingDirection: 'rtl', textAlign: 'right' },
+  rtlBlock: {
+    writingDirection: 'rtl',
+    textAlign: 'right',
+    alignSelf: 'stretch',
+    width: '100%',
+  },
 });

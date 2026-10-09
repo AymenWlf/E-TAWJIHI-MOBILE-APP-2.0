@@ -20,6 +20,9 @@ export type ModernSectorFamily = {
   key: string;
   /** Mots-clés matchés sur titre / code secteur API */
   match: string[];
+  /** Libellé affiché quand le métier n’a pas de secteur API */
+  titre: string;
+  titreAr: string;
   metiers: ModernMetierSeed[];
 };
 
@@ -28,6 +31,8 @@ const MAD = (min: number, max: number) => ({ salaireMin: min, salaireMax: max })
 export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   {
     key: 'tech',
+    titre: 'Technologies et numérique',
+    titreAr: 'التكنولوجيا والرقمنة',
     match: [
       'tech',
       'technologie',
@@ -54,6 +59,8 @@ export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   },
   {
     key: 'inge',
+    titre: 'Ingénierie et industrie',
+    titreAr: 'الهندسة والصناعة',
     match: ['ingénieur', 'ingenieur', 'industrie', 'industriel', 'mécanique', 'mecanique', 'électr', 'electr', 'génie', 'genie'],
     metiers: [
       { id: 'mm_inge_1', nom: 'Ingénieur Industriel / Lean', nomArabe: 'مهندس صناعي / Lean', descriptionAr: 'تحسين الإنتاج والجودة وسلسلة التوريد والتحسين المستمر.', slug: 'ingenieur-industriel', ...MAD(11000, 22000), niveauAccessibilite: 'Accessible', description: 'Optimisation production, qualité, supply.' },
@@ -68,6 +75,8 @@ export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   },
   {
     key: 'data',
+    titre: 'Data et analyse',
+    titreAr: 'البيانات والتحليل',
     match: ['data', 'analyse', 'statistique', 'analytics', 'business intelligence', 'bi '],
     metiers: [
       { id: 'mm_data_1', nom: 'Data Analyst', nomArabe: 'محلل بيانات', descriptionAr: 'لوحات القيادة ورؤى الأعمال والتقارير الداعمة للقرار.', slug: 'data-analyst', ...MAD(11000, 22000), niveauAccessibilite: 'Accessible', description: 'Tableaux de bord, insights business.' },
@@ -82,6 +91,8 @@ export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   },
   {
     key: 'finance',
+    titre: 'Finance et gestion',
+    titreAr: 'المالية والتدبير',
     match: ['finance', 'gestion', 'comptab', 'audit', 'banque', 'assurance', 'économ', 'econom'],
     metiers: [
       { id: 'mm_fin_1', nom: 'Analyste Financier', nomArabe: 'محلل مالي', descriptionAr: 'التحليل المالي والتقارير وقرارات الاستثمار.', slug: 'analyste-financier', ...MAD(11000, 24000), niveauAccessibilite: 'Accessible', description: 'Analyse financière, reporting, décisions d’investissement.' },
@@ -97,6 +108,8 @@ export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   },
   {
     key: 'conseil',
+    titre: 'Conseil et gestion de projet',
+    titreAr: 'الاستشارة وإدارة المشاريع',
     match: ['conseil', 'stratégie', 'strategie', 'consulting', 'management', 'organisation'],
     metiers: [
       { id: 'mm_cons_1', nom: 'Consultant Stratégie', nomArabe: 'استشاري استراتيجية', descriptionAr: 'استشارات الإدارة والتحول والنمو.', slug: 'consultant-strategie', ...MAD(14000, 30000), niveauAccessibilite: 'Sélectif', description: 'Conseil direction, transformation, growth.' },
@@ -111,6 +124,8 @@ export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   },
   {
     key: 'marketing',
+    titre: 'Marketing et communication',
+    titreAr: 'التسويق والتواصل',
     match: ['marketing', 'communication', 'média', 'media', 'marque', 'brand', 'publicité', 'publicite'],
     metiers: [
       { id: 'mm_mkt_1', nom: 'Growth Marketer', nomArabe: 'مسوّق نمو', descriptionAr: 'الاكتساب الرقمي ومسارات التحويل والتسويق القائم على الأداء.', slug: 'growth-marketer', ...MAD(10000, 22000), niveauAccessibilite: 'Accessible', description: 'Acquisition digitale, funnels, performance.' },
@@ -125,6 +140,8 @@ export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   },
   {
     key: 'design',
+    titre: 'Design et création',
+    titreAr: 'التصميم والإبداع',
     match: ['design', 'création', 'creation', 'créatif', 'creatif', 'arts', 'graphique', 'architecture'],
     metiers: [
       { id: 'mm_des_1', nom: 'Product Designer', nomArabe: 'مصمم منتج', descriptionAr: 'تصميم المنتجات الرقمية من البداية إلى النهاية.', slug: 'product-designer', ...MAD(11000, 24000), niveauAccessibilite: 'Sélectif', description: 'Design de produits digitaux end-to-end.' },
@@ -139,6 +156,8 @@ export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   },
   {
     key: 'sante',
+    titre: 'Santé',
+    titreAr: 'الصحة',
     match: ['santé', 'sante', 'médic', 'medic', 'soin', 'pharma', 'bioméd', 'biomed', 'paraméd', 'paramed'],
     metiers: [
       { id: 'mm_san_1', nom: 'Médecin (parcours)', nomArabe: 'طبيب (مسار)', descriptionAr: 'الرعاية والتشخيص والتخصص طويل الأمد.', slug: 'medecin', ...MAD(15000, 40000), niveauAccessibilite: 'Très sélectif', description: 'Soins, diagnostic, spécialisation longue.' },
@@ -153,6 +172,8 @@ export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   },
   {
     key: 'edu',
+    titre: 'Éducation et formation',
+    titreAr: 'التعليم والتكوين',
     match: ['éduc', 'educ', 'formation', 'enseignement', 'pédagog', 'pedagog', 'rh ', 'ressources humaines'],
     metiers: [
       { id: 'mm_edu_1', nom: 'Enseignant / Formateur', nomArabe: 'أستاذ / مكوّن', descriptionAr: 'نقل المعرفة والبيداغوجيا ومتابعة المتعلمين.', slug: 'enseignant-formateur', ...MAD(7000, 16000), niveauAccessibilite: 'Accessible', description: 'Transmission, pédagogie, suivi élèves.' },
@@ -167,6 +188,8 @@ export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   },
   {
     key: 'droit',
+    titre: 'Droit et justice',
+    titreAr: 'القانون والعدالة',
     match: ['droit', 'juridique', 'loi', 'notariat', 'avocat'],
     metiers: [
       { id: 'mm_dro_1', nom: 'Juriste d’entreprise', nomArabe: 'مستشار قانوني للمقاولة', descriptionAr: 'العقود والامتثال والاستشارة القانونية الداخلية.', slug: 'juriste-entreprise', ...MAD(11000, 24000), niveauAccessibilite: 'Sélectif', description: 'Contrats, conformité, conseil interne.' },
@@ -181,6 +204,8 @@ export const MODERN_SECTOR_METIERS: ModernSectorFamily[] = [
   },
   {
     key: 'default',
+    titre: 'Métiers transverses',
+    titreAr: 'مهن متعددة القطاعات',
     match: [],
     metiers: [
       { id: 'mm_def_1', nom: 'Chef de Projet', nomArabe: 'رئيس مشروع', descriptionAr: 'تنسيق الفرق والتخطيط والمخرجات.', slug: 'chef-de-projet', ...MAD(11000, 23000), niveauAccessibilite: 'Accessible', description: 'Coordination d’équipes et livrables.' },
@@ -210,6 +235,37 @@ export function matchModernFamily(secteurTitre: string, code?: string): ModernSe
     if (fam.match.some((m) => hay.includes(norm(m)))) return fam;
   }
   return MODERN_SECTOR_METIERS.find((f) => f.key === 'default')!;
+}
+
+/** Retrouve le couple FR + AR d’un métier du catalogue, même si le libellé stocké n’a qu’une langue. */
+export function findModernMetierName(
+  id: string,
+  label: string,
+): { nom: string; nomArabe: string; secteurTitre: string; secteurTitreAr: string } | null {
+  const raw = label.trim();
+  const splitAt = raw.indexOf(' · ');
+  const frPart = splitAt > 0 ? raw.slice(0, splitAt).trim() : raw;
+  const arPart = splitAt > 0 ? raw.slice(splitAt + 3).trim() : raw;
+  const same = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+  for (const fam of MODERN_SECTOR_METIERS) {
+    for (const m of fam.metiers) {
+      const idHit = id === m.id || id.startsWith(`${m.id}_`);
+      const nameHit =
+        same(m.nom, frPart) ||
+        same(m.nomArabe, arPart) ||
+        same(m.nom, raw) ||
+        same(m.nomArabe, raw);
+      if (idHit || nameHit) {
+        return {
+          nom: m.nom,
+          nomArabe: m.nomArabe,
+          secteurTitre: fam.titre,
+          secteurTitreAr: fam.titreAr,
+        };
+      }
+    }
+  }
+  return null;
 }
 
 /** 7–10 métiers modernes pour un secteur (titre API). */

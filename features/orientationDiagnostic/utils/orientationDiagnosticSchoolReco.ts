@@ -700,7 +700,9 @@ function scoreEstablishment(
     admissionType: e.admissionType ?? null,
     admissionLabel: resolveAdmissionDisplayLabel(e),
     facultePubliqueAccesOuvert: isFacultePubliqueAccesOuvert(e),
-    logo: e.logo || null,
+    logo:
+      ((e as Establishment & { media?: { logo?: string | null } }).media?.logo ?? e.logo)?.trim() ||
+      null,
     algorithmicScore: total,
     combinedScore: total,
     reasonsYes: yes,

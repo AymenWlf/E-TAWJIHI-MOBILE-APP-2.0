@@ -8,6 +8,7 @@ import {
   RECOMMENDATION_FOLLOW_MIN_COUNT,
   type RecommendationFollowCopyLocale,
 } from '@/constants/recommendationParcours';
+import { CAIRO } from '@/theme/arabicTypography';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
@@ -44,10 +45,10 @@ export function RecommendationFollowProgress({
           size={13}
           color={satisfied ? homeShell.greenDark : brand.primary}
         />
-        <Text style={[styles.title, isRTL && styles.rtlText]}>
+        <Text style={[styles.title, isRTL ? styles.rtlText : styles.ltrText, locale === 'ar' && styles.arabicFace]}>
           {formatRecommendationFollowProgressTitle(done, locale)}
         </Text>
-        <Text style={[styles.ratio, isRTL && styles.rtlText]} latinDigits>
+        <Text style={[styles.ratio, isRTL ? styles.rtlText : styles.ltrText]} latinDigits>
           {done}/{goal}
         </Text>
       </View>
@@ -60,7 +61,7 @@ export function RecommendationFollowProgress({
           ]}
         />
       </View>
-      <Text style={[styles.hint, isRTL && styles.rtlText]}>
+      <Text style={[styles.hint, isRTL ? styles.rtlText : styles.ltrText, locale === 'ar' && styles.arabicFace]}>
         {formatRecommendationFollowProgressHint(done, locale)}
       </Text>
     </View>
@@ -82,13 +83,13 @@ const styles = StyleSheet.create({
     borderColor: `${homeShell.greenDark}55`,
     backgroundColor: homeShell.greenAlpha18,
   },
-  wrapRtl: DIR_RTL,
+  wrapRtl: { ...DIR_RTL, alignItems: 'stretch' },
   headRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
   },
-  headRowRtl: { flexDirection: 'row-reverse' },
+  headRowRtl: { flexDirection: 'row' },
   title: {
     flex: 1,
     fontSize: fontSize.xs,
@@ -124,4 +125,6 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
   rtlText: { writingDirection: 'rtl', textAlign: 'right' },
+  ltrText: { writingDirection: 'ltr', textAlign: 'left' },
+  arabicFace: { fontFamily: CAIRO.bold },
 });

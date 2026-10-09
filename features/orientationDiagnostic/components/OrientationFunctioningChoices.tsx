@@ -2,7 +2,7 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
-import { diagnosticTheme } from '@/components/diagnostic/DiagnosticUi';
+import { diagnosticTheme, LIKERT_DEGREE_ICON } from '@/components/diagnostic/DiagnosticUi';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
@@ -53,6 +53,18 @@ export function FunctioningScaleChoices({
         {options.map((opt, index) => {
           const on = selectedId === opt.id;
           const n = index + 1;
+          const degreeIcon = LIKERT_DEGREE_ICON[opt.id];
+          const mark = (
+            <View style={[styles.numChip, on && styles.numChipOn]}>
+              {degreeIcon ? (
+                <FontAwesome name={degreeIcon} size={14} color={on ? brand.white : brand.primary} />
+              ) : (
+                <Text style={[styles.numChipTxt, on && styles.numChipTxtOn]} latinDigits>
+                  {n}
+                </Text>
+              )}
+            </View>
+          );
           return (
             <Pressable
               key={opt.id}
@@ -61,23 +73,34 @@ export function FunctioningScaleChoices({
               accessibilityState={{ selected: on }}
               style={({ pressed }) => [
                 styles.scaleRow,
-                rtl && styles.scaleRowRtl,
                 on && styles.scaleRowOn,
                 pressed && !on && styles.pressed,
               ]}>
-              <View style={[styles.numChip, on && styles.numChipOn]}>
-                <Text style={[styles.numChipTxt, on && styles.numChipTxtOn]} latinDigits>
-                  {n}
-                </Text>
-              </View>
-              <Text
-                style={[styles.scaleLabel, rtl && styles.rtlText, on && styles.scaleLabelOn]}
-                numberOfLines={3}>
-                {opt.label}
-              </Text>
-              <View style={[styles.checkSlot, on && styles.checkSlotOn]}>
-                {on ? <FontAwesome name="check" size={12} color={brand.white} /> : null}
-              </View>
+              {rtl ? (
+                <>
+                  <Text
+                    style={[styles.scaleLabel, styles.rtlText, on && styles.scaleLabelOn]}
+                    numberOfLines={3}>
+                    {opt.label}
+                  </Text>
+                  <View style={[styles.checkSlot, on && styles.checkSlotOn]}>
+                    {on ? <FontAwesome name="check" size={12} color={brand.white} /> : null}
+                  </View>
+                  {mark}
+                </>
+              ) : (
+                <>
+                  {mark}
+                  <Text
+                    style={[styles.scaleLabel, on && styles.scaleLabelOn]}
+                    numberOfLines={3}>
+                    {opt.label}
+                  </Text>
+                  <View style={[styles.checkSlot, on && styles.checkSlotOn]}>
+                    {on ? <FontAwesome name="check" size={12} color={brand.white} /> : null}
+                  </View>
+                </>
+              )}
             </Pressable>
           );
         })}
@@ -120,7 +143,7 @@ export function FunctioningBinaryChoices({
                 <Text style={[styles.letterTxt, on && styles.letterTxtOn]}>{letter}</Text>
               </View>
               {on ? (
-                <View style={styles.pickedPill}>
+                <View style={[styles.pickedPill, rtl && styles.pickedPillRtl]}>
                   <FontAwesome name="check" size={11} color={homeShell.greenDark} />
                   <Text style={styles.pickedPillTxt}>{rtl ? 'مختار' : 'Choisi'}</Text>
                 </View>
@@ -188,14 +211,27 @@ export function FunctioningDilemmaChoices({
           value === 50 && styles.midBtnOn,
           pressed && value !== 50 && styles.pressed,
         ]}>
-        <FontAwesome
-          name="balance-scale"
-          size={14}
-          color={value === 50 ? brand.primary : brand.textMuted}
-        />
-        <Text style={[styles.midTxt, rtl && styles.rtlText, value === 50 && styles.midTxtOn]}>
-          {midLabel}
-        </Text>
+        {rtl ? (
+          <>
+            <Text style={[styles.midTxt, styles.rtlText, value === 50 && styles.midTxtOn]}>
+              {midLabel}
+            </Text>
+            <FontAwesome
+              name="balance-scale"
+              size={14}
+              color={value === 50 ? brand.primary : brand.textMuted}
+            />
+          </>
+        ) : (
+          <>
+            <FontAwesome
+              name="balance-scale"
+              size={14}
+              color={value === 50 ? brand.primary : brand.textMuted}
+            />
+            <Text style={[styles.midTxt, value === 50 && styles.midTxtOn]}>{midLabel}</Text>
+          </>
+        )}
       </Pressable>
     </View>
   );
@@ -240,7 +276,6 @@ const styles = StyleSheet.create({
     borderColor: homeShell.borderOnWhite,
     backgroundColor: brand.white,
   },
-  scaleRowRtl: { flexDirection: 'row-reverse' },
   scaleRowOn: {
     borderColor: homeShell.green,
     backgroundColor: homeShell.greenSurface,
@@ -323,6 +358,7 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     backgroundColor: homeShell.greenSurfaceStrong,
   },
+  pickedPillRtl: { flexDirection: 'row-reverse' },
   pickedPillTxt: { fontSize: 11, fontWeight: '800', color: homeShell.greenDark },
   binaryLabel: {
     fontSize: fontSize.md,

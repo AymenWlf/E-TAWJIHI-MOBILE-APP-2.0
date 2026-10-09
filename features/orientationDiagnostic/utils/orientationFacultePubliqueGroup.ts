@@ -1,5 +1,8 @@
 import { normalizeAdmissionType } from '../constants/establishmentAdmissionType';
 
+/** Diplômes affichés pour le groupe universités / facultés publiques. */
+export const FACULTES_PUBLIQUES_DIPLOMES = ['Deug', 'Licence', 'Master', 'Doctorat'] as const;
+
 type SchoolLike = {
   facultePubliqueAccesOuvert?: boolean | null;
   type?: string | null;

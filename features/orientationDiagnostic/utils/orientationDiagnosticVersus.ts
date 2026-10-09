@@ -1,4 +1,8 @@
-import { modernMetiersForSecteur } from '../data/orientationDiagnosticModernMetiers';
+import {
+  findModernMetierName,
+  MODERN_SECTOR_METIERS,
+  modernMetiersForSecteur,
+} from '../data/orientationDiagnosticModernMetiers';
 import {
   formatBilingualName,
   pickMetierDisplayName,
@@ -18,7 +22,10 @@ import {
   normalizeOrientationPlan,
   orientationPlanSortRank,
 } from '../constants/establishmentOrientationPlan';
-import { isFacultePubliqueAccesOuvert } from './orientationFacultePubliqueGroup';
+import {
+  FACULTES_PUBLIQUES_DIPLOMES,
+  isFacultePubliqueAccesOuvert,
+} from './orientationFacultePubliqueGroup';
 import type { DiagnosticAnswers } from '../types/orientationDiagnosticPrototype';
 import type { DiagnosticStep } from '../types/orientationDiagnosticPrototype';
 
@@ -36,21 +43,50 @@ export type VersusRound = 'R16' | 'QF' | 'SF' | 'FINAL';
 export type VersusSchoolOption = {
   id: string;
   label: string;
+  nom?: string;
+  nomArabe?: string | null;
+  sigle?: string;
+  ville?: string | null;
+  dureeEtudes?: string | null;
+  diplomes?: string[];
+  logo?: string | null;
   orientationPlan?: 'A' | 'B' | 'C' | 'D' | null;
   admissionType?: string | null;
   admissionLabel?: string | null;
   /** Rang de seed 1–16 (1 = favori) */
   seed?: number;
+  /** Secteur associé (libellé bilingue « FR · AR » quand les deux existent) */
+  secteurLabel?: string | null;
 };
 
-export function facultesPubliquesVersusOption(): VersusSchoolOption {
+function establishmentLogoPath(e: Establishment): string | null {
+  const raw =
+    (e as Establishment & { media?: { logo?: string | null } }).media?.logo ?? e.logo;
+  const text = typeof raw === 'string' ? raw.trim() : '';
+  return text || null;
+}
+
+export function facultesPubliquesVersusOption(logo?: string | null): VersusSchoolOption {
   return {
     id: VERSUS_FACULTES_PUBLIQUES_ID,
     label: 'Universités et facultés publiques',
+    nom: 'Universités et facultés publiques',
+    nomArabe: 'الجامعات والكليات العمومية',
+    logo: logo || null,
+    diplomes: [...FACULTES_PUBLIQUES_DIPLOMES],
     orientationPlan: null,
     admissionType: 'acces_ouvert',
     admissionLabel: 'Accès ouvert',
   };
+}
+
+function facultePubliqueSampleLogo(list: Establishment[]): string | null {
+  for (const school of list) {
+    if (!isFacultePubliqueAccesOuvert(school)) continue;
+    const logo = establishmentLogoPath(school);
+    if (logo) return logo;
+  }
+  return null;
 }
 
 export type VersusDuel = {
@@ -156,10 +192,83 @@ function schoolLabel(e: Establishment): string {
   return city && city !== '—' ? `${name} (${city})` : name;
 }
 
+function schoolCitiesLabel(e: Establishment): string | null {
+  const names: string[] = [];
+  const seen = new Set<string>();
+  const push = (value?: string | null) => {
+    const text = (value || '').trim();
+    if (!text) return;
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    names.push(text);
+  };
+  if (Array.isArray(e.campus)) {
+    for (const campus of e.campus) {
+      if (!campus || typeof campus !== 'object') continue;
+      const row = campus as {
+        ville?: string | { titre?: string } | null;
+        city?: { titre?: string } | string | null;
+      };
+      if (typeof row.ville === 'string') push(row.ville);
+      else if (row.ville && typeof row.ville === 'object') push(row.ville.titre);
+      else if (typeof row.city === 'string') push(row.city);
+      else if (row.city && typeof row.city === 'object') push(row.city.titre);
+    }
+  }
+  if (!names.length) {
+    push(e.ville);
+    push(e.location?.ville);
+    if (Array.isArray(e.villes)) e.villes.forEach((ville) => push(typeof ville === 'string' ? ville : ''));
+  }
+  return names.length ? names.join(' · ') : null;
+}
+
+function schoolDureeLabel(e: Establishment): string | null {
+  const raw = e.dureeEtudes;
+  if (typeof raw === 'string' && raw.trim()) {
+    const text = raw.trim();
+    return /\bans?\b/i.test(text) ? text : `${text} ans`;
+  }
+  if (typeof raw === 'number' && Number.isFinite(raw) && raw > 0) return `${raw} ans`;
+  const min = e.dureeEtudesMin;
+  const max = e.dureeEtudesMax;
+  if (min != null && max != null && min > 0 && max > 0) {
+    return min === max ? `${min} ans` : `${min}-${max} ans`;
+  }
+  if (max != null && max > 0) return `${max} ans`;
+  if (min != null && min > 0) return `${min} ans`;
+  const years = e.anneesEtudes;
+  if (typeof years === 'number' && Number.isFinite(years) && years > 0) return `${years} ans`;
+  if (typeof years === 'string' && years.trim()) {
+    const text = years.trim();
+    return /\bans?\b/i.test(text) ? text : `${text} ans`;
+  }
+  return null;
+}
+
+function schoolDiplomes(e: Establishment): string[] {
+  const extra = e as Establishment & { diplomes?: string[] | null };
+  const raw = [
+    ...(Array.isArray(e.diplomesDelivres) ? e.diplomesDelivres : []),
+    ...(Array.isArray(extra.diplomes) ? extra.diplomes : []),
+  ]
+    .map((item) => String(item || '').trim())
+    .filter(Boolean);
+  return [...new Set(raw)];
+}
+
 export function schoolVersusOption(e: Establishment): VersusSchoolOption {
   return {
     id: String(e.id),
     label: schoolLabel(e),
+    nom: (e.nom || '').trim() || undefined,
+    nomArabe: e.nomArabe?.trim() || null,
+    sigle: e.sigle?.trim() || undefined,
+    ville: schoolCitiesLabel(e),
+    dureeEtudes: schoolDureeLabel(e),
+    diplomes: schoolDiplomes(e),
+    logo: e.logo || null,
     orientationPlan: normalizeOrientationPlan(e.orientationPlan),
     admissionType: e.admissionType ?? null,
     admissionLabel: resolveAdmissionDisplayLabel(e),
@@ -306,16 +415,38 @@ function metiersBySector(
   return groups;
 }
 
+function metierSectorLabel(id: string, preferred?: string | null): string | undefined {
+  const direct = (preferred || '').trim();
+  if (direct && !/^Secteur \d+$/i.test(direct)) return direct;
+  const found = findModernMetierName(id, '');
+  if (found?.secteurTitre) return formatBilingualName(found.secteurTitre, found.secteurTitreAr);
+  return direct || undefined;
+}
+
+function withMetierSector(opt: VersusSchoolOption, preferred?: string | null): VersusSchoolOption {
+  const secteurLabel = metierSectorLabel(opt.id, preferred ?? opt.secteurLabel);
+  return secteurLabel ? { ...opt, secteurLabel } : opt;
+}
+
 async function selectMetierField16(
   answers: DiagnosticAnswers,
 ): Promise<VersusSchoolOption[]> {
   const labels = answers.labels || {};
   const selectedIds = flattenSelectedMetierIds(answers.multi);
   const scored = new Map<string, { opt: VersusSchoolOption; score: number }>();
+  const sectorByMetierId = new Map<string, string>();
+  for (const group of metiersBySector(answers)) {
+    for (const metier of group.metiers) {
+      if (group.sectorLabel) sectorByMetierId.set(metier.id, group.sectorLabel);
+    }
+  }
 
   selectedIds.forEach((id, i) => {
     scored.set(id, {
-      opt: { id, label: labels[id] || id },
+      opt: withMetierSector(
+        { id, label: labels[id] || id },
+        sectorByMetierId.get(id),
+      ),
       score: 1000 - i, // ordre de sélection
     });
   });
@@ -338,7 +469,10 @@ async function selectMetierField16(
           if (!prev || prev.score < bonus) {
             const mLabel = pickMetierDisplayName(m) || m.nom;
             scored.set(id, {
-              opt: { id, label: labels[id] || mLabel },
+              opt: withMetierSector(
+                { id, label: labels[id] || mLabel },
+                titre || m.secteur?.titre || sectorByMetierId.get(id),
+              ),
               score: selectedIds.includes(id) ? (prev?.score ?? 1000) : bonus,
             });
           }
@@ -352,7 +486,10 @@ async function selectMetierField16(
       const prev = scored.get(m.id);
       if (!prev) {
         scored.set(m.id, {
-          opt: { id: m.id, label: formatBilingualName(m.nom, m.nomArabe) },
+          opt: withMetierSector(
+            { id: m.id, label: formatBilingualName(m.nom, m.nomArabe) },
+            titre,
+          ),
           score: bonus,
         });
       }
@@ -367,10 +504,83 @@ async function selectMetierField16(
         if (scored.size >= VERSUS_FIELD_SIZE) break;
         if (!scored.has(m.id)) {
           scored.set(m.id, {
-            opt: { id: m.id, label: formatBilingualName(m.nom, m.nomArabe) },
+            opt: withMetierSector(
+              { id: m.id, label: formatBilingualName(m.nom, m.nomArabe) },
+            ),
             score: 40 + (m.salaireMax || 0) / 500,
           });
         }
+      }
+    }
+  }
+
+  // Moins de 16 : d’abord d’autres métiers des secteurs choisis, puis les familles les plus proches.
+  if (scored.size < VERSUS_FIELD_SIZE) {
+    try {
+      const res = await metierService.getAll({ limit: 80, afficherDansTest: true });
+      if (res.success && res.data) {
+        const preferred = new Set(sectorIds);
+        const extras = [...res.data].sort((a, b) => {
+          const aHit = a.secteur?.id != null && preferred.has(a.secteur.id) ? 1 : 0;
+          const bHit = b.secteur?.id != null && preferred.has(b.secteur.id) ? 1 : 0;
+          if (aHit !== bHit) return bHit - aHit;
+          return metierSalary(b) - metierSalary(a);
+        });
+        for (const m of extras) {
+          if (scored.size >= VERSUS_FIELD_SIZE) break;
+          if (m.id == null) continue;
+          const id = String(m.id);
+          const label = labels[id] || pickMetierDisplayName(m) || m.nom;
+          if (scored.has(id) || scoredHasMetierName(scored, label)) continue;
+          const sameSector = m.secteur?.id != null && preferred.has(m.secteur.id);
+          if (!sameSector && preferred.size > 0) continue;
+          const sectorName =
+            (m.secteur?.id != null ? labels[String(m.secteur.id)] : '') || m.secteur?.titre || '';
+          scored.set(id, {
+            opt: withMetierSector({ id, label }, sectorName),
+            score: 180 + Math.min(40, metierSalary(m) / 400),
+          });
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (scored.size < VERSUS_FIELD_SIZE) {
+    const sectorTitles = sectorIds
+      .map((sid) => labels[String(sid)] || '')
+      .filter(Boolean);
+    const hay = sectorTitles.map((t) => norm(t)).join(' ');
+    const families = MODERN_SECTOR_METIERS.map((fam) => {
+      const hits =
+        fam.key === 'default'
+          ? 0
+          : fam.match.filter((token) => hay.includes(norm(token))).length;
+      return { fam, hits };
+    }).sort(
+      (a, b) =>
+        b.hits - a.hits ||
+        (a.fam.key === 'default' ? 1 : 0) - (b.fam.key === 'default' ? 1 : 0),
+    );
+
+    for (const { fam, hits } of families) {
+      if (scored.size >= VERSUS_FIELD_SIZE) break;
+      const compat = hits > 0 ? 120 : fam.key === 'default' ? 70 : 45;
+      for (const m of fam.metiers) {
+        if (scored.size >= VERSUS_FIELD_SIZE) break;
+        const already =
+          scored.has(m.id) ||
+          [...scored.keys()].some((k) => k === m.id || k.startsWith(`${m.id}_`));
+        const label = formatBilingualName(m.nom, m.nomArabe);
+        if (already || scoredHasMetierName(scored, label)) continue;
+        scored.set(`${m.id}_compat`, {
+          opt: withMetierSector(
+            { id: `${m.id}_compat`, label },
+            formatBilingualName(fam.titre, fam.titreAr),
+          ),
+          score: compat + Math.min(20, (m.salaireMax || 0) / 800),
+        });
       }
     }
   }
@@ -409,7 +619,7 @@ async function selectEcoleField16(
 
   let list: Establishment[] = [];
   try {
-    const res = await establishmentService.getAll({ limit: 300, isActive: true });
+    const res = await establishmentService.getAll({ limit: 500, isActive: true });
     list = (res.data || []).filter((e) => e.isActive !== false);
   } catch {
     list = [];
@@ -480,6 +690,11 @@ async function selectEcoleField16(
     bumpScore(id, schoolVersusOption(e), score);
   }
 
+  const faculteGroup = scored.get(VERSUS_FACULTES_PUBLIQUES_ID);
+  if (faculteGroup) {
+    faculteGroup.opt = facultesPubliquesVersusOption(facultePubliqueSampleLogo(list));
+  }
+
   const ranked = [...scored.values()]
     .sort((a, b) => b.score - a.score)
     .map((x) => x.opt)
@@ -494,7 +709,7 @@ async function selectEcoleField16(
     for (const id of selectedIds.slice(0, 16)) {
       if (faculteIds.has(id)) {
         if (!hasFaculteGroup) {
-          collapsed.push(facultesPubliquesVersusOption());
+          collapsed.push(facultesPubliquesVersusOption(facultePubliqueSampleLogo(list)));
           hasFaculteGroup = true;
         }
         continue;
@@ -514,20 +729,6 @@ async function selectEcoleField16(
       if (field.length >= VERSUS_FIELD_SIZE) break;
       if (!field.some((f) => f.id === item.id)) field.push(item);
     }
-  }
-
-  // Dernier recours : cloner avec suffixe pour atteindre 16 (rare) — pas le groupe facultés
-  let pad = 0;
-  const clonePool = field.filter((f) => f.id !== VERSUS_FACULTES_PUBLIQUES_ID);
-  const pool = clonePool.length > 0 ? clonePool : field;
-  while (field.length < VERSUS_FIELD_SIZE && pool.length > 0) {
-    const base = pool[pad % pool.length];
-    field.push({
-      ...base,
-      id: `${base.id}__alt${pad}`,
-      label: `${base.label} (piste ${pad + 1})`,
-    });
-    pad += 1;
   }
 
   return withSeeds(field.slice(0, VERSUS_FIELD_SIZE));
@@ -675,12 +876,84 @@ export function versusPlanToSteps(plan: VersusDuel[]): DiagnosticStep[] {
     options: d.options.map((o) => ({
       id: o.id,
       label: o.label,
+      nom: o.nom,
+      nomArabe: o.nomArabe,
+      sigle: o.sigle,
+      ville: o.ville,
+      dureeEtudes: o.dureeEtudes,
+      diplomes: o.diplomes,
+      logo: o.logo,
       orientationPlan: o.orientationPlan,
       admissionType: o.admissionType,
       admissionLabel: o.admissionLabel,
       seed: o.seed,
+      secteurLabel: o.secteurLabel,
     })),
   }));
+}
+
+function versusSchoolNeedsVisual(option: VersusSchoolOption): boolean {
+  if (option.id === VERSUS_FACULTES_PUBLIQUES_ID) {
+    return !option.logo || !(option.diplomes?.length);
+  }
+  return /^\d+$/.test(option.id) && !option.nom;
+}
+
+let versusSchoolVisualCache: Map<string, VersusSchoolOption> | null = null;
+
+/** Complète logo, diplômes et noms bilingues d’un tableau déjà enregistré. */
+export async function hydrateVersusSchoolVisuals(
+  answers: DiagnosticAnswers,
+): Promise<DiagnosticAnswers | null> {
+  const stored = [
+    ...(answers.versusField?.ecoles ?? []),
+    ...(answers.versusPlan ?? []).flatMap((duel) =>
+      duel.versusType === 'ecole' ? duel.options : [],
+    ),
+  ];
+  if (!stored.some(versusSchoolNeedsVisual)) return null;
+
+  if (!versusSchoolVisualCache) {
+    const fresh = await selectEcoleField16(answers);
+    versusSchoolVisualCache = new Map(fresh.map((option) => [option.id, option]));
+  }
+  const byId = versusSchoolVisualCache;
+  let changed = false;
+  const merge = (option: VersusSchoolOption): VersusSchoolOption => {
+    const next = byId.get(option.id);
+    if (!next?.nom && !next?.logo) return option;
+    if (option.id === VERSUS_FACULTES_PUBLIQUES_ID) {
+      if (option.logo && option.diplomes?.length) return option;
+      changed = true;
+      return {
+        ...option,
+        ...next,
+        id: option.id,
+        seed: option.seed ?? next.seed,
+      };
+    }
+    if (option.nom) return option;
+    changed = true;
+    return {
+      ...option,
+      ...next,
+      id: option.id,
+      seed: option.seed ?? next.seed,
+    };
+  };
+
+  const hydrated: DiagnosticAnswers = {
+    ...answers,
+    versusField: answers.versusField
+      ? { ...answers.versusField, ecoles: answers.versusField.ecoles.map(merge) }
+      : answers.versusField,
+    versusPlan: (answers.versusPlan ?? []).map((duel) =>
+      duel.versusType === 'ecole'
+        ? { ...duel, options: duel.options.map(merge) }
+        : duel,
+    ),
+  };
+  return changed ? hydrated : null;
 }
 
 /**

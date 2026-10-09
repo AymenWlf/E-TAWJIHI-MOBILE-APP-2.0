@@ -1,3 +1,4 @@
+import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { router } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
@@ -8,7 +9,8 @@ import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { postPlanReussiteStep } from '@/services/planReussiteSteps';
-import { brand, spacing } from '@/theme/tokens';
+import { homeShell } from '@/theme/homeShell';
+import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
   clearOrientationDiagnosticPrototypeDraft,
   completedModulesUpTo,
@@ -18,7 +20,7 @@ import {
 } from '../constants/orientationDiagnosticPrototypeStorage';
 import type { ModuleId } from '../types/orientationDiagnosticPrototype';
 import { buildOrientationCoreSteps } from '../data/orientationDiagnosticQuestions';
-import { localizeStep, tOd } from '../data/orientationDiagnosticI18n';
+import { localizeModuleMeta, localizeStep, tOd } from '../data/orientationDiagnosticI18n';
 import type { DiagnosticAnswers } from '../types/orientationDiagnosticPrototype';
 import {
   buildOrientationReport,
@@ -31,6 +33,7 @@ import { buildVersusPlan, versusPlanToSteps } from '../utils/orientationDiagnost
 import { submitOrientationAnswersAsSchoolRecommendations } from '@/utils/syncOrientationToSchoolRecommendations';
 import { OrientationDiagnosticBriefScreen } from './OrientationDiagnosticBriefScreen';
 import { OrientationDiagnosticStepContent } from './OrientationDiagnosticStepContent';
+import { OrientationCatalogDetailProvider } from './OrientationCatalogDetailSheet';
 import { OrientationDiagnosticWizardShell } from './OrientationDiagnosticWizardShell';
 export function OrientationDiagnosticWizard() {
   const { isRTL, locale } = useLocale();
@@ -291,6 +294,14 @@ export function OrientationDiagnosticWizard() {
     uiLocale,
   ]);
 
+  const scrollRef = useRef<ScrollView>(null);
+
+  useEffect(() => {
+    requestAnimationFrame(() => {
+      scrollRef.current?.scrollTo({ y: 0, animated: false });
+    });
+  }, [stepIndex, situationPhase, situationBriefDone, versusBriefDone]);
+
   const canContinue = useMemo(() => {
     if (!step) return false;
     if (showSituationBrief || showVersusBrief) return true;
@@ -502,7 +513,7 @@ export function OrientationDiagnosticWizard() {
         : displayStep.subtitle || '';
 
   return (
-    <>
+    <OrientationCatalogDetailProvider uiLocale={uiLocale}>
       <OrientationDiagnosticWizardShell
         uiLocale={uiLocale}
         rtl={isRTL}
@@ -516,12 +527,24 @@ export function OrientationDiagnosticWizard() {
         onRetake={retakeTest}
         continueDisabled={!canContinue}
         backDisabled={!canGoBack}
-        busy={versusBuilding || reportBuilding || catalogLoading}
-        moduleFlash={moduleFlash}>
+        busy={versusBuilding || reportBuilding || catalogLoading}>
         <ScrollView
+          ref={scrollRef}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
+          <View style={styles.moduleBanner}>
+            <Text style={[styles.moduleLabel, isRTL && styles.rtlText]}>{localizeModuleMeta(step.module, uiLocale).label}</Text>
+            <Text style={[styles.moduleObjective, isRTL && styles.rtlText]}>
+              {localizeModuleMeta(step.module, uiLocale).objective}
+            </Text>
+            {moduleFlash ? (
+              <View style={[styles.flash, isRTL && styles.flashRtl]}>
+                <FontAwesome name="check-circle" size={14} color={homeShell.greenDark} />
+                <Text style={[styles.flashTxt, isRTL && styles.rtlText]}>{moduleFlash}</Text>
+              </View>
+            ) : null}
+          </View>
           {showSituationBrief ? (
             <OrientationDiagnosticBriefScreen kind="situation" uiLocale={uiLocale} rtl={isRTL} />
           ) : showVersusBrief ? (
@@ -579,11 +602,32 @@ export function OrientationDiagnosticWizard() {
         onCancel={closeConfirm}
         onConfirm={confirmRetake}
       />
-    </>
+    </OrientationCatalogDetailProvider>
   );
 }
 
 const styles = StyleSheet.create({
   boot: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: brand.backgroundSoft },
-  scroll: { paddingBottom: spacing.xl },
+  scroll: { paddingBottom: spacing.xl, gap: spacing.sm },
+  moduleBanner: {
+    marginBottom: spacing.sm,
+    padding: spacing.md,
+    backgroundColor: brand.white,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: homeShell.borderOnWhite,
+    gap: 4,
+  },
+  moduleLabel: { fontSize: fontSize.md, fontWeight: '800', color: brand.primary },
+  moduleObjective: { fontSize: fontSize.sm, color: brand.textMuted, lineHeight: 20 },
+  flash: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 4,
+    paddingVertical: 4,
+  },
+  flashRtl: { flexDirection: 'row-reverse' },
+  flashTxt: { fontSize: fontSize.xs, color: homeShell.greenDark, fontWeight: '600' },
+  rtlText: { writingDirection: 'rtl', textAlign: 'right' },
 });

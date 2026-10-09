@@ -38,6 +38,38 @@ import type { DiagnosticStep } from '../types/orientationDiagnosticPrototype';
 
 type PickerKey = 'city' | 'studyLevel' | 'bacType' | 'bacFiliere' | 'bacYear' | 'spec1' | 'spec2' | 'spec3';
 
+const STUDY_LEVEL_AR: Record<string, string> = {
+  '1ère année Baccalauréat': 'السنة الأولى باك',
+  '2ème année Baccalauréat en cours': 'السنة الثانية باك (قيد الدراسة)',
+  '2ème année Baccalauréat terminé': 'السنة الثانية باك (تم الحصول على الباك)',
+  Bachelier: 'حاصل على الباك في سنة سابقة',
+  'BAC+1': 'باك +1',
+  'BAC+2': 'باك +2',
+  'BAC+3': 'باك +3',
+  'BAC+4': 'باك +4',
+  'BAC+5': 'باك +5',
+  'BAC+6': 'باك +6',
+  'BAC+8': 'باك +8 (دكتوراه)',
+};
+
+const BAC_TYPE_AR: Record<string, string> = {
+  marocain: 'البكالوريا المغربية',
+  mission: 'البكالوريا الفرنسية (البعثة)',
+};
+
+const MISSION_SPECIALITY_AR: Record<string, string> = {
+  Mathématiques: 'الرياضيات',
+  'Physique-Chimie': 'الفيزياء والكيمياء',
+  SVT: 'علوم الحياة والأرض',
+  NSI: 'المعلوميات والعلوم الرقمية',
+  SES: 'العلوم الاقتصادية والاجتماعية',
+  HGGSP: 'التاريخ والجغرافيا والجيوسياسة والعلوم السياسية',
+  HLP: 'العلوم الإنسانية والآداب والفلسفة',
+  LLCE: 'اللغات والآداب والثقافات الأجنبية',
+  Arts: 'الفنون',
+  Technologique: 'المسار التكنولوجي',
+};
+
 function labeledPickItems(
   options: ReadonlyArray<{ value: string; label: string; labelAr?: string }>,
   locale: OrientationUiLocale,
@@ -91,7 +123,7 @@ export function OrientationDiagnosticProfileSteps({
   const studyItems: SearchablePickItem[] = STUDY_LEVELS.map((o) => ({
     id: o.value,
     value: o.value,
-    label: o.label,
+    label: uiLocale === 'ar' ? STUDY_LEVEL_AR[o.value] || o.label : o.label,
   }));
 
   const p = profile ?? EMPTY_DIAGNOSTIC_PROFILE;
@@ -109,7 +141,10 @@ export function OrientationDiagnosticProfileSteps({
   const specItems: SearchablePickItem[] = SPECIALITES_MISSION.map((s) => ({
     id: s,
     value: s,
-    label: SPECIALITES_MISSION_LABELS[s] || s,
+    label:
+      uiLocale === 'ar'
+        ? MISSION_SPECIALITY_AR[s] || SPECIALITES_MISSION_LABELS[s] || s
+        : SPECIALITES_MISSION_LABELS[s] || s,
   }));
   const filiereFieldLabel =
     p.studyLevel === '1ère année Baccalauréat'
@@ -150,15 +185,6 @@ export function OrientationDiagnosticProfileSteps({
           <DiagnosticTextInput
             value={p.lastName}
             onChangeText={(v) => onChange({ lastName: v })}
-            rtl={rtl}
-          />
-          <DiagnosticFieldLabel required rtl={rtl}>
-            {uiLocale === 'ar' ? 'تاريخ الميلاد' : 'Date de naissance'}
-          </DiagnosticFieldLabel>
-          <DiagnosticTextInput
-            value={p.dateNaissance}
-            onChangeText={(v) => onChange({ dateNaissance: v })}
-            placeholder="AAAA-MM-JJ"
             rtl={rtl}
           />
           <DiagnosticFieldLabel rtl={rtl}>
@@ -216,7 +242,7 @@ export function OrientationDiagnosticProfileSteps({
                   <DiagnosticChoiceRow
                     key={bt.value}
                     rtl={rtl}
-                    label={bt.label}
+                    label={uiLocale === 'ar' ? BAC_TYPE_AR[bt.value] || bt.label : bt.label}
                     selected={p.bacType === bt.value}
                     onPress={() =>
                       onChange({
@@ -345,8 +371,8 @@ export function OrientationDiagnosticProfileSteps({
         {p.bacType === 'marocain' ? (
           <>
             <DiagnosticGradeAvailabilityBlock
-              sectionTitle={uiLocale === 'ar' ? 'درجات البكالوريا المغربي' : 'Notes Bac marocain'}
-              question={uiLocale === 'ar' ? 'هل لديك درجات نهائية؟' : 'As-tu tes notes définitives ?'}
+              sectionTitle={uiLocale === 'ar' ? 'نقط البكالوريا المغربية' : 'Notes Bac marocain'}
+              question={uiLocale === 'ar' ? 'هل تتوفر على النقط النهائية؟' : 'As-tu tes notes définitives ?'}
               accent="national"
               received={noteAvail as '' | 'yes' | 'no'}
               onSelectYes={() => onChange({ noteAvailability: 'real' })}
@@ -400,7 +426,7 @@ export function OrientationDiagnosticProfileSteps({
     return (
       <Text style={[styles.skipNote, rtl && styles.rtlText]}>
         {uiLocale === 'ar'
-          ? 'لا يلزم إدخال درجات لهذا المستوى.'
+          ? 'لا يلزم إدخال النقط في هذا المستوى.'
           : 'Aucune note requise pour ton niveau actuel.'}
       </Text>
     );

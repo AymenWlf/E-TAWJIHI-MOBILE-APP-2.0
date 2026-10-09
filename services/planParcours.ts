@@ -6,9 +6,9 @@ import {
 } from '@/constants/orientationParcours';
 import { RECOMMENDATION_FOLLOW_MIN_COUNT } from '@/constants/recommendationParcours';
 import { INVITE_FRIEND_QUALIFIED_MIN_COUNT } from '@/constants/inviteFriendParcours';
-import { fetchEstablishmentFollows } from '@/services/establishmentFollows';
+import { fetchEstablishmentFollowCount } from '@/services/establishmentFollows';
 import { httpGetJson } from '@/services/http';
-import { fetchUserReferralProgram } from '@/services/userReferral';
+import { fetchReferralQualifiedCount } from '@/services/userReferral';
 
 type PlanReussiteStepsResponse = {
   success?: boolean;
@@ -24,35 +24,15 @@ const stepBool = (steps: Record<string, boolean | string | number>, key: string)
  * Progression du parcours mobile (7 étapes).
  * Clés dédiées mobile dans `planReussiteSteps` — pas de mélange avec le plan web.
  */
-export async function fetchPlanParcoursCompletion(
-  accessToken: string | null,
+function completionFromSteps(
   accountSetupComplete: boolean,
-): Promise<PlanParcoursCompletion> {
-  const completion: PlanParcoursCompletion = {
-    ...EMPTY_PLAN_PARCOURS_COMPLETION,
-    accountSetupComplete: Boolean(accountSetupComplete),
-  };
-
-  if (!accessToken) {
-    return completion;
-  }
-
-  const [planRes, followsRes, referralProgram] = await Promise.all([
-    httpGetJson<PlanReussiteStepsResponse>(buildApiUrl('/api/user/plan-reussite/steps'), {
-      headers: { Authorization: `Bearer ${accessToken}` },
-    }).catch(() => null),
-    fetchEstablishmentFollows(accessToken).catch(() => ({ items: [] })),
-    fetchUserReferralProgram(accessToken).catch(() => null),
-  ]);
-
-  const steps = planRes?.data?.planReussiteSteps ?? {};
-  const followCount = followsRes.items.length;
+  steps: Record<string, boolean | string | number>,
+  followCount: number,
+  inviteFriendQualifiedCount: number,
+): PlanParcoursCompletion {
   const recommendationStepMarked =
     stepBool(steps, PLAN_PARCOURS_MOBILE_STEP_KEYS.recommendation) ||
     stepBool(steps, 'schoolSelection');
-
-  const inviteFriendQualifiedCount = referralProgram?.tierProgress?.qualifiedAffiliateCount ?? 0;
-  const inviteFriendComplete = inviteFriendQualifiedCount >= INVITE_FRIEND_QUALIFIED_MIN_COUNT;
 
   return {
     accountSetupComplete: Boolean(accountSetupComplete),
@@ -69,7 +49,46 @@ export async function fetchPlanParcoursCompletion(
     recommendationFollowCount: followCount,
     feedbackComplete: stepBool(steps, PLAN_PARCOURS_MOBILE_STEP_KEYS.feedback),
     applyToSchoolsComplete: stepBool(steps, PLAN_PARCOURS_MOBILE_STEP_KEYS.applyToSchools),
-    inviteFriendComplete,
+    inviteFriendComplete: inviteFriendQualifiedCount >= INVITE_FRIEND_QUALIFIED_MIN_COUNT,
     inviteFriendQualifiedCount,
   };
+}
+
+/**
+ * Affiche le plan dès que les étapes sont lues, puis complète écoles suivies
+ * et parrainages sans bloquer la section.
+ */
+export async function fetchPlanParcoursCompletion(
+  accessToken: string | null,
+  accountSetupComplete: boolean,
+  onPartial?: (completion: PlanParcoursCompletion) => void,
+  knownCounts?: { followCount: number; qualifiedCount: number },
+): Promise<PlanParcoursCompletion> {
+  const seedFollow = knownCounts?.followCount ?? 0;
+  const seedQualified = knownCounts?.qualifiedCount ?? 0;
+  const empty = completionFromSteps(accountSetupComplete, {}, seedFollow, seedQualified);
+  if (!accessToken) {
+    onPartial?.(empty);
+    return empty;
+  }
+
+  const headers = { Authorization: `Bearer ${accessToken}` };
+  const stepsPromise = httpGetJson<PlanReussiteStepsResponse>(
+    buildApiUrl('/api/user/plan-reussite/steps'),
+    { headers },
+  ).catch(() => null);
+  const followCountPromise = fetchEstablishmentFollowCount(accessToken).catch(() => seedFollow);
+  const qualifiedCountPromise = fetchReferralQualifiedCount(accessToken).catch(() => seedQualified);
+
+  const planRes = await stepsPromise;
+  const steps = planRes?.data?.planReussiteSteps ?? {};
+  const withSteps = completionFromSteps(accountSetupComplete, steps, seedFollow, seedQualified);
+  onPartial?.(withSteps);
+
+  const [followCount, inviteFriendQualifiedCount] = await Promise.all([
+    followCountPromise,
+    qualifiedCountPromise,
+  ]);
+
+  return completionFromSteps(accountSetupComplete, steps, followCount, inviteFriendQualifiedCount);
 }

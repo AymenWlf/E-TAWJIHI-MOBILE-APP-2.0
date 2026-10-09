@@ -15,6 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { DiagnosticStatusBar } from '@/components/diagnostic/DiagnosticUi';
 import { AppConfirmDialog } from '@/components/ui/AppConfirmDialog';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import {
   ETAWJIHI_LOGO_LIGHT_ASPECT,
@@ -49,6 +50,8 @@ import {
   reportAmbitionLabel,
   reportFamilyTierLabel,
   reportFunctioningLabels,
+  reportMetierBilingualLines,
+  reportPhraseBilingualLines,
 } from '../utils/orientationDiagnosticReportLocale';
 import { orientationUiLocaleFromApp } from '../utils/orientationUiLocaleFromApp';
 
@@ -203,6 +206,9 @@ export function OrientationDiagnosticReportScreen() {
             {t('retakeTest')}
           </Text>
         </Pressable>
+      </View>
+      <View style={styles.langRow}>
+        <HeroLangSwitch />
       </View>
 
       <View style={styles.body}>
@@ -441,58 +447,112 @@ export function OrientationDiagnosticReportScreen() {
             ))}
           </Section>
 
-          <Section index={7} title={t('reportSec7')} rtl={isRTL}>
-            {report.metiers.slice(0, 10).map((m, i) => (
-              <View key={m.id} style={[styles.rankRow, isRTL && styles.rowRtl]}>
-                <Text style={styles.rank} latinDigits>
-                  {i + 1}
-                </Text>
-                <Text style={[styles.cardTitle, isRTL && styles.rtlText, { flex: 1 }]}>
-                  {localizeReportPhrase(m.label, uiLocale)}
-                </Text>
-                <View style={styles.scorePill}>
-                  <Text style={styles.scorePillTxt} latinDigits>
-                    {m.score}%
+          <Section
+            index={7}
+            title={uiLocale === 'ar' ? '7. المهن الأنسب لملفك' : t('reportSec7')}
+            rtl={isRTL}>
+            {report.metiers.slice(0, 10).map((m, i) => {
+              const name = reportMetierBilingualLines(m.id, m.label, uiLocale);
+              return (
+                <View key={m.id} style={[styles.rankRow, isRTL && styles.rowRtl]}>
+                  <Text style={styles.rank} latinDigits>
+                    {i + 1}
                   </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.cardTitle,
+                        name.primaryRtl ? styles.rtlText : styles.ltrText,
+                      ]}>
+                      {name.primary}
+                    </Text>
+                    {name.secondary ? (
+                      <Text
+                        style={[
+                          styles.cardMeta,
+                          name.secondaryRtl ? styles.rtlText : styles.ltrText,
+                        ]}>
+                        {name.secondary}
+                      </Text>
+                    ) : null}
+                  </View>
+                  <View style={styles.scorePill}>
+                    <Text style={styles.scorePillTxt} latinDigits>
+                      {m.score}%
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            ))}
+              );
+            })}
           </Section>
 
           <Section index={8} title={t('reportSec8')} rtl={isRTL}>
-            {report.ecolesStrategie.map((line, i) => (
-              <View key={i} style={[styles.strategyRow, isRTL && styles.rowRtl]}>
-                <View style={styles.strategyDot} />
-                <Text style={[styles.bullet, isRTL && styles.rtlText, { flex: 1 }]}>
-                  {localizeReportPhrase(line, uiLocale)}
-                </Text>
-              </View>
-            ))}
+            {report.ecolesStrategie.map((line, i) => {
+              const text = reportPhraseBilingualLines(line, uiLocale);
+              return (
+                <View key={i} style={[styles.strategyRow, isRTL && styles.rowRtl]}>
+                  <View style={styles.strategyDot} />
+                  <View style={{ flex: 1 }}>
+                    <Text
+                      style={[
+                        styles.bullet,
+                        text.primaryRtl ? styles.rtlText : styles.ltrText,
+                      ]}>
+                      {text.primary}
+                    </Text>
+                    {text.secondary ? (
+                      <Text
+                        style={[
+                          styles.cardMeta,
+                          text.secondaryRtl ? styles.rtlText : styles.ltrText,
+                        ]}>
+                        {text.secondary}
+                      </Text>
+                    ) : null}
+                  </View>
+                </View>
+              );
+            })}
             {report.filieresSuggest.length ? (
               <View style={styles.filieresBox}>
                 <Text style={[styles.filieresLabel, isRTL && styles.rtlText]}>
-                  {uiLocale === 'ar' ? 'مسارات مقترحة' : 'Filières suggérées'}
+                  {uiLocale === 'ar' ? 'شعب مقترحة' : 'Filières suggérées'}
                 </Text>
-                <Text style={[styles.filieresValue, isRTL && styles.rtlText]}>
-                  {report.filieresSuggest.join(' · ')}
-                </Text>
+                {(() => {
+                  const french = report.filieresSuggest.join(' · ');
+                  const arabic = report.filieresSuggest
+                    .map((item) => localizeReportPhrase(item, 'ar'))
+                    .join(' · ');
+                  const primary = uiLocale === 'ar' ? arabic : french;
+                  const secondary = uiLocale === 'ar' ? french : arabic;
+                  return (
+                    <>
+                      <Text
+                        style={[
+                          styles.filieresValue,
+                          uiLocale === 'ar' ? styles.rtlText : styles.ltrText,
+                        ]}>
+                        {primary}
+                      </Text>
+                      <Text
+                        style={[
+                          styles.cardMeta,
+                          uiLocale === 'ar' ? styles.ltrText : styles.rtlText,
+                        ]}>
+                        {secondary}
+                      </Text>
+                    </>
+                  );
+                })()}
               </View>
             ) : null}
           </Section>
 
-          <View style={{ height: 210 }} />
+          <View style={{ height: 160 }} />
         </ScrollView>
 
         <View style={styles.ctaDock}>
           <View style={styles.ctaFade} />
-          <Pressable
-            onPress={onRetakeTest}
-            style={({ pressed }) => [styles.ctaRetake, pressed && { opacity: 0.92 }]}
-            accessibilityRole="button"
-            accessibilityLabel={t('retakeTest')}>
-            <FontAwesome name="refresh" size={14} color={brand.primary} />
-            <Text style={styles.ctaRetakeTxt}>{t('retakeTest')}</Text>
-          </Pressable>
           <Pressable
             onPress={() => void onDownloadPdf()}
             style={({ pressed }) => [styles.ctaPdf, pressed && { opacity: 0.92 }]}
@@ -525,7 +585,7 @@ export function OrientationDiagnosticReportScreen() {
             ) : (
               <>
                 <Text style={styles.ctaTxt}>
-                  {uiLocale === 'ar' ? 'متابعة — توصيات المدارس' : 'Continuer — recommandations écoles'}
+                  {uiLocale === 'ar' ? 'متابعة — المدارس المقترحة' : 'Continuer — recommandations écoles'}
                 </Text>
                 <FontAwesome
                   name={isRTL ? 'arrow-left' : 'arrow-right'}
@@ -638,6 +698,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     backgroundColor: '#1a2454',
+  },
+  langRow: {
+    alignItems: 'center',
+    backgroundColor: '#1a2454',
+    paddingBottom: spacing.sm,
   },
   backBtn: {
     width: 36,
@@ -1124,19 +1189,6 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFillObject,
     backgroundColor: 'rgba(238,241,247,0.92)',
   },
-  ctaRetake: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.sm,
-    backgroundColor: brand.white,
-    borderRadius: 16,
-    paddingVertical: 12,
-    borderWidth: 1.5,
-    borderColor: 'rgba(51,62,143,0.22)',
-    marginBottom: spacing.sm,
-  },
-  ctaRetakeTxt: { color: brand.primary, fontWeight: '800', fontSize: fontSize.sm },
   ctaPdf: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1166,5 +1218,6 @@ const styles = StyleSheet.create({
   },
   ctaTxt: { color: brand.white, fontWeight: '800', fontSize: fontSize.md },
   rtlText: { writingDirection: 'rtl', textAlign: 'right' },
+  ltrText: { writingDirection: 'ltr', textAlign: 'left' },
   rowRtl: { flexDirection: 'row-reverse' },
 });

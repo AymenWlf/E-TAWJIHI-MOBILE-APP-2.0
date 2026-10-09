@@ -46,7 +46,7 @@ import {
   getTassjilPracticalLinkLock,
   isTassjilPracticalLinkId,
 } from '@/utils/tassjilPracticalLinkLock';
-import { buildApiUrl, isDevApiBaseUrl } from '@/constants/api';
+import { isDevApiBaseUrl } from '@/constants/api';
 import { PRACTICAL_LINK_DEFS } from '@/constants/practicalLinks';
 import {
   BAC_RESULTS_STATIC_DEFAULT,
@@ -74,7 +74,6 @@ import {
   type TawjihPlusParcoursGate,
   guardDailyChallengeAccess,
 } from '@/utils/tawjihPlusParcoursGate';
-import { httpGetJson } from '@/services/http';
 import { buildHomePlanParcoursData } from '@/utils/orientationParcoursTasks';
 import {
   fetchStoryChannels,
@@ -142,6 +141,7 @@ function HomeTabScreen() {
   const [bacResultsLoading, setBacResultsLoading] = useState(true);
   const homeRefreshInFlightRef = useRef(false);
   const planParcoursLoadGenRef = useRef(0);
+  const planParcoursCompletionRef = useRef<PlanParcoursCompletion | null>(null);
   const insets = useSafeAreaInsets();
   const { width: screenW } = useWindowDimensions();
   const heroWide = isHomeHeroWideLayout(screenW);
@@ -397,8 +397,7 @@ function HomeTabScreen() {
     [locale, t],
   );
 
-  const orientationSheetLoading =
-    orientationSheet.visible && (planParcoursInitialLoading || planParcoursLoading);
+  const orientationSheetLoading = orientationSheet.visible && planParcoursInitialLoading;
 
   const orientationSheetTasks = useMemo(() => {
     if (!orientationSheet.visible || orientationSheetLoading) return undefined;
@@ -444,31 +443,31 @@ function HomeTabScreen() {
 
   const refreshPlanParcours = useCallback(async (): Promise<PlanParcoursCompletion> => {
     const gen = ++planParcoursLoadGenRef.current;
-    setPlanParcoursLoading(true);
-    try {
-      const token = await getValidAccessToken();
-      let accountSetupComplete = Boolean(user?.is_setup);
-      if (token) {
-        try {
-          const res = await httpGetJson<{ success?: boolean; data?: { user?: { is_setup?: boolean } } }>(
-            buildApiUrl('/api/me'),
-            { headers: { Authorization: `Bearer ${token}` } },
-          );
-          accountSetupComplete = Boolean(res.data?.user?.is_setup);
-        } catch {
-          /* conserve la valeur locale */
-        }
-      }
-      const completion = await fetchPlanParcoursCompletion(token, accountSetupComplete);
-      if (gen === planParcoursLoadGenRef.current) {
-        setPlanParcoursCompletion(completion);
-      }
-      return completion;
-    } finally {
-      if (gen === planParcoursLoadGenRef.current) {
+    const token = await getValidAccessToken();
+    const accountSetupComplete = Boolean(user?.is_setup);
+    const known = planParcoursCompletionRef.current;
+    const completion = await fetchPlanParcoursCompletion(
+      token,
+      accountSetupComplete,
+      (partial) => {
+        if (gen !== planParcoursLoadGenRef.current) return;
+        planParcoursCompletionRef.current = partial;
+        setPlanParcoursCompletion(partial);
         setPlanParcoursLoading(false);
-      }
+      },
+      known
+        ? {
+            followCount: known.recommendationFollowCount,
+            qualifiedCount: known.inviteFriendQualifiedCount,
+          }
+        : undefined,
+    );
+    if (gen === planParcoursLoadGenRef.current) {
+      planParcoursCompletionRef.current = completion;
+      setPlanParcoursCompletion(completion);
+      setPlanParcoursLoading(false);
     }
+    return completion;
   }, [getValidAccessToken, user?.is_setup]);
 
   const handleOrientationStep = useCallback(

@@ -92,7 +92,7 @@ export const ORIENTATION_DIAGNOSTIC_STEPS: DiagnosticStep[] = [
     module: 'profile',
     kind: 'profile_identity',
     title: 'Tes informations personnelles',
-    subtitle: 'Prénom, nom, date de naissance, téléphone et ville — comme dans l’ancien test.',
+    subtitle: 'Prénom, nom, téléphone et ville.',
   },
   {
     id: 'prof_school',
@@ -563,7 +563,7 @@ export const ORIENTATION_DIAGNOSTIC_STEPS: DiagnosticStep[] = [
     kind: 'cities',
     title: 'Dans quelles villes pourrais-tu étudier ?',
     subtitle:
-      'Choisis les grandes villes, ou cherche une autre ville (2 lettres mini). « Peu importe » = flexible partout.',
+      'Ouvre la liste et choisis une ou plusieurs villes. « Peu importe » = flexible partout au Maroc.',
     options: [
       { id: 'casa', label: 'Casablanca' },
       { id: 'rabat', label: 'Rabat' },
@@ -683,7 +683,7 @@ export const ORIENTATION_DIAGNOSTIC_STEPS: DiagnosticStep[] = [
     maxSelect: 15,
     title: 'Quelles écoles voudrais-tu garder dans ton radar ?',
     subtitle:
-      'Une page par type d’établissement — sélectionne jusqu’à 8 écoles par type (max 15 au total).',
+      'Une page par type d’établissement — sélectionne jusqu’à 8 écoles par type.',
   },
 
   // Versus : étapes injectées dynamiquement (voir orientationDiagnosticVersus.ts)
@@ -702,7 +702,6 @@ export const METIERS_PER_SECTOR_MAX = 3;
 /** Préfixe des étapes écoles (une par type). */
 export const SCHOOL_STEP_PREFIX = 'sch_ecoles__';
 export const SCHOOLS_PER_TYPE_MAX = 8;
-export const SCHOOLS_TOTAL_MAX = 15;
 
 /** Ordre d’affichage des pages type. */
 export const SCHOOL_TYPE_PAGE_ORDER = [
@@ -774,7 +773,7 @@ export function buildSchoolStepsForTypes(
     schoolType: t.match,
     schoolTypeKey: t.key,
     title: `Écoles · ${t.label}`,
-    subtitle: `Type ${index + 1} / ${total || 1} — jusqu’à ${SCHOOLS_PER_TYPE_MAX} établissements ${t.label.toLowerCase()} (max ${SCHOOLS_TOTAL_MAX} au total sur tous les types).`,
+    subtitle: `Type ${index + 1} / ${total || 1} — jusqu’à ${SCHOOLS_PER_TYPE_MAX} établissements ${t.label.toLowerCase()}.`,
   }));
 }
 

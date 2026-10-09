@@ -43,8 +43,17 @@ export type ChoiceOption = {
   orientationPlan?: 'A' | 'B' | 'C' | 'D' | null;
   admissionType?: string | null;
   admissionLabel?: string | null;
+  nom?: string;
+  nomArabe?: string | null;
+  sigle?: string;
+  ville?: string | null;
+  dureeEtudes?: string | null;
+  diplomes?: string[];
+  logo?: string | null;
   /** Seed Coupe du monde (1–16) */
   seed?: number;
+  /** Secteur associé, affiché sur la carte Versus métier */
+  secteurLabel?: string | null;
 };
 
 /** Méta persistée pour une école radar (plan + admission). */
@@ -61,6 +70,7 @@ export type OrientationSchoolMeta = {
   villes?: string[];
   dureeEtudes?: string | null;
   diplomes?: string[];
+  logo?: string | null;
 };
 
 export type PreferenceSchool = {
@@ -73,6 +83,9 @@ export type PreferenceSchool = {
   villes?: string[];
   dureeEtudes?: string | null;
   diplomes?: string[];
+  logo?: string | null;
+  /** Rang Coupe du monde (1 = vainqueur). Absent si l’école n’a pas joué. */
+  versusRank?: number | null;
 };
 
 export type DiagnosticStep = {

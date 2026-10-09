@@ -2,7 +2,16 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { StatusBar } from 'expo-status-bar';
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
-import { Platform, Pressable, StyleSheet, TextInput, View, type TextInputProps } from 'react-native';
+import {
+  Platform,
+  Pressable,
+  StyleSheet,
+  TextInput,
+  View,
+  type StyleProp,
+  type TextInputProps,
+  type TextStyle,
+} from 'react-native';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -17,6 +26,28 @@ import { getDiagnosticFormLabels } from '@/constants/schoolDiagnosticFormLabels'
 import type { DiagnosticUiLocale } from '@/constants/schoolDiagnosticLocale';
 import { homeShell } from '@/theme/homeShell';
 import { labelContainsDigits, preserveLtrDigitsInRtlLabel } from '@/utils/bidiText';
+
+/** Libellé arabe + montants : une seule police, chiffres gardés dans l’ordre. */
+function ArabicMixedLabel({ label, style }: { label: string; style: StyleProp<TextStyle> }) {
+  const hasArabic = /[\u0600-\u06FF]/.test(label);
+  if (!hasArabic || !/\d/.test(label)) {
+    return <Text style={style}>{label}</Text>;
+  }
+  const parts = label.split(/(\d[\d.,]*)/g);
+  return (
+    <Text style={style}>
+      {parts.map((part, index) =>
+        /^\d/.test(part) ? (
+          <Text key={`${index}-${part}`} style={[style, { writingDirection: 'ltr' }]}>
+            {part}
+          </Text>
+        ) : (
+          part
+        ),
+      )}
+    </Text>
+  );
+}
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
 import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
@@ -122,6 +153,20 @@ export function DiagnosticTextInput({
   );
 }
 
+/** Degré 1 → 5 : interdit, batterie qui se remplit, étoile. */
+export const LIKERT_DEGREE_ICON: Record<string, ComponentProps<typeof FontAwesome>['name']> = {
+  '1': 'ban',
+  '2': 'battery-quarter',
+  '3': 'battery-half',
+  '4': 'battery-three-quarters',
+  '5': 'star',
+};
+
+const SITUATION_ACCENT = {
+  plus: { border: '#059669', bg: '#d1fae5', text: '#065f46', mark: '#059669', icon: 'plus' as const },
+  moins: { border: '#dc2626', bg: '#fecaca', text: '#7f1d1d', mark: '#dc2626', icon: 'minus' as const },
+};
+
 export function DiagnosticChoiceRow({
   label,
   detail,
@@ -130,6 +175,11 @@ export function DiagnosticChoiceRow({
   rtl,
   mode = 'radio',
   icon,
+  degreeId,
+  accent,
+  disabled,
+  secondary,
+  secondaryRtl,
 }: {
   label: string;
   /** Explication sous le libellé principal */
@@ -139,37 +189,88 @@ export function DiagnosticChoiceRow({
   rtl?: boolean;
   mode?: 'radio' | 'checkbox';
   icon?: ComponentProps<typeof FontAwesome>['name'];
+  /** Id 1–5 : icône du degré. */
+  degreeId?: string;
+  /** Mise en situation : vert + plus, ou rouge + moins. */
+  accent?: 'plus' | 'moins';
+  disabled?: boolean;
+  /** Autre langue, affichée en retrait sous le libellé choisi. */
+  secondary?: string;
+  secondaryRtl?: boolean;
 }) {
+  const degreeIcon = degreeId ? LIKERT_DEGREE_ICON[degreeId] : undefined;
+  const accentTone = accent ? SITUATION_ACCENT[accent] : undefined;
+  const markIcon = accentTone?.icon ?? 'check';
   return (
     <Pressable
-      onPress={onPress}
+      onPress={() => {
+        if (disabled) return;
+        onPress();
+      }}
+      disabled={disabled}
       accessibilityRole={mode === 'checkbox' ? 'checkbox' : 'radio'}
-      accessibilityState={{ selected }}
+      accessibilityState={{ selected, disabled }}
       style={({ pressed }) => [
         styles.choiceRow,
         rtl && styles.choiceRowRtl,
-        selected && styles.choiceRowSelected,
-        pressed && styles.choiceRowPressed,
+        selected && !accentTone && styles.choiceRowSelected,
+        accentTone && selected
+          ? { borderColor: accentTone.border, backgroundColor: accentTone.bg }
+          : null,
+        pressed && !disabled && styles.choiceRowPressed,
       ]}>
       <View
         style={[
           styles.choiceMark,
           mode === 'checkbox' && styles.choiceMarkSquare,
-          selected && styles.choiceMarkOn,
+          selected && !accentTone && styles.choiceMarkOn,
+          accentTone && selected ? { backgroundColor: accentTone.mark, borderColor: accentTone.mark } : null,
         ]}>
-        {selected ? <FontAwesome name="check" size={11} color={brand.white} /> : null}
+        {selected ? <FontAwesome name={markIcon} size={11} color={brand.white} /> : null}
       </View>
+      {degreeIcon ? (
+        <View style={[styles.choiceIconWrap, selected && styles.choiceIconWrapOn]}>
+          <FontAwesome name={degreeIcon} size={15} color={selected ? brand.primary : brand.textMuted} />
+        </View>
+      ) : null}
       {icon ? (
         <View style={[styles.choiceIconWrap, selected && styles.choiceIconWrapOn]}>
           <FontAwesome name={icon} size={14} color={selected ? brand.primary : brand.textMuted} />
         </View>
       ) : null}
       <View style={[styles.choiceTextCol, rtl && styles.choiceTextColRtl]}>
-        <Text
-          style={[styles.choiceLabel, rtl && styles.rtlText, selected && styles.choiceLabelSelected]}
-          latinDigits={rtl && labelContainsDigits(label)}>
-          {preserveLtrDigitsInRtlLabel(label, rtl)}
-        </Text>
+        {/[\u0600-\u06FF]/.test(label) ? (
+          <ArabicMixedLabel
+            label={label}
+            style={[
+              styles.choiceLabel,
+              styles.rtlText,
+              selected && !accentTone && styles.choiceLabelSelected,
+              accentTone && selected ? { color: accentTone.text, fontWeight: '800' } : null,
+            ]}
+          />
+        ) : (
+          <Text
+            style={[
+              styles.choiceLabel,
+              rtl && styles.rtlText,
+              selected && !accentTone && styles.choiceLabelSelected,
+              accentTone && selected ? { color: accentTone.text, fontWeight: '800' } : null,
+            ]}
+            latinDigits={rtl && labelContainsDigits(label)}>
+            {preserveLtrDigitsInRtlLabel(label, rtl)}
+          </Text>
+        )}
+        {secondary ? (
+          <Text
+            style={[
+              styles.choiceSecondary,
+              secondaryRtl ? styles.rtlText : styles.choiceSecondaryLtr,
+              rtl && !secondaryRtl && styles.choiceSecondaryAlignEnd,
+            ]}>
+            {secondary}
+          </Text>
+        ) : null}
         {detail ? (
           <Text style={[styles.choiceDetail, rtl && styles.rtlText]} latinDigits={rtl && labelContainsDigits(detail)}>
             {preserveLtrDigitsInRtlLabel(detail, rtl)}
@@ -721,7 +822,8 @@ const styles = StyleSheet.create({
   },
   inputRtl: { textAlign: 'right', writingDirection: 'rtl', alignSelf: 'stretch' },
   inputMultiline: { minHeight: 140, maxHeight: 220, textAlignVertical: 'top', paddingTop: spacing.md },
-  choiceRowRtl: DIR_RTL,
+  /** Pastille / coche à droite du libellé (le `direction` seul ne renverse pas la ligne). */
+  choiceRowRtl: { flexDirection: 'row-reverse' },
   choiceRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -763,7 +865,15 @@ const styles = StyleSheet.create({
   choiceTextCol: { flex: 1, minWidth: 0, gap: 4 },
   choiceTextColRtl: { alignItems: 'flex-end' },
   choiceLabel: { fontSize: fontSize.sm, fontWeight: '600', color: brand.text },
-  choiceLabelSelected: { fontWeight: '800', color: brand.primary },
+  choiceLabelSelected: { color: brand.primary },
+  choiceSecondary: {
+    fontSize: fontSize.xs,
+    fontWeight: '600',
+    color: brand.textMuted,
+    lineHeight: 16,
+  },
+  choiceSecondaryLtr: { writingDirection: 'ltr', textAlign: 'left' },
+  choiceSecondaryAlignEnd: { textAlign: 'right' },
   choiceDetail: {
     fontSize: fontSize.xs,
     color: brand.textMuted,
@@ -794,7 +904,7 @@ const styles = StyleSheet.create({
   },
   chipCheck: { marginRight: 6 },
   chipCheckRtl: { marginRight: 0, marginLeft: 6 },
-  chipRtl: DIR_RTL,
+  chipRtl: { flexDirection: 'row-reverse' },
   chipText: { fontSize: fontSize.xs, color: brand.textMuted, fontWeight: '600', flexShrink: 1 },
   chipTextRtl: { writingDirection: 'rtl', textAlign: 'right' },
   chipTextSelected: { color: diagnosticTheme.accentDark, fontWeight: '800' },

@@ -20,6 +20,17 @@ export function AppLaunchBootstrap({ onBootstrapComplete }: Props) {
 
   const navigationReady = Boolean(useRootNavigationState()?.key);
   const completedRef = useRef(false);
+  const onBootstrapCompleteRef = useRef(onBootstrapComplete);
+  onBootstrapCompleteRef.current = onBootstrapComplete;
+
+  useEffect(() => {
+    const watchdog = setTimeout(() => {
+      if (completedRef.current) return;
+      completedRef.current = true;
+      onBootstrapCompleteRef.current();
+    }, 3500);
+    return () => clearTimeout(watchdog);
+  }, []);
 
   useEffect(() => {
     if (completedRef.current) return;
@@ -32,7 +43,7 @@ export function AppLaunchBootstrap({ onBootstrapComplete }: Props) {
     const finish = () => {
       if (cancelled || completedRef.current) return;
       completedRef.current = true;
-      onBootstrapComplete();
+      onBootstrapCompleteRef.current();
     };
 
     void (async () => {
@@ -59,7 +70,6 @@ export function AppLaunchBootstrap({ onBootstrapComplete }: Props) {
     refreshToken,
     user,
     getValidAccessToken,
-    onBootstrapComplete,
   ]);
 
   return null;

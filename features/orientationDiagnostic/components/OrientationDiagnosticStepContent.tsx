@@ -1,31 +1,31 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
-import {
-  DiagnosticChoiceRow,
-  DiagnosticChip,
-  DiagnosticChipGrid,
-  DiagnosticFieldLabel,
-  DiagnosticFormBlock,
-  DiagnosticTextInput,
-  diagnosticTheme,
-} from '@/components/diagnostic/DiagnosticUi';
+import { DiagnosticChoiceRow, diagnosticTheme } from '@/components/diagnostic/DiagnosticUi';
+import { SearchablePickSheet, type SearchablePickItem } from '@/components/schools/SearchablePickSheet';
+import { SelectField } from '@/components/ui/SelectField';
 import { Text } from '@/components/ui/Text';
-import { listCities, type CityRow } from '@/services/referenceData';
-import { applyVersusWinner } from '../utils/orientationDiagnosticVersus';
 import {
+  fallbackEstablishmentAvatarName,
+  getEstablishmentLogoUrl,
+} from '@/constants/establishmentMedia';
+import { listCities, type CityRow } from '@/services/referenceData';
+import { applyVersusWinner, hydrateVersusSchoolVisuals } from '../utils/orientationDiagnosticVersus';
+import {
+  formatBilingualName,
   localizeAmbitionLabel,
   localizeStep,
   RIASEC_LIKERT_AR,
   tOd,
-  tOdFill,
   type OrientationUiLocale,
 } from '../data/orientationDiagnosticI18n';
 import {
   orientationPlanLabel,
 } from '../constants/establishmentOrientationPlan';
+import { findModernMetierName } from '../data/orientationDiagnosticModernMetiers';
 import type {
+  ChoiceOption,
   DiagnosticAnswers,
   DiagnosticStep,
   Likert5,
@@ -41,33 +41,151 @@ import {
   FunctioningDilemmaChoices,
   FunctioningScaleChoices,
 } from './OrientationFunctioningChoices';
-import { syncEcoleMultiKeys } from '../data/orientationDiagnosticQuestions';
+import {
+  isMetierSectorStepId,
+  sectorIdFromMetierStepId,
+  syncEcoleMultiKeys,
+} from '../data/orientationDiagnosticQuestions';
 import { toggleMultiMax } from '../utils/orientationMultiToggle';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
-import { useEffect } from 'react';
 
-const PRIMARY_CITY_LABELS = new Set([
-  'casablanca',
-  'rabat',
-  'marrakech',
-  'tanger',
-  'fès',
-  'fes',
-]);
+function versusSectorLine(value: string, locale: OrientationUiLocale) {
+  const splitAt = value.indexOf(' · ');
+  const french = (splitAt > 0 ? value.slice(0, splitAt) : value).trim();
+  const arabic = (splitAt > 0 ? value.slice(splitAt + 3) : '').trim();
+  if (locale === 'ar') return { text: arabic || french, rtl: true };
+  return { text: french || arabic, rtl: false };
+}
 
-const QUICK_OTHER_CITIES = [
-  'Agadir',
-  'Meknès',
-  'Oujda',
-  'Kénitra',
-  'El Jadida',
-  'Tétouan',
-  'Safi',
-  'Nador',
-  'Mohammedia',
-  'Beni Mellal',
-];
+function versusMetierSector(
+  opt: ChoiceOption,
+  answers: DiagnosticAnswers,
+  locale: OrientationUiLocale,
+) {
+  let raw = (opt.secteurLabel || '').trim();
+  if (!raw) {
+    const labels = answers.labels || {};
+    for (const [stepId, ids] of Object.entries(answers.multi || {})) {
+      if (!isMetierSectorStepId(stepId) || !(ids || []).includes(opt.id)) continue;
+      const sectorId = sectorIdFromMetierStepId(stepId);
+      raw = (sectorId ? labels[sectorId] : '').trim();
+      if (raw) break;
+    }
+  }
+  if (!raw) {
+    const embedded = opt.id.match(/_s(\d+)/);
+    raw = (embedded ? answers.labels?.[embedded[1]] : '').trim();
+  }
+  if (!raw) {
+    const found = findModernMetierName(opt.id, opt.label);
+    if (found?.secteurTitre) raw = formatBilingualName(found.secteurTitre, found.secteurTitreAr);
+  }
+  if (!raw || /^Secteur \d+$/i.test(raw)) return null;
+  return versusSectorLine(raw, locale);
+}
+
+function versusMetierLines(id: string, label: string, locale: OrientationUiLocale) {
+  const found = findModernMetierName(id, label);
+  const splitAt = label.indexOf(' · ');
+  const french = (found?.nom ?? (splitAt > 0 ? label.slice(0, splitAt) : label)).trim();
+  const arabic = (found?.nomArabe ?? (splitAt > 0 ? label.slice(splitAt + 3) : '')).trim();
+  const distinct = Boolean(french && arabic && french !== arabic);
+  if (locale === 'ar' && arabic) {
+    return {
+      primary: arabic,
+      secondary: distinct ? french : '',
+      primaryRtl: true,
+      secondaryRtl: false,
+    };
+  }
+  return {
+    primary: french || arabic,
+    secondary: distinct ? arabic : '',
+    primaryRtl: false,
+    secondaryRtl: true,
+  };
+}
+
+const DIP_COLORS = [
+  { bg: '#dbeafe', text: '#1d4ed8' },
+  { bg: '#d1fae5', text: '#047857' },
+  { bg: '#fef3c7', text: '#b45309' },
+  { bg: '#ede9fe', text: '#6d28d9' },
+] as const;
+
+function parseVersusSchoolLabel(label: string): { fr: string; ar: string; ville: string } {
+  const cityMatch = label.match(/^(.*?)(?:\s*\(([^)]+)\))\s*$/);
+  const core = (cityMatch ? cityMatch[1] : label).trim();
+  const ville = cityMatch?.[2]?.trim() || '';
+  const idx = core.indexOf(' · ');
+  if (idx > 0) {
+    return { fr: core.slice(0, idx).trim(), ar: core.slice(idx + 3).trim(), ville };
+  }
+  return { fr: core, ar: '', ville };
+}
+
+function versusSchoolLines(opt: ChoiceOption, locale: OrientationUiLocale) {
+  const parsed = parseVersusSchoolLabel(opt.label);
+  const french = opt.nom || opt.sigle
+    ? opt.sigle?.trim()
+      ? `${opt.sigle.trim()} — ${(opt.nom || '').trim()}`
+      : (opt.nom || '').trim()
+    : parsed.fr;
+  const arabic = (opt.nomArabe || parsed.ar || '').trim();
+  const distinct = Boolean(french && arabic && french !== arabic);
+  const ville = (opt.ville || parsed.ville || '').trim();
+  if (locale === 'ar' && arabic) {
+    return {
+      primary: arabic,
+      secondary: distinct ? french : '',
+      primaryRtl: true,
+      secondaryRtl: false,
+      ville,
+    };
+  }
+  return {
+    primary: french || arabic,
+    secondary: distinct ? arabic : '',
+    primaryRtl: false,
+    secondaryRtl: true,
+    ville,
+  };
+}
+
+function versusSchoolLogoUri(opt: ChoiceOption): string {
+  return (
+    (opt.logo ? getEstablishmentLogoUrl(opt.logo) : null) ||
+    fallbackEstablishmentAvatarName(opt.nom || opt.label, opt.sigle)
+  );
+}
+
+const LEGACY_STUDY_CITY: Record<string, string> = {
+  casa: 'Casablanca',
+  rabat: 'Rabat',
+  marrakech: 'Marrakech',
+  tanger: 'Tanger',
+  fes: 'Fès',
+};
+
+const FLEX_CITY = 'peuimporte';
+const FLEX_CITY_LABEL = 'Peu importe — partout au Maroc';
+
+function selectedStudyCityNames(answers: DiagnosticAnswers): string[] {
+  const selected = answers.cities ?? [];
+  if (selected.includes(FLEX_CITY)) return [FLEX_CITY];
+  const names: string[] = [];
+  for (const id of selected) {
+    if (id === 'autres' || id === FLEX_CITY) continue;
+    const name = LEGACY_STUDY_CITY[id] || id;
+    if (name && !names.includes(name)) names.push(name);
+  }
+  for (const raw of answers.cityOther ?? []) {
+    const name = raw.trim();
+    if (name && !names.includes(name)) names.push(name);
+  }
+  return names;
+}
 
 export function OrientationDiagnosticStepContent({
   step,
@@ -89,6 +207,21 @@ export function OrientationDiagnosticStepContent({
   accessToken?: string | null;
 }) {
   const displayStep = useMemo(() => localizeStep(step, uiLocale), [step, uiLocale]);
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
+
+  useEffect(() => {
+    if (step.kind !== 'versus' || step.versusType !== 'ecole') return;
+    const missing = (step.options ?? []).some((option) => /^\d+$/.test(option.id) && !option.nom);
+    if (!missing) return;
+    let cancelled = false;
+    void hydrateVersusSchoolVisuals(answersRef.current).then((next) => {
+      if (!cancelled && next) setAnswers(next);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [setAnswers, step.id, step.kind, step.options, step.versusType]);
 
   if (
     step.kind === 'profile_identity' ||
@@ -185,6 +318,7 @@ export function OrientationDiagnosticStepContent({
               key={opt.id}
               rtl={rtl}
               label={opt.label}
+              degreeId={opt.id}
               selected={on}
               onPress={() =>
                 setAnswers((prev) => ({
@@ -215,7 +349,7 @@ export function OrientationDiagnosticStepContent({
         <View style={styles.gap}>
           <Text style={[styles.emptyHint, rtl && styles.rtlText]}>
             {uiLocale === 'ar'
-              ? 'ارجع خطوة للخلف واختر 3 محركات أولاً.'
+              ? 'ارجع إلى الخطوة السابقة واختر ثلاثة دوافع أولاً.'
               : 'Reviens à l’étape précédente et sélectionne d’abord 3 moteurs.'}
           </Text>
         </View>
@@ -244,8 +378,8 @@ export function OrientationDiagnosticStepContent({
           options={opts.map((o) => ({ id: o.id, label: o.label }))}
           selectedId={selectedId}
           rtl={rtl}
-          lowHint={uiLocale === 'ar' ? 'قطب أ' : 'Pôle A'}
-          highHint={uiLocale === 'ar' ? 'قطب ب' : 'Pôle B'}
+          lowHint={uiLocale === 'ar' ? 'الخيار أ' : 'Pôle A'}
+          highHint={uiLocale === 'ar' ? 'الخيار ب' : 'Pôle B'}
           onSelect={(id) =>
             setAnswers((prev) => ({
               ...prev,
@@ -358,20 +492,14 @@ export function OrientationDiagnosticStepContent({
           const isMoins = sit.least === id;
           const lockedPlus = !isMost && isPlus;
           const selected = isMost ? isPlus : isMoins;
-          const tone = isPlus ? 'most' : isMoins ? 'least' : undefined;
-          const badge = isPlus
-            ? tOd(uiLocale, 'plusBadge')
-            : isMoins
-              ? tOd(uiLocale, 'moinsBadge')
-              : undefined;
+          const accent = isPlus ? 'plus' : isMoins ? 'moins' : undefined;
           return (
             <DiagnosticChoiceRow
               key={id}
               rtl={rtl}
               label={opt.label}
               selected={selected || lockedPlus}
-              tone={tone}
-              badge={badge}
+              accent={accent}
               disabled={lockedPlus}
               onPress={() => {
                 if (lockedPlus) return;
@@ -517,17 +645,116 @@ export function OrientationDiagnosticStepContent({
                   <View />
                 )}
               </View>
-              <Text style={[styles.versusLabel, rtl && styles.rtlText, on && styles.versusLabelOn]}>
-                {opt.label}
-              </Text>
-              {step.versusType === 'ecole' && opt.orientationPlan ? (
-                <Text style={styles.versusTag}>
-                  {orientationPlanLabel(opt.orientationPlan)}
-                </Text>
-              ) : null}
-              {step.versusType === 'ecole' && opt.admissionLabel ? (
-                <Text style={styles.versusTag}>{opt.admissionLabel}</Text>
-              ) : null}
+              {step.versusType === 'metier' ? (
+                (() => {
+                  const names = versusMetierLines(opt.id, opt.label, uiLocale);
+                  const sector = versusMetierSector(opt, answers, uiLocale);
+                  return (
+                    <View style={rtl ? styles.versusNameRtl : undefined}>
+                      <Text
+                        style={[
+                          styles.versusLabel,
+                          names.primaryRtl && styles.rtlText,
+                          on && styles.versusLabelOn,
+                        ]}>
+                        {names.primary}
+                      </Text>
+                      {names.secondary ? (
+                        <Text
+                          style={[
+                            styles.versusLabelSecondary,
+                            names.secondaryRtl ? styles.rtlText : styles.versusLabelLtr,
+                            rtl && !names.secondaryRtl && styles.versusLabelAlignEnd,
+                          ]}>
+                          {names.secondary}
+                        </Text>
+                      ) : null}
+                      {sector ? (
+                        <View style={[styles.versusSectorPill, rtl && styles.versusSectorPillRtl]}>
+                          <Text style={[styles.versusSectorTxt, sector.rtl && styles.rtlText]}>
+                            {sector.text}
+                          </Text>
+                        </View>
+                      ) : null}
+                    </View>
+                  );
+                })()
+              ) : (
+                (() => {
+                  const face = versusSchoolLines(opt, uiLocale);
+                  const diplomes = opt.diplomes || [];
+                  const diplomeTags = diplomes.slice(0, 4);
+                  return (
+                    <View style={[styles.versusSchool, rtl && styles.versusSchoolRtl]}>
+                      <Image
+                        source={{ uri: versusSchoolLogoUri(opt) }}
+                        style={styles.versusLogo}
+                        resizeMode="contain"
+                      />
+                      <View style={styles.versusSchoolBody}>
+                        <Text
+                          style={[
+                            styles.versusSchoolName,
+                            face.primaryRtl && styles.rtlText,
+                            on && styles.versusLabelOn,
+                          ]}>
+                          {face.primary}
+                        </Text>
+                        {face.secondary ? (
+                          <Text
+                            style={[
+                              styles.versusLabelSecondary,
+                              face.secondaryRtl ? styles.rtlText : styles.versusLabelLtr,
+                            ]}>
+                            {face.secondary}
+                          </Text>
+                        ) : null}
+                        {face.ville ? (
+                          <Text style={[styles.versusCity, rtl && styles.rtlText]}>{face.ville}</Text>
+                        ) : null}
+                        {opt.dureeEtudes ? (
+                          <Text style={[styles.versusCity, rtl && styles.rtlText]}>
+                            {tOd(uiLocale, 'modalDuree')}
+                            {'  '}
+                            <Text style={styles.versusDuree}>{opt.dureeEtudes}</Text>
+                          </Text>
+                        ) : null}
+                        {diplomeTags.length ? (
+                          <View style={[styles.versusDipRow, rtl && styles.versusDipRowRtl]}>
+                            {diplomeTags.map((name, i) => {
+                              const tone = DIP_COLORS[i % DIP_COLORS.length];
+                              return (
+                                <View key={name} style={[styles.versusDip, { backgroundColor: tone.bg }]}>
+                                  <Text style={[styles.versusDipTxt, { color: tone.text }]}>{name}</Text>
+                                </View>
+                              );
+                            })}
+                            {diplomes.length > diplomeTags.length ? (
+                              <View style={[styles.versusDip, styles.versusDipMore]}>
+                                <Text style={styles.versusDipMoreTxt}>
+                                  +{diplomes.length - diplomeTags.length}
+                                </Text>
+                              </View>
+                            ) : null}
+                          </View>
+                        ) : null}
+                        {opt.orientationPlan || opt.admissionLabel ? (
+                          <View style={[styles.versusDipRow, rtl && styles.versusDipRowRtl]}>
+                            {opt.orientationPlan ? (
+                              <Text style={styles.versusTag}>
+                                {orientationPlanLabel(opt.orientationPlan)}
+                              </Text>
+                            ) : null}
+                            {opt.admissionLabel ? (
+                              <Text style={styles.versusTag}>{opt.admissionLabel}</Text>
+                            ) : null}
+                          </View>
+                        ) : null}
+                      </View>
+                    </View>
+                  );
+                })()
+              )}
               <View style={[styles.versusFooter, rtl && styles.versusFooterRtl]}>
                 {on ? (
                   <View style={[styles.versusWin, rtl && styles.versusFooterRtl]}>
@@ -564,12 +791,20 @@ export function OrientationDiagnosticStepContent({
   return null;
 }
 
+
+function applyStudyCityToggle(current: string[], picked: string): string[] {
+  if (picked === FLEX_CITY) {
+    return current.includes(FLEX_CITY) ? [] : [FLEX_CITY];
+  }
+  const withoutFlex = current.filter((name) => name !== FLEX_CITY);
+  return withoutFlex.includes(picked)
+    ? withoutFlex.filter((name) => name !== picked)
+    : [...withoutFlex, picked];
+}
+
 function CitiesStepMobile({
-  step,
   answers,
   setAnswers,
-  uiLocale,
-  rtl,
 }: {
   step: DiagnosticStep;
   answers: DiagnosticAnswers;
@@ -578,271 +813,93 @@ function CitiesStepMobile({
   rtl?: boolean;
 }) {
   const [cities, setCities] = useState<CityRow[]>([]);
-  const [query, setQuery] = useState('');
-  const selected = answers.cities ?? [];
-  const others = answers.cityOther ?? [];
-  const flexible = selected.includes('peuimporte');
-  const showOther = selected.includes('autres');
+  const [open, setOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    void listCities(2000).then(setCities).catch(() => undefined);
+    let alive = true;
+    void listCities(1000)
+      .then((rows) => {
+        if (alive) setCities(rows);
+      })
+      .catch(() => undefined)
+      .finally(() => {
+        if (alive) setLoading(false);
+      });
+    return () => {
+      alive = false;
+    };
   }, []);
 
-  const primaryOpts = (step.options ?? []).filter(
-    (o) => o.id !== 'autres' && o.id !== 'peuimporte',
-  );
-  const autresOpt = (step.options ?? []).find((o) => o.id === 'autres');
-  const flexOpt = (step.options ?? []).find((o) => o.id === 'peuimporte');
+  const selectedNames = selectedStudyCityNames(answers);
+  const flexible = selectedNames.includes(FLEX_CITY);
+  const chosen = selectedNames.filter((name) => name !== FLEX_CITY);
 
-  const availableOther = useMemo(
-    () =>
-      cities
-        .map((c) => c.titre)
-        .filter((n): n is string => Boolean(n))
-        .filter((n) => !PRIMARY_CITY_LABELS.has(n.toLowerCase())),
-    [cities],
-  );
+  const items = useMemo<SearchablePickItem[]>(() => {
+    return [...cities]
+      .filter((c) => c.titre?.trim())
+      .sort((a, b) => a.titre.localeCompare(b.titre, 'fr', { sensitivity: 'base' }))
+      .map((c) => ({
+        id: String(c.id),
+        value: c.titre,
+        label: c.titre,
+        subtitle: c.region?.titre,
+      }));
+  }, [cities]);
 
-  const quickOthers = useMemo(
-    () =>
-      QUICK_OTHER_CITIES.map(
-        (name) =>
-          availableOther.find((c) => c.toLowerCase() === name.toLowerCase()) || name,
-      ).filter((name) =>
-        availableOther.some((c) => c.toLowerCase() === name.toLowerCase()),
-      ),
-    [availableOther],
-  );
-
-  const searchResults = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (q.length < 2) return [];
-    return availableOther.filter((n) => n.toLowerCase().includes(q)).slice(0, 30);
-  }, [availableOther, query]);
-
-  const searchTotal = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    if (q.length < 2) return 0;
-    return availableOther.filter((n) => n.toLowerCase().includes(q)).length;
-  }, [availableOther, query]);
-
-  const summaryLabels = [
-    ...primaryOpts.filter((o) => selected.includes(o.id)).map((o) => o.label),
-    ...others,
-  ];
-
-  const toggleCityId = (optId: string) => {
-    setAnswers((prev) => {
-      let nextCities = prev.cities ?? [];
-      let cityOther = [...(prev.cityOther ?? [])];
-      if (optId === 'peuimporte') {
-        const on = nextCities.includes('peuimporte');
-        nextCities = on ? [] : ['peuimporte'];
-        cityOther = [];
-        if (!on) setQuery('');
-      } else {
-        nextCities = nextCities.filter((c) => c !== 'peuimporte');
-        if (nextCities.includes(optId)) {
-          nextCities = nextCities.filter((c) => c !== optId);
-          if (optId === 'autres') {
-            cityOther = [];
-            setQuery('');
-          }
-        } else {
-          nextCities = [...nextCities, optId];
-        }
-      }
-      return { ...prev, cities: nextCities, cityOther };
-    });
-  };
-
-  const toggleOther = (name: string) => {
-    setAnswers((prev) => {
-      const cur = prev.cityOther ?? [];
-      const next = cur.includes(name) ? cur.filter((c) => c !== name) : [...cur, name];
-      let citiesList = prev.cities ?? [];
-      if (!citiesList.includes('autres')) {
-        citiesList = [...citiesList.filter((c) => c !== 'peuimporte'), 'autres'];
-      }
-      return { ...prev, cities: citiesList, cityOther: next };
-    });
+  const toggle = (picked: string) => {
+    setAnswers((prev) => ({
+      ...prev,
+      cities: applyStudyCityToggle(selectedStudyCityNames(prev), picked),
+      cityOther: [],
+    }));
   };
 
   return (
-    <DiagnosticFormBlock rtl={rtl}>
-      {!flexible && summaryLabels.length > 0 ? (
-        <View style={styles.citiesSummary}>
-          <Text style={[styles.citiesSummaryLabel, rtl && styles.rtlText]}>
-            {tOdFill(uiLocale, 'citiesRetainedTpl', {
-              n: summaryLabels.length,
-              s: summaryLabels.length > 1 ? 's' : '',
-            })}
-          </Text>
-          <DiagnosticChipGrid rtl={rtl}>
-            {summaryLabels.map((name) => {
-              const primary = primaryOpts.find((o) => o.label === name);
-              return (
-                <DiagnosticChip
-                  key={name}
-                  label={`✕ ${name}`}
-                  selected
-                  rtl={rtl}
-                  onPress={() => {
-                    if (primary) toggleCityId(primary.id);
-                    else toggleOther(name);
-                  }}
-                />
-              );
-            })}
-          </DiagnosticChipGrid>
+    <View style={styles.cityField}>
+      <Pressable
+        onPress={() => toggle(FLEX_CITY)}
+        accessibilityRole="button"
+        accessibilityState={{ selected: flexible }}
+        style={[styles.flexCity, flexible && styles.flexCityOn]}>
+        <Text style={[styles.flexCityTxt, flexible && styles.flexCityTxtOn]}>{FLEX_CITY_LABEL}</Text>
+      </Pressable>
+      <SelectField
+        label="Villes"
+        hint="Appuyez sur le champ pour rechercher et choisir plusieurs villes."
+        value=""
+        rtl={false}
+        loading={loading}
+        loadingLabel="Chargement des villes…"
+        disabled={!loading && cities.length === 0}
+        onPress={() => setOpen(true)}
+      />
+      {chosen.length > 0 ? (
+        <View style={styles.cityChips}>
+          {chosen.map((name) => (
+            <View key={name} style={styles.cityChip}>
+              <Text style={styles.cityChipTxt}>{name}</Text>
+            </View>
+          ))}
         </View>
       ) : null}
-
-      {flexible ? (
-        <View style={styles.citiesFlexBanner}>
-          <Text style={[styles.citiesFlexTitle, rtl && styles.rtlText]}>
-            {tOd(uiLocale, 'citiesFlexibleTitle')}
-          </Text>
-          <Text style={[styles.citiesFlexSub, rtl && styles.rtlText]}>
-            {tOd(uiLocale, 'citiesFlexibleSub')}
-          </Text>
-        </View>
-      ) : null}
-
-      {!flexible ? (
-        <>
-          <DiagnosticFieldLabel rtl={rtl}>
-            {tOd(uiLocale, 'citiesPrimaryTitle')}
-          </DiagnosticFieldLabel>
-          <DiagnosticChipGrid rtl={rtl}>
-            {primaryOpts.map((o) => (
-              <DiagnosticChip
-                key={o.id}
-                label={o.label}
-                selected={selected.includes(o.id)}
-                onPress={() => toggleCityId(o.id)}
-                rtl={rtl}
-              />
-            ))}
-          </DiagnosticChipGrid>
-        </>
-      ) : null}
-
-      {flexOpt ? (
-        <DiagnosticChoiceRow
-          rtl={rtl}
-          mode="checkbox"
-          label={flexOpt.label}
-          detail={tOd(uiLocale, 'citiesFlexibleReplace')}
-          selected={flexible}
-          onPress={() => toggleCityId('peuimporte')}
-        />
-      ) : null}
-
-      {autresOpt && !flexible ? (
-        <DiagnosticChoiceRow
-          rtl={rtl}
-          mode="checkbox"
-          label={autresOpt.label}
-          detail={
-            others.length
-              ? tOdFill(uiLocale, 'citiesSelectedTpl', {
-                  n: others.length,
-                  s: others.length > 1 ? 's' : '',
-                })
-              : tOd(uiLocale, 'citiesOthersExamples')
-          }
-          selected={showOther}
-          onPress={() => toggleCityId('autres')}
-        />
-      ) : null}
-
-      {showOther && !flexible ? (
-        <View style={styles.citiesOtherBlock}>
-          {others.length === 0 ? (
-            <Text style={[styles.emptyHint, rtl && styles.rtlText]}>
-              {tOd(uiLocale, 'citiesSelectAtLeastOne')}
-            </Text>
-          ) : (
-            <>
-              <DiagnosticFieldLabel rtl={rtl}>
-                {tOdFill(uiLocale, 'citiesSelectedTpl', {
-                  n: others.length,
-                  s: others.length > 1 ? 's' : '',
-                })}
-              </DiagnosticFieldLabel>
-              <DiagnosticChipGrid rtl={rtl}>
-                {others.map((name) => (
-                  <DiagnosticChip
-                    key={name}
-                    label={`✕ ${name}`}
-                    selected
-                    onPress={() => toggleOther(name)}
-                    rtl={rtl}
-                  />
-                ))}
-              </DiagnosticChipGrid>
-            </>
-          )}
-
-          {quickOthers.length > 0 ? (
-            <>
-              <DiagnosticFieldLabel rtl={rtl}>
-                {tOd(uiLocale, 'citiesSuggestions')}
-              </DiagnosticFieldLabel>
-              <DiagnosticChipGrid rtl={rtl}>
-                {quickOthers.map((name) => (
-                  <DiagnosticChip
-                    key={name}
-                    label={name}
-                    selected={others.some((c) => c.toLowerCase() === name.toLowerCase())}
-                    onPress={() => toggleOther(name)}
-                    rtl={rtl}
-                  />
-                ))}
-              </DiagnosticChipGrid>
-            </>
-          ) : null}
-
-          <DiagnosticFieldLabel rtl={rtl}>{tOd(uiLocale, 'citiesSearch')}</DiagnosticFieldLabel>
-          <DiagnosticTextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder={tOd(uiLocale, 'citiesSearchPlaceholder')}
-            rtl={rtl}
-          />
-
-          {query.trim().length < 2 ? (
-            <Text style={[styles.emptyHint, rtl && styles.rtlText]}>
-              {tOd(uiLocale, 'citiesSearchMinChars')}
-            </Text>
-          ) : searchResults.length === 0 ? (
-            <Text style={[styles.emptyHint, rtl && styles.rtlText]}>
-              {tOdFill(uiLocale, 'citiesNoResult', { q: query.trim() })}
-            </Text>
-          ) : (
-            <>
-              <DiagnosticChipGrid rtl={rtl}>
-                {searchResults.map((name) => (
-                  <DiagnosticChip
-                    key={name}
-                    label={name}
-                    selected={others.includes(name)}
-                    onPress={() => toggleOther(name)}
-                    rtl={rtl}
-                  />
-                ))}
-              </DiagnosticChipGrid>
-              {searchTotal > 30 ? (
-                <Text style={[styles.emptyHint, rtl && styles.rtlText]}>
-                  {tOd(uiLocale, 'citiesShowFirst60')}
-                </Text>
-              ) : null}
-            </>
-          )}
-        </View>
-      ) : null}
-    </DiagnosticFormBlock>
+      <SearchablePickSheet
+        visible={open}
+        title="Sélectionnez vos villes"
+        searchPlaceholder="Rechercher une ville…"
+        emptyLabel="Aucune ville trouvée"
+        allLabel="Choisir des villes…"
+        items={items}
+        selectedValue=""
+        selectedValues={chosen}
+        multiSelect
+        closeOnPick={false}
+        confirmLabel="Confirmer"
+        rtl={false}
+        onPick={toggle}
+        onClose={() => setOpen(false)}
+      />
+    </View>
   );
 }
 
@@ -854,24 +911,29 @@ const styles = StyleSheet.create({
     lineHeight: 20,
     paddingVertical: spacing.sm,
   },
-  citiesSummary: { gap: spacing.xs, marginBottom: spacing.sm },
-  citiesSummaryLabel: {
-    fontSize: fontSize.xs,
-    fontWeight: '700',
-    color: brand.textMuted,
-  },
-  citiesFlexBanner: {
-    gap: 4,
-    padding: spacing.md,
+  cityField: { paddingBottom: spacing.sm, gap: spacing.sm },
+  flexCity: {
+    borderWidth: 1.5,
+    borderColor: diagnosticTheme.fieldBorder,
     borderRadius: radius.lg,
-    backgroundColor: diagnosticTheme.accentSoft,
-    borderWidth: 1,
-    borderColor: homeShell.green,
-    marginBottom: spacing.sm,
+    backgroundColor: brand.white,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
   },
-  citiesFlexTitle: { fontSize: fontSize.sm, fontWeight: '800', color: brand.primary },
-  citiesFlexSub: { fontSize: fontSize.xs, color: brand.textMuted, lineHeight: 18 },
-  citiesOtherBlock: { gap: spacing.sm, marginTop: spacing.xs },
+  flexCityOn: {
+    borderColor: brand.primary,
+    backgroundColor: diagnosticTheme.primarySoft,
+  },
+  flexCityTxt: { fontSize: fontSize.sm, fontWeight: '700', color: brand.text },
+  flexCityTxtOn: { color: brand.primary },
+  cityChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+  cityChip: {
+    backgroundColor: '#eef2ff',
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+  },
+  cityChipTxt: { fontSize: 12, fontWeight: '700', color: brand.primary },
   situationHintRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
@@ -990,6 +1052,61 @@ const styles = StyleSheet.create({
     lineHeight: 24,
   },
   versusLabelOn: { color: '#065f46' },
+  versusNameRtl: { alignItems: 'flex-end' },
+  versusLabelSecondary: {
+    marginTop: 2,
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: brand.textMuted,
+    lineHeight: 20,
+  },
+  versusLabelLtr: { writingDirection: 'ltr', textAlign: 'left' },
+  versusLabelAlignEnd: { textAlign: 'right' },
+  versusSectorPill: {
+    marginTop: 8,
+    alignSelf: 'flex-start',
+    backgroundColor: homeShell.greenSurface,
+    borderWidth: 1,
+    borderColor: homeShell.greenBorder,
+    borderRadius: 999,
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+  },
+  versusSectorPillRtl: { alignSelf: 'flex-end' },
+  versusSectorTxt: {
+    fontSize: fontSize.xs,
+    fontWeight: '700',
+    color: homeShell.greenDark,
+  },
+  versusSchool: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: spacing.sm,
+  },
+  versusSchoolRtl: { flexDirection: 'row-reverse' },
+  versusLogo: {
+    width: 52,
+    height: 52,
+    borderRadius: 12,
+    backgroundColor: brand.white,
+    borderWidth: 1,
+    borderColor: '#e2e8f0',
+  },
+  versusSchoolBody: { flex: 1, minWidth: 0, gap: 3 },
+  versusSchoolName: {
+    fontSize: fontSize.sm,
+    fontWeight: '800',
+    color: brand.text,
+    lineHeight: 20,
+  },
+  versusCity: { fontSize: fontSize.xs, color: brand.textMuted, fontWeight: '600' },
+  versusDuree: { writingDirection: 'ltr', color: brand.text, fontWeight: '700' },
+  versusDipRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 2 },
+  versusDipRowRtl: { flexDirection: 'row-reverse' },
+  versusDip: { borderRadius: 999, paddingHorizontal: 8, paddingVertical: 3 },
+  versusDipTxt: { fontSize: 11, fontWeight: '700', writingDirection: 'ltr' },
+  versusDipMore: { backgroundColor: '#f1f5f9' },
+  versusDipMoreTxt: { fontSize: 11, fontWeight: '700', color: '#475569' },
   versusTag: { fontSize: fontSize.xs, color: brand.textMuted, fontWeight: '600' },
   versusFooter: { marginTop: 2 },
   versusFooterRtl: { alignItems: 'flex-end' },

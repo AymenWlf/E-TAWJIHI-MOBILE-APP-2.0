@@ -14,6 +14,22 @@ const IS_WEB = Platform.OS === 'web';
 /** Notif considérée comme ouverture seulement si tap récent (évite les réponses Expo périmées). */
 const PUSH_LAUNCH_MAX_AGE_MS = 20_000;
 
+function withTimeout<T>(promise: Promise<T>, ms: number, fallback: T): Promise<T> {
+  return new Promise((resolve) => {
+    const timer = setTimeout(() => resolve(fallback), ms);
+    promise.then(
+      (value) => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      () => {
+        clearTimeout(timer);
+        resolve(fallback);
+      },
+    );
+  });
+}
+
 function isMeaningfulDeepLink(url: string | null | undefined): url is string {
   if (!url?.trim()) return false;
   const normalized = url.trim();
@@ -65,10 +81,14 @@ export async function resolveAppLaunchIntent(): Promise<AppLaunchIntent> {
     }
 
     try {
-      const [notifResp, initialUrl] = await Promise.all([
-        Notifications.getLastNotificationResponseAsync(),
-        Linking.getInitialURL(),
-      ]);
+      const [notifResp, initialUrl] = await withTimeout(
+        Promise.all([
+          Notifications.getLastNotificationResponseAsync(),
+          Linking.getInitialURL(),
+        ]),
+        1500,
+        [null, null] as const,
+      );
 
       if (isRecentPushLaunchResponse(notifResp)) {
         resolved = {

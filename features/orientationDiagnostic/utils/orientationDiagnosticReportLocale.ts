@@ -12,6 +12,35 @@ import type {
 } from '../types/orientationDiagnosticPrototype';
 import type { DiagnosticTierId } from './schoolDiagnosticTier';
 
+const REPORT_METIER_NAMES: Record<string, [fr: string, ar: string]> = {
+  ing_ia: ['Ingénieur IA / Data', 'مهندس ذكاء اصطناعي / بيانات'],
+  dev: ['Développeur logiciel', 'مطور برمجيات'],
+  consultant: ['Consultant stratégie', 'مستشار استراتيجي'],
+  product: ['Product Manager', 'مدير منتج'],
+  inge_indus: ['Ingénieur industriel', 'مهندس صناعي'],
+  founder: ['Entrepreneur / fondateur', 'رائد أعمال ومؤسس'],
+  finance_ana: ['Analyste financier', 'محلل مالي'],
+  mkt: ['Responsable marketing', 'مسؤول تسويق'],
+  med: ['Métiers de la santé', 'مهن الصحة'],
+  enseignant: ['Enseignant / formateur', 'أستاذ ومكوّن'],
+  ux: ['Designer UX / UI', 'مصمم تجربة / واجهة المستخدم'],
+  data_sci: ['Data scientist', 'عالم بيانات'],
+};
+
+export function reportMetierBilingualLines(
+  id: string,
+  fallback: string,
+  locale: OrientationUiLocale,
+): { primary: string; secondary?: string; primaryRtl: boolean; secondaryRtl: boolean } {
+  const known = REPORT_METIER_NAMES[id];
+  const separator = fallback.indexOf(' · ');
+  const fr = known?.[0] || (separator > 0 ? fallback.slice(0, separator).trim() : fallback);
+  const ar = known?.[1] || (separator > 0 ? fallback.slice(separator + 3).trim() : '');
+  return locale === 'ar'
+    ? { primary: ar || fr, secondary: ar ? fr : undefined, primaryRtl: Boolean(ar), secondaryRtl: false }
+    : { primary: fr, secondary: ar || undefined, primaryRtl: false, secondaryRtl: true };
+}
+
 const PROFILE_TITLE_AR: Record<string, string> = {
   'L’Explorateur Stratège': 'المستكشف الاستراتيجي',
   'L’Analyste Curieux': 'المحلل الفضولي',
@@ -83,23 +112,25 @@ const PHRASE_AR: Record<string, string> = {
   'Capacité à articuler ambitions personnelles et contraintes réalistes.':
     'القدرة على الجمع بين الطموحات الشخصية والقيود الواقعية.',
   'Ton besoin d’autonomie peut rendre les environnements très rigides (process lourds) frustrants.':
-    'حاجتك إلى الاستقلالية قد تجعل البيئات الجامدة (إجراءات ثقيلة) محبطة.',
+    'قد تجعلك حاجتك إلى الاستقلالية غير مرتاح في البيئات الصارمة ذات الإجراءات الكثيرة.',
   'Ton attrait pour la variété peut rendre le choix d’une spécialité difficile — cadre 2–3 familles avant de trancher.':
-    'انجذابك للتنوع قد يصعّب اختيار تخصص — حدّد 2–3 عائلات قبل الحسم.',
+    'قد يصعّب حبك للتنوع اختيار تخصص واحد. حدّد عائلتين أو ثلاث عائلات مهنية قبل الحسم.',
   'Tes dilemmes montrent une tolérance au risque plus élevée que ta stabilité déclarée : clarifie ce que tu es prêt(e) à accepter.':
-    'معضلاتك تُظهر تحملاً للمخاطر أعلى من استقرارك المصرّح به: وضّح ما أنت مستعد(ة) لقبوله.',
+    'تُظهر اختياراتك استعداداً أكبر للمخاطرة. حدّد بوضوح ما يمكنك قبوله.',
   'La clarté du projet est encore faible : priorise l’exploration concrète (métiers, stages, rencontres) avant les classements d’écoles.':
-    'وضوح المشروع لا يزال ضعيفاً: قدّم الاستكشاف العملي (مهن، تداريب، لقاءات) قبل ترتيب المدارس.',
+    'مشروعك يحتاج إلى مزيد من الوضوح. استكشف المهن والتداريب واللقاءات أولاً، ثم رتّب المدارس.',
   'Tu vises l’impact, mais le contact humain intensif te fatigue : privilégie des rôles d’impact « analytique » ou « produit ».':
-    'تستهدف الأثر لكن التواصل البشري المكثف يُرهقك: فضّل أدوار أثر «تحليلية» أو «منتج».',
+    'تريد إحداث أثر، لكن التواصل المستمر قد يتعبك. اختر أدواراً تحليلية أو مرتبطة بالمنتجات.',
   'Attention à ne pas sur-optimiser le prestige d’une école avant d’avoir validé l’adéquation métier / mode de vie.':
-    'احذر من المبالغة في هيبة مدرسة قبل التأكد من ملاءمة المهنة / نمط الحياة.',
+    'لا تجعل سمعة المدرسة أهم من توافق المهنة ونمط الحياة معك.',
   'Prioriser universités publiques / CPGE / écoles à frais maîtrisés comme plan A.':
     'إعطاء الأولوية للجامعات العمومية / الأقسام التحضيرية / مدارس بتكاليف مضبوطة كخطة أ.',
   'Construire un plan A/B : 1–2 cibles ambitieuses + options accessibles budgétairement.':
     'بناء خطة أ/ب: هدف أو هدفان طموحان + خيارات في المتناول ميزانياً.',
+  'Mobilité géographique large : avantage pour optimiser le fit école / filière.':
+    'مرونة جغرافية واسعة: ميزة لتحسين التوافق بين المدرسة والشعبة.',
   'Faisabilité correcte : passer aux actions (portes ouvertes, dossiers, calendrier concours).':
-    'قابلية تنفيذ جيدة: الانتقال إلى الأفعال (أبواب مفتوحة، ملفات، رزنامة مباريات).',
+    'إمكانية التنفيذ جيدة. انتقل إلى خطوات عملية: الأيام المفتوحة والملفات ومواعيد المباريات.',
   'Secteurs alignés avec tes choix': 'قطاعات متوافقة مع اختياراتك',
   'Secteurs peu alignés': 'قطاعات قليلة التوافق',
   'Ville compatible avec tes préférences': 'مدينة متوافقة مع تفضيلاتك',
@@ -109,15 +140,15 @@ const PHRASE_AR: Record<string, string> = {
   'Filière bac non acceptée': 'شعبة الباك غير مقبولة',
   'Filière / bac compatible': 'شعبة / باك متوافق',
   'Compatibilité bac limitée': 'توافق باك محدود',
-  'Seuil d’admission difficilement atteignable': 'عتبة قبول صعبة البلوغ',
+  'Seuil d’admission difficilement atteignable': 'عتبة قبول صعبة المنال',
   'Notes compatibles avec les seuils': 'نقط متوافقة مع العتبات',
   'Budget cohérent': 'ميزانية متسقة',
   'Frais potentiellement élevés pour ton budget': 'رسوم قد تكون مرتفعة لميزانيتك',
   'Niveau de diplôme visé proposé': 'مستوى الدبلوم المستهدف مقترح',
   'Accès sur concours': 'ولوج عبر مباراة',
-  'Déjà dans ton radar': 'موجودة سلفاً في رادارك',
-  'Vainqueur Versus': 'فائز Versus',
-  'Écarté en Versus': 'مُستبعد في Versus',
+  'Déjà dans ton radar': 'موجودة في قائمة مدارسك',
+  'Vainqueur Versus': 'فائز في المواجهات',
+  'Écarté en Versus': 'مُستبعد في المواجهات',
   Concours: 'مباراة',
   'Étude de dossier': 'دراسة ملف',
   'Management': 'التدبير',
@@ -145,7 +176,7 @@ const PHRASE_AR: Record<string, string> = {
   'Formation & RH': 'التكوين والموارد البشرية',
   'Psychologie': 'علم النفس',
   'Design graphique / UX': 'التصميم الجرافيكي / UX',
-  'Architecture d’intérieur': 'الهندسة الداخلية',
+  'Architecture d’intérieur': 'التصميم الداخلي',
   'Médias créatifs': 'وسائط إبداعية',
   'Data science': 'علم البيانات',
   'Statistique': 'الإحصاء',
@@ -155,7 +186,7 @@ const PHRASE_AR: Record<string, string> = {
 const TIER_AR: Record<DiagnosticTierId, string> = {
   recommended: 'موصى به',
   possible: 'ممكن',
-  lastResort: 'ملاذ أخير',
+  lastResort: 'خيار احتياطي',
   avoid: 'يُفضّل تجنّبه',
 };
 
@@ -170,7 +201,7 @@ export function localizeReportPhrase(text: string, locale: OrientationUiLocale):
   if (locale !== 'ar' || !text) return text;
   if (PHRASE_AR[text]) return PHRASE_AR[text];
   const vs = text.match(/^Vainqueur Versus \(×(\d+)\)$/);
-  if (vs) return `فائز Versus (×${vs[1]})`;
+  if (vs) return `فائز في المواجهات (×${vs[1]})`;
   const ancrer = text.match(/^Ancrer la shortlist sur les familles « (.+) » et « (.+) »\.$/);
   if (ancrer) {
     return `تثبيت القائمة القصيرة على عائلتي « ${localizeFamilyLabel(ancrer[1], locale)} » و« ${localizeFamilyLabel(ancrer[2], locale)} ».`;
@@ -178,8 +209,35 @@ export function localizeReportPhrase(text: string, locale: OrientationUiLocale):
   const cities = text.match(/^Cibler d’abord les établissements dans : (.+)\.$/);
   if (cities) return `استهداف المؤسسات أولاً في: ${cities[1]}.`;
   const admis = text.match(/^Anticiper les modes d’admission de ton radar : (.+)\.$/);
-  if (admis) return `توقّع أنماط القبول في رادارك: ${localizeReportPhrase(admis[1], locale)}.`;
+  if (admis) {
+    const modes = admis[1]
+      .split(',')
+      .map((mode) => localizeReportPhrase(mode.trim(), locale))
+      .join('، ');
+    return `توقّع أنماط القبول في رادارك: ${modes}.`;
+  }
   return PHRASE_AR[text] || text;
+}
+
+export function reportPhraseBilingualLines(
+  french: string,
+  locale: OrientationUiLocale,
+): { primary: string; secondary?: string; primaryRtl: boolean; secondaryRtl: boolean } {
+  const arabic = localizeReportPhrase(french, 'ar');
+  const hasArabic = arabic !== french;
+  return locale === 'ar'
+    ? {
+        primary: hasArabic ? arabic : french,
+        secondary: hasArabic ? french : undefined,
+        primaryRtl: hasArabic,
+        secondaryRtl: false,
+      }
+    : {
+        primary: french,
+        secondary: hasArabic ? arabic : undefined,
+        primaryRtl: false,
+        secondaryRtl: true,
+      };
 }
 
 export function localizeFamilyLabel(labelOrId: string, locale: OrientationUiLocale): string {
@@ -241,9 +299,9 @@ export function localizeProfileSentence(
     fn.autonomie > 70
       ? 'مع ميل قوي إلى الاستقلالية'
       : fn.collaboration > 70
-        ? 'في بيئات تعاونية'
-        : 'بالمزج بين التفكير والعمل';
-  return `${title} — ملف بغلبة ${p} و${s}، ${tone}. تبدو محفَّزاً/ة خصوصاً في السياقات التي تتيح فهم المشكلات واقتراح حلول والتقدّم نحو مسؤوليات أكبر.`;
+        ? 'مع ميل قوي إلى التعاون'
+        : 'مع توازن بين التفكير والعمل';
+  return `${title} — يغلب على ملفك بُعدا ${p} و${s}، ${tone}. تبدو أكثر تحفيزاً في البيئات التي تتيح لك فهم المشكلات واقتراح الحلول وتحمّل مسؤوليات أكبر.`;
 }
 
 export function localizeDiagnosticBody(
@@ -257,12 +315,12 @@ export function localizeDiagnosticBody(
     .join('، ');
   const label = report.diagnosticLabel;
   if (label === 'Exploration active' || label === 'Exploration initiale') {
-    return `لديك بالفعل اهتمامات متسقة (خصوصاً ${top})، لكن مشروعك ليس دقيقاً بما يكفي لتثبيت تكوين. الأولوية: مقارنة 2 إلى 3 عائلات مهنية ثم بناء استراتيجية المدارس.`;
+    return `لديك اهتمامات واضحة، خصوصاً في ${top}، لكن مشروعك يحتاج إلى مزيد من التحديد. قارن بين عائلتين أو ثلاث عائلات مهنية، ثم ضع خطة لاختيار المدارس.`;
   }
   if (label === 'Affinage du projet') {
-    return `لديك اتجاه واعد حول ${top}. الخطوة التالية هي التحقق من مهنة أو مهنتين مستهدفتين ورسم الشعب / المؤسسات المتوافقة مع قيودك.`;
+    return `لديك اتجاه واعد نحو ${top}. اختر مهنة أو مهنتين، ثم حدّد الشعب والمؤسسات التي تناسب وضعك وإمكاناتك.`;
   }
-  return `مستوى وضوحك مرتفع. يمكنك الانتقال إلى استراتيجية قبول ملموسة: رزنامة، خطط أ/ب للمدارس، ومواءمة الميزانية / التنقل — مع الإبقاء على ${top} كبوصلة.`;
+  return `مشروعك واضح. يمكنك الآن إعداد خطة قبول عملية تشمل المواعيد، وخطتي أ وب للمدارس، والميزانية والتنقل، مع اعتماد ${top} كاتجاه رئيسي.`;
 }
 
 export function localizeForceLine(
@@ -275,10 +333,10 @@ export function localizeForceLine(
     /^Facilité à t’exprimer dans un registre (.+) \(et (.+) en secondaire\)\.$/,
   );
   if (m && dominante) {
-    return `سهولة التعبير ضمن سجل ${localizeRiasecLabel(dominante.primary, locale)} (و${localizeRiasecLabel(dominante.secondary, locale)} ثانوياً).`;
+    return `سهولة التعبير عن ميول ${localizeRiasecLabel(dominante.primary, locale)}، مع ميول ثانوية من نوع ${localizeRiasecLabel(dominante.secondary, locale)}.`;
   }
   if (m) {
-    return `سهولة التعبير ضمن سجل ${m[1]} (و${m[2]} ثانوياً).`;
+    return `سهولة التعبير عن ميول ${m[1]}، مع ميول ثانوية من نوع ${m[2]}.`;
   }
   return localizeReportPhrase(line, locale);
 }

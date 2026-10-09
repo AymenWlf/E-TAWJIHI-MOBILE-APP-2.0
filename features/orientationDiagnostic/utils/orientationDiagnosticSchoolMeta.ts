@@ -32,5 +32,8 @@ export function buildOrientationSchoolMeta(e: Establishment): OrientationSchoolM
     villes,
     dureeEtudes: establishmentDureeEtudesLabel(e) || null,
     diplomes,
+    logo:
+      ((e as Establishment & { media?: { logo?: string | null } }).media?.logo ?? e.logo)?.trim() ||
+      null,
   };
 }
