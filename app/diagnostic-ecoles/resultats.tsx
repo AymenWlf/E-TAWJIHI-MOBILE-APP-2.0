@@ -10,6 +10,7 @@ import { DiagnosticLoadingView } from '@/components/diagnostic/DiagnosticLoading
 import { DiagnosticRecommendationRow } from '@/components/diagnostic/DiagnosticRecommendationRow';
 import { DiagnosticStatusBar, diagnosticTheme } from '@/components/diagnostic/DiagnosticUi';
 import { Text } from '@/components/ui/Text';
+import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
@@ -852,26 +853,14 @@ export default function DiagnosticResultatsScreen() {
               </Text>
             ) : null}
           </View>
-          <View style={styles.langSwitch}>
-            {(['fr', 'ar'] as const).map((code) => {
-              const on = reportLocale === code;
-              return (
-                <Pressable
-                  key={code}
-                  onPress={() => {
-                    reportLocaleLocked.current = true;
-                    setReportLocale(code);
-                  }}
-                  style={[styles.langBtn, on && styles.langBtnOn]}
-                  accessibilityRole="button"
-                  accessibilityState={{ selected: on }}>
-                  <Text style={[styles.langBtnTxt, on && styles.langBtnTxtOn, styles.ltrText]}>
-                    {code === 'fr' ? 'FR' : 'AR'}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
+          <HeroLangSwitch
+            style={styles.langSlot}
+            locale={reportLocale}
+            onLocaleChange={(code) => {
+              reportLocaleLocked.current = true;
+              setReportLocale(code);
+            }}
+          />
         </View>
         <View style={styles.headerAccentLine} />
         {tierCounts.length > 0 ? (
@@ -1059,26 +1048,7 @@ const styles = StyleSheet.create({
   },
   secondaryUnderRtl: { writingDirection: 'ltr', textAlign: 'right' },
   secondaryUnderLtr: { writingDirection: 'rtl', textAlign: 'left' },
-  langSwitch: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: radius.full,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.45)',
-    overflow: 'hidden',
-    marginTop: 2,
-  },
-  langBtn: {
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-  },
-  langBtnOn: { backgroundColor: brand.white },
-  langBtnTxt: {
-    fontSize: 11,
-    fontWeight: '800',
-    color: 'rgba(255,255,255,0.9)',
-  },
-  langBtnTxtOn: { color: brand.primary },
+  langSlot: { marginTop: 2 },
   scroll: { flex: 1, backgroundColor: '#F8FAFC' },
   scrollRtl: DIR_RTL,
   scrollContent: {

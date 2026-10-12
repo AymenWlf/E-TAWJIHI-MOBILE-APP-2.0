@@ -17,7 +17,7 @@ function rtlEmbedLatin(text: string, rtl: boolean): string {
 /** Pourcentage lisible en RTL (chiffres LTR + police système via `latinDigits` sur Text). */
 export function formatDiagnosticPercent(value: number, rtl?: boolean): string {
   const n = Math.round(value);
-  const core = `${n}%`;
+  const core = rtl ? `${n}٪` : `${n}%`;
   return rtl ? `${LRI}${core}${PDI}` : core;
 }
 

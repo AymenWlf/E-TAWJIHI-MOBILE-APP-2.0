@@ -7,15 +7,29 @@ import { radius } from '@/theme/tokens';
 import { heroShellHeaderUi, useHeroShellHeaderWide } from '@/utils/heroShellHeaderUi';
 
 import { DIR_LTR } from '@/utils/layoutDirection';
+
+type AppLocale = 'fr' | 'ar';
+
 type Props = {
   style?: StyleProp<ViewStyle>;
+  /**
+   * Locale affichée. Sans `onLocaleChange`, le switch suit la langue de l’app.
+   */
+  locale?: AppLocale;
+  /** Si fourni, ne change pas la langue globale : seulement cette valeur. */
+  onLocaleChange?: (locale: AppLocale) => void;
 };
 
 /** FR / عربي — switch langue unifié (accueil + en-têtes hero). Ordre visuel fixe : FR à gauche, عربي à droite. */
-export function HeroLangSwitch({ style }: Props = {}) {
-  const { locale, setLocale, t, isRTL } = useLocale();
+export function HeroLangSwitch({ style, locale: localeProp, onLocaleChange }: Props = {}) {
+  const { locale: appLocale, setLocale, t, isRTL } = useLocale();
   const { width: screenW } = useWindowDimensions();
   const isWideHeader = useHeroShellHeaderWide(screenW);
+  const locale = localeProp ?? appLocale;
+  const select = (next: AppLocale) => {
+    if (onLocaleChange) onLocaleChange(next);
+    else setLocale(next);
+  };
 
   return (
     <View
@@ -27,7 +41,7 @@ export function HeroLangSwitch({ style }: Props = {}) {
       accessibilityRole="tablist"
       accessibilityLabel={t('languageSwitcher')}>
       <Pressable
-        onPress={() => setLocale('fr')}
+        onPress={() => select('fr')}
         style={({ pressed }) => [
           styles.langPill,
           locale === 'fr' && styles.langPillActive,
@@ -45,7 +59,7 @@ export function HeroLangSwitch({ style }: Props = {}) {
         </Text>
       </Pressable>
       <Pressable
-        onPress={() => setLocale('ar')}
+        onPress={() => select('ar')}
         style={({ pressed }) => [
           styles.langPill,
           locale === 'ar' && styles.langPillActive,

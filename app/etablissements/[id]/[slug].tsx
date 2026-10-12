@@ -449,7 +449,7 @@ export default function EstablishmentDetailScreen() {
     if (!data?.seuilsAdmission) return null;
     return getSeuilAdmissionDisplay(data.seuilsAdmission, {
       locale: locale === 'ar' ? 'ar' : 'fr',
-      campusLabels: campusSeuilLabelsFromApi(data.campus),
+      campusLabels: campusSeuilLabelsFromApi(data.campus, locale === 'ar' ? 'ar' : 'fr'),
     });
   }, [data?.seuilsAdmission, campusRows, locale]);
   const uni = useMemo(() => (data ? universityName(data, { rtl: isRTL }) : ''), [data, isRTL]);

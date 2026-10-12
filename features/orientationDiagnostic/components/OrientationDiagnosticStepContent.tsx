@@ -3,7 +3,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { DiagnosticChoiceRow, diagnosticTheme } from '@/components/diagnostic/DiagnosticUi';
-import { SearchablePickSheet, type SearchablePickItem } from '@/components/schools/SearchablePickSheet';
+import type { SearchablePickItem } from '@/components/schools/SearchablePickSheet';
+import { HostedSearchablePickSheet } from './orientationPickSheetHost';
 import { SelectField } from '@/components/ui/SelectField';
 import { Text } from '@/components/ui/Text';
 import {
@@ -16,6 +17,7 @@ import { applyVersusWinner, hydrateVersusSchoolVisuals } from '../utils/orientat
 import {
   formatBilingualName,
   localizeAmbitionLabel,
+  localizeFlexibleCityLabel,
   localizeStep,
   RIASEC_LIKERT_AR,
   tOd,
@@ -170,7 +172,6 @@ const LEGACY_STUDY_CITY: Record<string, string> = {
 };
 
 const FLEX_CITY = 'peuimporte';
-const FLEX_CITY_LABEL = 'Peu importe — partout au Maroc';
 
 function selectedStudyCityNames(answers: DiagnosticAnswers): string[] {
   const selected = answers.cities ?? [];
@@ -806,6 +807,7 @@ function applyStudyCityToggle(current: string[], picked: string): string[] {
 function CitiesStepMobile({
   answers,
   setAnswers,
+  uiLocale,
 }: {
   step: DiagnosticStep;
   answers: DiagnosticAnswers;
@@ -863,7 +865,14 @@ function CitiesStepMobile({
         accessibilityRole="button"
         accessibilityState={{ selected: flexible }}
         style={[styles.flexCity, flexible && styles.flexCityOn]}>
-        <Text style={[styles.flexCityTxt, flexible && styles.flexCityTxtOn]}>{FLEX_CITY_LABEL}</Text>
+        <Text
+          style={[
+            styles.flexCityTxt,
+            flexible && styles.flexCityTxtOn,
+            uiLocale === 'ar' && styles.flexCityTxtRtl,
+          ]}>
+          {localizeFlexibleCityLabel(uiLocale)}
+        </Text>
       </Pressable>
       <SelectField
         label="Villes"
@@ -884,7 +893,7 @@ function CitiesStepMobile({
           ))}
         </View>
       ) : null}
-      <SearchablePickSheet
+      <HostedSearchablePickSheet
         visible={open}
         title="Sélectionnez vos villes"
         searchPlaceholder="Rechercher une ville…"
@@ -926,6 +935,7 @@ const styles = StyleSheet.create({
     backgroundColor: diagnosticTheme.primarySoft,
   },
   flexCityTxt: { fontSize: fontSize.sm, fontWeight: '700', color: brand.text },
+  flexCityTxtRtl: { writingDirection: 'rtl', textAlign: 'right' },
   flexCityTxtOn: { color: brand.primary },
   cityChips: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
   cityChip: {

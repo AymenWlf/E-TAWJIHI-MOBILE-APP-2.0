@@ -38,11 +38,14 @@ import {
   readOrientationDiagnosticPrototypeDraft,
 } from '../constants/orientationDiagnosticPrototypeStorage';
 import {
+  localizeDisplayedStudyCities,
   localizeRiasecLabel,
+  riasecCodeParts,
   tOd,
   type OrientationUiLocale,
 } from '../data/orientationDiagnosticI18n';
-import type { OrientationReport, RiasecLetter } from '../types/orientationDiagnosticPrototype';
+import type { DiagnosticAnswers, OrientationReport, RiasecLetter } from '../types/orientationDiagnosticPrototype';
+import { studentSummaryFromAnswers } from '../utils/orientationDiagnosticEngine';
 import {
   localizeDiagnosticBody,
   localizeDiagnosticLabel,
@@ -92,6 +95,7 @@ export function OrientationDiagnosticReportScreen() {
 
   const [loading, setLoading] = useState(true);
   const [report, setReport] = useState<OrientationReport | null>(null);
+  const [sourceAnswers, setSourceAnswers] = useState<DiagnosticAnswers | null>(null);
   const [marking, setMarking] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [retakeConfirmVisible, setRetakeConfirmVisible] = useState(false);
@@ -101,6 +105,7 @@ export function OrientationDiagnosticReportScreen() {
     void (async () => {
       const draft = await readOrientationDiagnosticPrototypeDraft(userId);
       let nextReport = draft?.report ?? null;
+      if (!cancelled && draft?.answers) setSourceAnswers(draft.answers);
       const token = await getValidAccessToken();
       if (token) {
         try {
@@ -161,11 +166,30 @@ export function OrientationDiagnosticReportScreen() {
     }
   }, [report, markReportComplete]);
 
+  const identitySummary = useMemo(() => {
+    const profile = sourceAnswers?.profile;
+    const hasFilledProfile = Boolean(
+      profile &&
+        (profile.firstName.trim() ||
+          profile.lastName.trim() ||
+          profile.studyLevel.trim() ||
+          profile.bacFiliere.trim() ||
+          profile.bacType.trim() ||
+          profile.noteNational.trim() ||
+          (sourceAnswers?.cities?.length ?? 0) > 0),
+    );
+    if (hasFilledProfile && sourceAnswers) return studentSummaryFromAnswers(sourceAnswers);
+    return report?.studentSummary ?? null;
+  }, [report?.studentSummary, sourceAnswers]);
+
   const onDownloadPdf = useCallback(async () => {
     if (!report || pdfBusy) return;
     setPdfBusy(true);
     try {
-      await downloadOrientationDiagnosticReportPdf(report, uiLocale);
+      await downloadOrientationDiagnosticReportPdf(
+        identitySummary ? { ...report, studentSummary: identitySummary } : report,
+        uiLocale,
+      );
     } catch {
       Alert.alert(
         uiLocale === 'ar' ? 'خطأ' : 'Erreur',
@@ -174,7 +198,7 @@ export function OrientationDiagnosticReportScreen() {
     } finally {
       setPdfBusy(false);
     }
-  }, [pdfBusy, report, uiLocale]);
+  }, [identitySummary, pdfBusy, report, uiLocale]);
 
   const onRetakeTest = useCallback(() => setRetakeConfirmVisible(true), []);
 
@@ -209,11 +233,11 @@ export function OrientationDiagnosticReportScreen() {
   const s = report.scores;
 
   const identityItems = [
-    { label: t('reportKvEleve'), value: report.studentSummary.fullName },
-    { label: t('reportKvNiveau'), value: report.studentSummary.studyLevel },
-    { label: t('reportKvBac'), value: report.studentSummary.bacLabel },
-    { label: t('reportKvVilles'), value: report.studentSummary.city },
-    { label: t('reportKvNotes'), value: report.studentSummary.notesLabel },
+    { label: t('reportKvEleve'), value: identitySummary?.fullName },
+    { label: t('reportKvNiveau'), value: identitySummary?.studyLevel },
+    { label: t('reportKvBac'), value: identitySummary?.bacLabel },
+    { label: t('reportKvVilles'), value: localizeDisplayedStudyCities(identitySummary?.city, uiLocale) },
+    { label: t('reportKvNotes'), value: identitySummary?.notesLabel },
   ].filter((x) => x.value?.trim());
 
   return (
@@ -259,6 +283,7 @@ export function OrientationDiagnosticReportScreen() {
             />
             <Text style={[styles.heroKicker, isRTL && styles.rtlText]}>{diagLabel}</Text>
             <Text style={[styles.heroTitle, isRTL && styles.rtlText]}>{profileTitle}</Text>
+            <RiasecProfileRow code={s.codeConsolide} uiLocale={uiLocale} rtl={isRTL} />
             <Text style={[styles.heroBody, isRTL && styles.rtlText]}>{profileSentence}</Text>
             {diagBody ? (
               <Text style={[styles.heroBodyMuted, isRTL && styles.rtlText]}>{diagBody}</Text>
@@ -285,6 +310,7 @@ export function OrientationDiagnosticReportScreen() {
                   <Text style={styles.passCode} latinDigits>
                     {s.codeConsolide || t('reportProfilFallback')}
                   </Text>
+                  <RiasecProfileRow code={s.codeConsolide} uiLocale={uiLocale} rtl={isRTL} />
                   <Text style={[styles.passDiag, isRTL && styles.rtlText]}>{diagLabel}</Text>
                   <View style={styles.passMetrics}>
                     <View style={styles.passMetric}>
@@ -322,7 +348,11 @@ export function OrientationDiagnosticReportScreen() {
           <Animated.View
             entering={FadeInUp.delay(80).duration(380)}
             style={[styles.snapshot, isRTL && styles.rowRtl]}>
-            <SnapshotItem k="RIASEC" v={s.codeConsolide || '—'} rtl={isRTL} />
+            <SnapshotItem
+              k={s.codeConsolide ? `RIASEC · ${s.codeConsolide}` : 'RIASEC'}
+              v={riasecCodeParts(s.codeConsolide, uiLocale).map((part) => part.label).join(' · ') || '—'}
+              rtl={isRTL}
+            />
             <SnapshotItem
               k={t('reportPassAmbition')}
               v={`${s.ambitionGlobale}%`}
@@ -475,7 +505,7 @@ export function OrientationDiagnosticReportScreen() {
                 </View>
                 <View style={styles.scorePill}>
                   <Text style={styles.scorePillTxt} latinDigits>
-                    {f.score}%
+                    {uiLocale === 'ar' ? `${f.score}٪` : `${f.score}%`}
                   </Text>
                 </View>
               </View>
@@ -513,7 +543,7 @@ export function OrientationDiagnosticReportScreen() {
                   </View>
                   <View style={styles.scorePill}>
                     <Text style={styles.scorePillTxt} latinDigits>
-                      {m.score}%
+                      {uiLocale === 'ar' ? `${m.score}٪` : `${m.score}%`}
                     </Text>
                   </View>
                 </View>
@@ -645,6 +675,29 @@ export function OrientationDiagnosticReportScreen() {
       onConfirm={confirmRetakeTest}
     />
     </>
+  );
+}
+
+function RiasecProfileRow({
+  code,
+  uiLocale,
+  rtl,
+}: {
+  code: string;
+  uiLocale: OrientationUiLocale;
+  rtl?: boolean;
+}) {
+  const parts = riasecCodeParts(code, uiLocale);
+  if (!parts.length) return null;
+  return (
+    <View style={[styles.riasecRow, rtl && styles.rowRtl]}>
+      {parts.map((part) => (
+        <View key={part.letter} style={[styles.riasecChip, rtl && styles.rowRtl]}>
+          <Text style={styles.riasecLetter}>{part.letter}</Text>
+          <Text style={[styles.riasecName, rtl && styles.rtlText]}>{part.label}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -814,6 +867,41 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     textTransform: 'uppercase',
     color: 'rgba(255,255,255,0.72)',
+  },
+  riasecRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 8,
+    marginTop: 2,
+  },
+  riasecChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: 'rgba(255,255,255,0.14)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.22)',
+    borderRadius: 999,
+    paddingVertical: 3,
+    paddingRight: 10,
+    paddingLeft: 3,
+  },
+  riasecLetter: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    overflow: 'hidden',
+    backgroundColor: brand.white,
+    color: brand.primary,
+    textAlign: 'center',
+    fontSize: 12,
+    fontWeight: '800',
+    lineHeight: 22,
+  },
+  riasecName: {
+    color: brand.white,
+    fontSize: 13,
+    fontWeight: '700',
   },
   heroTitle: {
     fontSize: 24,

@@ -2,6 +2,10 @@ import { ETAWJIHI_RECEIPT_LOGO_URL } from '@/utils/commercialServiceReceiptDocum
 import type { SchoolDiagnosticRecommendationItem } from '@/services/schoolRecommendationDiagnostic';
 import { partitionFacultePublique } from '@/features/orientationDiagnostic/utils/orientationFacultePubliqueGroup';
 import {
+  formatReportScorePercent,
+  localizeReportPhrase,
+} from '@/features/orientationDiagnostic/utils/orientationDiagnosticReportLocale';
+import {
   getDiagnosticTier,
   tierColor,
   type DiagnosticTier,
@@ -67,7 +71,7 @@ export function buildSchoolDiagnosticRecommendationsHtml(
         : `${row.sigle ? `${row.sigle} — ` : ''}${row.nom}`;
     const reasons = (row.reasonsYes ?? [])
       .slice(0, 2)
-      .map((r) => `<li>+ ${esc(r)}</li>`)
+      .map((r) => `<li>+ ${esc(localizeReportPhrase(r, locale))}</li>`)
       .join('');
     return `<div class="card">
       <div class="card-top">
@@ -75,7 +79,7 @@ export function buildSchoolDiagnosticRecommendationsHtml(
           <h4>${esc(nom)}</h4>
           <p class="muted">${esc(row.ville || '')}${row.typeEcole ? ` · ${esc(row.typeEcole)}` : ''}</p>
         </div>
-        <div class="score">${Math.round(row.combinedScore)}%</div>
+        <div class="score">${esc(formatReportScorePercent(row.combinedScore, locale))}</div>
       </div>
       ${reasons ? `<ul>${reasons}</ul>` : ''}
     </div>`;

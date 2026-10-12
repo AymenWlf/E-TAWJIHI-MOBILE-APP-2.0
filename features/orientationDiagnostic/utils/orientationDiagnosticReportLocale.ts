@@ -1,5 +1,6 @@
 import {
   localizeAmbitionLabel,
+  localizeDisplayedStudyCities,
   localizeRiasecLabel,
   tOd,
   tOdFill,
@@ -131,6 +132,54 @@ const PHRASE_AR: Record<string, string> = {
     'مرونة جغرافية واسعة: ميزة لتحسين التوافق بين المدرسة والشعبة.',
   'Faisabilité correcte : passer aux actions (portes ouvertes, dossiers, calendrier concours).':
     'إمكانية التنفيذ جيدة. انتقل إلى خطوات عملية: الأيام المفتوحة والملفات ومواعيد المباريات.',
+  'Tu peux ouvrir le spectre aux écoles privées sélectives — garde un plan B public.':
+    'يمكنك توسيع الاختيار نحو المدارس الخاصة الانتقائية، مع الإبقاء على خطة ب عمومية.',
+  'Faisabilité actuelle limitée : séquencer (année de consolidation / alternatives) plutôt que forcer un parcours inaccessible.':
+    'إمكانية التنفيذ محدودة حالياً. رتّب المراحل (سنة لتقوية الملف أو بدائل) بدل فرض مسار صعب المنال.',
+  'Plan A': 'الخطة A',
+  'Plan B': 'الخطة B',
+  'Plan C': 'الخطة C',
+  'Plan D': 'الخطة D',
+  'Accès ouvert': 'ولوج مفتوح',
+  'Ordre de mérite': 'ترتيب الاستحقاق',
+  'Secteur d\'activité aligné avec vos centres d\'intérêt.':
+    'قطاع النشاط متوافق مع ميولك.',
+  'Recoupement avec un secteur que vous souhaitez éviter.':
+    'تداخل مع قطاع تريد تجنبه.',
+  'Ville compatible avec votre projet de mobilité.':
+    'المدينة متوافقة مع مشروع تنقلك.',
+  'Localisation peu alignée avec vos villes d\'études ciblées.':
+    'الموقع قليل التوافق مع مدن الدراسة التي اخترتها.',
+  'Type d\'établissement correspondant à vos préférences.':
+    'نوع المؤسسة يوافق تفضيلاتك.',
+  'Type d\'établissement éloigné de vos préférences (public / privé / autre).':
+    'نوع المؤسسة بعيد عن تفضيلاتك (عمومي / خاص / آخر).',
+  'Cohérence bac / filière ou spécialités avec l\'établissement.':
+    'توافق الباك / الشعبة أو التخصصات مع المؤسسة.',
+  'Filière ou spécialités bac potentiellement moins alignées.':
+    'الشعبة أو تخصصات الباك قد تكون أقل توافقاً.',
+  'Filière du bac : incompatible avec cette fiche (filière non ouverte par l\'établissement, ou non renseignée alors que la fiche distingue les filières).':
+    'شعبة الباك غير متوافقة مع هذه البطاقة (الشعبة غير مفتوحة في المؤسسة، أو غير مُدخلة بينما البطاقة تميّز الشعب).',
+  'Fourchette de frais compatible avec votre budget indicatif.':
+    'نطاق الرسوم متوافق مع ميزانيتك التقريبية.',
+  'Frais de scolarité potentiellement élevés par rapport à votre budget.':
+    'رسوم الدراسة قد تكون مرتفعة مقارنة بميزانيتك.',
+  'Concours / sélection : l\'établissement en propose.':
+    'مباراة / انتقاء: المؤسسة تنظّمها.',
+  'Concours ou sélection alors que vous les évitez.':
+    'مباراة أو انتقاء بينما تفضّل تجنبهما.',
+  'Critères militaires : taille minimale habituellement exigée non atteinte (déclaration « non »).':
+    'المعايير العسكرية: الطول الأدنى المطلوب عادة غير متوفر (تصريح « لا »).',
+  'Vos notes de référence semblent dans la fourchette des seuils connus.':
+    'نقطك المرجعية تبدو ضمن نطاق العتبات المعروفة.',
+  'Seuils d\'admission éventuels : comparer avec vos notes prévisionnelles.':
+    'عتبات القبول المحتملة: قارنها بنقطك التوقعية.',
+  'Notes de référence et seuils indiqués sur la fiche : correspondance intermédiaire — vérifiez les conditions d\'admission.':
+    'النقط المرجعية والعتبات في البطاقة: توافق متوسط. راجع شروط القبول.',
+  'Diplômes délivrés par l’établissement compatibles avec vos diplômes visés.':
+    'الدبلومات التي تمنحها المؤسسة متوافقة مع الدبلومات التي تستهدفها.',
+  'Diplômes visés : recouvrement limité avec les diplômes délivrés par cet établissement.':
+    'الدبلومات المستهدفة: توافق محدود مع دبلومات هذه المؤسسة.',
   'Secteurs alignés avec tes choix': 'قطاعات متوافقة مع اختياراتك',
   'Secteurs peu alignés': 'قطاعات قليلة التوافق',
   'Ville compatible avec tes préférences': 'مدينة متوافقة مع تفضيلاتك',
@@ -197,17 +246,40 @@ const TIER_HINT_AR: Record<DiagnosticTierId, string> = {
   avoid: '< 45 % أو شعبة / عتبة غير متوافقة',
 };
 
+/** Pourcentage du score école : « 0% » en français, « 0٪ » en arabe. */
+export function formatReportScorePercent(score: number, locale: OrientationUiLocale): string {
+  const n = Math.round(Number(score) || 0);
+  return locale === 'ar' ? `${n}٪` : `${n}%`;
+}
+
 export function localizeReportPhrase(text: string, locale: OrientationUiLocale): string {
   if (locale !== 'ar' || !text) return text;
   if (PHRASE_AR[text]) return PHRASE_AR[text];
   const vs = text.match(/^Vainqueur Versus \(×(\d+)\)$/);
   if (vs) return `فائز في المواجهات (×${vs[1]})`;
-  const ancrer = text.match(/^Ancrer la shortlist sur les familles « (.+) » et « (.+) »\.$/);
+  const ancrer = text.match(/^Ancrer la shortlist sur les familles « (.+) »\.$/);
   if (ancrer) {
-    return `تثبيت القائمة القصيرة على عائلتي « ${localizeFamilyLabel(ancrer[1], locale)} » و« ${localizeFamilyLabel(ancrer[2], locale)} ».`;
+    const names = ancrer[1].split(' » et « ').map((name) => localizeFamilyLabel(name.trim(), locale));
+    if (names.length <= 1) return `تثبيت القائمة القصيرة على عائلة « ${names[0] || ''} ».`;
+    const last = names[names.length - 1];
+    const head = names.slice(0, -1).join(' » و« ');
+    return `تثبيت القائمة القصيرة على عائلات « ${head} » و« ${last} ».`;
   }
   const cities = text.match(/^Cibler d’abord les établissements dans : (.+)\.$/);
-  if (cities) return `استهداف المؤسسات أولاً في: ${cities[1]}.`;
+  if (cities) {
+    const place = localizeDisplayedStudyCities(cities[1].replace(/, /g, ' · '), locale).replace(/ · /g, '، ');
+    return `استهداف المؤسسات أولاً في: ${place}.`;
+  }
+  const plans = text.match(/^Répartir tes candidatures selon les catégories retenues : (.+)\.$/);
+  if (plans) {
+    const list = plans[1]
+      .split(',')
+      .map((part) => localizeReportPhrase(part.trim(), locale))
+      .join('، ');
+    return `وزّع ترشيحاتك حسب الفئات المختارة: ${list}.`;
+  }
+  const align = text.match(/^Alignement RIASEC (\d+)% avec ton profil consolidé\.$/);
+  if (align) return `توافق RIASEC بنسبة ${align[1]}٪ مع ملفك النهائي.`;
   const admis = text.match(/^Anticiper les modes d’admission de ton radar : (.+)\.$/);
   if (admis) {
     const modes = admis[1]

@@ -12,6 +12,7 @@ import {
   type TextInputProps,
   type TextStyle,
 } from 'react-native';
+import { useDiagnosticFieldScroll } from '@/components/diagnostic/diagnosticFieldScroll';
 import Animated, {
   Easing,
   useAnimatedStyle,
@@ -130,6 +131,7 @@ export function DiagnosticTextInput({
   onFocus?: TextInputProps['onFocus'];
   onBlur?: TextInputProps['onBlur'];
 }) {
+  const scrollFieldIntoView = useDiagnosticFieldScroll();
   return (
     <AppTextInput
       value={value}
@@ -138,7 +140,10 @@ export function DiagnosticTextInput({
       placeholderTextColor="rgba(100,116,139,0.6)"
       keyboardType={keyboardType}
       multiline={multiline}
-      onFocus={onFocus}
+      onFocus={(event) => {
+        onFocus?.(event);
+        scrollFieldIntoView();
+      }}
       onBlur={onBlur}
       textRtl={rtl}
       textAlign={rtl ? 'right' : 'left'}

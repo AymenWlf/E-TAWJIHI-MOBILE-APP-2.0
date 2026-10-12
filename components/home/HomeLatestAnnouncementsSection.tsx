@@ -7,6 +7,7 @@ import { SkeletonBlock, useSkeletonPulse } from '@/components/ui/CardLoadingSkel
 import { Text } from '@/components/ui/Text';
 import {
   fallbackEstablishmentAvatarName,
+  getEstablishmentFileUrl,
   getEstablishmentLogoUrl,
 } from '@/constants/establishmentMedia';
 import { useLocale } from '@/contexts/LocaleContext';
@@ -23,6 +24,7 @@ import { PaywallCardReservedOverlay } from '@/components/inscriptions/TawjihPlus
 import { AnnouncementTypeChip } from '@/components/inscriptions/AnnouncementTypeChip';
 import { EstablishmentTypeBadge } from '@/components/ui/EstablishmentTypeBadge';
 import { getAnnouncementTypeStyle } from '@/utils/announcementTypeStyle';
+import { isTitleFirstContestAnnouncementType } from '@/utils/contestAnnouncementTitleFirst';
 
 const CARD_W = 212;
 const CARD_H = 108;
@@ -62,11 +64,15 @@ function LatestAnnouncementCard({
 }) {
   const title = pickAnnouncementTitle(item, locale);
   const school = item.establishment;
-  const schoolLabel = school ? pickEstablishmentName(school, locale) : '';
-  const logoUri = school
-    ? getEstablishmentLogoUrl(school.logo) ??
-      fallbackEstablishmentAvatarName(school.nom, school.sigle)
-    : null;
+  const titleFirst = isTitleFirstContestAnnouncementType(item.announcementType);
+  const schoolLabel = !titleFirst && school ? pickEstablishmentName(school, locale) : '';
+  const announcementLogoUri = getEstablishmentFileUrl(item.logo);
+  const logoUri = titleFirst
+    ? announcementLogoUri
+    : school
+      ? (getEstablishmentLogoUrl(school.logo) ??
+        fallbackEstablishmentAvatarName(school.nom, school.sigle))
+      : null;
   const dateLabel = formatShortDate(item.dateStart, locale);
   const showDateLocked = (datesLocked || Boolean(item.previewOnly)) && item.isSponsored !== true;
   const statusLabel = item.isOpen ? openLabel : closedLabel;
@@ -99,10 +105,19 @@ function LatestAnnouncementCard({
           ) : logoUri ? (
             <Image
               source={{ uri: logoUri }}
-              style={styles.logo}
-              resizeMode="cover"
+              style={[styles.logo, titleFirst && styles.logoAnnouncement]}
+              resizeMode={titleFirst ? 'contain' : 'cover'}
               accessibilityIgnoresInvertColors
             />
+          ) : titleFirst ? (
+            <View
+              style={[
+                styles.logo,
+                styles.logoPlaceholderLocked,
+                { backgroundColor: typeVisual.bg, borderColor: typeVisual.border },
+              ]}>
+              <FontAwesome name={typeVisual.icon} size={18} color={typeVisual.fg} />
+            </View>
           ) : (
             <View style={[styles.logo, styles.logoPlaceholder]}>
               <FontAwesome name="bullhorn" size={16} color={ACCENT} />
@@ -399,6 +414,10 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(13, 148, 136, 0.08)',
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(13, 148, 136, 0.16)',
+  },
+  logoAnnouncement: {
+    backgroundColor: brand.white,
+    borderColor: 'rgba(15, 23, 42, 0.08)',
   },
   logoPlaceholder: {
     alignItems: 'center',

@@ -808,7 +808,7 @@ function studyCitiesLabelFromAnswers(answers: DiagnosticAnswers): string {
   return labels.length ? labels.join(' · ') : '—';
 }
 
-function studentSummaryFromAnswers(answers: DiagnosticAnswers) {
+export function studentSummaryFromAnswers(answers: DiagnosticAnswers) {
   const p = answers.profile;
   const bacLabel =
     p.bacType === 'mission'

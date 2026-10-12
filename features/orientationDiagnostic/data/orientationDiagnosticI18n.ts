@@ -491,7 +491,7 @@ export const STEP_AR: Record<string, StepArOverlay> = {
   real_villes: {
     title: 'في أي مدن يمكنك الدراسة؟',
     subtitle:
-      'افتح القائمة واختر مدينة أو أكثر. أسماء المدن بالفرنسية. « Peu importe » = مرن في كل المغرب.',
+      'افتح القائمة واختر مدينة أو أكثر. أسماء المدن بالفرنسية. « لا يهم » = مرن في كل المغرب.',
     options: {
       casa: 'الدار البيضاء',
       rabat: 'الرباط',
@@ -982,6 +982,11 @@ export const UI_I18N: Record<OrientationUiLocale, Record<string, string>> = {
     citiesFlexibleReplace: 'Remplace les choix de villes précises',
     schoolSearchLabel: 'Rechercher une école {type}',
     schoolSearchPlaceholder: 'Nom, sigle, ville…',
+    schoolCityFilter: 'Ville',
+    schoolCityAll: 'Toutes les villes',
+    schoolCitySearch: 'Rechercher une ville…',
+    schoolCityEmpty: 'Aucune ville',
+    schoolNoResultFilters: 'Aucune école ne correspond à ces filtres.',
     schoolNoActiveType: 'Aucune école active de type {type} pour le moment — tu peux continuer.',
     schoolNoFiliere: 'Aucune école de type {type} ne correspond à ta filière ou à ta ville. Tu peux continuer.',
     schoolLoadError: 'Impossible de charger les écoles.',
@@ -1450,6 +1455,11 @@ export const UI_I18N: Record<OrientationUiLocale, Record<string, string>> = {
     citiesFlexibleReplace: 'يلغي اختيارات المدن المحددة',
     schoolSearchLabel: 'ابحث عن مدرسة {type}',
     schoolSearchPlaceholder: 'الاسم، الاختصار، المدينة…',
+    schoolCityFilter: 'المدينة',
+    schoolCityAll: 'كل المدن',
+    schoolCitySearch: 'ابحث عن مدينة…',
+    schoolCityEmpty: 'لا توجد مدينة',
+    schoolNoResultFilters: 'لا توجد مدرسة تطابق هذا البحث أو هذه المدينة.',
     schoolNoActiveType: 'لا توجد مدرسة نشطة من نوع {type} حالياً — يمكنك المتابعة.',
     schoolNoFiliere: 'لا توجد مدرسة من نوع {type} تناسب شعبتك أو مدينتك. يمكنك المتابعة.',
     schoolLoadError: 'تعذّر تحميل المدارس.',
@@ -1651,6 +1661,21 @@ export function tOd(locale: OrientationUiLocale, key: string): string {
   return UI_I18N[locale][key] ?? UI_I18N.fr[key] ?? key;
 }
 
+const FLEXIBLE_CITY_LABEL_FR = 'Peu importe — partout au Maroc';
+
+export function localizeFlexibleCityLabel(locale: OrientationUiLocale): string {
+  return locale === 'ar' ? 'لا يهم — في أي مكان بالمغرب' : FLEXIBLE_CITY_LABEL_FR;
+}
+
+export function localizeDisplayedStudyCities(
+  value: string | undefined | null,
+  locale: OrientationUiLocale,
+): string {
+  const text = (value ?? '').trim();
+  if (locale === 'ar' && text === FLEXIBLE_CITY_LABEL_FR) return localizeFlexibleCityLabel('ar');
+  return value ?? '';
+}
+
 /** Remplace `{key}` dans une chaîne i18n. */
 export function tOdFill(
   locale: OrientationUiLocale,
@@ -1672,6 +1697,22 @@ export function localizeAmbitionLabel(id: string, locale: OrientationUiLocale): 
 
 export function localizeRiasecLabel(letter: string, locale: OrientationUiLocale): string {
   return tOd(locale, `riasec${letter.toUpperCase()}`);
+}
+
+/** Les 3 lettres du code, dans l’ordre du profil, avec leur nom lisible. */
+export function riasecCodeParts(
+  code: string,
+  locale: OrientationUiLocale,
+): { letter: string; label: string }[] {
+  const seen = new Set<string>();
+  const parts: { letter: string; label: string }[] = [];
+  for (const ch of (code || '').toUpperCase()) {
+    if (!'RIASEC'.includes(ch) || seen.has(ch)) continue;
+    seen.add(ch);
+    parts.push({ letter: ch, label: localizeRiasecLabel(ch, locale) });
+    if (parts.length === 3) break;
+  }
+  return parts;
 }
 
 export function localizeSchoolTypeLabel(key: string, locale: OrientationUiLocale): string {

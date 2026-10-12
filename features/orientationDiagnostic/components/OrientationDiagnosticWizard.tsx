@@ -1,9 +1,14 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Keyboard, Platform, ScrollView, StyleSheet, View } from 'react-native';
 
 import { DiagnosticStepHeader } from '@/components/diagnostic/DiagnosticUi';
+import {
+  DiagnosticFieldScrollProvider,
+  scrollFocusedInputIntoView,
+} from '@/components/diagnostic/diagnosticFieldScroll';
+import { KeyboardAwareBottomSpacer } from '@/components/ui/KeyboardAwareBottomSpacer';
 import { AppConfirmDialog } from '@/components/ui/AppConfirmDialog';
 import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
@@ -15,6 +20,7 @@ import {
   resetOrientationDiagnosticSession,
   saveOrientationDiagnosticStep,
 } from '@/services/orientationDiagnosticSession';
+import { getUserProfile } from '@/services/userProfile';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
@@ -25,6 +31,10 @@ import {
   type OrientationDiagnosticPrototypeDraft,
 } from '../constants/orientationDiagnosticPrototypeStorage';
 import type { DiagnosticStep, ModuleId, OrientationReport } from '../types/orientationDiagnosticPrototype';
+import {
+  withAccountOrientationPrefill,
+  type AccountOrientationPrefill,
+} from '../data/orientationDiagnosticProfile';
 import { buildOrientationCoreSteps } from '../data/orientationDiagnosticQuestions';
 import { localizeModuleMeta, localizeStep, tOd } from '../data/orientationDiagnosticI18n';
 import type { DiagnosticAnswers } from '../types/orientationDiagnosticPrototype';
@@ -66,6 +76,8 @@ export function OrientationDiagnosticWizard() {
   const [completedModules, setCompletedModules] = useState<ModuleId[]>([]);
   const [confirmKind, setConfirmKind] = useState<'quit' | 'retake' | null>(null);
   const [remoteSteps, setRemoteSteps] = useState<DiagnosticStep[] | null>(null);
+  const [accountPrefill, setAccountPrefill] = useState<AccountOrientationPrefill | null>(null);
+  const pendingAccountPersist = useRef<DiagnosticAnswers | null>(null);
   const resumedRef = useRef(false);
 
   const persistProgress = useCallback(
@@ -215,7 +227,6 @@ export function OrientationDiagnosticWizard() {
         return;
       }
 
-      // Profil toujours vide au démarrage (pas de préremplissage compte / profil).
       if (!cancelled) {
         const fresh = emptyAnswers();
         setAnswers(fresh);
@@ -254,6 +265,62 @@ export function OrientationDiagnosticWizard() {
     : coreSteps.length;
   const totalSteps = Math.max(quizSteps.length, coreStepsCount);
   const step = quizSteps[stepIndex];
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const token = await getValidAccessToken();
+      if (!token) {
+        if (alive) setAccountPrefill(null);
+        return;
+      }
+      try {
+        const profile = await getUserProfile(token);
+        if (!alive) return;
+        setAccountPrefill({
+          firstName: profile?.prenom || user?.firstName,
+          lastName: profile?.nom || user?.lastName,
+          phone: profile?.telephone || user?.phone,
+          studyLevel: profile?.niveau,
+          bacType: profile?.bacType,
+          filiere: profile?.filiere,
+        });
+      } catch {
+        if (!alive) return;
+        setAccountPrefill({
+          firstName: user?.firstName,
+          lastName: user?.lastName,
+          phone: user?.phone,
+        });
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [user?.id, user?.phone, user?.firstName, user?.lastName, getValidAccessToken]);
+
+  useEffect(() => {
+    if (booting || !accountPrefill) return;
+    setAnswers((prev) => {
+      const profile = withAccountOrientationPrefill(prev.profile, accountPrefill);
+      if (profile === prev.profile) return prev;
+      const next = { ...prev, profile };
+      pendingAccountPersist.current = next;
+      return next;
+    });
+  }, [booting, accountPrefill, answers.profile]);
+
+  useEffect(() => {
+    const next = pendingAccountPersist.current;
+    if (!next || booting) return;
+    pendingAccountPersist.current = null;
+    persistProgress({
+      phase: 'quiz',
+      stepId: step?.id || 'prof_identity',
+      answers: next,
+      lastCompletedModule,
+    });
+  }, [answers.profile, booting, step?.id, lastCompletedModule, persistProgress]);
 
   useEffect(() => {
     let alive = true;
@@ -446,6 +513,10 @@ export function OrientationDiagnosticWizard() {
   ]);
 
   const scrollRef = useRef<ScrollView>(null);
+  const scrollContentRef = useRef<View>(null);
+  const scrollFocusedField = useCallback(() => {
+    scrollFocusedInputIntoView(scrollRef, scrollContentRef);
+  }, []);
 
   useEffect(() => {
     requestAnimationFrame(() => {
@@ -651,6 +722,14 @@ export function OrientationDiagnosticWizard() {
     })();
   }, [getValidAccessToken, uiLocale, userId]);
 
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const sub = Keyboard.addListener(showEvent, () => {
+      scrollFocusedInputIntoView(scrollRef, scrollContentRef);
+    });
+    return () => sub.remove();
+  }, []);
+
   if (booting || !step || !displayStep) {
     return (
       <View style={styles.boot}>
@@ -684,11 +763,15 @@ export function OrientationDiagnosticWizard() {
         continueDisabled={!canContinue}
         backDisabled={!canGoBack}
         busy={versusBuilding || reportBuilding || catalogLoading}>
+        <DiagnosticFieldScrollProvider scroll={scrollFocusedField}>
         <ScrollView
           ref={scrollRef}
+          style={styles.scrollView}
           contentContainerStyle={styles.scroll}
           keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}>
+          <View ref={scrollContentRef} collapsable={false}>
           <View style={styles.moduleBanner}>
             <Text style={[styles.moduleLabel, isRTL && styles.rtlText]}>{localizeModuleMeta(step.module, uiLocale).label}</Text>
             <Text style={[styles.moduleObjective, isRTL && styles.rtlText]}>
@@ -733,7 +816,10 @@ export function OrientationDiagnosticWizard() {
               />
             </>
           )}
+          <KeyboardAwareBottomSpacer minPaddingWhenKeyboardClosed={spacing.md} />
+          </View>
         </ScrollView>
+        </DiagnosticFieldScrollProvider>
       </OrientationDiagnosticWizardShell>
 
       <AppConfirmDialog
@@ -764,7 +850,8 @@ export function OrientationDiagnosticWizard() {
 
 const styles = StyleSheet.create({
   boot: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: brand.backgroundSoft },
-  scroll: { paddingBottom: spacing.xl, gap: spacing.sm },
+  scrollView: { flex: 1 },
+  scroll: { paddingBottom: spacing.md, gap: spacing.sm },
   moduleBanner: {
     marginBottom: spacing.sm,
     padding: spacing.md,

@@ -4,6 +4,8 @@
  * Temporalité : previsionnel | anneeEnCours | anneePrecedente (+ source official | estimation)
  */
 
+import { localizeBacFiliereLabel } from '@/utils/schoolFicheLocale';
+
 export type SeuilAdmissionMode = 'general' | 'filiere_bac' | 'genre' | 'ville' | '';
 
 export type SeuilTemporalKey = 'previsionnel' | 'anneeEnCours' | 'anneePrecedente';
@@ -295,7 +297,9 @@ export function getSeuilAdmissionDisplay(
     const map = mergeParFiliereBac(bn);
     for (const [label, pair] of Object.entries(map)) {
       const values = buildRowValues(pair, locale);
-      if (values.length) bacNormalRows.push({ segmentLabel: label, values });
+      if (values.length) {
+        bacNormalRows.push({ segmentLabel: localizeBacFiliereLabel(label, locale), values });
+      }
     }
   } else if (mode === 'genre') {
     const pg = (bn.parGenre && typeof bn.parGenre === 'object' ? bn.parGenre : {}) as Record<string, unknown>;
@@ -332,7 +336,9 @@ export function getSeuilAdmissionDisplay(
       const map = mergeParFiliereBac(bn);
       for (const [label, pair] of Object.entries(map)) {
         const values = buildRowValues(pair, locale);
-        if (values.length) bacNormalRows.push({ segmentLabel: label, values });
+        if (values.length) {
+          bacNormalRows.push({ segmentLabel: localizeBacFiliereLabel(label, locale), values });
+        }
       }
     }
   }
@@ -366,11 +372,27 @@ export function getSeuilAdmissionDisplay(
         : MODE_SHORT[mode as keyof typeof MODE_SHORT]
       : '—';
   const modeTag =
-    mode === 'general' ? '' : mode === 'filiere_bac' ? ' · filière' : mode === 'genre' ? ' · genre' : mode === 'ville' ? ' · campus' : '';
+    mode === 'general'
+      ? ''
+      : mode === 'filiere_bac'
+        ? locale === 'ar'
+          ? ' · شعبة'
+          : ' · filière'
+        : mode === 'genre'
+          ? locale === 'ar'
+            ? ' · جنس'
+            : ' · genre'
+          : mode === 'ville'
+            ? locale === 'ar'
+              ? ' · حرم'
+              : ' · campus'
+            : '';
 
-  let cardLine = bacNums.length ? `Prév. ${rangeLabel(bacNums)}${modeTag}` : '';
+  let cardLine = bacNums.length
+    ? `${locale === 'ar' ? 'توقعي' : 'Prév.'} ${rangeLabel(bacNums)}${modeTag}`
+    : '';
   if (missionN !== null) {
-    const mShort = `M ${formatNote20(missionN)}/20`;
+    const mShort = `${locale === 'ar' ? 'د' : 'M'} ${formatNote20(missionN)}/20`;
     cardLine = cardLine ? `${cardLine} · ${mShort}` : mShort;
   }
   if (!cardLine && hasAnyValue) {

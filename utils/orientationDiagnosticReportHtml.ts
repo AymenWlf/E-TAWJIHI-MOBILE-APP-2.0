@@ -1,16 +1,20 @@
 import { getEstablishmentLogoUrl } from '@/constants/establishmentMedia';
 import { ETAWJIHI_RECEIPT_LOGO_URL } from '@/utils/commercialServiceReceiptDocument';
-import { tOd, type OrientationUiLocale } from '@/features/orientationDiagnostic/data/orientationDiagnosticI18n';
-import { RIASEC_LABELS } from '@/features/orientationDiagnostic/data/orientationDiagnosticQuestions';
+import { localizeDisplayedStudyCities, localizeRiasecLabel, riasecCodeParts, tOd, tOdFill, type OrientationUiLocale } from '@/features/orientationDiagnostic/data/orientationDiagnosticI18n';
 import type {
   FunctioningScores,
   OrientationReport,
   RiasecLetter,
 } from '@/features/orientationDiagnostic/types/orientationDiagnosticPrototype';
 import {
+  localizeFamilyLabel,
   localizeProfileSentence,
   localizeProfileTitle,
+  formatReportScorePercent,
   localizeReportPhrase,
+  reportAmbitionLabel,
+  reportFamilyTierLabel,
+  reportFunctioningLabels,
   reportMetierBilingualLines,
 } from '@/features/orientationDiagnostic/utils/orientationDiagnosticReportLocale';
 
@@ -258,6 +262,38 @@ html, body {
 }
 `;
 
+/** Le corps à 210 mm dépasse l’A4 déjà margée : en arabe le PDF paraît zoomé et rogné. */
+const PRINT_CSS_RTL = `
+html, body {
+  width: auto !important;
+  max-width: 100% !important;
+  overflow: hidden;
+  font-size: 10pt;
+  line-height: 1.4;
+}
+.print-only { width: 100%; max-width: 100%; overflow: hidden; }
+.header-section { align-items: center; gap: 10px; }
+.header-section > div { flex: 1; min-width: 0; }
+.header-logo { height: 64px; width: auto; max-width: 36mm; object-fit: contain; }
+h1 { font-size: 15pt !important; line-height: 1.25; }
+.section-title { font-size: 12.5pt; }
+.watermark { font-size: 56pt; left: 0; right: 0; width: 100%; overflow: hidden; }
+.official-stamp {
+  font-size: 16pt;
+  letter-spacing: 0;
+  padding: 6px 12px;
+  border-width: 4px;
+  top: 70px;
+  right: auto;
+  left: 10px;
+  max-width: 62%;
+}
+.list-plain { padding-left: 0; padding-inline-start: 16px; }
+.family-row, .metier-row, .school-row, .info-grid, .func-grid { max-width: 100%; }
+.family-row > div, .metier-row > div, .school-row > div { min-width: 0; }
+.footer { left: 0; right: 0; width: 100%; }
+`;
+
 function esc(value: string | number | null | undefined): string {
   return String(value ?? '')
     .replace(/&/g, '&amp;')
@@ -300,10 +336,11 @@ function tierClass(tier: string): string {
   return 'tier-exploratoire';
 }
 
-function tierText(tier: string): string {
-  if (tier === 'forte') return 'Très forte compatibilité';
-  if (tier === 'bonne') return 'Bonne compatibilité';
-  return 'À explorer';
+function tierText(tier: string, uiLocale: OrientationUiLocale): string {
+  if (tier === 'forte' || tier === 'bonne' || tier === 'exploratoire') {
+    return reportFamilyTierLabel(tier, uiLocale);
+  }
+  return reportFamilyTierLabel('exploratoire', uiLocale);
 }
 
 export function buildOrientationDiagnosticReportHtml(
@@ -325,13 +362,16 @@ export function buildOrientationDiagnosticReportHtml(
   const topSchools = (report.ecolesRecommandees ?? []).slice(0, 12);
   const topMetiers = report.metiers.slice(0, 10);
   const dateLabel = formatDate();
+  const riasecNames = riasecCodeParts(s.codeConsolide, uiLocale)
+    .map((part) => `${part.letter} ${part.label}`)
+    .join(' · ');
 
   const identity = (
     [
       [isAr ? 'الاسم الكامل' : 'Nom complet', report.studentSummary.fullName],
       [isAr ? 'المستوى' : 'Niveau', report.studentSummary.studyLevel],
       [isAr ? 'الباك والشعبة' : 'Bac / filière', report.studentSummary.bacLabel],
-      [isAr ? 'مدن الدراسة' : 'Villes d’études', report.studentSummary.city],
+      [isAr ? 'مدن الدراسة' : 'Villes d’études', localizeDisplayedStudyCities(report.studentSummary.city, uiLocale)],
       [isAr ? 'النقط' : 'Notes', report.studentSummary.notesLabel],
       [isAr ? 'رمز RIASEC' : 'Code RIASEC', s.codeConsolide],
     ] as const
@@ -348,30 +388,32 @@ export function buildOrientationDiagnosticReportHtml(
       const d = s.riasecDeclare[L];
       const c = s.riasecComportemental[L];
       const delta = Math.round(c - d);
+      const riasecLabel = localizeRiasecLabel(L, uiLocale);
       const deltaLabel =
         Math.abs(delta) < 8
-          ? 'Discours et comportement proches'
+          ? t('reportGapFlat')
           : delta > 0
-            ? `Tu te comportes plus « ${RIASEC_LABELS[L]} » que tu ne le déclares`
-            : `Tu déclares plus « ${RIASEC_LABELS[L]} » que tu ne le montres en situation`;
+            ? tOdFill(uiLocale, 'reportGapUp', { label: riasecLabel })
+            : tOdFill(uiLocale, 'reportGapDown', { label: riasecLabel });
       const deltaColor = Math.abs(delta) < 8 ? '#6b7280' : delta > 0 ? '#059669' : '#d97706';
-      return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:8px;font-size:10pt;font-weight:bold;margin-bottom:4px"><span>${esc(L)} · ${esc(RIASEC_LABELS[L])}</span><span style="color:${deltaColor};font-size:8.5pt;font-weight:700;text-align:right;max-width:58%">${esc(deltaLabel)}</span></div>${scoreBar('Ce que tu déclares', d, 'bar-personality')}${scoreBar('Ce que tu choisis en situation', c, 'bar-interest')}</div>`;
+      return `<div style="margin-bottom:10px"><div style="display:flex;justify-content:space-between;gap:8px;font-size:10pt;font-weight:bold;margin-bottom:4px"><span>${esc(L)} · ${esc(riasecLabel)}</span><span style="color:${deltaColor};font-size:8.5pt;font-weight:700;text-align:right;max-width:58%">${esc(deltaLabel)}</span></div>${scoreBar(t('reportDeclareBar'), d, 'bar-personality')}${scoreBar(t('reportBehaviorBar'), c, 'bar-interest')}</div>`;
     })
     .join('');
 
+  const fnLabels = reportFunctioningLabels(uiLocale);
   const functioning = FUNCTIONING_LABELS.map(
-    ({ key, label }) =>
-      `<div class="func-item"><strong>${s.functioning[key]}%</strong><span>${esc(label)}</span></div>`,
+    ({ key }) =>
+      `<div class="func-item"><strong>${s.functioning[key]}%</strong><span>${esc(fnLabels[key])}</span></div>`,
   ).join('');
 
   const ambitions = report.moteursOrdered
-    .map((m) => scoreBar(m.label, m.score, 'bar-personality'))
+    .map((m) => scoreBar(reportAmbitionLabel(m.key, m.label, uiLocale), m.score, 'bar-personality'))
     .join('');
 
   const families = report.families
     .map(
       (f) =>
-        `<div class="family-row avoid-break"><div><div style="font-weight:bold">${esc(f.label)}</div><div class="${tierClass(f.tier)}">${esc(tierText(f.tier))}</div>${f.why ? `<div class="text-sm text-secondary" style="margin-top:3px">${esc(f.why)}</div>` : ''}</div><strong class="text-primary">${f.score}%</strong></div>`,
+        `<div class="family-row avoid-break"><div><div style="font-weight:bold">${esc(localizeFamilyLabel(f.id, uiLocale) || localizeFamilyLabel(f.label, uiLocale) || f.label)}</div><div class="${tierClass(f.tier)}">${esc(tierText(f.tier, uiLocale))}</div>${f.why ? `<div class="text-sm text-secondary" style="margin-top:3px">${esc(localizeReportPhrase(f.why, uiLocale))}</div>` : ''}</div><strong class="text-primary">${f.score}%</strong></div>`,
     )
     .join('');
 
@@ -447,21 +489,21 @@ export function buildOrientationDiagnosticReportHtml(
         .filter(Boolean)
         .join(' · ');
       const logo = printSchoolLogo(e.logo, e.sigle || e.nom);
-      return `<div class="school-row avoid-break"><img class="school-logo" src="${esc(logo)}" alt="" /><div style="flex:1;min-width:0"><div style="font-weight:bold">${bilingualHtml(name)}</div>${cities ? `<div class="text-sm text-secondary" style="margin-top:2px;line-height:1.4">${esc(cities)}</div>` : ''}<div class="text-sm text-secondary" style="margin-top:2px">${esc(meta)}</div></div><strong class="text-primary">${Math.round(e.combinedScore)}%</strong></div>`;
+      return `<div class="school-row avoid-break"><img class="school-logo" src="${esc(logo)}" alt="" /><div style="flex:1;min-width:0"><div style="font-weight:bold">${bilingualHtml(name)}</div>${cities ? `<div class="text-sm text-secondary" style="margin-top:2px;line-height:1.4">${esc(cities)}</div>` : ''}<div class="text-sm text-secondary" style="margin-top:2px">${esc(meta)}</div></div><strong class="text-primary">${esc(formatReportScorePercent(e.combinedScore, isAr ? 'ar' : 'fr'))}</strong></div>`;
     })
     .join('');
 
   const qr = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(BRAND.registerUrl)}`;
 
   const body = `<div class="print-only" dir="${isAr ? 'rtl' : 'ltr'}">
-<style>${PRINT_CSS}</style>
+<style>${PRINT_CSS}${isAr ? PRINT_CSS_RTL : ''}</style>
 <div class="watermark">${esc(BRAND.domain)}</div>
 <div class="official-stamp">${esc(BRAND.domain)}</div>
 <div class="header-section">
   <div>
     <h1 style="font-size:18pt;font-weight:bold;color:#2563eb;margin-bottom:5px">${isAr ? 'التقرير الرسمي للتوجيه' : "Rapport Officiel d'Orientation"}</h1>
     <p class="text-secondary">${esc(fullName)} • ${isAr ? 'أُنشئ في' : 'Généré le'} ${esc(dateLabel)}</p>
-    <p class="text-sm text-secondary" style="margin-top:4px">${isAr ? 'تشخيص التوجيه · الملف' : "Diagnostic d'orientation · Profil"} ${esc(s.codeConsolide || '—')}</p>
+    <p class="text-sm text-secondary" style="margin-top:4px">${isAr ? 'تشخيص التوجيه · الملف' : "Diagnostic d'orientation · Profil"} ${esc(s.codeConsolide || '—')}${riasecNames ? ` · ${esc(riasecNames)}` : ''}</p>
   </div>
   <img src="${BRAND.logo}" alt="${esc(BRAND.domain)}" class="header-logo" />
 </div>
@@ -484,7 +526,7 @@ export function buildOrientationDiagnosticReportHtml(
       <span class="code-pill">${isAr ? 'اختياراتك' : 'Comportemental'} · ${esc(s.codeComportemental)}</span>
       <span class="code-pill">${isAr ? 'النتيجة النهائية' : 'Consolidé'} · ${esc(s.codeConsolide)}</span>
     </div>
-    <p style="margin:0;font-size:10pt">${isAr ? 'الغالب' : 'Dominante'} : <strong>${esc(RIASEC_LABELS[report.dominante.primary])}</strong> · ${isAr ? 'الثانوي' : 'Secondaire'} : <strong>${esc(RIASEC_LABELS[report.dominante.secondary])}</strong> · ${isAr ? 'المكمّل' : 'Complémentaire'} : <strong>${esc(RIASEC_LABELS[report.dominante.tertiary])}</strong></p>
+    <p style="margin:0;font-size:10pt">${isAr ? 'الغالب' : 'Dominante'} : <strong>${esc(localizeRiasecLabel(report.dominante.primary, uiLocale))}</strong> · ${isAr ? 'الثانوي' : 'Secondaire'} : <strong>${esc(localizeRiasecLabel(report.dominante.secondary, uiLocale))}</strong> · ${isAr ? 'المكمّل' : 'Complémentaire'} : <strong>${esc(localizeRiasecLabel(report.dominante.tertiary, uiLocale))}</strong></p>
   </div>
 </div>
 
@@ -507,7 +549,7 @@ export function buildOrientationDiagnosticReportHtml(
   </div>
   <div class="card">
     <h3 style="font-size:11pt;font-weight:bold;margin-bottom:8px;color:#1e40af">${esc(t('reportConsolideBars'))}</h3>
-    ${ordered.map((L) => scoreBar(`${L} · ${RIASEC_LABELS[L]}`, s.riasecConsolide[L], 'bar-riasec')).join('')}
+    ${ordered.map((L) => scoreBar(`${L} · ${localizeRiasecLabel(L, uiLocale)}`, s.riasecConsolide[L], 'bar-riasec')).join('')}
   </div>
   <div class="card" style="margin-top:8px">
     <h3 style="font-size:11pt;font-weight:bold;margin-bottom:6px;color:#047857">${esc(t('reportGapTitle'))}</h3>

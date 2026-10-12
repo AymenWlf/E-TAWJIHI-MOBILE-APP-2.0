@@ -4,6 +4,7 @@
  * (`academicSetup` + `filiereFormOptionsForNiveau` + `anneesBacFormOptionsForSetup`).
  */
 
+import { sanitizeFiliereForNiveau } from '@/utils/academicFiliere';
 import { ANNEES_BAC_VALUES, SPECIALITES_MISSION } from '../constants/academicSetup';
 import { isFiliere1BacId } from '../constants/orientation1bacFilieres';
 import { resolveFiliereDisplayLabel } from '../utils/academicFiliere';
@@ -92,6 +93,78 @@ export const BAC_MISSION_SPECIALITES = SPECIALITES_MISSION;
 
 /** Années du bac — générées comme le setup compte (`ANNEES_BAC_VALUES`). */
 export const ANNEE_BAC = ANNEES_BAC_VALUES;
+
+export type AccountOrientationPrefill = {
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  studyLevel?: string | null;
+  bacType?: string | null;
+  filiere?: string | null;
+};
+
+function mapAccountBacType(raw: string | null | undefined): string {
+  const value = (raw ?? '').trim().toLowerCase();
+  if (value === 'mission') return 'mission';
+  if (value === 'marocain' || value === 'normal' || value === 'maroc') return 'marocain';
+  return '';
+}
+
+/** Complète les champs vides du test avec le compte connecté, sans écraser une saisie. */
+export function withAccountOrientationPrefill(
+  profile: DiagnosticProfile | null | undefined,
+  account: AccountOrientationPrefill,
+): DiagnosticProfile {
+  const current: DiagnosticProfile = {
+    ...EMPTY_DIAGNOSTIC_PROFILE,
+    ...(profile ?? {}),
+    bacSpecialites: profile?.bacSpecialites ?? [],
+  };
+  const firstName = current.firstName.trim() ? current.firstName : (account.firstName ?? '').trim();
+  const lastName = current.lastName.trim() ? current.lastName : (account.lastName ?? '').trim();
+  const phoneNumber = current.phoneNumber.trim() ? current.phoneNumber : (account.phone ?? '').trim();
+  let studyLevel = current.studyLevel.trim() ? current.studyLevel : '';
+  let bacType = current.bacType.trim() ? current.bacType : '';
+  let bacFiliere = current.bacFiliere.trim() ? current.bacFiliere : '';
+
+  const accountLevel = (account.studyLevel ?? '').trim();
+  if (!studyLevel && accountLevel && STUDY_LEVELS.some((level) => level.value === accountLevel)) {
+    studyLevel = accountLevel;
+  }
+  const accountBac = mapAccountBacType(account.bacType);
+  if (!bacType && accountBac) bacType = accountBac;
+
+  const accountFiliere = (account.filiere ?? '').trim();
+  if (!bacFiliere && accountFiliere) {
+    const sanitized = studyLevel
+      ? sanitizeFiliereForNiveau(studyLevel, accountFiliere)
+      : accountFiliere;
+    bacFiliere = sanitized || accountFiliere;
+    if (!bacType) bacType = 'marocain';
+  }
+
+  if (
+    firstName === current.firstName &&
+    lastName === current.lastName &&
+    phoneNumber === current.phoneNumber &&
+    studyLevel === current.studyLevel &&
+    bacType === current.bacType &&
+    bacFiliere === current.bacFiliere &&
+    profile
+  ) {
+    return profile.bacSpecialites ? profile : current;
+  }
+
+  return {
+    ...current,
+    firstName,
+    lastName,
+    phoneNumber,
+    studyLevel,
+    bacType,
+    bacFiliere,
+  };
+}
 
 export function isBacStudyLevel(level: string): boolean {
   return (

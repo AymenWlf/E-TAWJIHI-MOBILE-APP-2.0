@@ -2,7 +2,10 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { DiagnosticChoiceRow, DiagnosticHint, diagnosticTheme } from '@/components/diagnostic/DiagnosticUi';
+import { useDiagnosticFieldScroll } from '@/components/diagnostic/diagnosticFieldScroll';
+import type { SearchablePickItem } from '@/components/schools/SearchablePickSheet';
 import { Text } from '@/components/ui/Text';
+import { HostedSearchablePickSheet } from './orientationPickSheetHost';
 import { fetchSecteurDetail, fetchSecteursCatalog, pickSecteurTitle } from '@/services/secteurs';
 import { getEstablishmentByIdSlug } from '@/services/establishments';
 import metierService, { type Metier } from '../services/metierService';
@@ -354,6 +357,14 @@ function pickSchoolLabel(e: Establishment): string {
   return sigle ? `${sigle} — ${nom}` : nom;
 }
 
+function foldSchoolText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
 export function OrientationDynamicSectorsStep({
   step,
   answers,
@@ -696,8 +707,11 @@ export function OrientationDynamicSchoolsStep({
   const [ecoles, setEcoles] = useState<Establishment[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
+  const [cityFilter, setCityFilter] = useState('');
+  const [cityOpen, setCityOpen] = useState(false);
   const [facultesOpen, setFacultesOpen] = useState(false);
   const detail = useOrientationCatalogDetail();
+  const scrollFieldIntoView = useDiagnosticFieldScroll();
   const detailReq = useRef(0);
   const stepKey = step.id;
   const max = step.maxSelect ?? SCHOOLS_PER_TYPE_MAX;
@@ -729,6 +743,12 @@ export function OrientationDynamicSchoolsStep({
     };
   }, [onLoadingChange]);
 
+  useEffect(() => {
+    setQuery('');
+    setCityFilter('');
+    setCityOpen(false);
+  }, [stepKey]);
+
   const byType = useMemo(
     () => ecoles.filter((e) => normalizeSchoolType(e.type) === typeMatch),
     [ecoles, typeMatch],
@@ -737,20 +757,43 @@ export function OrientationDynamicSchoolsStep({
     () => byType.filter((e) => schoolMatchesProfile(e, answers)),
     [byType, answers],
   );
+  const cityOptions = useMemo<SearchablePickItem[]>(() => {
+    const seen = new Set<string>();
+    const items: SearchablePickItem[] = [];
+    for (const school of ofType) {
+      for (const city of establishmentDisplayCities(school)) {
+        const key = foldSchoolText(city);
+        if (!key || seen.has(key)) continue;
+        seen.add(key);
+        items.push({ id: key, value: city, label: city });
+      }
+    }
+    items.sort((a, b) => a.label.localeCompare(b.label, 'fr', { sensitivity: 'base' }));
+    return items;
+  }, [ofType]);
+
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
-    const list = q
-      ? ofType.filter((e) => {
-          const hay = `${pickSchoolLabel(e)} ${e.nomArabe || ''}`.toLowerCase();
-          return hay.includes(q);
-        })
-      : ofType;
+    const q = foldSchoolText(query);
+    const cityKey = foldSchoolText(cityFilter);
+    const list = ofType.filter((e) => {
+      const cities = establishmentDisplayCities(e);
+      if (cityKey && !cities.some((city) => foldSchoolText(city) === cityKey)) return false;
+      if (!q) return true;
+      const hay = foldSchoolText(
+        `${pickSchoolLabel(e)} ${e.nom || ''} ${e.nomArabe || ''} ${e.sigle || ''} ${cities.join(' ')}`,
+      );
+      return hay.includes(q);
+    });
     return sortSchoolsForSelection(list).sort((a, b) => {
       const ac = schoolMatchesStudyCities(a, answers) ? 0 : 1;
       const bc = schoolMatchesStudyCities(b, answers) ? 0 : 1;
       return ac - bc;
     });
-  }, [ofType, query, answers]);
+  }, [ofType, query, cityFilter, answers]);
+
+  useEffect(() => {
+    if (query.trim() || cityFilter) setFacultesOpen(true);
+  }, [query, cityFilter]);
 
   const { facultes, others } = useMemo(() => partitionFacultePublique(filtered), [filtered]);
   const selectedInFacultes = useMemo(
@@ -927,13 +970,49 @@ export function OrientationDynamicSchoolsStep({
           ? `${selected.length}/${max} · الإجمالي ${totalSelected}`
           : `${selected.length}/${max} · ${totalSelected} au total`}
       </Text>
+      <Text style={[styles.filterLabel, rtl && styles.rtlText]}>
+        {tOdFill(uiLocale, 'schoolSearchLabel', {
+          type: (typeMatch || (uiLocale === 'ar' ? 'مدرسة' : 'école')).toLowerCase(),
+        })}
+      </Text>
       <TextInput
         value={query}
         onChangeText={setQuery}
-        placeholder={uiLocale === 'ar' ? 'بحث…' : 'Rechercher…'}
+        onFocus={scrollFieldIntoView}
+        placeholder={tOd(uiLocale, 'schoolSearchPlaceholder')}
         placeholderTextColor={brand.textMuted}
         style={[styles.search, rtl && styles.searchRtl]}
       />
+      <Text style={[styles.filterLabel, rtl && styles.rtlText]}>
+        {tOd(uiLocale, 'schoolCityFilter')}
+      </Text>
+      <Pressable
+        onPress={() => setCityOpen(true)}
+        accessibilityRole="button"
+        style={[styles.cityFilter, rtl && styles.cityFilterRtl]}>
+        <Text
+          style={[styles.cityFilterTxt, !cityFilter && styles.cityFilterPlaceholder, rtl && styles.rtlText]}
+          numberOfLines={1}>
+          {cityFilter || tOd(uiLocale, 'schoolCityAll')}
+        </Text>
+        <Text style={styles.cityFilterChevron}>▾</Text>
+      </Pressable>
+      <HostedSearchablePickSheet
+        visible={cityOpen}
+        title={tOd(uiLocale, 'schoolCityFilter')}
+        searchPlaceholder={tOd(uiLocale, 'schoolCitySearch')}
+        emptyLabel={tOd(uiLocale, 'schoolCityEmpty')}
+        allLabel={tOd(uiLocale, 'schoolCityAll')}
+        items={cityOptions}
+        selectedValue={cityFilter}
+        rtl={Boolean(rtl)}
+        onPick={setCityFilter}
+        onClose={() => setCityOpen(false)}
+      />
+
+      {filtered.length === 0 ? (
+        <DiagnosticHint rtl={rtl}>{tOd(uiLocale, 'schoolNoResultFilters')}</DiagnosticHint>
+      ) : null}
 
       {facultes.length ? (
         <View style={styles.accordion}>
@@ -987,7 +1066,7 @@ export function OrientationDynamicSchoolsStep({
         </View>
       ) : null}
 
-      {others.slice(0, 80).map(renderSchoolRow)}
+      {(query.trim() || cityFilter ? others : others.slice(0, 80)).map(renderSchoolRow)}
     </View>
   );
 }
@@ -1007,6 +1086,29 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   searchRtl: { textAlign: 'right' },
+  filterLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: '700',
+    color: brand.text,
+    marginBottom: -2,
+  },
+  cityFilter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: spacing.sm,
+    borderWidth: 1,
+    borderColor: diagnosticTheme.fieldBorder,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 12,
+    backgroundColor: brand.white,
+    marginBottom: spacing.sm,
+  },
+  cityFilterRtl: { flexDirection: 'row-reverse' },
+  cityFilterTxt: { flex: 1, fontSize: fontSize.sm, fontWeight: '700', color: brand.text },
+  cityFilterPlaceholder: { fontWeight: '600', color: brand.textMuted },
+  cityFilterChevron: { fontSize: 14, color: brand.primary, fontWeight: '700' },
   emptyBtn: {
     backgroundColor: diagnosticTheme.primarySoft,
     padding: spacing.md,

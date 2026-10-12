@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import type { ComponentProps, ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import {
@@ -19,6 +19,8 @@ import {
 } from '../data/orientationDiagnosticI18n';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+
+import { OrientationPickSheetHost } from './orientationPickSheetHost';
 
 const MODULE_ICONS: Record<ModuleId, ComponentProps<typeof FontAwesome>['name']> = {
   profile: 'user',
@@ -72,7 +74,9 @@ export function OrientationDiagnosticWizardShell({
   const progressPct = totalSteps > 0 ? ((stepIndex + 1) / totalSteps) * 100 : 0;
 
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <View style={styles.safe}>
+      <OrientationPickSheetHost>
+      <SafeAreaView style={styles.headerSafe} edges={['top', 'left', 'right']}>
       <DiagnosticStatusBar />
       <View style={[styles.header, rtl && styles.headerRtl]}>
         <Pressable
@@ -131,7 +135,11 @@ export function OrientationDiagnosticWizardShell({
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${Math.min(100, progressPct)}%` }]} />
       </View>
+      </SafeAreaView>
 
+      <KeyboardAvoidingView
+        style={styles.avoid}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.body}>{children}</View>
 
       <View style={[styles.footer, rtl && styles.footerRtl]}>
@@ -176,12 +184,15 @@ export function OrientationDiagnosticWizardShell({
           )}
         </Pressable>
       </View>
-    </SafeAreaView>
+      </KeyboardAvoidingView>
+      </OrientationPickSheetHost>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: brand.backgroundSoft },
+  headerSafe: { backgroundColor: brand.primary },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -260,6 +271,7 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   progressFill: { height: '100%', backgroundColor: brand.white },
+  avoid: { flex: 1 },
   body: { flex: 1, paddingHorizontal: spacing.md },
   footer: {
     flexDirection: 'row',

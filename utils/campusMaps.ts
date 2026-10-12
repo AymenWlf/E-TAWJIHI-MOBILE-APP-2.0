@@ -299,15 +299,19 @@ function campusHasMinimalInfo(c: Record<string, unknown>): boolean {
 /**
  * Libellés campus pour les seuils d'admission (clés API = id campus, nom affiché).
  */
-export function campusSeuilLabelsFromApi(campus: Record<string, unknown>[] | undefined): Record<string, string> {
+export function campusSeuilLabelsFromApi(
+  campus: Record<string, unknown>[] | undefined,
+  locale: 'fr' | 'ar' = 'fr',
+): Record<string, string> {
   const labels: Record<string, string> = {};
   if (!Array.isArray(campus) || campus.length === 0) return labels;
+  const campusWord = locale === 'ar' ? 'حرم' : 'Campus';
   campus.forEach((c, index) => {
     const id = str((c as { id?: unknown }).id);
     if (!id) return;
     const ville = campusCityLabel(c);
     const nom = str(c.nom);
-    const name = nom || (ville ? `Campus ${ville}` : `Campus ${index + 1}`);
+    const name = nom || (ville ? `${campusWord} ${ville}` : `${campusWord} ${index + 1}`);
     labels[id] = name;
     labels[`campus-${id}`] = name;
   });

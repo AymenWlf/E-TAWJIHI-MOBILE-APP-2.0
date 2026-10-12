@@ -9,7 +9,8 @@ import {
   DiagnosticTextInput,
   diagnosticTheme,
 } from '@/components/diagnostic/DiagnosticUi';
-import { SearchablePickSheet, type SearchablePickItem } from '@/components/schools/SearchablePickSheet';
+import type { SearchablePickItem } from '@/components/schools/SearchablePickSheet';
+import { HostedSearchablePickSheet } from './orientationPickSheetHost';
 import { Text } from '@/components/ui/Text';
 import { SPECIALITES_MISSION_LABELS } from '@/constants/academicSetup';
 import type { CityRow } from '@/services/referenceData';
@@ -206,7 +207,7 @@ export function OrientationDiagnosticProfileSteps({
             </Text>
           </Pressable>
         </DiagnosticFormBlock>
-        <SearchablePickSheet
+        <HostedSearchablePickSheet
           visible={picker === 'city'}
           title={uiLocale === 'ar' ? 'المدينة' : 'Ville'}
           items={cityItems}
@@ -300,7 +301,7 @@ export function OrientationDiagnosticProfileSteps({
             </>
           ) : null}
         </DiagnosticFormBlock>
-        <SearchablePickSheet
+        <HostedSearchablePickSheet
           visible={picker === 'studyLevel'}
           title={uiLocale === 'ar' ? 'المستوى' : 'Niveau'}
           items={studyItems}
@@ -320,7 +321,7 @@ export function OrientationDiagnosticProfileSteps({
           onClose={() => setPicker(null)}
           {...pickCommon}
         />
-        <SearchablePickSheet
+        <HostedSearchablePickSheet
           visible={picker === 'bacFiliere'}
           title={filiereFieldLabel}
           items={filiereItems}
@@ -332,7 +333,7 @@ export function OrientationDiagnosticProfileSteps({
           onClose={() => setPicker(null)}
           {...pickCommon}
         />
-        <SearchablePickSheet
+        <HostedSearchablePickSheet
           visible={picker === 'bacYear'}
           title={uiLocale === 'ar' ? 'السنة' : 'Année'}
           items={yearItems}
@@ -345,7 +346,7 @@ export function OrientationDiagnosticProfileSteps({
           {...pickCommon}
         />
         {(['spec1', 'spec2', 'spec3'] as const).map((key, idx) => (
-          <SearchablePickSheet
+          <HostedSearchablePickSheet
             key={key}
             visible={picker === key}
             title={`Spécialité ${idx + 1}`}
