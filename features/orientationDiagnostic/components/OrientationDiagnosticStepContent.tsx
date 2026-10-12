@@ -10,7 +10,8 @@ import {
   fallbackEstablishmentAvatarName,
   getEstablishmentLogoUrl,
 } from '@/constants/establishmentMedia';
-import { listCities, type CityRow } from '@/services/referenceData';
+import type { CityRow } from '@/services/referenceData';
+import { prefetchOrientationCities } from '../utils/orientationDiagnosticCatalogCache';
 import { applyVersusWinner, hydrateVersusSchoolVisuals } from '../utils/orientationDiagnosticVersus';
 import {
   formatBilingualName,
@@ -818,7 +819,7 @@ function CitiesStepMobile({
 
   useEffect(() => {
     let alive = true;
-    void listCities(1000)
+    void prefetchOrientationCities()
       .then((rows) => {
         if (alive) setCities(rows);
       })

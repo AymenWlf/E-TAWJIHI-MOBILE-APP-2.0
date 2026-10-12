@@ -12,7 +12,8 @@ import {
 import { SearchablePickSheet, type SearchablePickItem } from '@/components/schools/SearchablePickSheet';
 import { Text } from '@/components/ui/Text';
 import { SPECIALITES_MISSION_LABELS } from '@/constants/academicSetup';
-import { listCities, type CityRow } from '@/services/referenceData';
+import type { CityRow } from '@/services/referenceData';
+import { prefetchOrientationCities } from '../utils/orientationDiagnosticCatalogCache';
 import { brand, fontSize, spacing } from '@/theme/tokens';
 import {
   filiereOptionsForNiveau,
@@ -100,7 +101,7 @@ export function OrientationDiagnosticProfileSteps({
   const [picker, setPicker] = useState<PickerKey | null>(null);
 
   useEffect(() => {
-    void listCities(1000).then(setCities).catch(() => undefined);
+    void prefetchOrientationCities().then(setCities).catch(() => undefined);
   }, []);
 
   const pickCommon = {

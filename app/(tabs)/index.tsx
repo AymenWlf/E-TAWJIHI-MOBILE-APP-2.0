@@ -68,7 +68,7 @@ import { resetPlanParcoursStepDev } from '@/services/planReussiteSteps';
 import { useParcoursFeedback } from '@/contexts/ParcoursFeedbackContext';
 import { navigatePlanParcoursStep, type PlanParcoursNavigationAuth } from '@/utils/planParcoursNavigation';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useReloadStudentClientState, useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
 import {
   guardTawjihPlusParcoursStep,
   type TawjihPlusParcoursGate,
@@ -120,8 +120,8 @@ function HomeTabScreen() {
   const {
     hasAccess: hasTawjihPlusAccess,
     loading: tawjihPlusLoading,
-    refresh: refreshTawjihPlusAccess,
   } = useTawjihPlusAccess();
+  const reloadStudentClient = useReloadStudentClientState();
   const {
     profile: eligibilityProfile,
     loading: eligibilityLoading,
@@ -810,8 +810,7 @@ function HomeTabScreen() {
         })(),
         loadDailyChallenge(),
         loadBacResultsConfig({ force: true }),
-        refreshTawjihPlusAccess(),
-        user ? reloadMe() : Promise.resolve(),
+        reloadStudentClient(),
       ]);
       await Promise.all([
         user ? refetchEligibilityProfile() : Promise.resolve(),
@@ -829,8 +828,7 @@ function HomeTabScreen() {
     loadDailyChallenge,
     loadBacResultsConfig,
     refreshPlanParcours,
-    refreshTawjihPlusAccess,
-    reloadMe,
+    reloadStudentClient,
     refetchEligibilityProfile,
     user,
   ]);

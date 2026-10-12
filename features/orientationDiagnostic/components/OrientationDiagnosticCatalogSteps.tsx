@@ -9,6 +9,11 @@ import metierService, { type Metier } from '../services/metierService';
 import establishmentService, { type Establishment } from '../services/establishmentService';
 import { toDiagnosticEstablishment } from '../adapters/establishmentAdapter';
 import {
+  localizeBacFiliereLabel,
+  localizeDiplomeLabel,
+  localizeEstablishmentType,
+} from '@/utils/schoolFicheLocale';
+import {
   buildOrientationSchoolMeta,
   establishmentDiplomesList,
   establishmentDureeEtudesLabel,
@@ -44,6 +49,12 @@ import {
   orientationPlanLabel,
 } from '../constants/establishmentOrientationPlan';
 import { establishmentDisplayCities } from '../utils/orientationDiagnosticSchoolReco';
+import { schoolMatchesProfile, schoolMatchesStudyCities } from '../utils/orientationDiagnosticVersus';
+import {
+  prefetchOrientationMetiers,
+  prefetchOrientationSchools,
+  prefetchOrientationSectors,
+} from '../utils/orientationDiagnosticCatalogCache';
 import { toggleMultiMax } from '../utils/orientationMultiToggle';
 import type { DiagnosticAnswers, DiagnosticStep } from '../types/orientationDiagnosticPrototype';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -182,16 +193,17 @@ function schoolDetailModel(e: Establishment, locale: OrientationUiLocale): Catal
   );
   const cities = establishmentDisplayCities(e);
   const cityLabel = cities.length ? cities.join(' · ') : e.ville || '—';
-  const diplomes = establishmentDiplomesList(e);
-  const rawDescription = (e.description || '').trim();
+  const diplomes = establishmentDiplomesList(e).map((name) => localizeDiplomeLabel(name, locale));
+  const arabicDescription = locale === 'ar' ? (e.descriptionAr || '').trim() : '';
+  const rawDescription = (arabicDescription || e.description || '').trim();
   const description = plainText(rawDescription);
   const lead = description
     ? rawDescription
     : [
-      e.type ? normalizeSchoolType(e.type) : '',
+      e.type ? localizeEstablishmentType(e.type, locale) : '',
       cityLabel !== '—' ? cityLabel : '',
-      normalizeOrientationPlan(e.orientationPlan) ? orientationPlanLabel(e.orientationPlan) : '',
-      resolveAdmissionDisplayLabel(e),
+      normalizeOrientationPlan(e.orientationPlan) ? orientationPlanLabel(e.orientationPlan, locale) : '',
+      resolveAdmissionDisplayLabel(e, locale),
     ]
       .filter(Boolean)
       .join(' · ');
@@ -204,12 +216,18 @@ function schoolDetailModel(e: Establishment, locale: OrientationUiLocale): Catal
   if (chips.length) sections.push({ title: tOd(locale, 'modalPointsCles'), chips });
   if (diplomes.length) sections.push({ title: tOd(locale, 'modalDiplomesDelivres'), chips: diplomes.slice(0, 8) });
   if (e.filieresAcceptees?.length) {
-    sections.push({ title: tOd(locale, 'modalFilieresBac'), chips: e.filieresAcceptees.map(String).slice(0, 10) });
+    sections.push({
+      title: tOd(locale, 'modalFilieresBac'),
+      chips: e.filieresAcceptees.map((name) => localizeBacFiliereLabel(String(name), locale)).slice(0, 10),
+    });
   }
   if (e.secteurs?.length) {
     sections.push({
       title: tOd(locale, 'modalSecteurs'),
-      chips: e.secteurs.map((s) => s.titre).filter(Boolean).slice(0, 8),
+      chips: e.secteurs
+        .map((s) => (locale === 'ar' && s.titreAr?.trim() ? s.titreAr.trim() : s.titre))
+        .filter(Boolean)
+        .slice(0, 8),
     });
   }
   return {
@@ -220,17 +238,17 @@ function schoolDetailModel(e: Establishment, locale: OrientationUiLocale): Catal
     subtitleRtl: names.secondaryRtl,
     source: tOd(locale, 'sourceFicheEtawjihi'),
     lead,
-    leadRtl: locale === 'ar' && !description,
+    leadRtl: locale === 'ar' && (Boolean(arabicDescription) || !description),
     stats: [
-      { label: tOd(locale, 'modalType'), value: normalizeSchoolType(e.type) || e.type || '—' },
+      { label: tOd(locale, 'modalType'), value: localizeEstablishmentType(e.type, locale) },
       {
         label: tOd(locale, 'modalPlanOrientation'),
-        value: normalizeOrientationPlan(e.orientationPlan) ? orientationPlanLabel(e.orientationPlan) : '—',
+        value: normalizeOrientationPlan(e.orientationPlan) ? orientationPlanLabel(e.orientationPlan, locale) : '—',
       },
       { label: tOd(locale, 'modalVillesCampus'), value: cityLabel },
       { label: tOd(locale, 'modalFrais'), value: schoolFeesLabel(e, locale) },
       { label: tOd(locale, 'modalDuree'), value: establishmentDureeEtudesLabel(e) || '—' },
-      { label: tOd(locale, 'modalAdmission'), value: resolveAdmissionDisplayLabel(e) },
+      { label: tOd(locale, 'modalAdmission'), value: resolveAdmissionDisplayLabel(e, locale) },
     ],
     sections,
   };
@@ -370,7 +388,7 @@ export function OrientationDynamicSectorsStep({
       setLoading(true);
       onLoadingChange?.(true);
       try {
-        const { items } = await fetchSecteursCatalog({ token: accessToken });
+        const items = await prefetchOrientationSectors(accessToken);
         if (cancelled) return;
         setSecteurs(items);
         if (!items.length) setError(tOd(uiLocale, 'noSectors'));
@@ -551,8 +569,7 @@ export function OrientationDynamicMetiersStep({
       const num = Number(secteurId);
       if (Number.isFinite(num)) {
         try {
-          const mRes = await metierService.getAll({ secteur: num, limit: 100, afficherDansTest: true });
-          apiMetiers = mRes.success && mRes.data ? [...mRes.data] : [];
+          apiMetiers = await prefetchOrientationMetiers(String(num));
         } catch {
           apiMetiers = [];
         }
@@ -695,7 +712,7 @@ export function OrientationDynamicSchoolsStep({
       setLoading(true);
       onLoadingChange?.(true);
       try {
-        const list = await establishmentService.fetchAllPublicCatalog({ isActive: true });
+        const list = await prefetchOrientationSchools();
         if (!cancelled) setEcoles(list);
       } catch {
         if (!cancelled) setEcoles([]);
@@ -712,8 +729,15 @@ export function OrientationDynamicSchoolsStep({
     };
   }, [onLoadingChange]);
 
+  const byType = useMemo(
+    () => ecoles.filter((e) => normalizeSchoolType(e.type) === typeMatch),
+    [ecoles, typeMatch],
+  );
+  const ofType = useMemo(
+    () => byType.filter((e) => schoolMatchesProfile(e, answers)),
+    [byType, answers],
+  );
   const filtered = useMemo(() => {
-    const ofType = ecoles.filter((e) => normalizeSchoolType(e.type) === typeMatch);
     const q = query.trim().toLowerCase();
     const list = q
       ? ofType.filter((e) => {
@@ -721,8 +745,12 @@ export function OrientationDynamicSchoolsStep({
           return hay.includes(q);
         })
       : ofType;
-    return sortSchoolsForSelection(list);
-  }, [ecoles, query, typeMatch]);
+    return sortSchoolsForSelection(list).sort((a, b) => {
+      const ac = schoolMatchesStudyCities(a, answers) ? 0 : 1;
+      const bc = schoolMatchesStudyCities(b, answers) ? 0 : 1;
+      return ac - bc;
+    });
+  }, [ofType, query, answers]);
 
   const { facultes, others } = useMemo(() => partitionFacultePublique(filtered), [filtered]);
   const selectedInFacultes = useMemo(
@@ -732,11 +760,15 @@ export function OrientationDynamicSchoolsStep({
 
   if (loading) return <ActivityIndicator color={brand.primary} style={{ marginTop: spacing.lg }} />;
 
-  if (!filtered.length && !answers.single[emptyKey]) {
+  if (!ofType.length && !answers.single[emptyKey]) {
     return (
       <View style={styles.wrap}>
         <DiagnosticHint rtl={rtl}>
-          {uiLocale === 'ar' ? 'لا توجد مدارس نشطة من هذا النوع.' : 'Aucune école active pour ce type.'}
+          {byType.length
+            ? tOdFill(uiLocale, 'schoolNoFiliere', { type: typeMatch || (uiLocale === 'ar' ? 'هذا النوع' : 'ce type') })
+            : uiLocale === 'ar'
+              ? 'لا توجد مدارس نشطة من هذا النوع.'
+              : 'Aucune école active pour ce type.'}
         </DiagnosticHint>
         <Pressable
           onPress={() =>

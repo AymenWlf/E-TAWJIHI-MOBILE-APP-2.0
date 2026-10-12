@@ -16,7 +16,7 @@ import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { getUserFacingApiError } from '@/utils/apiError';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
 import {
   fetchSchoolRecommendationDiagnosticByPublicCode,
   generateSchoolDiagnosticRecommendations,

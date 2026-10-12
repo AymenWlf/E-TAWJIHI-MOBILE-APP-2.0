@@ -13,7 +13,9 @@ import {
   type DiagnosticTierId,
 } from './schoolDiagnosticTier';
 import {
+  establishmentAcceptsBacFiliere,
   extractVersusSignals,
+  schoolMatchesProfile,
   VERSUS_FACULTES_PUBLIQUES_ID,
 } from './orientationDiagnosticVersus';
 import {
@@ -339,13 +341,18 @@ export function answersToSchoolMatchPayload(
   schoolLookup?: Map<string, Establishment>,
 ): MatchPayload {
   const cities = answers.cities ?? [];
-  const anyCity = cities.includes('peuimporte') || cities.length === 0;
-  const preferredCityNames = [
-    ...cities
-      .filter((id) => id !== 'peuimporte' && id !== 'autres')
-      .map((id) => CITY_ID_TO_LABEL[id] || id),
-    ...(answers.cityOther ?? []),
-  ].filter(Boolean);
+  const flexible = cities.includes('peuimporte');
+  const namedCities = flexible
+    ? []
+    : [
+        ...cities
+          .filter((id) => id !== 'peuimporte' && id !== 'autres')
+          .map((id) => CITY_ID_TO_LABEL[id] || id),
+        ...(answers.cityOther ?? []),
+      ].filter(Boolean);
+  const profileCity = answers.profile?.city?.trim() || '';
+  const preferredCityNames = namedCities.length ? namedCities : !flexible && profileCity ? [profileCity] : [];
+  const anyCity = flexible || preferredCityNames.length === 0;
 
   const types = answers.multi.sch_types ?? [];
   // Compat anciennes valeurs de brouillon
@@ -480,14 +487,9 @@ function scoreType(p: MatchPayload, e: Establishment): number {
 
 function filiereBacBlocks(p: MatchPayload, e: Establishment): boolean {
   if (p.bacType !== 'normal') return false;
-  let estBac = e.bacType || '';
-  if (estBac === 'both') estBac = 'normal';
-  if (estBac !== 'normal') return false;
-  const fil = e.filieresAcceptees;
-  if (!Array.isArray(fil) || fil.length === 0) return false;
   const stream = p.bacStream.trim();
   if (!stream) return true;
-  return !fil.some((f) => String(f).trim() === stream);
+  return !establishmentAcceptsBacFiliere(e, stream);
 }
 
 function scoreBac(p: MatchPayload, e: Establishment): number {
@@ -499,10 +501,9 @@ function scoreBac(p: MatchPayload, e: Establishment): number {
 
   if (p.bacType === 'normal') {
     if (estBac === 'mission') return 38;
-    const fil = e.filieresAcceptees;
-    if (!Array.isArray(fil) || fil.length === 0) return 74;
-    if (filiereBacBlocks(p, e)) return 0;
-    return 96;
+    const stream = p.bacStream.trim();
+    if (!stream) return 70;
+    return establishmentAcceptsBacFiliere(e, stream) ? 96 : 0;
   }
 
   if (p.bacType === 'mission') {
@@ -798,6 +799,7 @@ export async function buildSchoolRecommendations(
   const payload = answersToSchoolMatchPayload(answers, lookup);
 
   return list
+    .filter((e) => schoolMatchesProfile(e, answers))
     .map((e) => withTier(scoreEstablishment(payload, e)))
     .filter((r) => r.establishmentId > 0)
     .sort((a, b) => {

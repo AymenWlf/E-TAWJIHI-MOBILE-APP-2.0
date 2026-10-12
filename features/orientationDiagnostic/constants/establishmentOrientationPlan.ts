@@ -22,9 +22,20 @@ export function normalizeOrientationPlan(
   return null;
 }
 
-export function orientationPlanLabel(value?: string | null): string {
+const PLAN_FULL_AR: Record<EstablishmentOrientationPlan, string> = {
+  A: 'الخطة A — طموحة',
+  B: 'الخطة B — في المتناول',
+  C: 'الخطة C — آمنة',
+  D: 'الخطة D — متخصصة',
+};
+
+export function orientationPlanLabel(
+  value?: string | null,
+  locale: 'fr' | 'ar' = 'fr',
+): string {
   const p = normalizeOrientationPlan(value);
-  if (!p) return 'Sans plan';
+  if (!p) return locale === 'ar' ? 'بدون خطة' : 'Sans plan';
+  if (locale === 'ar') return PLAN_FULL_AR[p];
   return ESTABLISHMENT_ORIENTATION_PLANS.find((x) => x.id === p)?.full || `PLAN ${p}`;
 }
 

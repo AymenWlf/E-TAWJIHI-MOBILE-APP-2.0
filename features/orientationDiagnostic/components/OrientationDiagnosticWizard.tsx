@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { router } from 'expo-router';
+import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 
@@ -9,6 +9,12 @@ import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { postPlanReussiteStep } from '@/services/planReussiteSteps';
+import {
+  fetchOrientationDiagnosticServerReport,
+  fetchOrientationDiagnosticSession,
+  resetOrientationDiagnosticSession,
+  saveOrientationDiagnosticStep,
+} from '@/services/orientationDiagnosticSession';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
@@ -18,7 +24,7 @@ import {
   readOrientationDiagnosticPrototypeDraft,
   type OrientationDiagnosticPrototypeDraft,
 } from '../constants/orientationDiagnosticPrototypeStorage';
-import type { ModuleId } from '../types/orientationDiagnosticPrototype';
+import type { DiagnosticStep, ModuleId, OrientationReport } from '../types/orientationDiagnosticPrototype';
 import { buildOrientationCoreSteps } from '../data/orientationDiagnosticQuestions';
 import { localizeModuleMeta, localizeStep, tOd } from '../data/orientationDiagnosticI18n';
 import type { DiagnosticAnswers } from '../types/orientationDiagnosticPrototype';
@@ -30,6 +36,7 @@ import {
 import { buildSchoolRecommendations } from '../utils/orientationDiagnosticSchoolReco';
 import { orientationUiLocaleFromApp } from '../utils/orientationUiLocaleFromApp';
 import { buildVersusPlan, versusPlanToSteps } from '../utils/orientationDiagnosticVersus';
+import { prefetchUpcomingOrientationSteps } from '../utils/orientationDiagnosticCatalogCache';
 import { submitOrientationAnswersAsSchoolRecommendations } from '@/utils/syncOrientationToSchoolRecommendations';
 import { OrientationDiagnosticBriefScreen } from './OrientationDiagnosticBriefScreen';
 import { OrientationDiagnosticStepContent } from './OrientationDiagnosticStepContent';
@@ -40,6 +47,9 @@ export function OrientationDiagnosticWizard() {
   const uiLocale = orientationUiLocaleFromApp(locale);
   const { user, getValidAccessToken } = useAuth();
   const userId = user?.id ?? null;
+  const { fresh } = useLocalSearchParams<{ fresh?: string }>();
+  const forceFreshRef = useRef(fresh === '1');
+  if (fresh === '1') forceFreshRef.current = true;
 
   const [booting, setBooting] = useState(true);
   const [answers, setAnswers] = useState<DiagnosticAnswers>(() => emptyAnswers());
@@ -55,6 +65,7 @@ export function OrientationDiagnosticWizard() {
   const [lastCompletedModule, setLastCompletedModule] = useState<ModuleId | null>(null);
   const [completedModules, setCompletedModules] = useState<ModuleId[]>([]);
   const [confirmKind, setConfirmKind] = useState<'quit' | 'retake' | null>(null);
+  const [remoteSteps, setRemoteSteps] = useState<DiagnosticStep[] | null>(null);
   const resumedRef = useRef(false);
 
   const persistProgress = useCallback(
@@ -75,6 +86,18 @@ export function OrientationDiagnosticWizard() {
         report: patch.report ?? null,
         reportParcoursSynced: patch.reportParcoursSynced,
       });
+      void (async () => {
+        const token = await getValidAccessToken();
+        if (!token) return;
+        const session = await saveOrientationDiagnosticStep(token, {
+          stepId: patch.stepId ?? 'prof_identity',
+          phase: patch.phase === 'report' ? 'report' : 'quiz',
+          uiLocale,
+          answers: patch.answers,
+          clientUpdatedAt: new Date().toISOString(),
+        });
+        if (session?.steps?.length) setRemoteSteps(session.steps);
+      })().catch(() => undefined);
     },
     [
       userId,
@@ -84,13 +107,97 @@ export function OrientationDiagnosticWizard() {
       versusBriefDone,
       situationPhase,
       uiLocale,
+      getValidAccessToken,
     ],
   );
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
+      if (forceFreshRef.current) {
+        forceFreshRef.current = false;
+        const freshAnswers = emptyAnswers();
+        await clearOrientationDiagnosticPrototypeDraft(userId);
+        const freshToken = await getValidAccessToken();
+        if (freshToken) {
+          await resetOrientationDiagnosticSession(freshToken).catch(() => undefined);
+        }
+        await clearOrientationDiagnosticPrototypeDraft(userId);
+        if (cancelled) return;
+        setRemoteSteps(null);
+        setAnswers(freshAnswers);
+        setStepIndex(0);
+        setRestoreStepId(null);
+        setSituationPhase('most');
+        setSituationBriefDone(false);
+        setVersusBriefDone(false);
+        setLastCompletedModule(null);
+        setCompletedModules([]);
+        resumedRef.current = false;
+        const firstId = buildOrientationCoreSteps({ multi: {}, labels: {} })[0]?.id || 'prof_identity';
+        await persistOrientationDiagnosticPrototypeDraft({
+          userId,
+          phase: 'quiz',
+          stepId: firstId,
+          lastCompletedModule: null,
+          completedModules: [],
+          answers: freshAnswers,
+          ui: { situationBriefDone: false, versusBriefDone: false, situationPhase: 'most' },
+          uiLocale,
+          report: null,
+        });
+        if (!cancelled) setBooting(false);
+        return;
+      }
       const draft = await readOrientationDiagnosticPrototypeDraft(userId);
+      const token = await getValidAccessToken();
+      if (token) {
+        try {
+          const server = await fetchOrientationDiagnosticSession(token);
+          const localTime = draft?.savedAt ? Date.parse(draft.savedAt) : 0;
+          const serverTime = server?.updatedAt ? Date.parse(server.updatedAt) : 0;
+          const serverHasAnswers = Boolean(server && Object.keys(server.answers || {}).length > 0);
+          if (server && serverHasAnswers && serverTime >= localTime && !cancelled) {
+            if (server.steps?.length) setRemoteSteps(server.steps);
+            const restored = { ...emptyAnswers(), ...server.answers };
+            setAnswers(restored);
+            await persistOrientationDiagnosticPrototypeDraft({
+              userId,
+              phase: server.phase,
+              stepId: server.stepId,
+              lastCompletedModule: null,
+              completedModules: [],
+              answers: restored,
+              ui: { situationBriefDone: false, versusBriefDone: false, situationPhase: 'most' },
+              uiLocale,
+              report: server.report,
+            });
+            if (server.phase === 'report' && server.report) {
+              router.replace('/diagnostic-orientation/rapport' as never);
+              return;
+            }
+            setRestoreStepId(server.stepId);
+            resumedRef.current = true;
+            setBooting(false);
+            return;
+          }
+          if (draft && (draft.phase === 'quiz' || draft.phase === 'report') && draft.answers) {
+            void saveOrientationDiagnosticStep(token, {
+              stepId: draft.stepId,
+              phase: draft.phase === 'report' ? 'report' : 'quiz',
+              uiLocale,
+              answers: draft.answers,
+              clientUpdatedAt: draft.savedAt || new Date().toISOString(),
+            })
+              .then((session) => {
+                if (session?.steps?.length) setRemoteSteps(session.steps);
+              })
+              .catch(() => undefined);
+          }
+        } catch {
+          /* reprise locale */
+        }
+      }
       if (draft?.phase === 'report' && draft.report) {
         router.replace('/diagnostic-orientation/rapport' as never);
         return;
@@ -129,19 +236,41 @@ export function OrientationDiagnosticWizard() {
     return () => {
       cancelled = true;
     };
-  }, [userId, uiLocale]);
+  }, [userId, uiLocale, getValidAccessToken]);
 
   const coreSteps = useMemo(
     () => buildOrientationCoreSteps(answers),
     [answers.multi.car_secteurs, answers.multi.sch_types, answers.labels],
   );
-  const quizSteps = useMemo(
-    () => [...coreSteps, ...versusPlanToSteps(answers.versusPlan ?? [])],
-    [coreSteps, answers.versusPlan],
-  );
-  const coreStepsCount = coreSteps.length;
+  const quizSteps = useMemo(() => {
+    if (remoteSteps && remoteSteps.length > 0) return remoteSteps;
+    return [...coreSteps, ...versusPlanToSteps(answers.versusPlan ?? [])];
+  }, [remoteSteps, coreSteps, answers.versusPlan]);
+  const versusStart = remoteSteps?.findIndex((item) => item.kind === 'versus') ?? -1;
+  const coreStepsCount = remoteSteps?.length
+    ? versusStart >= 0
+      ? versusStart
+      : remoteSteps.length
+    : coreSteps.length;
   const totalSteps = Math.max(quizSteps.length, coreStepsCount);
   const step = quizSteps[stepIndex];
+
+  useEffect(() => {
+    let alive = true;
+    void (async () => {
+      const token = await getValidAccessToken();
+      if (!alive) return;
+      prefetchUpcomingOrientationSteps(
+        quizSteps,
+        stepIndex,
+        answers.multi.car_secteurs ?? [],
+        token,
+      );
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [quizSteps, stepIndex, answers.multi.car_secteurs, getValidAccessToken]);
   const displayStep = useMemo(
     () => (step ? localizeStep(step, uiLocale) : null),
     [step, uiLocale],
@@ -191,6 +320,22 @@ export function OrientationDiagnosticWizard() {
         let report = buildOrientationReport(ans);
         const ecolesRecommandees = await buildSchoolRecommendations(ans);
         report = { ...report, ecolesRecommandees };
+        const tokenForReport = await getValidAccessToken();
+        if (tokenForReport) {
+          try {
+            await saveOrientationDiagnosticStep(tokenForReport, {
+              stepId: 'report',
+              phase: 'report',
+              uiLocale,
+              answers: ans,
+              clientUpdatedAt: new Date().toISOString(),
+            });
+            const remote = await fetchOrientationDiagnosticServerReport(tokenForReport);
+            if (remote) report = remote as OrientationReport;
+          } catch {
+            /* le rapport local reste utilisé si le serveur est injoignable */
+          }
+        }
         let schoolRecoPublicCode: string | null = null;
         try {
           const reco = await submitOrientationAnswersAsSchoolRecommendations(ans, {
@@ -230,6 +375,12 @@ export function OrientationDiagnosticWizard() {
     setVersusBuilding(true);
     try {
       const completedModule = step?.module ?? 'schools';
+      if ((answers.versusPlan ?? []).length > 0 && answers.versusField) {
+        setVersusBriefDone(false);
+        setStepIndex(coreStepsCount);
+        setVersusBuilding(false);
+        return;
+      }
       const built = await buildVersusPlan(answers);
       if (!built.plan.length) {
         const ans = {
@@ -465,6 +616,11 @@ export function OrientationDiagnosticWizard() {
     void (async () => {
       const fresh = emptyAnswers();
       await clearOrientationDiagnosticPrototypeDraft(userId);
+      setRemoteSteps(null);
+      const token = await getValidAccessToken();
+      if (token) {
+        await resetOrientationDiagnosticSession(token).catch(() => undefined);
+      }
       setAnswers(fresh);
       setStepIndex(0);
       setRestoreStepId(null);
@@ -493,7 +649,7 @@ export function OrientationDiagnosticWizard() {
         reportParcoursSynced: false,
       });
     })();
-  }, [uiLocale, userId]);
+  }, [getValidAccessToken, uiLocale, userId]);
 
   if (booting || !step || !displayStep) {
     return (

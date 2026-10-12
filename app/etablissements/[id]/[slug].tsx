@@ -81,6 +81,7 @@ import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { campusSeuilLabelsFromApi, mapCampusForDisplay } from '@/utils/campusMaps';
 import { evaluateEligibility } from '@/utils/eligibility';
+import { localizeDiplomeLabel } from '@/utils/schoolFicheLocale';
 import { fireAndForget } from '@/utils/fireAndForget';
 import {
   addUtmToUrl,
@@ -988,7 +989,7 @@ export default function EstablishmentDetailScreen() {
             <Section title={t('estDetailDegrees')} rtl={isRTL}>
               <Wrap rtl={isRTL}>
                 {data.mergedDiplomes.map((d) => (
-                  <Chip key={d} txt={d} />
+                  <Chip key={d} txt={localizeDiplomeLabel(d, isRTL ? 'ar' : 'fr')} />
                 ))}
               </Wrap>
             </Section>

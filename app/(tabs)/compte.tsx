@@ -65,7 +65,7 @@ import {
   type UserActiveCommercialService,
 } from '@/services/userActiveServices';
 import { useUserReferral } from '@/hooks/useUserReferral';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useReloadStudentClientState, useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { getReferralRequiredServiceName, isReferralProgramUnlocked } from '@/services/userReferral';
 import { userIsCommercialClient } from '@/utils/commercialClientAccess';
@@ -85,6 +85,7 @@ export default function CompteTabScreen() {
   const router = useRouter();
   const { openSimpleAppFeedback } = useSimpleAppFeedback();
   const { user, isLoading: authLoading, getValidAccessToken, reloadMe, logout } = useAuth();
+  const reloadStudentClient = useReloadStudentClientState();
   const { t, isRTL, locale } = useLocale();
   const insets = useSafeAreaInsets();
   const [mainTab, setMainTab] = useState<'profile' | 'orders'>('profile');
@@ -518,7 +519,7 @@ export default function CompteTabScreen() {
     try {
       await Promise.all([
         loadCities(),
-        isLoggedIn ? reloadMe() : Promise.resolve(),
+        isLoggedIn ? reloadStudentClient() : Promise.resolve(),
         loadProfile(),
         loadOrders(),
         loadActiveServices(),
@@ -527,7 +528,7 @@ export default function CompteTabScreen() {
     } finally {
       setRefreshing(false);
     }
-  }, [loadCities, loadProfile, loadOrders, loadActiveServices, isLoggedIn, reloadMe, reloadReferral]);
+  }, [loadCities, loadProfile, loadOrders, loadActiveServices, isLoggedIn, reloadStudentClient, reloadReferral]);
 
   const save = useCallback(async () => {
     if (!isLoggedIn) return;

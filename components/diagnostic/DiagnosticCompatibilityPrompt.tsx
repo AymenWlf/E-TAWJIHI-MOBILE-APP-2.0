@@ -7,7 +7,7 @@ import { Text } from '@/components/ui/Text';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
 import { brand, fontSize, radius } from '@/theme/tokens';
 import { navigateToSchoolDiagnosticWizard } from '@/utils/navigateToSchoolDiagnosticEntry';
 import type { TawjihPlusParcoursGate } from '@/utils/tawjihPlusParcoursGate';

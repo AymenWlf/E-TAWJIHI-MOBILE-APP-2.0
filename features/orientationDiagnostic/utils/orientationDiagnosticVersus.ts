@@ -284,6 +284,77 @@ function schoolTypeKey(e: Establishment): string {
   return (e.type || '').trim() || '—';
 }
 
+/** Libellés de filière ramenés à une clé stable (formulaire, catalogue, variantes). */
+const FILIERE_CANON: Record<string, string> = {
+  'sciences math a': 'sma',
+  'sciences maths a': 'sma',
+  'sciences mathematiques a': 'sma',
+  'sciences mathematique a': 'sma',
+  sma: 'sma',
+  'sciences math b': 'smb',
+  'sciences maths b': 'smb',
+  'sciences mathematiques b': 'smb',
+  smb: 'smb',
+  'sciences physique': 'pc',
+  'sciences physiques': 'pc',
+  'sciences physique chimie': 'pc',
+  pc: 'pc',
+  svt: 'svt',
+  'sciences de la vie et de la terre': 'svt',
+  'sciences vie et terre': 'svt',
+  'sciences et technologies electriques': 'ste',
+  ste: 'ste',
+  'sciences et technologies mecaniques': 'stm',
+  stm: 'stm',
+  'sciences economique': 'eco',
+  'sciences economiques': 'eco',
+  'sciences eco': 'eco',
+  'sciences gestion comptable': 'sgc',
+  'sciences de gestion comptable': 'sgc',
+  'sciences agronomiques': 'agro',
+  lettres: 'lettres',
+  'sciences humaines': 'sh',
+  'sciences de la chariaa': 'chariaa',
+  'arts appliques': 'arts',
+  autre: 'autre',
+};
+
+/** 1re bac : les écoles listent les filières de 2e bac correspondantes. */
+const PREMIERE_BAC_STREAMS: Record<string, string[]> = {
+  '1bac_sc_math': ['sma', 'smb'],
+  '1bac_sc_exp': ['pc', 'svt'],
+  '1bac_sc_eco_gestion': ['eco', 'sgc'],
+  '1bac_lettres_sc_hum': ['lettres', 'sh'],
+  '1bac_ste': ['ste'],
+  '1bac_stm': ['stm'],
+};
+
+function canonicalFiliere(value: string): string {
+  const n = norm(value).replace(/['’]/g, '').replace(/\s+/g, ' ').trim();
+  return FILIERE_CANON[n] || n;
+}
+
+function chosenFiliereKeys(bacFiliere: string): string[] {
+  const raw = norm(bacFiliere).replace(/\s+/g, ' ').trim();
+  if (PREMIERE_BAC_STREAMS[raw]) return PREMIERE_BAC_STREAMS[raw];
+  const key = canonicalFiliere(bacFiliere);
+  return key ? [key] : [];
+}
+
+/**
+ * L’établissement déclare accepter cette filière de bac.
+ * La famille de secteurs choisie dans le test n’entre pas dans ce critère.
+ * Une liste vide n’est acceptée que pour une faculté publique à accès ouvert.
+ */
+export function establishmentAcceptsBacFiliere(e: Establishment, bacFiliere: string): boolean {
+  const accepted = (e.filieresAcceptees || []).map(String).map((item) => item.trim()).filter(Boolean);
+  if (!accepted.length) return isFacultePubliqueAccesOuvert(e);
+  const wanted = chosenFiliereKeys(bacFiliere);
+  if (!wanted.length) return false;
+  const have = accepted.map(canonicalFiliere);
+  return wanted.some((key) => have.includes(key));
+}
+
 /** École compatible avec la filière / spécialités du profil. */
 export function schoolMatchesProfile(
   e: Establishment,
@@ -310,21 +381,68 @@ export function schoolMatchesProfile(
   }
 
   if (p.bacType === 'marocain' && p.bacFiliere) {
-    const accepted = e.filieresAcceptees || [];
-    if (!accepted.length) return true;
-    const nf = norm(p.bacFiliere);
-    return accepted.some((a) => {
-      const na = norm(a);
-      return na.includes(nf) || nf.includes(na) || shareToken(nf, na);
-    });
+    return establishmentAcceptsBacFiliere(e, p.bacFiliere);
   }
 
   return true;
 }
 
-function shareToken(a: string, b: string): boolean {
-  const tokens = a.split(/[\s,/()-]+/).filter((t) => t.length >= 3);
-  return tokens.some((t) => b.includes(t));
+function cityText(value: unknown): string {
+  if (typeof value === 'string') return value.trim();
+  if (value && typeof value === 'object' && 'titre' in value) {
+    const titre = (value as { titre?: unknown }).titre;
+    return typeof titre === 'string' ? titre.trim() : '';
+  }
+  return '';
+}
+
+function schoolPlaceNames(e: Establishment): string[] {
+  const out: string[] = [];
+  const seat = cityText(e.ville);
+  if (seat) out.push(seat);
+  if (Array.isArray(e.villes)) {
+    for (const city of e.villes) {
+      const label = cityText(city);
+      if (label) out.push(label);
+    }
+  }
+  if (Array.isArray(e.campus)) {
+    for (const campus of e.campus) {
+      const city = cityText(campus && typeof campus === 'object' ? campus.ville : '');
+      if (city) out.push(city);
+    }
+  }
+  return out;
+}
+
+function wantedStudyCities(answers: DiagnosticAnswers): string[] | null {
+  const selected = answers.cities ?? [];
+  if (selected.includes('peuimporte')) return null;
+  const names = [
+    ...selected
+      .filter((id) => id !== 'peuimporte' && id !== 'autres')
+      .map((id) => CITY_ID_TO_LABEL[id] || id),
+    ...(answers.cityOther ?? []),
+  ]
+    .map((name) => name.trim())
+    .filter(Boolean);
+  if (names.length) return names;
+  const profileCity = answers.profile?.city?.trim();
+  return profileCity ? [profileCity] : null;
+}
+
+export function schoolMatchesStudyCities(e: Establishment, answers: DiagnosticAnswers): boolean {
+  const wanted = wantedStudyCities(answers);
+  if (!wanted) return true;
+  const places = schoolPlaceNames(e);
+  if (!places.length) return true;
+  return wanted.some((city) => {
+    const needle = norm(city);
+    return places.some((place) => {
+      const hay = norm(place);
+      return hay === needle || hay.includes(needle) || needle.includes(hay);
+    });
+  });
 }
 
 function uniqueById<T extends { id: string }>(list: T[]): T[] {
@@ -619,8 +737,9 @@ async function selectEcoleField16(
 
   let list: Establishment[] = [];
   try {
-    const res = await establishmentService.getAll({ limit: 500, isActive: true });
-    list = (res.data || []).filter((e) => e.isActive !== false);
+    list = (await establishmentService.fetchAllPublicCatalog({ isActive: true })).filter(
+      (e) => e.isActive !== false,
+    );
   } catch {
     list = [];
   }
@@ -660,6 +779,12 @@ async function selectEcoleField16(
   for (const e of list) {
     if (e.id == null) continue;
     const id = String(e.id);
+    if (
+      !selectedIds.includes(id) &&
+      (!schoolMatchesProfile(e, answers) || !schoolMatchesStudyCities(e, answers))
+    ) {
+      continue;
+    }
     let score = 50;
     if (selectedIds.includes(id)) score += 900;
     if (schoolMatchesProfile(e, answers)) score += 80;

@@ -13,6 +13,7 @@ import {
   programmeDisplayName,
   programmeSecteursLabel,
 } from '@/utils/establishmentProgrammes';
+import { localizeDiplomeLabel } from '@/utils/schoolFicheLocale';
 
 type Props = {
   programmes: EstablishmentProgramme[];
@@ -77,6 +78,9 @@ function ProgrammeCard({
   width: number;
 }) {
   const notSpecified = t('estDetailProgrammeNotSpecified');
+  const diplomaLabel = programme.diplome
+    ? localizeDiplomeLabel(programme.diplome, rtl ? 'ar' : 'fr')
+    : '';
 
   return (
     <View style={[styles.card, { width }]}>
@@ -86,7 +90,7 @@ function ProgrammeCard({
           <View style={styles.diplomePill}>
             <FontAwesome name="graduation-cap" size={11} color={brand.primary} />
             <Text style={styles.diplomeTxt} numberOfLines={1}>
-              {programme.diplome}
+              {diplomaLabel}
             </Text>
           </View>
         ) : null}
@@ -122,13 +126,16 @@ function ProgrammeCard({
             rtl={rtl}
             icon="certificate"
             label={t('estDetailProgrammeDegree')}
-            value={programme.diplome?.trim() || notSpecified}
+            value={diplomaLabel || notSpecified}
           />
           <ProgrammeInfoRow
             rtl={rtl}
             icon="shield"
             label={t('estDetailProgrammeAccreditation')}
-            value={formatProgrammeReconnaissanceLabel(programme.reconnaissance) || notSpecified}
+            value={
+              formatProgrammeReconnaissanceLabel(programme.reconnaissance, rtl ? 'ar' : 'fr')
+              || notSpecified
+            }
           />
         </View>
       </View>

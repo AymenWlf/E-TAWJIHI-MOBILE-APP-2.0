@@ -17,7 +17,7 @@ import type { HomeCopyKey } from '@/constants/i18n';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAuth } from '@/contexts/AuthContext';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
 import { TawjihPlusUpgradeCta } from '@/components/inscriptions/TawjihPlusPaywall';
 import { ReferralLockedBanner } from '@/components/account/ReferralLockedBanner';
 import { useUserReferral } from '@/hooks/useUserReferral';

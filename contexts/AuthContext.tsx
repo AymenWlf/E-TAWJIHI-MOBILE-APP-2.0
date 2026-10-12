@@ -188,7 +188,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           prev.is_setup === next.is_setup &&
           prev.firstName === next.firstName &&
           prev.lastName === next.lastName &&
-          prev.phone === next.phone
+          prev.phone === next.phone &&
+          prev.tassjilAccess === next.tassjilAccess &&
+          prev.legacyLink?.linked === next.legacyLink?.linked &&
+          prev.legacyLink?.requiresLink === next.legacyLink?.requiresLink &&
+          prev.legacyLink?.hasTassjilCandidate === next.legacyLink?.hasTassjilCandidate
         ) {
           return prev;
         }

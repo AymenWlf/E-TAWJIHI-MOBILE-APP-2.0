@@ -5108,7 +5108,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopServicesFiliereReste: 'باقي الشعب',
     shopSearchServicesPlaceholder: 'ابحث عن خدمة…',
     shopServiceDetail: 'التفاصيل',
-    shopServicePromoChip: 'عرض',
+    shopServicePromoChip: 'تخفيض',
     shopEntitlementAlreadyOwned: 'مفعّل مسبقًا على حسابك',
     shopEntitlementIncluded: 'مشمول في عرضك الحالي',
     shopEntitlementIncludedVia: 'مشمول مع {name}',

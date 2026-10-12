@@ -7,6 +7,7 @@ import type {
 export interface EstablishmentSecteur {
   id: number;
   titre: string;
+  titreAr?: string | null;
   code?: string;
 }
 
@@ -34,6 +35,7 @@ export interface Establishment {
   slug: string;
   logo?: string;
   description?: string;
+  descriptionAr?: string;
   location?: EstablishmentLocation;
   campus?: EstablishmentCampus[];
   concours: boolean;
@@ -117,6 +119,7 @@ export function toDiagnosticEstablishment(e: EstablishmentNormalized): Establish
     slug: e.slug,
     logo: e.media?.logo ?? e.logo ?? undefined,
     description: e.description,
+    descriptionAr: e.descriptionAr,
     location: e.location as EstablishmentLocation | undefined,
     campus: e.campus as EstablishmentCampus[] | undefined,
     concours,
@@ -142,6 +145,7 @@ export function toDiagnosticEstablishment(e: EstablishmentNormalized): Establish
     secteurs: e.secteurs?.map((s) => ({
       id: s.id ?? 0,
       titre: s.titre ?? '',
+      titreAr: s.titreAr ?? null,
       code: undefined,
     })),
     diplomesDelivres: e.mergedDiplomes,

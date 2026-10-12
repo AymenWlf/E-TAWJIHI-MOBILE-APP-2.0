@@ -11,7 +11,7 @@ import {
 
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useTawjihPlusAccessState } from '@/hooks/useTawjihPlusAccess';
 
 type TawjihPlusAccessContextValue = {
   /** Client avec TAWJIH PLUS ou pack TASSJIL actif (services actifs). */
@@ -19,7 +19,8 @@ type TawjihPlusAccessContextValue = {
   /** Filtres + listing écoles sup : au moins un service commercial actif. */
   hasSchoolsCatalogAccess: boolean;
   loading: boolean;
-  refresh: () => Promise<void>;
+  globalPartialAccessEnabled: boolean;
+  refresh: (opts?: { silent?: boolean }) => Promise<void>;
   /** Droit inscriptions renvoyé par l’API annonces (prioritaire sur le client seul). */
   applyServerInscriptionsAccess: (fullAccess: boolean, partialAccess?: boolean) => void;
   /** Si le fetch annonces échoue : débloquer l’UI en retombant sur les services client. */
@@ -47,7 +48,7 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
     globalPartialAccessEnabled,
     loading,
     refresh,
-  } = useTawjihPlusAccess();
+  } = useTawjihPlusAccessState();
   const [serverFullAccess, setServerFullAccess] = useState<boolean | null>(null);
   const [serverPartialAccess, setServerPartialAccess] = useState<boolean | null>(null);
   /** Meta `inscriptionsFullAccess` reçue (ou repli client après échec fetch annonces). */
@@ -113,6 +114,7 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
       hasAccess: hasAccess || serverFullAccess === true,
       hasSchoolsCatalogAccess: effectiveSchoolsCatalogAccess,
       loading,
+      globalPartialAccessEnabled,
       refresh,
       applyServerInscriptionsAccess,
       resolveInscriptionsAccessWithoutServer,
@@ -129,6 +131,7 @@ export function TawjihPlusAccessProvider({ children }: { children: ReactNode }) 
       isInscriptionsAccessPending,
       isInscriptionsLocked,
       isInscriptionsPartialAccess,
+      globalPartialAccessEnabled,
       loading,
       openTawjihPlusProduct,
       refresh,
@@ -152,4 +155,25 @@ export function useTawjihPlusAccessContext(): TawjihPlusAccessContextValue {
 /** Hors provider (ex. tests) : accès complet par défaut. */
 export function useTawjihPlusAccessContextOptional(): TawjihPlusAccessContextValue | null {
   return useContext(TawjihPlusAccessContext);
+}
+
+/** Même état client pour tous les écrans (pack, TASSJIL, services actifs). */
+export function useTawjihPlusAccess() {
+  const ctx = useTawjihPlusAccessContext();
+  return {
+    hasAccess: ctx.hasAccess,
+    hasSchoolsCatalogAccess: ctx.hasSchoolsCatalogAccess,
+    globalPartialAccessEnabled: ctx.globalPartialAccessEnabled,
+    loading: ctx.loading,
+    refresh: ctx.refresh,
+  };
+}
+
+/** Relit `/api/me` et les services actifs, sans masquer l’écran. */
+export function useReloadStudentClientState() {
+  const { user, reloadMe } = useAuth();
+  const { refresh } = useTawjihPlusAccess();
+  return useCallback(async () => {
+    await Promise.all([user ? reloadMe() : Promise.resolve(null), refresh({ silent: true })]);
+  }, [refresh, reloadMe, user]);
 }

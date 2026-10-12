@@ -31,7 +31,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useAppSidebar } from '@/contexts/AppSidebarContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
 import { navigateToOrientationDiagnosticWizard } from '@/utils/navigateToOrientationDiagnosticEntry';
 import { hasLegacyTassjilAccess } from '@/utils/tassjilPracticalLinkLock';
 import {

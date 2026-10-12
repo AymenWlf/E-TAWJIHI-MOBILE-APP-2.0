@@ -29,7 +29,7 @@ import { FollowedSchoolCard } from '@/components/inscriptions/FollowedSchoolCard
 import { StatusUpdateSheet } from '@/components/inscriptions/StatusUpdateSheet';
 import { TawjihPlusLockBanner } from '@/components/inscriptions/TawjihPlusPaywall';
 import {
-  TawjihPlusAccessProvider,
+  useReloadStudentClientState,
   useTawjihPlusAccessContext,
 } from '@/contexts/TawjihPlusAccessContext';
 import {
@@ -109,11 +109,7 @@ const MID_BANNER_AFTER_CARD_INDEX = 3;
 type TabId = 'candidacies' | 'announcements';
 
 export default function InscriptionsTabScreen() {
-  return (
-    <TawjihPlusAccessProvider>
-      <InscriptionsTabScreenInner />
-    </TawjihPlusAccessProvider>
-  );
+  return <InscriptionsTabScreenInner />;
 }
 
 function InscriptionsTabScreenInner() {
@@ -465,10 +461,13 @@ function InscriptionsTabScreenInner() {
     })();
   }, [tab]);
 
+  const reloadStudentClient = useReloadStudentClientState();
+
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       let freshFollows: EstablishmentFollow[] | undefined;
+      await reloadStudentClient();
       await reloadFiltersData();
       if (tab === 'candidacies') {
         freshFollows = await reloadFollows();
@@ -494,7 +493,7 @@ function InscriptionsTabScreenInner() {
     } finally {
       setRefreshing(false);
     }
-  }, [tab, reloadFollows, reloadAnnouncements, reloadFiltersData, isLoggedIn, refetchEligibilityProfile]);
+  }, [tab, reloadFollows, reloadAnnouncements, reloadFiltersData, isLoggedIn, refetchEligibilityProfile, reloadStudentClient]);
 
   const announcementsBootstrapPending = useMemo(() => {
     if (tab !== 'announcements') return false;

@@ -1,0 +1,75 @@
+import { buildApiUrl } from '@/constants/api';
+import type {
+  DiagnosticAnswers,
+  DiagnosticStep,
+  OrientationReport,
+} from '@/features/orientationDiagnostic/types/orientationDiagnosticPrototype';
+import { httpGetJson, httpPostJson, httpPutJson } from '@/services/http';
+
+export type OrientationDiagnosticServerSession = {
+  id: number;
+  stepId: string;
+  phase: 'quiz' | 'report';
+  uiLocale: string;
+  answers: DiagnosticAnswers;
+  report: OrientationReport | null;
+  steps: DiagnosticStep[];
+  currentStep: DiagnosticStep | null;
+  updatedAt: string;
+  staleClient?: boolean;
+};
+
+type Envelope<T> = { success?: boolean; message?: string; data?: T };
+
+function authHeaders(token: string): Record<string, string> {
+  return { Authorization: `Bearer ${token}` };
+}
+
+export async function fetchOrientationDiagnosticSession(
+  token: string,
+): Promise<OrientationDiagnosticServerSession | null> {
+  const res = await httpGetJson<Envelope<OrientationDiagnosticServerSession>>(
+    buildApiUrl('/api/orientation-diagnostic/session'),
+    { headers: authHeaders(token) },
+  );
+  return res.data ?? null;
+}
+
+export async function saveOrientationDiagnosticStep(
+  token: string,
+  body: {
+    stepId: string;
+    phase: 'quiz' | 'report';
+    uiLocale?: string;
+    answers: DiagnosticAnswers;
+    clientUpdatedAt: string;
+  },
+): Promise<OrientationDiagnosticServerSession | null> {
+  const res = await httpPutJson<Envelope<OrientationDiagnosticServerSession>, typeof body>(
+    buildApiUrl('/api/orientation-diagnostic/session/step'),
+    body,
+    { headers: authHeaders(token) },
+  );
+  return res.data ?? null;
+}
+
+export async function fetchOrientationDiagnosticServerReport(
+  token: string,
+): Promise<OrientationReport | null> {
+  const res = await httpGetJson<Envelope<OrientationReport>>(
+    buildApiUrl('/api/orientation-diagnostic/report'),
+    { headers: authHeaders(token) },
+  );
+  return res.data ?? null;
+}
+
+export async function resetOrientationDiagnosticSession(
+  token: string,
+): Promise<OrientationDiagnosticServerSession | null> {
+  const res = await httpPostJson<Envelope<OrientationDiagnosticServerSession>, Record<string, never>>(
+    buildApiUrl('/api/orientation-diagnostic/session/reset'),
+    {},
+    { headers: authHeaders(token) },
+  );
+  return res.data ?? null;
+}

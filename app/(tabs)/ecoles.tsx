@@ -34,7 +34,7 @@ import { Text } from '@/components/ui/Text';
 import { getApiBaseUrl } from '@/constants/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { EstablishmentLeadGenSheetProvider } from '@/contexts/EstablishmentLeadGenSheetContext';
-import { useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
+import { useReloadStudentClientState, useTawjihPlusAccessContext } from '@/contexts/TawjihPlusAccessContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useAppliedTextSearch } from '@/hooks/useAppliedTextSearch';
@@ -151,6 +151,7 @@ export default function EcolesScreen() {
     loading: schoolsCatalogAccessLoading,
     openTawjihPlusProduct: openTawjihPlusFromContext,
   } = useTawjihPlusAccessContext();
+  const reloadStudentClient = useReloadStudentClientState();
   /** Skeleton recherche/filtres tant que la session ou les droits client ne sont pas connus. */
   const searchFiltersAccessLoading = authLoading || schoolsCatalogAccessLoading;
   const searchFiltersLocked = !searchFiltersAccessLoading && !hasSchoolsCatalogAccess;
@@ -466,6 +467,7 @@ export default function EcolesScreen() {
       let citiesLocal = cities;
 
       await Promise.all([
+        reloadStudentClient(),
         reloadFollows(),
         isLoggedIn ? refetchEligibilityProfile() : Promise.resolve(),
         fetchListingPlacementsByEstablishment()
@@ -524,6 +526,7 @@ export default function EcolesScreen() {
     isLoggedIn,
     refetchEligibilityProfile,
     needsClientScan,
+    reloadStudentClient,
     filtersValue,
     cities,
     apiQueryBase,

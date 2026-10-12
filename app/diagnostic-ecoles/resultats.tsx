@@ -12,7 +12,7 @@ import { DiagnosticStatusBar, diagnosticTheme } from '@/components/diagnostic/Di
 import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
 import {
   deleteEstablishmentFollowByEstablishment,
   fetchEstablishmentFollows,
@@ -731,7 +731,9 @@ export default function DiagnosticResultatsScreen() {
               isRTL && styles.ctaSecondaryRtl,
               pressed && { opacity: 0.9 },
             ]}
-            onPress={() => router.replace('/diagnostic-orientation' as never)}>
+            onPress={() =>
+              router.replace({ pathname: '/diagnostic-orientation', params: { fresh: '1' } } as never)
+            }>
             <FontAwesome name="refresh" size={14} color={brand.primary} />
             <Text style={[styles.ctaSecondaryTxt, isRTL && styles.rtlText]}>{cpy.edit}</Text>
           </Pressable>

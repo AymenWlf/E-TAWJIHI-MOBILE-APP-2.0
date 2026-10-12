@@ -7,7 +7,7 @@ import { fetchUserActiveServices } from '@/services/userActiveServices';
 import { activeServicesGrantSchoolsCatalogAccess } from '@/utils/commercialClientAccess';
 import { globalPartialAccessGrantsSchoolsCatalog } from '@/utils/tawjihPlusGlobalAccess';
 
-export function useTawjihPlusAccess() {
+export function useTawjihPlusAccessState() {
   const { user, getValidAccessToken } = useAuth();
   const [hasAccess, setHasAccess] = useState(false);
   const [hasSchoolsCatalogAccess, setHasSchoolsCatalogAccess] = useState(false);
@@ -15,9 +15,9 @@ export function useTawjihPlusAccess() {
   const [loading, setLoading] = useState(true);
   const loadGenRef = useRef(0);
 
-  const refresh = useCallback(async () => {
+  const refresh = useCallback(async (opts?: { silent?: boolean }) => {
     const gen = ++loadGenRef.current;
-    setLoading(true);
+    if (!opts?.silent) setLoading(true);
 
     let partialGlobal = false;
     try {

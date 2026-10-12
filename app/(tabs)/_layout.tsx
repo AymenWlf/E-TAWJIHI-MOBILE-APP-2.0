@@ -2,12 +2,12 @@ import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { BottomTabBar, type BottomTabBarButtonProps, type BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { PlatformPressable } from '@react-navigation/elements';
 import { Tabs } from 'expo-router';
-import { useMemo } from 'react';
-import { Platform, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
+import { AppState, Platform, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Text } from '@/components/ui/Text';
-import { TawjihPlusAccessProvider } from '@/contexts/TawjihPlusAccessContext';
+import { useReloadStudentClientState } from '@/contexts/TawjihPlusAccessContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useNotificationsDrawer } from '@/contexts/NotificationsDrawerContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
@@ -143,6 +143,21 @@ function RtlAwareTabBar(props: BottomTabBarProps) {
 
 export default function TabLayout() {
   const { t, isRTL } = useLocale();
+  const reloadStudentClient = useReloadStudentClientState();
+  const lastClientReloadAt = useRef(0);
+  const reloadClientThrottled = useCallback(() => {
+    const now = Date.now();
+    if (now - lastClientReloadAt.current < 1200) return;
+    lastClientReloadAt.current = now;
+    void reloadStudentClient();
+  }, [reloadStudentClient]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') reloadClientThrottled();
+    });
+    return () => sub.remove();
+  }, [reloadClientThrottled]);
   const { count: cartCount } = useShopCart();
   const { inscriptionsTabBadgeCount } = useNotificationsDrawer();
   const insets = useSafeAreaInsets();
@@ -164,8 +179,10 @@ export default function TabLayout() {
     );
 
   return (
-    <TawjihPlusAccessProvider>
     <Tabs
+      screenListeners={{
+        focus: reloadClientThrottled,
+      }}
       initialRouteName={DEFAULT_TAB_SCREEN}
       screenOptions={{
         headerShown: false,
@@ -278,7 +295,6 @@ export default function TabLayout() {
         }}
       />
     </Tabs>
-    </TawjihPlusAccessProvider>
   );
 }
 

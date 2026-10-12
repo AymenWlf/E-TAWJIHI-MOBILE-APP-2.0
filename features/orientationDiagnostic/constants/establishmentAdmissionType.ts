@@ -62,18 +62,31 @@ function isConcoursLegacy(concours?: boolean | number | string | null): boolean 
   );
 }
 
-export function resolveAdmissionDisplayLabel(input: {
-  admissionType?: string | null;
-  concours?: boolean | number | string | null;
-  afficherEtudeDossierPublic?: boolean | null;
-}): string {
+export function resolveAdmissionDisplayLabel(
+  input: {
+    admissionType?: string | null;
+    concours?: boolean | number | string | null;
+    afficherEtudeDossierPublic?: boolean | null;
+  },
+  locale: 'fr' | 'ar' = 'fr',
+): string {
   const fromType = admissionTypeLabel(input.admissionType);
-  if (fromType) return fromType;
-
   const concoursOn = isConcoursLegacy(input.concours);
-  if (input.afficherEtudeDossierPublic && !concoursOn) return 'Étude de dossier';
-  if (concoursOn) return 'Concours';
-  return 'Étude de dossier';
+  const french =
+    fromType
+    || (input.afficherEtudeDossierPublic && !concoursOn
+      ? 'Étude de dossier'
+      : concoursOn
+        ? 'Concours'
+        : 'Étude de dossier');
+  if (locale !== 'ar') return french;
+  const map: Record<string, string> = {
+    Concours: 'مباراة',
+    'Accès ouvert': 'ولوج مفتوح',
+    'Étude de dossier': 'دراسة الملف',
+    'Ordre de mérite': 'ترتيب الاستحقاق',
+  };
+  return map[french] || french;
 }
 
 export function admissionImpliesConcours(value?: string | null): boolean {

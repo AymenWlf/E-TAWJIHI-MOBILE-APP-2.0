@@ -10,7 +10,7 @@ import {
   getEstablishmentLogoUrl,
 } from '@/constants/establishmentMedia';
 import { useLocale } from '@/contexts/LocaleContext';
-import { useTawjihPlusAccess } from '@/hooks/useTawjihPlusAccess';
+import { useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
 import type { ContestAnnouncementCard } from '@/services/contestAnnouncements';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';

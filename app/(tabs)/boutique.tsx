@@ -34,6 +34,7 @@ import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { Text } from '@/components/ui/Text';
 import { ETAWJIHI_LOGO_TRANSPARENT } from '@/constants/brandAssets';
 import { useAuth } from '@/contexts/AuthContext';
+import { useReloadStudentClientState } from '@/contexts/TawjihPlusAccessContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
@@ -129,6 +130,7 @@ export default function BoutiqueTabScreen() {
   const { t, isRTL, locale } = useLocale();
   const { presentShare } = useSharePreview();
   const { user, getValidAccessToken } = useAuth();
+  const reloadStudentClient = useReloadStudentClientState();
   const { count: cartCount, addLine, removeLine, replaceLines, lines: cartLines } = useShopCart();
   const {
     profile: eligibilityProfile,
@@ -425,6 +427,7 @@ export default function BoutiqueTabScreen() {
     setRefreshing(true);
     try {
       const jobs: Promise<void>[] = [
+        reloadStudentClient(),
         reloadProductsFirstPage(),
         refetchServiceEntitlements(),
         refetchEligibilityProfile(),
@@ -444,6 +447,7 @@ export default function BoutiqueTabScreen() {
     reloadProductsFirstPage,
     refetchServiceEntitlements,
     refetchEligibilityProfile,
+    reloadStudentClient,
   ]);
 
   const onEndReached = useCallback(() => {

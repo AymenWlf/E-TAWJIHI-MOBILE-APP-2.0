@@ -23,6 +23,10 @@ import {
 } from '@/constants/brandAssets';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
+import {
+  fetchOrientationDiagnosticServerReport,
+  resetOrientationDiagnosticSession,
+} from '@/services/orientationDiagnosticSession';
 import { postPlanReussiteStep } from '@/services/planReussiteSteps';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
@@ -78,7 +82,7 @@ const FUNCTIONING_KEYS = [
   'variete',
 ] as const;
 
-const LOGO_H = 28;
+const LOGO_H = 56;
 
 export function OrientationDiagnosticReportScreen() {
   const { isRTL, locale } = useLocale();
@@ -93,17 +97,41 @@ export function OrientationDiagnosticReportScreen() {
   const [retakeConfirmVisible, setRetakeConfirmVisible] = useState(false);
 
   useEffect(() => {
+    let cancelled = false;
     void (async () => {
       const draft = await readOrientationDiagnosticPrototypeDraft(userId);
-      if (draft?.report) {
-        setReport(draft.report);
+      let nextReport = draft?.report ?? null;
+      const token = await getValidAccessToken();
+      if (token) {
+        try {
+          const remote = await fetchOrientationDiagnosticServerReport(token);
+          if (!cancelled && remote && !Array.isArray(remote)) {
+            nextReport = remote;
+            if (draft) {
+              await persistOrientationDiagnosticPrototypeDraft({
+                ...draft,
+                phase: 'report',
+                report: remote,
+              });
+            }
+          }
+        } catch {
+          /* le rapport déjà en cache reste affiché */
+        }
+      }
+      if (cancelled) return;
+      if (nextReport) {
+        setReport(nextReport);
       }
       setLoading(false);
-      if (!draft?.report) {
+      if (!nextReport) {
         router.replace('/diagnostic-orientation' as never);
       }
     })();
-  }, [userId]);
+    return () => {
+      cancelled = true;
+    };
+  }, [getValidAccessToken, userId]);
 
   const markReportComplete = useCallback(async () => {
     if (marking) return;
@@ -154,9 +182,14 @@ export function OrientationDiagnosticReportScreen() {
     setRetakeConfirmVisible(false);
     void (async () => {
       await clearOrientationDiagnosticPrototypeDraft(userId);
-      router.replace('/diagnostic-orientation' as never);
+      const token = await getValidAccessToken();
+      if (token) {
+        await resetOrientationDiagnosticSession(token).catch(() => undefined);
+      }
+      await clearOrientationDiagnosticPrototypeDraft(userId);
+      router.replace({ pathname: '/diagnostic-orientation', params: { fresh: '1' } } as never);
     })();
-  }, [userId]);
+  }, [getValidAccessToken, userId]);
 
   if (loading || !report) {
     return (
@@ -185,7 +218,8 @@ export function OrientationDiagnosticReportScreen() {
 
   return (
     <>
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
+    <View style={styles.safe}>
+    <SafeAreaView style={styles.headerSafe} edges={['top', 'left', 'right']}>
       <DiagnosticStatusBar />
       <View style={[styles.topBar, isRTL && styles.rowRtl]}>
         <Pressable
@@ -210,8 +244,9 @@ export function OrientationDiagnosticReportScreen() {
       <View style={styles.langRow}>
         <HeroLangSwitch />
       </View>
+    </SafeAreaView>
 
-      <View style={styles.body}>
+      <SafeAreaView style={styles.body} edges={['bottom', 'left', 'right']}>
         <ScrollView contentContainerStyle={styles.scroll} showsVerticalScrollIndicator={false}>
           <Animated.View entering={FadeInDown.duration(420)} style={styles.hero}>
             <View style={styles.heroGlowA} />
@@ -596,8 +631,8 @@ export function OrientationDiagnosticReportScreen() {
             )}
           </Pressable>
         </View>
-      </View>
-    </SafeAreaView>
+      </SafeAreaView>
+    </View>
     <AppConfirmDialog
       visible={retakeConfirmVisible}
       title={t('retakeTest')}
@@ -690,18 +725,19 @@ function Section({
 
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: '#EEF1F7' },
+  headerSafe: { backgroundColor: brand.primary },
   boot: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEF1F7' },
-  body: { flex: 1 },
+  body: { flex: 1, backgroundColor: '#EEF1F7' },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: '#1a2454',
+    backgroundColor: brand.primary,
   },
   langRow: {
     alignItems: 'center',
-    backgroundColor: '#1a2454',
+    backgroundColor: brand.primary,
     paddingBottom: spacing.sm,
   },
   backBtn: {

@@ -29,6 +29,7 @@ import { AppSidebarProvider } from '@/contexts/AppSidebarContext';
 import { NotificationsDrawerProvider } from '@/contexts/NotificationsDrawerContext';
 import { useColorScheme } from '@/components/useColorScheme';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { TawjihPlusAccessProvider } from '@/contexts/TawjihPlusAccessContext';
 import { GlobalWallUnreadProvider } from '@/contexts/GlobalWallUnreadContext';
 import { LocaleProvider, useLocale } from '@/contexts/LocaleContext';
 import { SharePreviewProvider } from '@/contexts/SharePreviewContext';
@@ -124,6 +125,7 @@ export default function RootLayout() {
         <LocaleProvider>
           <SharePreviewProvider>
             <AuthProvider>
+              <TawjihPlusAccessProvider>
               <MaintenanceGate>
                 <AppUpdateGate>
                 <AppFeedbackProvider>
@@ -137,6 +139,7 @@ export default function RootLayout() {
                 </AppFeedbackProvider>
                 </AppUpdateGate>
               </MaintenanceGate>
+              </TawjihPlusAccessProvider>
             </AuthProvider>
           </SharePreviewProvider>
         </LocaleProvider>
