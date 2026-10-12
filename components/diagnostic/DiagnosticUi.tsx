@@ -687,6 +687,7 @@ export function DiagnosticStepHeader({
   rtl,
   stepNumber,
   stepTotal,
+  compact = false,
 }: {
   icon: ComponentProps<typeof FontAwesome>['name'];
   title: string;
@@ -694,20 +695,24 @@ export function DiagnosticStepHeader({
   rtl?: boolean;
   stepNumber?: number;
   stepTotal?: number;
+  /** Carte d’étape plus basse, pour laisser la question visible. */
+  compact?: boolean;
 }) {
   return (
-    <View style={[styles.stepHeader, rtl && styles.stepHeaderRtl]}>
-      <View style={styles.stepHeaderIcon}>
-        <FontAwesome name={icon} size={20} color={brand.primary} />
+    <View style={[styles.stepHeader, compact && styles.stepHeaderCompact, rtl && styles.stepHeaderRtl]}>
+      <View style={[styles.stepHeaderIcon, compact && styles.stepHeaderIconCompact]}>
+        <FontAwesome name={icon} size={compact ? 15 : 20} color={brand.primary} />
       </View>
       <View style={[styles.stepHeaderTexts, rtl && styles.stepHeaderTextsRtl]}>
         {stepNumber != null && stepTotal != null ? (
-          <Text style={[styles.stepHeaderKicker, rtl && styles.rtlText]}>
+          <Text style={[styles.stepHeaderKicker, compact && styles.stepHeaderKickerCompact, rtl && styles.stepHeaderKickerRtl]}>
             {rtl ? `المرحلة ${stepNumber} من ${stepTotal}` : `Étape ${stepNumber} sur ${stepTotal}`}
           </Text>
         ) : null}
-        <Text style={[styles.stepHeaderTitle, rtl && styles.rtlText]}>{title}</Text>
-        <Text style={[styles.stepHeaderSub, rtl && styles.rtlText]}>{subtitle}</Text>
+        <Text style={[styles.stepHeaderTitle, compact && styles.stepHeaderTitleCompact, rtl && styles.stepHeaderTitleRtl, compact && rtl && styles.stepHeaderTitleRtlCompact]}>{title}</Text>
+        {subtitle ? (
+          <Text style={[styles.stepHeaderSub, compact && styles.stepHeaderSubCompact, rtl && styles.stepHeaderSubRtl, compact && rtl && styles.stepHeaderSubRtlCompact]}>{subtitle}</Text>
+        ) : null}
       </View>
     </View>
   );
@@ -869,7 +874,13 @@ const styles = StyleSheet.create({
   choiceIconWrapOn: { backgroundColor: 'rgba(51, 62, 143, 0.12)' },
   choiceTextCol: { flex: 1, minWidth: 0, gap: 4 },
   choiceTextColRtl: { alignItems: 'flex-end' },
-  choiceLabel: { fontSize: fontSize.sm, fontWeight: '600', color: brand.text },
+  choiceLabel: {
+    fontSize: fontSize.sm,
+    fontWeight: '600',
+    color: brand.text,
+    lineHeight: 22,
+    alignSelf: 'stretch',
+  },
   choiceLabelSelected: { color: brand.primary },
   choiceSecondary: {
     fontSize: fontSize.xs,
@@ -1039,6 +1050,17 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 3,
   },
+  stepHeaderCompact: {
+    gap: spacing.sm,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    marginBottom: spacing.sm,
+    borderRadius: radius.lg,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.04,
+    shadowRadius: 6,
+    elevation: 1,
+  },
   stepHeaderIcon: {
     width: 48,
     height: 48,
@@ -1047,8 +1069,13 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: diagnosticTheme.primarySoft,
   },
-  stepHeaderTexts: { flex: 1, minWidth: 0, alignItems: 'flex-start' },
-  stepHeaderTextsRtl: { alignItems: 'flex-end' },
+  stepHeaderIconCompact: {
+    width: 32,
+    height: 32,
+    borderRadius: 10,
+  },
+  stepHeaderTexts: { flex: 1, minWidth: 0, alignItems: 'stretch' },
+  stepHeaderTextsRtl: { alignItems: 'stretch' },
   stepHeaderKicker: {
     fontSize: fontSize.xs,
     fontWeight: '800',
@@ -1056,19 +1083,46 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
     letterSpacing: 0.4,
     marginBottom: 4,
+    alignSelf: 'stretch',
+  },
+  stepHeaderKickerCompact: { marginBottom: 1 },
+  stepHeaderKickerRtl: {
+    writingDirection: 'rtl',
+    textAlign: 'right',
+    textTransform: 'none',
+    letterSpacing: 0,
   },
   stepHeaderTitle: {
     fontSize: fontSize.lg,
     fontWeight: '800',
     color: brand.text,
     letterSpacing: -0.3,
+    lineHeight: 24,
+    alignSelf: 'stretch',
   },
+  /** letterSpacing casse l’alignement RTL sur iOS et Android. */
+  stepHeaderTitleCompact: { lineHeight: 22 },
+  stepHeaderTitleRtl: {
+    writingDirection: 'rtl',
+    textAlign: 'right',
+    letterSpacing: 0,
+    lineHeight: 30,
+  },
+  stepHeaderTitleRtlCompact: { lineHeight: 28 },
   stepHeaderSub: {
     marginTop: 4,
     fontSize: fontSize.sm,
     color: brand.textMuted,
     lineHeight: 20,
+    alignSelf: 'stretch',
   },
+  stepHeaderSubCompact: { marginTop: 2, lineHeight: 17 },
+  stepHeaderSubRtl: {
+    writingDirection: 'rtl',
+    textAlign: 'right',
+    lineHeight: 24,
+  },
+  stepHeaderSubRtlCompact: { lineHeight: 22 },
   progressWrap: {
     paddingTop: spacing.lg,
     paddingHorizontal: spacing.lg,

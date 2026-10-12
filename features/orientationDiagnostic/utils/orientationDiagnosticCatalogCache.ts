@@ -30,14 +30,18 @@ export function prefetchOrientationSectors(token?: string | null): Promise<Secte
   return sectorsPromise;
 }
 
-export function prefetchOrientationMetiers(secteurId: string): Promise<Metier[]> {
-  const key = String(secteurId);
-  const num = Number(key);
+function loadSectorMetiers(secteurId: string, afficherDansTest?: boolean): Promise<Metier[]> {
+  const key = afficherDansTest == null ? `all:${secteurId}` : String(secteurId);
+  const num = Number(secteurId);
   if (!Number.isFinite(num)) return Promise.resolve([]);
   let pending = metiersPromises.get(key);
   if (!pending) {
     pending = metierService
-      .getAll({ secteur: num, limit: 100, afficherDansTest: true })
+      .getAll({
+        secteur: num,
+        limit: 100,
+        ...(afficherDansTest == null ? {} : { afficherDansTest }),
+      })
       .then((res) => (res.success && res.data ? [...res.data] : []))
       .catch((err) => {
         metiersPromises.delete(key);
@@ -46,6 +50,16 @@ export function prefetchOrientationMetiers(secteurId: string): Promise<Metier[]>
     metiersPromises.set(key, pending);
   }
   return pending;
+}
+
+/** Métiers du secteur prévus pour le test. */
+export function prefetchOrientationMetiers(secteurId: string): Promise<Metier[]> {
+  return loadSectorMetiers(secteurId, true);
+}
+
+/** Tous les métiers actifs du secteur, pour compléter une liste trop courte. */
+export function prefetchOrientationSectorMetiers(secteurId: string): Promise<Metier[]> {
+  return loadSectorMetiers(secteurId);
 }
 
 export function prefetchOrientationSchools(): Promise<Establishment[]> {

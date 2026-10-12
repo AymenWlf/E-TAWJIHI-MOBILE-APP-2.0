@@ -38,6 +38,8 @@ const HIDDEN_ROUTE_PREFIXES = [
   'logout',
   /** Jeu SNAKE — ne pas recouvrir la grille / les contrôles. */
   'daily-challenge',
+  /** Test et rapport d’orientation. */
+  'diagnostic-orientation',
 ] as const;
 
 export function FloatingBubbleHub() {

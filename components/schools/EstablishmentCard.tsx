@@ -19,7 +19,7 @@ import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { establishmentListingPlacement } from '@/utils/establishmentListingPlacement';
 import { evaluateEligibility } from '@/utils/eligibility';
-import { formatVillesCourtes, formatEstablishmentStudyDuration, secteurTitres, universityName } from '@/utils/establishmentFormat';
+import { formatEstablishmentStudyDuration, secteurTitres, universityName } from '@/utils/establishmentFormat';
 import { fireAndForget } from '@/utils/fireAndForget';
 import { placementIsActivelySponsored, placementShowsContactForm, placementTrafficDestinationUrl, addUtmToUrl } from '@/utils/referencingPlacementUi';
 import { stripHtmlToText } from '@/utils/sanitizeRichHtml';
@@ -117,7 +117,7 @@ export function EstablishmentCard({
     },
     eligibilityProfile,
   );
-  const villesTxt = formatVillesCourtes(item.villesListe, 2);
+  const villesTxt = item.villesListe.join(' · ');
   const uni = universityName(item, { rtl: isRTL });
   const secteurs = secteurTitres(item, { rtl: isRTL });
   const primaryName = isRTL && item.nomArabe ? item.nomArabe : item.nom;
@@ -248,7 +248,7 @@ export function EstablishmentCard({
           {contentLocked ? (
             <HiddenBar flex={1} height={12} isRTL={isRTL} />
           ) : (
-            <Text style={[styles.rowTxt, isRTL && styles.txtRtl]} numberOfLines={2}>
+            <Text style={[styles.rowTxt, isRTL && styles.txtRtl]}>
               {villesTxt}
               {villesTxt && uni ? ' · ' : ''}
               {uni}

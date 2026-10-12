@@ -3,14 +3,9 @@ import {
   type PlanParcoursStepId,
 } from '@/constants/orientationParcours';
 
-/** Étapes du parcours orientation réservées aux clients TAWJIH PLUS (ou pack TASSJIL). */
+/** Seule la gestion des inscriptions reste réservée aux clients TAWJIH PLUS (ou pack TASSJIL). */
 export const TAWJIH_PLUS_GATED_PLAN_STEP_IDS: readonly PlanParcoursStepId[] = [
-  PLAN_PARCOURS_STEP_IDS.orientationDiagnostic,
-  PLAN_PARCOURS_STEP_IDS.orientationReport,
-  PLAN_PARCOURS_STEP_IDS.recommendation,
-  PLAN_PARCOURS_STEP_IDS.feedback,
   PLAN_PARCOURS_STEP_IDS.applyToSchools,
-  PLAN_PARCOURS_STEP_IDS.inviteFriend,
 ] as const;
 
 const GATED_SET = new Set<string>(TAWJIH_PLUS_GATED_PLAN_STEP_IDS);
@@ -19,11 +14,8 @@ export function isPlanStepTawjihPlusGated(stepId: string): stepId is PlanParcour
   return GATED_SET.has(stepId);
 }
 
-/** Liens accueil / pratiques menant vers du contenu TAWJIH PLUS. */
+/** Gestion des inscriptions : réservée aux clients. */
 export const PRACTICAL_LINK_IDS_REQUIRING_TAWJIH_PLUS = [
-  'diagnostic-ecoles',
-  'diagnostic-rapport',
-  'diagnostic-recommandations',
   'inscriptions',
   'candidatures',
 ] as const;

@@ -29,6 +29,24 @@ const CARD_H = 100;
 const LOGO = 44;
 const PREVIEW_LIMIT = 10;
 
+function displayCities(item: MostVisitedEstablishment): string {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const push = (raw?: string | null) => {
+    const text = (raw || '').trim();
+    if (!text) return;
+    const key = text.toLowerCase();
+    if (seen.has(key)) return;
+    seen.add(key);
+    out.push(text);
+  };
+  push(item.ville);
+  if (Array.isArray(item.villes)) {
+    for (const ville of item.villes) push(String(ville));
+  }
+  return out.join(' · ');
+}
+
 type Props = {
   width: number;
   items: MostVisitedEstablishment[];
@@ -55,9 +73,7 @@ function MostVisitedSchoolCard({
   const label = pickEstablishmentName(item, locale);
   const logoUri =
     getEstablishmentLogoUrl(item.logo) ?? fallbackEstablishmentAvatarName(item.nom, item.sigle);
-  const city =
-    (item.ville ?? '').trim() ||
-    (Array.isArray(item.villes) && item.villes[0] ? String(item.villes[0]) : '');
+  const city = displayCities(item);
   const sigle = (item.sigle ?? '').trim();
   const showSigle = Boolean(sigle) && sigle.toLowerCase() !== label.trim().toLowerCase();
   const typeA11y = establishmentTypeDisplayLabel(item.type, t);
@@ -126,9 +142,7 @@ function MostVisitedSchoolCard({
               {city ? (
                 <View style={[styles.cityRow, isRTL && styles.cityRowRtl]}>
                   <FontAwesome name="map-marker" size={10} color={brand.textMuted} />
-                  <Text style={[styles.city, isRTL && styles.cityRtl]} numberOfLines={1} ellipsizeMode="tail">
-                    {city}
-                  </Text>
+                  <Text style={[styles.city, isRTL && styles.cityRtl]}>{city}</Text>
                 </View>
               ) : null}
               {(item.type ?? '').trim() ? (
@@ -260,11 +274,11 @@ const androidTextFix =
 const styles = StyleSheet.create({
   cardSlot: {
     width: CARD_W,
-    height: CARD_H,
+    minHeight: CARD_H,
   },
   card: {
     width: '100%',
-    height: '100%',
+    minHeight: CARD_H,
     borderRadius: radius.lg,
     backgroundColor: brand.white,
     borderWidth: StyleSheet.hairlineWidth,
@@ -416,7 +430,7 @@ const styles = StyleSheet.create({
   },
   cityRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 4,
     maxWidth: '100%',
   },

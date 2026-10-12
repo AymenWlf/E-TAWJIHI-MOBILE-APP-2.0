@@ -1,4 +1,3 @@
-import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
@@ -8,7 +7,6 @@ import {
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { DiagnosticRecommendationsTawjihPlusGate } from '@/components/diagnostic/DiagnosticRecommendationsTawjihPlusGate';
 import { DiagnosticLoadingView } from '@/components/diagnostic/DiagnosticLoadingView';
 import { DiagnosticStatusBar } from '@/components/diagnostic/DiagnosticUi';
 import { SchoolDiagnosticStoryCarousel } from '@/components/diagnostic/SchoolDiagnosticStoryCarousel';
@@ -16,7 +14,6 @@ import { Text } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { getUserFacingApiError } from '@/utils/apiError';
-import { useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
 import {
   fetchSchoolRecommendationDiagnosticByPublicCode,
   generateSchoolDiagnosticRecommendations,
@@ -51,8 +48,6 @@ export function SchoolDiagnosticStoryReportScreen() {
   const { c } = useLocalSearchParams<{ c?: string }>();
   const { getValidAccessToken, user } = useAuth();
   const { locale, isRTL, t } = useLocale();
-  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading, refresh: refreshTawjihPlusAccess } =
-    useTawjihPlusAccess();
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -158,14 +153,8 @@ export function SchoolDiagnosticStoryReportScreen() {
     };
   }, [publicCode, getValidAccessToken, applyFromServer, t]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refreshTawjihPlusAccess();
-    }, [refreshTawjihPlusAccess]),
-  );
-
   useEffect(() => {
-    if (loading || tawjihPlusLoading || !recommendationsDeferred || !hasTawjihPlusAccess) {
+    if (loading || !recommendationsDeferred) {
       return;
     }
     if (diagnosticId == null || generateStartedRef.current) return;
@@ -200,27 +189,22 @@ export function SchoolDiagnosticStoryReportScreen() {
     applyFromServer,
     diagnosticId,
     getValidAccessToken,
-    hasTawjihPlusAccess,
     loading,
     recommendationsDeferred,
     t,
-    tawjihPlusLoading,
   ]);
 
   useSchoolDiagnosticGrokEnrichment({
     diagnosticId,
     grokPending,
     recommendationsDeferred,
-    enabled: !loading && !tawjihPlusLoading && hasTawjihPlusAccess,
+    enabled: !loading,
     getValidAccessToken,
     onComplete: applyFromServer,
     onError: (error) => {
       setError(getUserFacingApiError(error, t, { context: 'diagnostic' }));
     },
   });
-
-  const showRecommendationsPaywall =
-    !tawjihPlusLoading && !hasTawjihPlusAccess && Boolean(publicCode);
 
   const sortedItems = useMemo(() => {
     const summary = computeDiagnosticBacComparisonNote(diagnosticPayload);
@@ -277,7 +261,7 @@ export function SchoolDiagnosticStoryReportScreen() {
     } as never);
   }, [publicCode]);
 
-  if (loading || tawjihPlusLoading) {
+  if (loading) {
     return (
       <DiagnosticLoadingView variant="report" rtl={storyRtl} locale={reportLocale} />
     );
@@ -294,15 +278,6 @@ export function SchoolDiagnosticStoryReportScreen() {
           </Pressable>
         </SafeAreaView>
       </View>
-    );
-  }
-
-  if (showRecommendationsPaywall) {
-    return (
-      <DiagnosticRecommendationsTawjihPlusGate
-        rtl={storyRtl}
-        onBack={() => router.replace('/(tabs)' as never)}
-      />
     );
   }
 

@@ -1,11 +1,9 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useFocusEffect } from '@react-navigation/native';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState, type ComponentProps } from 'react';
 import { Platform, Pressable, ScrollView, SectionList, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { DiagnosticRecommendationsTawjihPlusGate } from '@/components/diagnostic/DiagnosticRecommendationsTawjihPlusGate';
 import { DiagnosticLoadingView } from '@/components/diagnostic/DiagnosticLoadingView';
 import { DiagnosticRecommendationRow } from '@/components/diagnostic/DiagnosticRecommendationRow';
 import { DiagnosticStatusBar, diagnosticTheme } from '@/components/diagnostic/DiagnosticUi';
@@ -13,7 +11,6 @@ import { Text } from '@/components/ui/Text';
 import { HeroLangSwitch } from '@/components/ui/HeroLangSwitch';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
-import { useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
 import {
   deleteEstablishmentFollowByEstablishment,
   fetchEstablishmentFollows,
@@ -202,8 +199,6 @@ export default function DiagnosticResultatsScreen() {
   const { getValidAccessToken, user } = useAuth();
   const isLoggedIn = Boolean(user);
   const { locale: appLocale, t } = useLocale();
-  const { hasAccess: hasTawjihPlusAccess, loading: tawjihPlusLoading, refresh: refreshTawjihPlusAccess } =
-    useTawjihPlusAccess();
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
   const [profileSummary, setProfileSummary] = useState<string | null>(null);
@@ -405,14 +400,8 @@ export default function DiagnosticResultatsScreen() {
     };
   }, [c, getValidAccessToken, user, appLocale, applyDiagnostic, t]);
 
-  useFocusEffect(
-    useCallback(() => {
-      void refreshTawjihPlusAccess();
-    }, [refreshTawjihPlusAccess]),
-  );
-
   useEffect(() => {
-    if (loading || tawjihPlusLoading || !recommendationsDeferred || !hasTawjihPlusAccess) {
+    if (loading || !recommendationsDeferred) {
       return;
     }
     if (diagnosticId == null || generateStartedRef.current) return;
@@ -447,18 +436,16 @@ export default function DiagnosticResultatsScreen() {
     applyDiagnostic,
     diagnosticId,
     getValidAccessToken,
-    hasTawjihPlusAccess,
     loading,
     recommendationsDeferred,
     t,
-    tawjihPlusLoading,
   ]);
 
   useSchoolDiagnosticGrokEnrichment({
     diagnosticId,
     grokPending,
     recommendationsDeferred,
-    enabled: !loading && !tawjihPlusLoading && hasTawjihPlusAccess,
+    enabled: !loading,
     getValidAccessToken,
     onComplete: applyDiagnostic,
     onError: (error) => {
@@ -767,11 +754,7 @@ export default function DiagnosticResultatsScreen() {
     ],
   );
 
-  /** Non-client ayant terminé le diagnostic : toujours l’écran d’achat TAWJIH PLUS. */
-  const showRecommendationsPaywall =
-    !tawjihPlusLoading && !hasTawjihPlusAccess && Boolean(publicCode);
-
-  if (loading || tawjihPlusLoading) {
+  if (loading) {
     return (
       <DiagnosticLoadingView
         variant="results"
@@ -794,15 +777,6 @@ export default function DiagnosticResultatsScreen() {
           </Pressable>
         </SafeAreaView>
       </View>
-    );
-  }
-
-  if (showRecommendationsPaywall) {
-    return (
-      <DiagnosticRecommendationsTawjihPlusGate
-        rtl={isRTL}
-        onBack={() => router.replace('/(tabs)' as never)}
-      />
     );
   }
 

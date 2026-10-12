@@ -124,7 +124,7 @@ export function OrientationDiagnosticWizardShell({
               accessibilityLabel={meta.label}>
               <FontAwesome
                 name={MODULE_ICONS[mod]}
-                size={11}
+                size={10}
                 color={active || done ? brand.white : 'rgba(255,255,255,0.55)'}
               />
             </View>
@@ -197,7 +197,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingVertical: 6,
     backgroundColor: brand.primary,
     gap: spacing.sm,
   },
@@ -207,8 +207,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingVertical: 6,
-    paddingHorizontal: 10,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
     borderRadius: 999,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
@@ -227,14 +227,14 @@ const styles = StyleSheet.create({
   langRow: {
     alignItems: 'center',
     backgroundColor: brand.primary,
-    paddingBottom: spacing.sm,
+    paddingBottom: 2,
   },
   resetBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
-    paddingHorizontal: 10,
-    paddingVertical: 8,
+    paddingHorizontal: 8,
+    paddingVertical: 5,
     borderRadius: radius.md,
     backgroundColor: 'rgba(255,255,255,0.16)',
     minWidth: 88,
@@ -245,15 +245,16 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    gap: 6,
-    paddingVertical: spacing.sm,
+    gap: 5,
+    paddingTop: 2,
+    paddingBottom: 6,
     paddingHorizontal: spacing.md,
     backgroundColor: brand.primary,
   },
   moduleDot: {
-    width: 26,
-    height: 26,
-    borderRadius: 13,
+    width: 22,
+    height: 22,
+    borderRadius: 11,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.35)',
     backgroundColor: 'rgba(255,255,255,0.12)',
@@ -266,7 +267,7 @@ const styles = StyleSheet.create({
     height: 4,
     backgroundColor: 'rgba(255,255,255,0.2)',
     marginHorizontal: spacing.md,
-    marginBottom: spacing.sm,
+    marginBottom: 6,
     borderRadius: 2,
     overflow: 'hidden',
   },

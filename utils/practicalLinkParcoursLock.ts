@@ -31,12 +31,8 @@ export function getOrientationPracticalLinkLock(
     hasTawjihPlusAccess?: boolean;
   },
 ): PracticalLinkLockState {
-  if (options?.loading || options?.tawjihPlusLoading) {
+  if (options?.loading) {
     return { locked: true, reasonKey: 'practical_orientation_loading' };
-  }
-
-  if (options?.hasTawjihPlusAccess === false) {
-    return { locked: true, reasonKey: 'inscTawjihPlusLockHint' };
   }
 
   const accountDone = completion.accountSetupComplete;

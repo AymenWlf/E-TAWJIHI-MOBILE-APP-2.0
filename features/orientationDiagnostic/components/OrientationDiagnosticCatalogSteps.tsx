@@ -55,6 +55,7 @@ import { establishmentDisplayCities } from '../utils/orientationDiagnosticSchool
 import { schoolMatchesProfile, schoolMatchesStudyCities } from '../utils/orientationDiagnosticVersus';
 import {
   prefetchOrientationMetiers,
+  prefetchOrientationSectorMetiers,
   prefetchOrientationSchools,
   prefetchOrientationSectors,
 } from '../utils/orientationDiagnosticCatalogCache';
@@ -288,27 +289,62 @@ function seedToMetier(
   };
 }
 
+const MIN_METIER_CHOICES = 7;
+const MAX_METIER_CHOICES = 10;
+
+function metierNameKey(nom?: string | null): string {
+  return (nom || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+function pushUniqueMetier(out: Metier[], seen: Set<string>, m: Metier) {
+  const name = metierNameKey(m.nom);
+  const id = `id:${String(m.id)}`;
+  if ((!name && !m.id) || seen.has(id) || (name && seen.has(name))) return;
+  seen.add(id);
+  if (name) seen.add(name);
+  out.push(m);
+}
+
+/**
+ * Métiers du test d’abord. S’il y en a peu, complète avec les autres métiers
+ * du même secteur, puis le catalogue moderne de ce secteur (7 à 10).
+ */
 function mergeMetiersForSector(
-  apiMetiers: Metier[],
+  flagged: Metier[],
+  sectorExtras: Metier[],
   secteurId: string,
   titre: string,
   code?: string,
 ): Metier[] {
-  const modern = modernMetiersForSecteur(secteurId, titre, code, 9).map((s) =>
-    seedToMetier(s, titre),
-  );
-  const byName = new Map<string, Metier>();
-  for (const m of apiMetiers) {
-    const key = (m.nom || '').toLowerCase().trim();
-    if (key) byName.set(key, m);
+  const seen = new Set<string>();
+  const out: Metier[] = [];
+  const bySalary = (list: Metier[]) =>
+    [...list].sort((a, b) => metierSalarySortValue(b) - metierSalarySortValue(a));
+
+  for (const m of bySalary(flagged)) {
+    if (out.length >= MAX_METIER_CHOICES) break;
+    pushUniqueMetier(out, seen, m);
   }
-  for (const m of modern) {
-    const key = (m.nom || '').toLowerCase().trim();
-    if (key && !byName.has(key)) byName.set(key, m);
+  if (out.length < MAX_METIER_CHOICES) {
+    for (const m of bySalary(sectorExtras)) {
+      if (out.length >= MAX_METIER_CHOICES) break;
+      pushUniqueMetier(out, seen, m);
+    }
   }
-  return [...byName.values()]
-    .sort((a, b) => metierSalarySortValue(b) - metierSalarySortValue(a))
-    .slice(0, 10);
+  if (out.length < MIN_METIER_CHOICES) {
+    const modern = modernMetiersForSecteur(secteurId, titre, code, 9).map((s) =>
+      seedToMetier(s, titre),
+    );
+    for (const m of modern) {
+      if (out.length >= MAX_METIER_CHOICES) break;
+      pushUniqueMetier(out, seen, m);
+    }
+  }
+  return out;
 }
 
 function studyYearsMax(e: Establishment): number {
@@ -576,24 +612,42 @@ export function OrientationDynamicMetiersStep({
       const sectorTitre =
         sectorTitreRef.current || `Secteur ${secteurId}`;
       let code = '';
-      let apiMetiers: Metier[] = [];
+      let flagged: Metier[] = [];
+      let sectorExtras: Metier[] = [];
       const num = Number(secteurId);
       if (Number.isFinite(num)) {
         try {
-          apiMetiers = await prefetchOrientationMetiers(String(num));
+          flagged = await prefetchOrientationMetiers(String(num));
         } catch {
-          apiMetiers = [];
+          flagged = [];
+        }
+        if (flagged.length < MIN_METIER_CHOICES) {
+          try {
+            const all = await prefetchOrientationSectorMetiers(String(num));
+            const flaggedIds = new Set(flagged.map((m) => String(m.id)));
+            sectorExtras = all.filter(
+              (m) => m.id != null && !flaggedIds.has(String(m.id)) && m.isActivate !== false,
+            );
+          } catch {
+            sectorExtras = [];
+          }
         }
       }
-      const list = mergeMetiersForSector(apiMetiers, secteurId, sectorTitre, code);
+      const list = mergeMetiersForSector(flagged, sectorExtras, secteurId, sectorTitre, code);
       if (cancelled) return;
       setMetiers(list);
+      const usedSectorExtra = list.some((m) =>
+        sectorExtras.some((extra) => String(extra.id) === String(m.id)),
+      );
+      const usedModern = list.some((m) => String(m.id).startsWith('mm_'));
       setHint(
-        apiMetiers.length === 0
-          ? tOd(uiLocale, 'hintMarketMetiers')
-          : apiMetiers.length < list.length
-            ? tOd(uiLocale, 'hintMixteMetiers')
-            : null,
+        usedSectorExtra
+          ? tOd(uiLocale, 'hintSectorMetiers')
+          : flagged.length === 0 && usedModern
+            ? tOd(uiLocale, 'hintMarketMetiers')
+            : usedModern
+              ? tOd(uiLocale, 'hintMixteMetiers')
+              : null,
       );
       setLoading(false);
       onLoadingChange?.(false);
@@ -882,6 +936,8 @@ export function OrientationDynamicSchoolsStep({
     const atCap = !on && selected.length >= max;
     const names = bilingualLines(pickSchoolLabel(e), e.nomArabe, uiLocale);
     const dureeLabel = establishmentDureeEtudesLabel(e);
+    const cities = establishmentDisplayCities(e);
+    const citiesLabel = cities.length ? cities.join(' · ') : (e.ville || '').trim();
     const diplomes = isFacultePubliqueAccesOuvert(e)
       ? [...FACULTES_PUBLIQUES_DIPLOMES]
       : establishmentDiplomesList(e);
@@ -922,8 +978,8 @@ export function OrientationDynamicSchoolsStep({
               {names.secondary}
             </Text>
           ) : null}
-          {e.ville?.trim() ? (
-            <Text style={[styles.schoolCity, rtl && styles.rtlText]}>{e.ville.trim()}</Text>
+          {citiesLabel ? (
+            <Text style={[styles.schoolCity, styles.ltrText]}>{citiesLabel}</Text>
           ) : null}
           {dureeLabel ? (
             <Text style={[styles.schoolMetaLine, rtl && styles.rtlText]}>

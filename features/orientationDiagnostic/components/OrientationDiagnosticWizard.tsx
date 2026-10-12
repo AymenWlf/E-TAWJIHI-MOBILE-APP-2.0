@@ -79,6 +79,10 @@ export function OrientationDiagnosticWizard() {
   const [accountPrefill, setAccountPrefill] = useState<AccountOrientationPrefill | null>(null);
   const pendingAccountPersist = useRef<DiagnosticAnswers | null>(null);
   const resumedRef = useRef(false);
+  const uiLocaleRef = useRef(uiLocale);
+  uiLocaleRef.current = uiLocale;
+  /** Étape affichée : empêche une liste serveur incomplète de renvoyer au début. */
+  const heldStepIdRef = useRef<string | null>(null);
 
   const persistProgress = useCallback(
     (patch: Partial<OrientationDiagnosticPrototypeDraft> & { answers: DiagnosticAnswers }) => {
@@ -104,7 +108,7 @@ export function OrientationDiagnosticWizard() {
         const session = await saveOrientationDiagnosticStep(token, {
           stepId: patch.stepId ?? 'prof_identity',
           phase: patch.phase === 'report' ? 'report' : 'quiz',
-          uiLocale,
+          uiLocale: uiLocaleRef.current,
           answers: patch.answers,
           clientUpdatedAt: new Date().toISOString(),
         });
@@ -155,7 +159,7 @@ export function OrientationDiagnosticWizard() {
           completedModules: [],
           answers: freshAnswers,
           ui: { situationBriefDone: false, versusBriefDone: false, situationPhase: 'most' },
-          uiLocale,
+          uiLocale: uiLocaleRef.current,
           report: null,
         });
         if (!cancelled) setBooting(false);
@@ -181,7 +185,7 @@ export function OrientationDiagnosticWizard() {
               completedModules: [],
               answers: restored,
               ui: { situationBriefDone: false, versusBriefDone: false, situationPhase: 'most' },
-              uiLocale,
+              uiLocale: uiLocaleRef.current,
               report: server.report,
             });
             if (server.phase === 'report' && server.report) {
@@ -197,7 +201,7 @@ export function OrientationDiagnosticWizard() {
             void saveOrientationDiagnosticStep(token, {
               stepId: draft.stepId,
               phase: draft.phase === 'report' ? 'report' : 'quiz',
-              uiLocale,
+              uiLocale: uiLocaleRef.current,
               answers: draft.answers,
               clientUpdatedAt: draft.savedAt || new Date().toISOString(),
             })
@@ -239,7 +243,7 @@ export function OrientationDiagnosticWizard() {
           completedModules: [],
           answers: fresh,
           ui: { situationBriefDone: false, versusBriefDone: false, situationPhase: 'most' },
-          uiLocale,
+          uiLocale: uiLocaleRef.current,
         });
         setBooting(false);
       }
@@ -247,16 +251,28 @@ export function OrientationDiagnosticWizard() {
     return () => {
       cancelled = true;
     };
-  }, [userId, uiLocale, getValidAccessToken]);
+  }, [userId, getValidAccessToken]);
 
   const coreSteps = useMemo(
     () => buildOrientationCoreSteps(answers),
     [answers.multi.car_secteurs, answers.multi.sch_types, answers.labels],
   );
+  const localQuizSteps = useMemo(
+    () => [...coreSteps, ...versusPlanToSteps(answers.versusPlan ?? [])],
+    [coreSteps, answers.versusPlan],
+  );
+  const anchorStepId = restoreStepId || heldStepIdRef.current;
   const quizSteps = useMemo(() => {
-    if (remoteSteps && remoteSteps.length > 0) return remoteSteps;
-    return [...coreSteps, ...versusPlanToSteps(answers.versusPlan ?? [])];
-  }, [remoteSteps, coreSteps, answers.versusPlan]);
+    if (!remoteSteps?.length) return localQuizSteps;
+    if (
+      anchorStepId &&
+      !remoteSteps.some((item) => item.id === anchorStepId) &&
+      localQuizSteps.some((item) => item.id === anchorStepId)
+    ) {
+      return localQuizSteps;
+    }
+    return remoteSteps;
+  }, [remoteSteps, localQuizSteps, anchorStepId]);
   const versusStart = remoteSteps?.findIndex((item) => item.kind === 'versus') ?? -1;
   const coreStepsCount = remoteSteps?.length
     ? versusStart >= 0
@@ -265,6 +281,8 @@ export function OrientationDiagnosticWizard() {
     : coreSteps.length;
   const totalSteps = Math.max(quizSteps.length, coreStepsCount);
   const step = quizSteps[stepIndex];
+  if (restoreStepId) heldStepIdRef.current = restoreStepId;
+  else if (step?.id) heldStepIdRef.current = step.id;
 
   useEffect(() => {
     let alive = true;
@@ -312,11 +330,11 @@ export function OrientationDiagnosticWizard() {
 
   useEffect(() => {
     const next = pendingAccountPersist.current;
-    if (!next || booting) return;
+    if (!next || booting || restoreStepId) return;
     pendingAccountPersist.current = null;
     persistProgress({
       phase: 'quiz',
-      stepId: step?.id || 'prof_identity',
+      stepId: step?.id || heldStepIdRef.current || 'prof_identity',
       answers: next,
       lastCompletedModule,
     });
@@ -358,15 +376,18 @@ export function OrientationDiagnosticWizard() {
   useEffect(() => {
     if (!restoreStepId || !quizSteps.length) return;
     const idx = quizSteps.findIndex((s) => s.id === restoreStepId);
-    setStepIndex(idx >= 0 ? idx : 0);
+    // Liste pas encore reconstruite (secteur / métier / école) : attendre, ne pas revenir au début.
+    if (idx < 0) return;
+    setStepIndex(idx);
     setRestoreStepId(null);
   }, [quizSteps, restoreStepId]);
 
   useEffect(() => {
+    if (restoreStepId) return;
     if (stepIndex >= quizSteps.length && quizSteps.length > 0) {
       setStepIndex(quizSteps.length - 1);
     }
-  }, [quizSteps.length, stepIndex]);
+  }, [quizSteps.length, stepIndex, restoreStepId]);
 
   useEffect(() => {
     if (!step || step.kind !== 'situation') {
@@ -393,7 +414,7 @@ export function OrientationDiagnosticWizard() {
             await saveOrientationDiagnosticStep(tokenForReport, {
               stepId: 'report',
               phase: 'report',
-              uiLocale,
+              uiLocale: uiLocaleRef.current,
               answers: ans,
               clientUpdatedAt: new Date().toISOString(),
             });
@@ -422,7 +443,7 @@ export function OrientationDiagnosticWizard() {
           completedModules: completedModulesUpTo('versus'),
           answers: ans,
           ui: { situationBriefDone, versusBriefDone, situationPhase: 'most' },
-          uiLocale,
+          uiLocale: uiLocaleRef.current,
           report,
           schoolRecoPublicCode,
         });
@@ -773,8 +794,8 @@ export function OrientationDiagnosticWizard() {
           showsVerticalScrollIndicator={false}>
           <View ref={scrollContentRef} collapsable={false}>
           <View style={styles.moduleBanner}>
-            <Text style={[styles.moduleLabel, isRTL && styles.rtlText]}>{localizeModuleMeta(step.module, uiLocale).label}</Text>
-            <Text style={[styles.moduleObjective, isRTL && styles.rtlText]}>
+            <Text style={[styles.moduleLabel, isRTL && styles.rtlText, isRTL && styles.moduleLabelRtl]}>{localizeModuleMeta(step.module, uiLocale).label}</Text>
+            <Text style={[styles.moduleObjective, isRTL && styles.rtlText, isRTL && styles.moduleObjectiveRtl]}>
               {localizeModuleMeta(step.module, uiLocale).objective}
             </Text>
             {moduleFlash ? (
@@ -791,6 +812,7 @@ export function OrientationDiagnosticWizard() {
           ) : (
             <>
               <DiagnosticStepHeader
+                compact
                 icon={
                   step.module === 'functioning'
                     ? 'cogs'
@@ -851,18 +873,21 @@ export function OrientationDiagnosticWizard() {
 const styles = StyleSheet.create({
   boot: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: brand.backgroundSoft },
   scrollView: { flex: 1 },
-  scroll: { paddingBottom: spacing.md, gap: spacing.sm },
+  scroll: { paddingTop: 8, paddingBottom: spacing.sm, gap: 6 },
   moduleBanner: {
-    marginBottom: spacing.sm,
-    padding: spacing.md,
+    marginBottom: 6,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
     backgroundColor: brand.white,
     borderRadius: radius.lg,
     borderWidth: 1,
     borderColor: homeShell.borderOnWhite,
-    gap: 4,
+    gap: 2,
   },
-  moduleLabel: { fontSize: fontSize.md, fontWeight: '800', color: brand.primary },
-  moduleObjective: { fontSize: fontSize.sm, color: brand.textMuted, lineHeight: 20 },
+  moduleLabel: { fontSize: fontSize.sm, fontWeight: '800', color: brand.primary, lineHeight: 18 },
+  moduleLabelRtl: { lineHeight: 22 },
+  moduleObjective: { fontSize: fontSize.xs, color: brand.textMuted, lineHeight: 16 },
+  moduleObjectiveRtl: { lineHeight: 20 },
   flash: {
     flexDirection: 'row',
     alignItems: 'center',
