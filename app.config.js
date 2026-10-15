@@ -5,7 +5,6 @@ module.exports = ({ config }) => {
     typeof process.env.EXPO_PUBLIC_EAS_PROJECT_ID === 'string'
       ? process.env.EXPO_PUBLIC_EAS_PROJECT_ID.trim()
       : '';
-
   return {
     ...base,
     ...config,

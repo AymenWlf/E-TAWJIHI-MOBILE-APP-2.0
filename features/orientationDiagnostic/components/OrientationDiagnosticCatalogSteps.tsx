@@ -58,6 +58,10 @@ import {
   prefetchOrientationSectorMetiers,
   prefetchOrientationSchools,
   prefetchOrientationSectors,
+  reloadOrientationMetiers,
+  reloadOrientationSchools,
+  reloadOrientationSectorMetiers,
+  reloadOrientationSectors,
 } from '../utils/orientationDiagnosticCatalogCache';
 import { toggleMultiMax } from '../utils/orientationMultiToggle';
 import type { DiagnosticAnswers, DiagnosticStep } from '../types/orientationDiagnosticPrototype';
@@ -144,9 +148,9 @@ function secteurDetailModel(view: SecteurDetailView, locale: OrientationUiLocale
     leadRtl: locale === 'ar',
     meta: meta || undefined,
     stats: [
-      { label: tOd(locale, 'modalTendance'), value: view.tendance },
-      { label: tOd(locale, 'modalSalaire'), value: view.salaireLabel },
-    ],
+      view.tendance ? { label: tOd(locale, 'modalTendance'), value: view.tendance } : null,
+      view.salaireLabel ? { label: tOd(locale, 'modalSalaire'), value: view.salaireLabel } : null,
+    ].filter((stat): stat is { label: string; value: string } => Boolean(stat)),
     sections,
   };
 }
@@ -401,6 +405,27 @@ function foldSchoolText(value: string): string {
     .trim();
 }
 
+function CatalogReloadPanel({
+  message,
+  onReload,
+  locale,
+  rtl,
+}: {
+  message: string;
+  onReload: () => void;
+  locale: OrientationUiLocale;
+  rtl?: boolean;
+}) {
+  return (
+    <View style={styles.reloadBox}>
+      <Text style={[styles.err, rtl && styles.rtlText]}>{message}</Text>
+      <Pressable style={styles.emptyBtn} onPress={onReload}>
+        <Text style={styles.emptyBtnTxt}>{tOd(locale, 'catalogReload')}</Text>
+      </Pressable>
+    </View>
+  );
+}
+
 export function OrientationDynamicSectorsStep({
   step,
   answers,
@@ -420,9 +445,11 @@ export function OrientationDynamicSectorsStep({
 }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const detail = useOrientationCatalogDetail();
   const detailReq = useRef(0);
   const max = step.maxSelect ?? 7;
+  const minChoices = step.minSelect ?? 1;
   const selected = answers.multi.car_secteurs ?? [];
 
   const [secteurs, setSecteurs] = useState<Awaited<ReturnType<typeof fetchSecteursCatalog>>['items']>(
@@ -433,9 +460,11 @@ export function OrientationDynamicSectorsStep({
     let cancelled = false;
     void (async () => {
       setLoading(true);
+      setError(null);
       onLoadingChange?.(true);
       try {
-        const items = await prefetchOrientationSectors(accessToken);
+        const loadSectors = reloadTick > 0 ? reloadOrientationSectors : prefetchOrientationSectors;
+        const items = await loadSectors(accessToken);
         if (cancelled) return;
         setSecteurs(items);
         if (!items.length) setError(tOd(uiLocale, 'noSectors'));
@@ -452,12 +481,28 @@ export function OrientationDynamicSectorsStep({
       cancelled = true;
       onLoadingChange?.(false);
     };
-  }, [accessToken, onLoadingChange, uiLocale]);
+  }, [accessToken, onLoadingChange, reloadTick, uiLocale]);
+
+  const reloadCatalog = () => {
+    setLoading(true);
+    setError(null);
+    onLoadingChange?.(true);
+    setReloadTick((n) => n + 1);
+  };
 
   if (loading && !secteurs.length) {
     return <ActivityIndicator color={brand.primary} style={{ marginTop: spacing.lg }} />;
   }
-  if (error) return <Text style={styles.err}>{error}</Text>;
+  if (error || secteurs.length < minChoices) {
+    return (
+      <CatalogReloadPanel
+        locale={uiLocale}
+        rtl={rtl}
+        message={error || tOdFill(uiLocale, 'catalogNeedChoices', { min: minChoices })}
+        onReload={reloadCatalog}
+      />
+    );
+  }
 
   const openSecteur = (s: (typeof secteurs)[number]) => {
     const token = ++detailReq.current;
@@ -467,12 +512,20 @@ export function OrientationDynamicSectorsStep({
         titreAr: s.titreAr,
         code: s.code,
         description: s.description,
+        descriptionAr: s.descriptionAr,
         salaire: s.salaireLabel,
         softSkills: s.softSkills,
+        softSkillsAr: s.softSkillsAr,
         avantages: s.avantages,
+        avantagesAr: s.avantagesAr,
         inconvenients: s.inconvenients,
+        inconvenientsAr: s.inconvenientsAr,
         bacs: s.bacs,
+        bacsAr: s.bacsAr,
         typeBacs: s.typeBacs,
+        typeBacsAr: s.typeBacsAr,
+        tendance: s.tendance,
+        tendanceAr: s.tendanceAr,
         metiers: s.metiers,
         nbMetiers: s.nbMetiers,
         nbEcoles: s.nbEcoles,
@@ -491,13 +544,22 @@ export function OrientationDynamicSectorsStep({
                 titreAr: full.titreAr,
                 code: full.code,
                 description: full.description,
+                descriptionAr: full.descriptionAr,
                 salaire: full.salaireLabel,
                 softSkills: full.softSkills,
+                softSkillsAr: full.softSkillsAr,
                 avantages: full.avantages,
+                avantagesAr: full.avantagesAr,
                 inconvenients: full.inconvenients,
+                inconvenientsAr: full.inconvenientsAr,
                 bacs: full.bacs,
+                bacsAr: full.bacsAr,
                 typeBacs: full.typeBacs,
+                typeBacsAr: full.typeBacsAr,
+                tendance: full.tendance,
+                tendanceAr: full.tendanceAr,
                 metiers: full.metiers,
+                metiersLies: full.metiersLies,
                 nbMetiers: full.nbMetiers,
                 nbEcoles: full.nbEcoles,
               },
@@ -583,6 +645,7 @@ export function OrientationDynamicMetiersStep({
   const [metiers, setMetiers] = useState<Metier[]>([]);
   const [loading, setLoading] = useState(true);
   const [hint, setHint] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const detail = useOrientationCatalogDetail();
   const detailReq = useRef(0);
   const max = step.maxSelect ?? 3;
@@ -616,14 +679,16 @@ export function OrientationDynamicMetiersStep({
       let sectorExtras: Metier[] = [];
       const num = Number(secteurId);
       if (Number.isFinite(num)) {
+        const loadFlagged = reloadTick > 0 ? reloadOrientationMetiers : prefetchOrientationMetiers;
+        const loadAll = reloadTick > 0 ? reloadOrientationSectorMetiers : prefetchOrientationSectorMetiers;
         try {
-          flagged = await prefetchOrientationMetiers(String(num));
+          flagged = await loadFlagged(String(num));
         } catch {
           flagged = [];
         }
         if (flagged.length < MIN_METIER_CHOICES) {
           try {
-            const all = await prefetchOrientationSectorMetiers(String(num));
+            const all = await loadAll(String(num));
             const flaggedIds = new Set(flagged.map((m) => String(m.id)));
             sectorExtras = all.filter(
               (m) => m.id != null && !flaggedIds.has(String(m.id)) && m.isActivate !== false,
@@ -656,9 +721,27 @@ export function OrientationDynamicMetiersStep({
       cancelled = true;
       onLoadingChange?.(false);
     };
-  }, [secteurId, stepKey, uiLocale, onLoadingChange]);
+  }, [secteurId, stepKey, uiLocale, onLoadingChange, reloadTick]);
+
+  const minChoices = step.minSelect ?? 1;
+  const reloadCatalog = () => {
+    setLoading(true);
+    onLoadingChange?.(true);
+    setReloadTick((n) => n + 1);
+  };
 
   if (loading) return <ActivityIndicator color={brand.primary} style={{ marginTop: spacing.lg }} />;
+
+  if (secteurId && metiers.length < minChoices) {
+    return (
+      <CatalogReloadPanel
+        locale={uiLocale}
+        rtl={rtl}
+        message={hint && hint !== tOd(uiLocale, 'hintSelectSectorsFirst') ? hint : tOd(uiLocale, 'noMetiers')}
+        onReload={reloadCatalog}
+      />
+    );
+  }
 
   const openMetier = (m: Metier) => {
     const token = ++detailReq.current;
@@ -690,6 +773,14 @@ export function OrientationDynamicMetiersStep({
   return (
     <View style={styles.wrap}>
       {hint ? <DiagnosticHint rtl={rtl}>{hint}</DiagnosticHint> : null}
+      {secteurId && metiers.length < MIN_METIER_CHOICES ? (
+        <CatalogReloadPanel
+          locale={uiLocale}
+          rtl={rtl}
+          message={tOdFill(uiLocale, 'catalogNeedChoices', { min: MIN_METIER_CHOICES })}
+          onReload={reloadCatalog}
+        />
+      ) : null}
       <Text style={[styles.count, rtl && styles.rtlText]}>
         {selected.length}/{max}
       </Text>
@@ -760,6 +851,8 @@ export function OrientationDynamicSchoolsStep({
 }) {
   const [ecoles, setEcoles] = useState<Establishment[]>([]);
   const [loading, setLoading] = useState(true);
+  const [schoolError, setSchoolError] = useState<string | null>(null);
+  const [reloadTick, setReloadTick] = useState(0);
   const [query, setQuery] = useState('');
   const [cityFilter, setCityFilter] = useState('');
   const [cityOpen, setCityOpen] = useState(false);
@@ -778,12 +871,17 @@ export function OrientationDynamicSchoolsStep({
     let cancelled = false;
     void (async () => {
       setLoading(true);
+      setSchoolError(null);
       onLoadingChange?.(true);
       try {
-        const list = await prefetchOrientationSchools();
+        const loadSchools = reloadTick > 0 ? reloadOrientationSchools : prefetchOrientationSchools;
+        const list = await loadSchools();
         if (!cancelled) setEcoles(list);
       } catch {
-        if (!cancelled) setEcoles([]);
+        if (!cancelled) {
+          setEcoles([]);
+          setSchoolError(tOd(uiLocale, 'schoolLoadError'));
+        }
       } finally {
         if (!cancelled) {
           setLoading(false);
@@ -795,7 +893,7 @@ export function OrientationDynamicSchoolsStep({
       cancelled = true;
       onLoadingChange?.(false);
     };
-  }, [onLoadingChange]);
+  }, [onLoadingChange, reloadTick, uiLocale]);
 
   useEffect(() => {
     setQuery('');
@@ -855,7 +953,25 @@ export function OrientationDynamicSchoolsStep({
     [facultes, selected],
   );
 
+  const reloadCatalog = () => {
+    setLoading(true);
+    setSchoolError(null);
+    onLoadingChange?.(true);
+    setReloadTick((n) => n + 1);
+  };
+
   if (loading) return <ActivityIndicator color={brand.primary} style={{ marginTop: spacing.lg }} />;
+
+  if (schoolError || !ecoles.length) {
+    return (
+      <CatalogReloadPanel
+        locale={uiLocale}
+        rtl={rtl}
+        message={schoolError || tOdFill(uiLocale, 'catalogNeedChoices', { min: 1 })}
+        onReload={reloadCatalog}
+      />
+    );
+  }
 
   if (!ofType.length && !answers.single[emptyKey]) {
     return (
@@ -867,6 +983,9 @@ export function OrientationDynamicSchoolsStep({
               ? 'لا توجد مدارس نشطة من هذا النوع.'
               : 'Aucune école active pour ce type.'}
         </DiagnosticHint>
+        <Pressable style={styles.emptyBtn} onPress={reloadCatalog}>
+          <Text style={styles.emptyBtnTxt}>{tOd(uiLocale, 'catalogReload')}</Text>
+        </Pressable>
         <Pressable
           onPress={() =>
             setAnswers((prev) => ({
@@ -1165,6 +1284,7 @@ const styles = StyleSheet.create({
   cityFilterTxt: { flex: 1, fontSize: fontSize.sm, fontWeight: '700', color: brand.text },
   cityFilterPlaceholder: { fontWeight: '600', color: brand.textMuted },
   cityFilterChevron: { fontSize: 14, color: brand.primary, fontWeight: '700' },
+  reloadBox: { gap: spacing.sm, marginTop: spacing.md },
   emptyBtn: {
     backgroundColor: diagnosticTheme.primarySoft,
     padding: spacing.md,

@@ -50,6 +50,7 @@ import { isDevApiBaseUrl } from '@/constants/api';
 import { PRACTICAL_LINK_DEFS } from '@/constants/practicalLinks';
 import {
   BAC_RESULTS_STATIC_DEFAULT,
+  HOME_BAC_RESULTS_SLIDE_VISIBLE,
   orderHomeStackCards,
   type BacResultsCardConfig,
   type BacVerificationChannel,
@@ -588,7 +589,7 @@ function HomeTabScreen() {
     const showLegacyTassjil = Boolean(
       user?.legacyLink?.hasTassjilCandidate || user?.legacyLink?.linked,
     );
-    return base.map((card) => {
+    const mapped = base.map((card) => {
       const isParcoursCard =
         card.id === 'stack-1' || card.orientationProgress != null;
       const dailyPatch =
@@ -653,6 +654,8 @@ function HomeTabScreen() {
           : card.dailyActions,
       };
     });
+    if (HOME_BAC_RESULTS_SLIDE_VISIBLE) return mapped;
+    return mapped.filter((card) => card.id !== 'stack-bac-results' && card.bacResults == null);
   }, [
     locale,
     dailyOverlay,

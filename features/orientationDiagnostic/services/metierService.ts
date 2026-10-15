@@ -17,7 +17,15 @@ export interface Metier {
   salaireMin?: string | null;
   salaireMax?: string | null;
   competences?: string[];
+  competencesAr?: string[];
   formations?: string[];
+  formationsAr?: string[];
+  missions?: string[];
+  missionsAr?: string[];
+  debouches?: string[];
+  debouchesAr?: string[];
+  tendance?: string | null;
+  tendanceAr?: string | null;
   isActivate: boolean;
   afficherDansTest?: boolean;
   createdAt?: string;

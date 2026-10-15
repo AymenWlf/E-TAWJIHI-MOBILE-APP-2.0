@@ -49,6 +49,7 @@ import {
 } from '@/utils/academicFiliere';
 import { anneesBacOptionsForLocale } from '@/utils/bacSchoolYearLabels';
 import { listCities, type CityRow } from '@/services/referenceData';
+import { arabicCitySearchText } from '@/utils/moroccanCitySearch';
 import { completeAccountSetup, type AccountSetupPayload } from '@/services/accountSetup';
 import { getOldClient, getUserProfile } from '@/services/userProfile';
 import { promptNotificationPermissionAfterAuth } from '@/services/pushNotifications';
@@ -450,6 +451,7 @@ export default function AccountSetupScreen() {
           id: String(c.id),
           value: String(c.id),
           label: c.titre ?? '',
+          searchText: arabicCitySearchText(c.titre ?? ''),
           subtitle: c.region?.titre,
         })),
     [cities],

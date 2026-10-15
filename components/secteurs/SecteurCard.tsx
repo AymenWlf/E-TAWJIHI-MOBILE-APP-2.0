@@ -3,9 +3,13 @@ import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Text } from '@/components/ui/Text';
 import type { SecteurCard as SecteurCardModel } from '@/services/secteurs';
-import { pickSecteurTitle } from '@/services/secteurs';
+import { pickSecteurList, pickSecteurTitle } from '@/services/secteurs';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { stripHtmlToText } from '@/utils/sanitizeRichHtml';
+import {
+  localizeSecteurSalary,
+  resolveSecteurDescription,
+} from '@/utils/secteurCatalogLocale';
 
 type Props = {
   item: SecteurCardModel;
@@ -33,8 +37,9 @@ export function SecteurCard({
   removeFavoriteA11y,
 }: Props) {
   const title = pickSecteurTitle(item, locale);
-  const desc = stripHtmlToText(item.description, 140);
-  const skills = item.softSkills.slice(0, 3);
+  const desc = stripHtmlToText(resolveSecteurDescription(item, locale), 140);
+  const skills = pickSecteurList(item.softSkills, item.softSkillsAr, locale).slice(0, 3);
+  const salary = localizeSecteurSalary(item.salaireLabel, locale);
 
   return (
     <Pressable
@@ -101,19 +106,19 @@ export function SecteurCard({
           </Text>
         ) : null}
 
-        {item.salaireLabel ? (
+        {salary ? (
           <View style={[styles.salaryRow, isRTL && styles.rowRtl]}>
             <FontAwesome name="money" size={12} color="#15803D" />
             <Text style={[styles.salaryTxt, isRTL && styles.rtl]} numberOfLines={1}>
-              {item.salaireLabel}
+              {salary}
             </Text>
           </View>
         ) : null}
 
         {skills.length > 0 ? (
           <View style={[styles.chips, isRTL && styles.chipsRtl]}>
-            {skills.map((s) => (
-              <View key={s} style={styles.chip}>
+            {skills.map((s, index) => (
+              <View key={`${index}-${s}`} style={styles.chip}>
                 <Text style={styles.chipTxt} numberOfLines={1}>
                   {s}
                 </Text>

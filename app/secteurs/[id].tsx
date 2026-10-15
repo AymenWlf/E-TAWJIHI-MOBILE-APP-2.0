@@ -23,10 +23,18 @@ import { useLocale } from '@/contexts/LocaleContext';
 import { fetchFavoriteSecteurIds, toggleSecteurFavorite } from '@/services/favoris';
 import {
   fetchSecteurDetail,
+  fetchSecteurJobNames,
+  pickSecteurList,
+  pickSecteurText,
   pickSecteurTitle,
   type SecteurDetail,
+  type SecteurJobName,
 } from '@/services/secteurs';
-import { homeShell } from '@/theme/homeShell';
+import {
+  localizeSecteurSalary,
+  pickLocalizedJobName,
+  resolveSecteurDescription,
+} from '@/utils/secteurCatalogLocale';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { getUserFacingLoadError } from '@/utils/apiError';
 
@@ -34,8 +42,8 @@ function ChipList({ items, isRTL }: { items: string[]; isRTL: boolean }) {
   if (items.length === 0) return null;
   return (
     <View style={[styles.chips, isRTL && styles.chipsRtl]}>
-      {items.map((item) => (
-        <View key={item} style={styles.chip}>
+      {items.map((item, index) => (
+        <View key={`${index}-${item}`} style={styles.chip}>
           <Text style={styles.chipTxt}>{item}</Text>
         </View>
       ))}
@@ -83,6 +91,7 @@ export default function SecteurDetailScreen() {
   const [loadError, setLoadError] = useState<string | null>(null);
   const [isFavorite, setIsFavorite] = useState(false);
   const [favoriteBusy, setFavoriteBusy] = useState(false);
+  const [jobs, setJobs] = useState<SecteurJobName[]>([]);
 
   const loadFavorite = useCallback(async () => {
     if (!isLoggedIn || !Number.isFinite(id) || id < 1) {
@@ -114,12 +123,23 @@ export default function SecteurDetailScreen() {
       const detail = await fetchSecteurDetail(id, { token });
       if (!detail) {
         setData(null);
+        setJobs([]);
         setLoadError(t('secteursDetailNotFound'));
         return;
       }
       setData(detail);
+      if (detail.metiersLies.length > 0) {
+        setJobs(detail.metiersLies);
+      } else {
+        try {
+          setJobs(await fetchSecteurJobNames(id));
+        } catch {
+          setJobs([]);
+        }
+      }
     } catch (e) {
       setData(null);
+      setJobs([]);
       setLoadError(getUserFacingLoadError(e, t, { context: 'generic' }));
     }
   }, [getValidAccessToken, id, t]);
@@ -185,12 +205,40 @@ export default function SecteurDetailScreen() {
     return t('secteursTitle');
   }, [data, params.title, t, uiLocale]);
 
+  const description = data ? resolveSecteurDescription(data, uiLocale) : '';
+  const salary = data ? localizeSecteurSalary(data.salaireLabel, uiLocale) : null;
+  const tendance = data ? pickSecteurText(data.tendance, data.tendanceAr, uiLocale) : '';
+  const softSkills = data ? pickSecteurList(data.softSkills, data.softSkillsAr, uiLocale) : [];
+  const personnalites = data ? pickSecteurList(data.personnalites, data.personnalitesAr, uiLocale) : [];
+  const bacs = data
+    ? [
+        ...pickSecteurList(data.typeBacs, data.typeBacsAr, uiLocale),
+        ...pickSecteurList(data.bacs, data.bacsAr, uiLocale),
+      ]
+    : [];
+  const avantages = data ? pickSecteurList(data.avantages, data.avantagesAr, uiLocale) : [];
+  const inconvenients = data ? pickSecteurList(data.inconvenients, data.inconvenientsAr, uiLocale) : [];
+  const arabicJobs = useMemo(() => {
+    const byFrench = new Map<string, string>();
+    for (const job of jobs) {
+      if (job.nomArabe) {
+        byFrench.set(
+          job.nom.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim(),
+          job.nomArabe,
+        );
+      }
+    }
+    if (jobs.length > 0) {
+      return jobs.map((job) => pickLocalizedJobName(job.nom, job.nomArabe, uiLocale, byFrench));
+    }
+    return (data?.metiers ?? []).map((name) => pickLocalizedJobName(name, null, uiLocale, byFrench));
+  }, [data?.metiers, jobs, uiLocale]);
+
   return (
     <View style={styles.root}>
-      <Stack.Screen options={{ headerShown: false, title: '', header: () => null }} />
+      <Stack.Screen options={{ headerShown: false, title: '' }} />
       <StatusBar style="light" />
-      <View style={[styles.headerSafe, { paddingTop: insets.top }]}>
-        <View style={[styles.topBar, isRTL && styles.rowRtl]}>
+      <View style={[styles.topBar, { paddingTop: insets.top + 6 }, isRTL && styles.rowRtl]}>
           <Pressable
             onPress={() => router.back()}
             style={({ pressed }) => [styles.iconBtn, pressed && { opacity: 0.85 }]}
@@ -224,7 +272,6 @@ export default function SecteurDetailScreen() {
             />
           </Pressable>
           <HeroLangSwitch />
-        </View>
       </View>
 
       {loading && !data ? (
@@ -258,7 +305,7 @@ export default function SecteurDetailScreen() {
           </View>
 
           <View style={styles.headerCard}>
-            <Text style={[styles.h1, isRTL && styles.rtl]}>{pickSecteurTitle(data, uiLocale)}</Text>
+            <Text style={[styles.h1, isRTL && styles.rtl]}>{title}</Text>
             {data.code ? (
               <Text style={[styles.code, isRTL && styles.rtl]}>{data.code}</Text>
             ) : null}
@@ -278,80 +325,91 @@ export default function SecteurDetailScreen() {
             </View>
           </View>
 
-          {data.salaireLabel ? (
+          {salary ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
                 {t('secteursSalary')}
               </Text>
               <View style={[styles.salaryBox, isRTL && styles.rowRtl]}>
                 <FontAwesome name="money" size={16} color="#15803D" />
-                <Text style={[styles.salaryTxt, isRTL && styles.rtl]}>{data.salaireLabel}</Text>
+                <Text style={[styles.salaryTxt, isRTL && styles.rtl]}>{salary}</Text>
               </View>
             </View>
           ) : null}
 
-          <View style={styles.section}>
-            <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
-              {t('secteursAbout')}
-            </Text>
-            <EstablishmentDescriptionHtml
-              description={data.description}
-              emptyLabel={t('secteursNoDescription')}
-              forceRtl={isRTL}
-            />
-          </View>
+          {description ? (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
+                {t('secteursAbout')}
+              </Text>
+              <EstablishmentDescriptionHtml
+                description={description}
+                emptyLabel={t('secteursNoDescription')}
+                forceRtl={isRTL}
+              />
+            </View>
+          ) : null}
 
-          {data.softSkills.length > 0 ? (
+          {tendance ? (
+            <View style={styles.section}>
+              <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
+                {t('secteursTendance')}
+              </Text>
+              <Text style={[styles.salaryTxt, isRTL && styles.rtl]}>{tendance}</Text>
+            </View>
+          ) : null}
+
+          {softSkills.length > 0 ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
                 {t('secteursSoftSkills')}
               </Text>
-              <ChipList items={data.softSkills} isRTL={isRTL} />
+              <ChipList items={softSkills} isRTL={isRTL} />
             </View>
           ) : null}
 
-          {data.personnalites.length > 0 ? (
+          {personnalites.length > 0 ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
                 {t('secteursPersonalities')}
               </Text>
-              <ChipList items={data.personnalites} isRTL={isRTL} />
+              <ChipList items={personnalites} isRTL={isRTL} />
             </View>
           ) : null}
 
-          {(data.bacs.length > 0 || data.typeBacs.length > 0) ? (
+          {bacs.length > 0 ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
                 {t('secteursBac')}
               </Text>
-              <ChipList items={[...data.typeBacs, ...data.bacs]} isRTL={isRTL} />
+              <ChipList items={bacs} isRTL={isRTL} />
             </View>
           ) : null}
 
-          {data.metiers.length > 0 ? (
+          {arabicJobs.length > 0 ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
                 {t('secteursJobs')}
               </Text>
-              <ChipList items={data.metiers} isRTL={isRTL} />
+              <ChipList items={arabicJobs} isRTL={isRTL} />
             </View>
           ) : null}
 
-          {data.avantages.length > 0 ? (
+          {avantages.length > 0 ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
                 {t('secteursPros')}
               </Text>
-              <BulletList items={data.avantages} tone="plus" isRTL={isRTL} />
+              <BulletList items={avantages} tone="plus" isRTL={isRTL} />
             </View>
           ) : null}
 
-          {data.inconvenients.length > 0 ? (
+          {inconvenients.length > 0 ? (
             <View style={styles.section}>
               <Text style={[styles.sectionTitle, isRTL && styles.rtl]}>
                 {t('secteursCons')}
               </Text>
-              <BulletList items={data.inconvenients} tone="minus" isRTL={isRTL} />
+              <BulletList items={inconvenients} tone="minus" isRTL={isRTL} />
             </View>
           ) : null}
 
@@ -391,25 +449,19 @@ function StatBox({
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: brand.backgroundSoft },
-  headerSafe: {
-    backgroundColor: homeShell.bg,
-    zIndex: 10,
-  },
   topBar: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: spacing.sm,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: homeShell.bg,
-    borderBottomLeftRadius: radius.xl,
-    borderBottomRightRadius: radius.xl,
+    paddingBottom: spacing.sm,
+    backgroundColor: brand.primary,
   },
   rowRtl: { flexDirection: 'row-reverse' },
   iconBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 36,
+    height: 36,
+    borderRadius: radius.full,
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'rgba(255,255,255,0.16)',
@@ -422,6 +474,7 @@ const styles = StyleSheet.create({
     color: brand.white,
     fontWeight: '800',
     fontSize: fontSize.md,
+    textAlign: 'center',
   },
   errorWrap: {
     flexGrow: 1,

@@ -23,6 +23,12 @@ export type BacResultsCardConfig = {
   bacCardFirst: boolean;
 };
 
+/**
+ * Affichage de la carte « Résultat du baccalauréat » dans la pile d’accueil.
+ * false = masquée (le composant, les données et le chargement restent en place).
+ */
+export const HOME_BAC_RESULTS_SLIDE_VISIBLE = false;
+
 /** Valeurs par défaut si l’API est injoignable. */
 export const BAC_RESULTS_STATIC_DEFAULT: BacResultsCardConfig = {
   globalStatus: 'not_yet',

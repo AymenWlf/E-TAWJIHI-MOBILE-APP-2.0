@@ -249,9 +249,8 @@ export function validateProfileGrades(p: DiagnosticProfile): string | null {
   if (!needsNotes(p.studyLevel)) return null;
   if (!p.noteAvailability) return 'Indique si tes notes sont disponibles ou estimées.';
   if (p.bacType === 'marocain') {
-    const definitive = p.noteAvailability === 'real' || p.noteAvailability === 'disponible';
-    if (definitive && !hasNote(p.noteGenerale1ereBac)) {
-      return 'Renseigne ta note définitive.';
+    if (!hasNote(p.noteGenerale1ereBac) || !hasNote(p.noteControleContinu) || !hasNote(p.noteNational)) {
+      return 'Renseigne la moyenne de 1ère bac, le contrôle continu et le national prévisionnel.';
     }
   }
   if (p.bacType === 'mission') {

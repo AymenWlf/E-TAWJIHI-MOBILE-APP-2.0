@@ -375,6 +375,7 @@ export type HomeCopyKey =
   | 'secteursStatJobs'
   | 'secteursSalary'
   | 'secteursAbout'
+  | 'secteursTendance'
   | 'secteursNoDescription'
   | 'secteursSoftSkills'
   | 'secteursPersonalities'
@@ -2214,6 +2215,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     secteursStatJobs: 'Métiers',
     secteursSalary: 'Salaire indicatif',
     secteursAbout: 'À propos',
+    secteursTendance: 'Tendance',
     secteursNoDescription: 'Aucune description disponible pour ce secteur.',
     secteursSoftSkills: 'Soft skills',
     secteursPersonalities: 'Personnalités',
@@ -4179,6 +4181,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     secteursStatJobs: 'مهن',
     secteursSalary: 'راتب تقريبي',
     secteursAbout: 'نبذة',
+    secteursTendance: 'الاتجاه',
     secteursNoDescription: 'لا يوجد وصف متاح لهذا القطاع.',
     secteursSoftSkills: 'المهارات الشخصية',
     secteursPersonalities: 'الشخصيات',

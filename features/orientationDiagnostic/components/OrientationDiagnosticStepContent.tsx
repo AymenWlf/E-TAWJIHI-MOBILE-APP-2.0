@@ -13,6 +13,7 @@ import {
 } from '@/constants/establishmentMedia';
 import type { CityRow } from '@/services/referenceData';
 import { prefetchOrientationCities } from '../utils/orientationDiagnosticCatalogCache';
+import { arabicCitySearchText } from '@/utils/moroccanCitySearch';
 import { applyVersusWinner, hydrateVersusSchoolVisuals } from '../utils/orientationDiagnosticVersus';
 import {
   formatBilingualName,
@@ -808,6 +809,7 @@ function CitiesStepMobile({
   answers,
   setAnswers,
   uiLocale,
+  rtl = false,
 }: {
   step: DiagnosticStep;
   answers: DiagnosticAnswers;
@@ -846,6 +848,7 @@ function CitiesStepMobile({
         id: String(c.id),
         value: c.titre,
         label: c.titre,
+        searchText: arabicCitySearchText(c.titre),
         subtitle: c.region?.titre,
       }));
   }, [cities]);
@@ -905,7 +908,7 @@ function CitiesStepMobile({
         multiSelect
         closeOnPick={false}
         confirmLabel="Confirmer"
-        rtl={false}
+        rtl={rtl}
         onPick={toggle}
         onClose={() => setOpen(false)}
       />

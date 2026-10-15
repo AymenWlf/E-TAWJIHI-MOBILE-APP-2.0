@@ -12,6 +12,7 @@ import type { DiagnosticAnswers } from '@/features/orientationDiagnostic/types/o
 import { answersToSchoolMatchPayload } from '@/features/orientationDiagnostic/utils/orientationDiagnosticSchoolReco';
 import { resolveFiliereDisplayLabel } from '@/features/orientationDiagnostic/utils/academicFiliere';
 import type { CityRow } from '@/services/referenceData';
+import { computeDiagnosticBacComparisonNote } from '@/utils/diagnosticBacComparisonNote';
 
 function normalizeLabel(s: string): string {
   return s
@@ -20,6 +21,19 @@ function normalizeLabel(s: string): string {
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .trim();
+}
+
+/** 25 % (1ère bac + CC) et 75 % national prévisionnel, même formule que le seuil d’admission. */
+function marocainComparisonNote(premiere: string, cc: string, national: string): string {
+  const summary = computeDiagnosticBacComparisonNote({
+    bacType: 'normal',
+    noteGeneralePremiereBacSur20: premiere.trim(),
+    noteGeneraleSemestre1SecondBacSur20: cc.trim(),
+    previsionnelBacNationalMinSur20: national.trim(),
+    previsionnelBacNationalMaxSur20: national.trim(),
+  });
+  if (summary.comparisonNote == null) return '';
+  return String(Math.round(summary.comparisonNote * 100) / 100);
 }
 
 function mapStudyLevel(level: string): string {
@@ -175,17 +189,13 @@ export function mapOrientationAnswersToSchoolQuickForm(
     missionSpecialite3: match.missionSpecialite3,
 
     noteGeneralePremiereBacSur20: bacType === 'normal' ? p.noteGenerale1ereBac.trim() : '',
-    regionalGradeReceived:
-      bacType === 'normal' && p.noteGenerale1ereBac.trim() ? (definitive ? 'yes' : 'no') : '',
+    regionalGradeReceived: bacType === 'normal' && p.noteGenerale1ereBac.trim() ? 'yes' : '',
     noteGeneraleSemestre1SecondBacSur20: bacType === 'normal' ? p.noteControleContinu.trim() : '',
-    semestre1BacGradeReceived:
-      bacType === 'normal' && p.noteControleContinu.trim() ? (definitive ? 'yes' : 'no') : '',
-    noteBacFinaleSur20,
-    bacGradeReceived,
-    previsionnelBacNationalMinSur20:
-      bacType === 'normal' && !definitive ? p.noteNational.trim() : '',
-    previsionnelBacNationalMaxSur20:
-      bacType === 'normal' && !definitive ? p.noteNational.trim() : '',
+    semestre1BacGradeReceived: bacType === 'normal' && p.noteControleContinu.trim() ? 'yes' : '',
+    noteBacFinaleSur20: bacType === 'normal' ? marocainComparisonNote(p) : noteBacFinaleSur20,
+    bacGradeReceived: bacType === 'normal' ? (marocainComparisonNote(p) ? 'yes' : '') : bacGradeReceived,
+    previsionnelBacNationalMinSur20: bacType === 'normal' ? p.noteNational.trim() : '',
+    previsionnelBacNationalMaxSur20: bacType === 'normal' ? p.noteNational.trim() : '',
 
     noteMissionPremiereSur20: bacType === 'mission' ? p.noteGeneralePremiere.trim() : '',
     premiereMissionGradeReceived:

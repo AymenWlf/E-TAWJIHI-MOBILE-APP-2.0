@@ -177,6 +177,9 @@ function mapDiplomes(niveau?: string): string[] {
   }
 }
 
+/**
+ * Note de comparaison aux seuils : 25 % (1ère bac + contrôle continu) et 75 % national prévisionnel.
+ */
 function extractUserNote(profile: DiagnosticAnswers['profile']): number | null {
   if (profile.bacType === 'mission') {
     return (
@@ -185,11 +188,14 @@ function extractUserNote(profile: DiagnosticAnswers['profile']): number | null {
       parseNote(profile.noteGeneralePremiere)
     );
   }
-  return (
-    parseNote(profile.noteNational) ??
-    parseNote(profile.noteControleContinu) ??
-    parseNote(profile.noteGenerale1ereBac)
+  const regionalParts = [parseNote(profile.noteGenerale1ereBac), parseNote(profile.noteControleContinu)].filter(
+    (n): n is number => n != null,
   );
+  const regional =
+    regionalParts.length > 0 ? regionalParts.reduce((sum, n) => sum + n, 0) / regionalParts.length : null;
+  const national = parseNote(profile.noteNational);
+  if (regional != null && national != null) return 0.25 * regional + 0.75 * national;
+  return national ?? regional;
 }
 
 function collectNumericThresholds(node: unknown, out: number[] = []): number[] {

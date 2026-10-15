@@ -17,7 +17,7 @@ import { Text } from '@/components/ui/Text';
 import { homeShell } from '@/theme/homeShell';
 import { fontSize, radius, spacing } from '@/theme/tokens';
 
-import { DIR_RTL } from '@/utils/layoutDirection';
+import { foldCityQuery } from '@/utils/moroccanCitySearch';
 type FaName = ComponentProps<typeof FontAwesome>['name'];
 
 function StatusPickSwatch({
@@ -134,15 +134,14 @@ export function SearchablePickPanel({
   );
 
   const filtered = useMemo(() => {
-    const q = query.trim().toLowerCase();
+    const q = foldCityQuery(query);
     if (!q) return items;
     return items.filter((i) => {
       const parts: string[] = [i.label];
       const extra = (i.searchText ?? '').trim();
       if (extra) parts.push(extra);
       if (searchInSubtitle && i.subtitle) parts.push(i.subtitle);
-      const hay = parts.join('\n').toLowerCase();
-      return hay.includes(q);
+      return foldCityQuery(parts.join('\n')).includes(q);
     });
   }, [items, query, searchInSubtitle]);
 
@@ -186,7 +185,7 @@ export function SearchablePickPanel({
       </View>
 
       <FlatList
-        {...(rtl ? { style: { ...DIR_RTL, height: listHeight } } : { style: { height: listHeight } })}
+        style={{ height: listHeight }}
         data={filtered}
         keyExtractor={(it) => it.id}
         keyboardShouldPersistTaps="always"

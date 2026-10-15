@@ -805,7 +805,9 @@ function studyCitiesLabelFromAnswers(answers: DiagnosticAnswers): string {
       if (name?.trim() && !labels.includes(name.trim())) labels.push(name.trim());
     }
   }
-  return labels.length ? labels.join(' · ') : '—';
+  if (labels.length) return labels.join(' · ');
+  const residence = answers.profile?.city?.trim();
+  return residence || '—';
 }
 
 export function studentSummaryFromAnswers(answers: DiagnosticAnswers) {
@@ -817,12 +819,9 @@ export function studentSummaryFromAnswers(answers: DiagnosticAnswers) {
         ? `Marocain · ${formatProfileBacFiliereLabel(p.bacFiliere)}`
         : p.studyLevel || '—';
   let notesLabel = 'Non renseignées';
-  if (p.bacType === 'marocain' && p.noteAvailability === 'estimation') {
-    if (p.noteControleContinu || p.noteNational) {
-      notesLabel = `Estimation ${p.noteControleContinu || '—'}–${p.noteNational || '—'}/20`;
-    }
-  } else if (p.bacType === 'marocain' && p.noteGenerale1ereBac) {
-    notesLabel = `${p.noteGenerale1ereBac}/20`;
+  if (p.bacType === 'marocain' && (p.noteGenerale1ereBac || p.noteControleContinu || p.noteNational)) {
+    const estim = p.noteAvailability === 'estimation' ? ' (estim.)' : '';
+    notesLabel = `1ère ${p.noteGenerale1ereBac || '—'} · CC ${p.noteControleContinu || '—'} · Nat. ${p.noteNational || '—'}${estim}`;
   } else if (p.bacType === 'mission' && (p.noteGeneralePremiere || p.noteGeneraleBac)) {
     notesLabel = `1ère ${p.noteGeneralePremiere || '—'} · Term. ${p.noteGeneraleTerminale || '—'} · Bac ${
       p.noteGeneraleBac || '—'
@@ -834,6 +833,33 @@ export function studentSummaryFromAnswers(answers: DiagnosticAnswers) {
     bacLabel,
     city: studyCitiesLabelFromAnswers(answers),
     notesLabel,
+  };
+}
+
+const EMPTY_SUMMARY_VALUES = new Set(['', '—', '-', 'Non renseignées', 'Étudiant(e)', 'Élève']);
+
+/** Garde la valeur déjà enregistrée quand la réponse courante est vide. */
+export function mergeStudentSummary<T extends {
+  fullName: string;
+  studyLevel: string;
+  bacLabel: string;
+  city: string;
+  notesLabel: string;
+}>(live: T, stored?: Partial<T> | null): T {
+  const pick = (current: string | undefined, previous: string | undefined) => {
+    const next = (current ?? '').trim();
+    const saved = (previous ?? '').trim();
+    if (next && !EMPTY_SUMMARY_VALUES.has(next)) return next;
+    if (saved && !EMPTY_SUMMARY_VALUES.has(saved)) return saved;
+    return next || saved || '—';
+  };
+  return {
+    ...live,
+    fullName: pick(live.fullName, stored?.fullName),
+    studyLevel: pick(live.studyLevel, stored?.studyLevel),
+    bacLabel: pick(live.bacLabel, stored?.bacLabel),
+    city: pick(live.city, stored?.city),
+    notesLabel: pick(live.notesLabel, stored?.notesLabel),
   };
 }
 

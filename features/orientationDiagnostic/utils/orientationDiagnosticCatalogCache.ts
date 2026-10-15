@@ -18,6 +18,11 @@ export function prefetchOrientationCities(): Promise<CityRow[]> {
   return citiesPromise;
 }
 
+export function reloadOrientationSectors(token?: string | null): Promise<SecteurCard[]> {
+  sectorsPromise = null;
+  return prefetchOrientationSectors(token);
+}
+
 export function prefetchOrientationSectors(token?: string | null): Promise<SecteurCard[]> {
   if (!sectorsPromise) {
     sectorsPromise = fetchSecteursCatalog({ token })
@@ -60,6 +65,22 @@ export function prefetchOrientationMetiers(secteurId: string): Promise<Metier[]>
 /** Tous les métiers actifs du secteur, pour compléter une liste trop courte. */
 export function prefetchOrientationSectorMetiers(secteurId: string): Promise<Metier[]> {
   return loadSectorMetiers(secteurId);
+}
+
+export function reloadOrientationMetiers(secteurId: string): Promise<Metier[]> {
+  metiersPromises.delete(String(secteurId));
+  metiersPromises.delete(`all:${secteurId}`);
+  return prefetchOrientationMetiers(secteurId);
+}
+
+export function reloadOrientationSectorMetiers(secteurId: string): Promise<Metier[]> {
+  metiersPromises.delete(`all:${secteurId}`);
+  return prefetchOrientationSectorMetiers(secteurId);
+}
+
+export function reloadOrientationSchools(): Promise<Establishment[]> {
+  schoolsPromise = null;
+  return prefetchOrientationSchools();
 }
 
 export function prefetchOrientationSchools(): Promise<Establishment[]> {

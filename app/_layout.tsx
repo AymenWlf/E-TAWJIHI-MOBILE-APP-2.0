@@ -211,6 +211,7 @@ function RootLayoutNav({ onBootstrapComplete }: { onBootstrapComplete: () => voi
               <Stack.Screen name="compte/parrainage" options={{ headerShown: false }} />
               <Stack.Screen name="inscriptions" options={{ headerShown: false }} />
               <Stack.Screen name="etablissements" options={{ headerShown: false }} />
+              <Stack.Screen name="secteurs" options={{ headerShown: false }} />
               <Stack.Screen name="communaute" options={{ headerShown: false }} />
               <Stack.Screen name="daily-challenge" options={{ headerShown: false }} />
               <Stack.Screen name="diagnostic-ecoles" options={{ headerShown: false }} />

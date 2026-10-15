@@ -26,6 +26,7 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import {
   clearOrientationDiagnosticPrototypeDraft,
   completedModulesUpTo,
+  ORIENTATION_MODULE_ORDER,
   persistOrientationDiagnosticPrototypeDraft,
   readOrientationDiagnosticPrototypeDraft,
   type OrientationDiagnosticPrototypeDraft,
@@ -52,6 +53,30 @@ import { OrientationDiagnosticBriefScreen } from './OrientationDiagnosticBriefSc
 import { OrientationDiagnosticStepContent } from './OrientationDiagnosticStepContent';
 import { OrientationCatalogDetailProvider } from './OrientationCatalogDetailSheet';
 import { OrientationDiagnosticWizardShell } from './OrientationDiagnosticWizardShell';
+function orientationAnswersScore(answers: DiagnosticAnswers | null | undefined): number {
+  const profile = answers?.profile;
+  if (!profile) return answers?.cities?.length ?? 0;
+  const filled = [
+    profile.studyLevel,
+    profile.bacType,
+    profile.bacFiliere,
+    profile.bacYear,
+    profile.city,
+    profile.cityId,
+    profile.noteGenerale1ereBac,
+    profile.noteControleContinu,
+    profile.noteNational,
+    profile.noteGeneralePremiere,
+    profile.noteGeneraleTerminale,
+    profile.noteGeneraleBac,
+  ].filter((value) => String(value || '').trim()).length;
+  return filled + (profile.bacSpecialites?.length ?? 0) + (answers?.cities?.length ?? 0);
+}
+
+function richerOrientationAnswers(current: DiagnosticAnswers, pending: DiagnosticAnswers): DiagnosticAnswers {
+  return orientationAnswersScore(current) >= orientationAnswersScore(pending) ? current : pending;
+}
+
 export function OrientationDiagnosticWizard() {
   const { isRTL, locale } = useLocale();
   const uiLocale = orientationUiLocaleFromApp(locale);
@@ -335,7 +360,7 @@ export function OrientationDiagnosticWizard() {
     persistProgress({
       phase: 'quiz',
       stepId: step?.id || heldStepIdRef.current || 'prof_identity',
-      answers: next,
+      answers: richerOrientationAnswers(answers, next),
       lastCompletedModule,
     });
   }, [answers.profile, booting, step?.id, lastCompletedModule, persistProgress]);
@@ -692,6 +717,33 @@ export function OrientationDiagnosticWizard() {
     setStepIndex((i) => i - 1);
   };
 
+  const goToModule = (moduleId: ModuleId) => {
+    if (versusBuilding || reportBuilding || catalogLoading || !step) return;
+    const currentReached = ORIENTATION_MODULE_ORDER.indexOf(step.module);
+    const savedReached = lastCompletedModule
+      ? ORIENTATION_MODULE_ORDER.indexOf(lastCompletedModule)
+      : -1;
+    const completedReached = Math.max(
+      -1,
+      ...completedModules.map((id) => ORIENTATION_MODULE_ORDER.indexOf(id)),
+    );
+    const reachedIndex = Math.max(currentReached, savedReached, completedReached);
+    const targetIndex = ORIENTATION_MODULE_ORDER.indexOf(moduleId);
+    if (targetIndex < 0 || reachedIndex < 0 || targetIndex > reachedIndex) return;
+    const targetStepIndex = quizSteps.findIndex((item) => item.module === moduleId);
+    if (targetStepIndex < 0 || targetStepIndex === stepIndex) return;
+    setSituationPhase('most');
+    setStepIndex(targetStepIndex);
+    persistProgress({
+      phase: 'quiz',
+      stepId: quizSteps[targetStepIndex].id,
+      answers,
+      lastCompletedModule,
+      completedModules,
+      ui: { situationBriefDone, versusBriefDone, situationPhase: 'most' },
+    });
+  };
+
   const quitTest = useCallback(() => setConfirmKind('quit'), []);
   const retakeTest = useCallback(() => setConfirmKind('retake'), []);
 
@@ -781,6 +833,7 @@ export function OrientationDiagnosticWizard() {
         onContinue={goNext}
         onQuit={quitTest}
         onRetake={retakeTest}
+        onSelectModule={goToModule}
         continueDisabled={!canContinue}
         backDisabled={!canGoBack}
         busy={versusBuilding || reportBuilding || catalogLoading}>

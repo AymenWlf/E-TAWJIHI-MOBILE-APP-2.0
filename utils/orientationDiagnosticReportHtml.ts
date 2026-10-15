@@ -7,9 +7,13 @@ import type {
   RiasecLetter,
 } from '@/features/orientationDiagnostic/types/orientationDiagnosticPrototype';
 import {
+  localizeDiagnosticBody,
+  localizeDiagnosticLabel,
   localizeFamilyLabel,
+  localizeForceLine,
   localizeProfileSentence,
   localizeProfileTitle,
+  localizeSchoolRecoReasons,
   formatReportScorePercent,
   localizeReportPhrase,
   reportAmbitionLabel,
@@ -471,7 +475,8 @@ export function buildOrientationDiagnosticReportHtml(
   const strategie = report.ecolesStrategie ?? [];
 
   const schoolRows = topSchools
-    .map((e) => {
+    .map((raw) => {
+      const e = localizeSchoolRecoReasons(raw, uiLocale);
       const cities = e.villes?.length ? e.villes.join(' · ') : e.ville || '';
       const diplomes = (e.diplomes ?? []).slice(0, 3).join(' · ');
       const name =
@@ -479,11 +484,15 @@ export function buildOrientationDiagnosticReportHtml(
           ? `${e.sigle ? `${e.sigle} — ` : ''}${e.nom} · ${e.nomArabe.trim()}`
           : `${e.sigle ? `${e.sigle} — ` : ''}${e.nom}`;
       const meta = [
-        e.typeEcole,
+        e.typeEcole ? localizeReportPhrase(e.typeEcole, uiLocale) : null,
         e.dureeEtudes,
         diplomes,
-        e.orientationPlanLabel || (e.orientationPlan ? `Plan ${e.orientationPlan}` : null),
-        e.admissionLabel,
+        e.orientationPlanLabel
+          ? localizeReportPhrase(e.orientationPlanLabel, uiLocale)
+          : e.orientationPlan
+            ? localizeReportPhrase(`Plan ${e.orientationPlan}`, uiLocale)
+            : null,
+        e.admissionLabel ? localizeReportPhrase(e.admissionLabel, uiLocale) : null,
         e.tierLabel,
       ]
         .filter(Boolean)
@@ -570,12 +579,12 @@ export function buildOrientationDiagnosticReportHtml(
 
 <div class="section no-break">
   <h2 class="section-title">${esc(t('reportSec4'))}</h2>
-  <div class="card" style="background-color:#ecfdf5;border:1px solid #6ee7b7"><ul class="list-plain">${report.forces.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></div>
+  <div class="card" style="background-color:#ecfdf5;border:1px solid #6ee7b7"><ul class="list-plain">${report.forces.map((f) => `<li>${esc(localizeForceLine(f, uiLocale, report.dominante))}</li>`).join('')}</ul></div>
 </div>
 
 <div class="section no-break">
   <h2 class="section-title">${esc(t('reportSec5'))}</h2>
-  <div class="card" style="background-color:#fffbeb;border:1px solid #fcd34d"><ul class="list-plain">${report.vigilances.map((f) => `<li>${esc(f)}</li>`).join('')}</ul></div>
+  <div class="card" style="background-color:#fffbeb;border:1px solid #fcd34d"><ul class="list-plain">${report.vigilances.map((f) => `<li>${esc(localizeReportPhrase(f, uiLocale))}</li>`).join('')}</ul></div>
 </div>
 
 <div class="section">
@@ -584,7 +593,7 @@ export function buildOrientationDiagnosticReportHtml(
 </div>
 
 <div class="section page-break">
-  <h2 class="section-title">${isAr ? 'اختياراتك المهنية والدراسية' : 'Tes choix métiers & écoles'}</h2>
+  <h2 class="section-title">${isAr ? '7. اختياراتك المهنية والدراسية' : '7. Tes choix métiers & écoles'}</h2>
   <div class="card">
     <div class="info-grid" style="margin-bottom:10px">
       <div class="info-cell"><div class="k">${esc(t('reportStatSectors'))}</div><div class="v">${report.preferences.sectors.length}</div></div>
@@ -611,8 +620,11 @@ export function buildOrientationDiagnosticReportHtml(
   ${versusBlock}
 </div>
 
-<div class="section">
-  <h2 class="section-title">${isAr ? 'المهن الأنسب لملفك' : 'Métiers recommandés'}</h2>
+${
+  isAr
+    ? ''
+    : `<div class="section">
+  <h2 class="section-title">Métiers recommandés</h2>
   ${metierRows}
   ${
     filieres.length
@@ -628,7 +640,8 @@ export function buildOrientationDiagnosticReportHtml(
           .join('')}</ul></div>`
       : ''
   }
-</div>
+</div>`
+}
 
 ${
   topSchools.length
@@ -647,8 +660,8 @@ ${
     ${scoreBar(t('reportDiagFaisabilite'), s.faisabilite, 'bar-personality')}
   </div>
   <div class="diag-box" style="margin-top:10px">
-    <div class="label">Profil : ${esc(report.diagnosticLabel)}</div>
-    <p style="margin:0;font-size:10pt;color:#374151">${esc(report.diagnosticBody)}</p>
+    <div class="label">${isAr ? 'الملف' : 'Profil'} : ${esc(localizeDiagnosticLabel(report.diagnosticLabel, uiLocale))}</div>
+    <p style="margin:0;font-size:10pt;color:#374151">${esc(localizeDiagnosticBody(report, uiLocale))}</p>
   </div>
 </div>
 
@@ -657,27 +670,27 @@ ${
     <img src="https://cdn.e-tawjihi.ma/signature_aymen.png" alt="Signature Aymen Ouallaf" style="height:80px;width:auto;object-fit:contain;margin-bottom:10px" />
     <div>
       <p style="font-size:12px;font-weight:bold;margin:0;color:#1F2937">Aymen Ouallaf</p>
-      <p style="font-size:10px;margin:2px 0;color:#6b7280">Directeur de la plateforme</p>
+      <p style="font-size:10px;margin:2px 0;color:#6b7280">${isAr ? 'مدير المنصة' : 'Directeur de la plateforme'}</p>
       <p style="font-size:9px;margin:0;color:#9ca3af">${esc(BRAND.name)}</p>
     </div>
   </div>
   <div style="text-align:center;flex:1;margin:0 20px">
     <img src="${BRAND.logo}" alt="${esc(BRAND.name)}" style="height:80px;width:auto;margin-bottom:10px" />
-    <p style="font-size:11px;color:#6b7280;margin:5px 0">Ce rapport a été généré par la plateforme ${esc(BRAND.name)}</p>
-    <p style="font-size:10px;color:#9ca3af;margin:0">Plateforme d'orientation académique et professionnelle</p>
+    <p style="font-size:11px;color:#6b7280;margin:5px 0">${isAr ? `أُنشئ هذا التقرير عبر منصة ${esc(BRAND.name)}` : `Ce rapport a été généré par la plateforme ${esc(BRAND.name)}`}</p>
+    <p style="font-size:10px;color:#9ca3af;margin:0">${isAr ? 'منصة للتوجيه الدراسي والمهني' : "Plateforme d'orientation académique et professionnelle"}</p>
     <p style="font-size:10px;color:#d1d5db;margin:5px 0">www.${esc(BRAND.domain.toLowerCase())}</p>
     <div style="margin-top:15px">
       <div style="background-color:white;padding:8px;border-radius:6px;border:1px solid #e5e7eb;display:inline-block;margin-bottom:8px">
         <img src="${qr}" alt="QR Code Inscription" style="width:60px;height:60px" />
       </div>
-      <p style="font-size:9px;color:#6b7280;margin:2px 0">Scannez pour vous inscrire</p>
+      <p style="font-size:9px;color:#6b7280;margin:2px 0">${isAr ? 'امسح الرمز للتسجيل' : 'Scannez pour vous inscrire'}</p>
     </div>
   </div>
   <div style="display:flex;flex-direction:column;align-items:center;text-align:center;width:30%">
     <img src="https://cdn.e-tawjihi.ma/signature_fz.png" alt="Signature Responsable Orientation" style="height:80px;width:auto;object-fit:contain;margin-bottom:10px" />
     <div>
-      <p style="font-size:12px;font-weight:bold;margin:0;color:#1F2937">Responsable d'Orientation</p>
-      <p style="font-size:10px;margin:2px 0;color:#6b7280">Service d'Orientation</p>
+      <p style="font-size:12px;font-weight:bold;margin:0;color:#1F2937">${isAr ? 'مسؤول التوجيه' : "Responsable d'Orientation"}</p>
+      <p style="font-size:10px;margin:2px 0;color:#6b7280">${isAr ? 'خدمة التوجيه' : "Service d'Orientation"}</p>
       <p style="font-size:9px;margin:0;color:#9ca3af">${esc(BRAND.name)}</p>
     </div>
   </div>
@@ -685,20 +698,20 @@ ${
 
 <div style="border-top:1px solid #f3f4f6;margin:20px 0"></div>
 <div style="text-align:center;margin-top:20px">
-  <p style="font-size:10px;color:#6b7280;margin:10px 0;line-height:1.4">Ce rapport a été généré automatiquement basé sur vos réponses aux différents tests d'orientation. Il est recommandé de consulter un conseiller d'orientation pour un accompagnement personnalisé.</p>
+  <p style="font-size:10px;color:#6b7280;margin:10px 0;line-height:1.4">${isAr ? 'أُنشئ هذا التقرير تلقائياً من إجاباتك على اختبارات التوجيه. يُستحسن استشارة مستشار توجيه لمواكبة شخصية.' : "Ce rapport a été généré automatiquement basé sur vos réponses aux différents tests d'orientation. Il est recommandé de consulter un conseiller d'orientation pour un accompagnement personnalisé."}</p>
   <div style="font-size:9px;color:#9ca3af">
-    <p style="margin:5px 0">© ${new Date().getFullYear()} ${esc(BRAND.name)}. Tous droits réservés.</p>
-    <p style="margin:0">Rapport confidentiel à usage personnel uniquement</p>
+    <p style="margin:5px 0">© ${new Date().getFullYear()} ${esc(BRAND.name)}. ${isAr ? 'جميع الحقوق محفوظة.' : 'Tous droits réservés.'}</p>
+    <p style="margin:0">${isAr ? 'تقرير سري للاستعمال الشخصي فقط' : 'Rapport confidentiel à usage personnel uniquement'}</p>
   </div>
 </div>
-<div class="footer">Rapport d'Orientation - ${esc(fullName)} - ${esc(dateLabel)}</div>
+<div class="footer">${isAr ? 'تقرير التوجيه' : "Rapport d'Orientation"} - ${esc(fullName)} - ${esc(dateLabel)}</div>
 </div>`;
 
   return `<!DOCTYPE html>
 <html lang="${isAr ? 'ar' : 'fr'}" dir="${isAr ? 'rtl' : 'ltr'}">
 <head>
   <meta charset="utf-8" />
-  <title>Rapport d'Orientation - ${esc(fullName)}</title>
+  <title>${isAr ? 'تقرير التوجيه' : "Rapport d'Orientation"} - ${esc(fullName)}</title>
 </head>
 <body>${body}</body>
 </html>`;

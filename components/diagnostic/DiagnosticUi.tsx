@@ -603,6 +603,7 @@ export function DiagnosticGradeAvailabilityBlock({
   previsionnelMax,
   onPrevisionnelMinChange,
   onPrevisionnelMaxChange,
+  showPrevisionnelRange = true,
   rtl,
   locale,
   labels,

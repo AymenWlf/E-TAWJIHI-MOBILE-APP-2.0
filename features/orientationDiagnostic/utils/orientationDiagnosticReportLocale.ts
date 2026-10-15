@@ -114,16 +114,26 @@ const PHRASE_AR: Record<string, string> = {
     'القدرة على الجمع بين الطموحات الشخصية والقيود الواقعية.',
   'Ton besoin d’autonomie peut rendre les environnements très rigides (process lourds) frustrants.':
     'قد تجعلك حاجتك إلى الاستقلالية غير مرتاح في البيئات الصارمة ذات الإجراءات الكثيرة.',
+  'Ton besoin d’autonomie peut rendre les environnements très rigides frustrants.':
+    'قد تجعلك حاجتك إلى الاستقلالية غير مرتاح في البيئات الصارمة.',
   'Ton attrait pour la variété peut rendre le choix d’une spécialité difficile — cadre 2–3 familles avant de trancher.':
     'قد يصعّب حبك للتنوع اختيار تخصص واحد. حدّد عائلتين أو ثلاث عائلات مهنية قبل الحسم.',
+  'Ton attrait pour la variété peut rendre le choix d’une spécialité difficile.':
+    'قد يصعّب حبك للتنوع اختيار تخصص واحد.',
   'Tes dilemmes montrent une tolérance au risque plus élevée que ta stabilité déclarée : clarifie ce que tu es prêt(e) à accepter.':
     'تُظهر اختياراتك استعداداً أكبر للمخاطرة. حدّد بوضوح ما يمكنك قبوله.',
   'La clarté du projet est encore faible : priorise l’exploration concrète (métiers, stages, rencontres) avant les classements d’écoles.':
     'مشروعك يحتاج إلى مزيد من الوضوح. استكشف المهن والتداريب واللقاءات أولاً، ثم رتّب المدارس.',
+  'La clarté du projet est encore faible : priorise l’exploration concrète avant les classements d’écoles.':
+    'مشروعك يحتاج إلى مزيد من الوضوح. استكشف المهن أولاً، ثم رتّب المدارس.',
   'Tu vises l’impact, mais le contact humain intensif te fatigue : privilégie des rôles d’impact « analytique » ou « produit ».':
     'تريد إحداث أثر، لكن التواصل المستمر قد يتعبك. اختر أدواراً تحليلية أو مرتبطة بالمنتجات.',
+  'Tu vises l’impact, mais le contact humain intensif te fatigue : privilégie des rôles plus analytiques.':
+    'تريد إحداث أثر، لكن التواصل المستمر قد يتعبك. اختر أدواراً تحليلية.',
   'Attention à ne pas sur-optimiser le prestige d’une école avant d’avoir validé l’adéquation métier / mode de vie.':
     'لا تجعل سمعة المدرسة أهم من توافق المهنة ونمط الحياة معك.',
+  'Attention à ne pas sur-optimiser le prestige d’une école avant d’avoir validé l’adéquation métier.':
+    'لا تجعل سمعة المدرسة أهم من توافق المهنة معك.',
   'Prioriser universités publiques / CPGE / écoles à frais maîtrisés comme plan A.':
     'إعطاء الأولوية للجامعات العمومية / الأقسام التحضيرية / مدارس بتكاليف مضبوطة كخطة أ.',
   'Construire un plan A/B : 1–2 cibles ambitieuses + options accessibles budgétairement.':

@@ -1,7 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import type { ComponentProps, ReactNode } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { useEffect, useState, type ReactNode } from 'react';
+import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import {
   DiagnosticStatusBar,
@@ -22,19 +22,6 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 
 import { OrientationPickSheetHost } from './orientationPickSheetHost';
 
-const MODULE_ICONS: Record<ModuleId, ComponentProps<typeof FontAwesome>['name']> = {
-  profile: 'user',
-  context: 'compass',
-  riasec: 'heart',
-  situations: 'users',
-  functioning: 'cogs',
-  ambitions: 'rocket',
-  reality: 'map-marker',
-  careers: 'briefcase',
-  schools: 'university',
-  versus: 'random',
-};
-
 export function OrientationDiagnosticWizardShell({
   uiLocale,
   rtl,
@@ -46,6 +33,7 @@ export function OrientationDiagnosticWizardShell({
   onContinue,
   onQuit,
   onRetake,
+  onSelectModule,
   continueDisabled,
   backDisabled,
   continueLabel,
@@ -63,6 +51,7 @@ export function OrientationDiagnosticWizardShell({
   onContinue: () => void;
   onQuit: () => void;
   onRetake?: () => void;
+  onSelectModule?: (moduleId: ModuleId) => void;
   continueDisabled?: boolean;
   backDisabled?: boolean;
   continueLabel?: string;
@@ -72,6 +61,19 @@ export function OrientationDiagnosticWizardShell({
 }) {
   const doneSet = new Set(completedModules);
   const progressPct = totalSteps > 0 ? ((stepIndex + 1) / totalSteps) * 100 : 0;
+  const insets = useSafeAreaInsets();
+  const [keyboardOpen, setKeyboardOpen] = useState(false);
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+    const show = Keyboard.addListener('keyboardDidShow', () => setKeyboardOpen(true));
+    const hide = Keyboard.addListener('keyboardDidHide', () => setKeyboardOpen(false));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  /** Hauteur de la barre système Android (retour, accueil, applications). */
+  const androidNavInset = Platform.OS === 'android' && !keyboardOpen ? insets.bottom : 0;
 
   return (
     <View style={styles.safe}>
@@ -108,29 +110,63 @@ export function OrientationDiagnosticWizardShell({
         <HeroLangSwitch />
       </View>
 
-      <View style={styles.moduleTrack}>
-        {ORIENTATION_MODULE_ORDER.map((mod) => {
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.moduleScroller}
+        contentContainerStyle={[styles.moduleTrack, rtl && styles.moduleTrackRtl]}>
+        {ORIENTATION_MODULE_ORDER.map((mod, index) => {
           const done = doneSet.has(mod);
           const active = mod === currentModule;
+          const currentIndex = ORIENTATION_MODULE_ORDER.indexOf(currentModule);
+          const completedReached = Math.max(
+            -1,
+            ...ORIENTATION_MODULE_ORDER.map((id, idIndex) => (doneSet.has(id) ? idIndex : -1)),
+          );
+          const reachedIndex = Math.max(currentIndex, completedReached);
+          const canOpen = Boolean(onSelectModule) && index <= reachedIndex;
           const meta = localizeModuleMeta(mod, uiLocale);
           return (
-            <View
+            <Pressable
               key={mod}
-              style={[
-                styles.moduleDot,
-                done && styles.moduleDotDone,
-                active && styles.moduleDotActive,
-              ]}
-              accessibilityLabel={meta.label}>
-              <FontAwesome
-                name={MODULE_ICONS[mod]}
-                size={10}
-                color={active || done ? brand.white : 'rgba(255,255,255,0.55)'}
-              />
-            </View>
+              disabled={!canOpen}
+              onPress={() => onSelectModule?.(mod)}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: !canOpen, selected: active }}
+              accessibilityLabel={meta.label}
+              style={({ pressed }) => [
+                styles.moduleStep,
+                pressed && canOpen && { opacity: 0.75 },
+              ]}>
+              <View
+                style={[
+                  styles.moduleDot,
+                  done && styles.moduleDotDone,
+                  active && styles.moduleDotActive,
+                ]}>
+                <Text
+                  style={[
+                    styles.moduleDotTxt,
+                    (done || active) && styles.moduleDotTxtOn,
+                    active && styles.moduleDotTxtActive,
+                  ]}>
+                  {done && !active ? '✓' : String(index + 1)}
+                </Text>
+              </View>
+              <Text
+                style={[
+                  styles.moduleName,
+                  rtl && styles.rtlText,
+                  (done || active) && styles.moduleNameOn,
+                  active && styles.moduleNameActive,
+                ]}
+                numberOfLines={1}>
+                {meta.short}
+              </Text>
+            </Pressable>
           );
         })}
-      </View>
+      </ScrollView>
 
       <View style={styles.progressTrack}>
         <View style={[styles.progressFill, { width: `${Math.min(100, progressPct)}%` }]} />
@@ -142,7 +178,7 @@ export function OrientationDiagnosticWizardShell({
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
       <View style={styles.body}>{children}</View>
 
-      <View style={[styles.footer, rtl && styles.footerRtl]}>
+      <View style={[styles.footer, rtl && styles.footerRtl, { paddingBottom: spacing.lg + androidNavInset }]}>
         <Pressable
           onPress={onBack}
           disabled={backDisabled || busy}
@@ -241,15 +277,20 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   resetTxt: { color: brand.white, fontSize: fontSize.sm, fontWeight: '700' },
+  moduleScroller: { backgroundColor: brand.primary, flexGrow: 0 },
   moduleTrack: {
     flexDirection: 'row',
-    justifyContent: 'center',
-    flexWrap: 'wrap',
-    gap: 5,
+    alignItems: 'flex-start',
+    gap: 2,
     paddingTop: 2,
-    paddingBottom: 6,
-    paddingHorizontal: spacing.md,
-    backgroundColor: brand.primary,
+    paddingBottom: 8,
+    paddingHorizontal: spacing.sm,
+  },
+  moduleTrackRtl: { flexDirection: 'row-reverse' },
+  moduleStep: {
+    width: 68,
+    alignItems: 'center',
+    gap: 3,
   },
   moduleDot: {
     width: 22,
@@ -261,8 +302,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  moduleDotTxt: { color: 'rgba(255,255,255,0.55)', fontSize: 10, fontWeight: '800' },
+  moduleDotTxtOn: { color: brand.white },
+  moduleName: {
+    color: 'rgba(255,255,255,0.55)',
+    fontSize: 9,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  moduleNameOn: { color: brand.white },
   moduleDotDone: { backgroundColor: 'rgba(47,206,148,0.35)', borderColor: homeShell.green },
-  moduleDotActive: { backgroundColor: homeShell.green, borderColor: homeShell.green },
+  moduleDotActive: {
+    backgroundColor: brand.white,
+    borderColor: brand.white,
+    borderWidth: 2,
+  },
+  moduleDotTxtActive: { color: brand.primary },
+  moduleNameActive: { color: brand.white, fontWeight: '800' },
   progressTrack: {
     height: 4,
     backgroundColor: 'rgba(255,255,255,0.2)',

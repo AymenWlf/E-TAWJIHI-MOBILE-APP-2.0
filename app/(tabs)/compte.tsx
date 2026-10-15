@@ -58,6 +58,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { invalidateEligibilityProfileCache } from '@/hooks/useEligibilityProfile';
 import { listCities, type CityRow } from '@/services/referenceData';
+import { arabicCitySearchText } from '@/utils/moroccanCitySearch';
 import { getUserProfile, updateUserProfile, type UserProfile } from '@/services/userProfile';
 import { fetchUserOrders, type UserOrderSummary } from '@/services/userOrders';
 import {
@@ -175,6 +176,7 @@ export default function CompteTabScreen() {
         id: String(c.id),
         value: String(c.id),
         label: c.titre,
+        searchText: arabicCitySearchText(c.titre),
         subtitle: c.region?.titre,
       })),
     [cities],

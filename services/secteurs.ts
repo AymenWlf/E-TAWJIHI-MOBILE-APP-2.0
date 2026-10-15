@@ -1,6 +1,7 @@
 import { buildApiUrl } from '@/constants/api';
 import { getEstablishmentFileUrl } from '@/constants/establishmentMedia';
 import { httpGetJson } from '@/services/http';
+import { secteurTitleArByCode } from '@/utils/secteurCatalogLocale';
 
 export type SecteurCard = {
   id: number;
@@ -8,15 +9,25 @@ export type SecteurCard = {
   titreAr: string | null;
   code: string;
   description: string;
+  descriptionAr: string | null;
   image: string | null;
   imageUrl: string | null;
   softSkills: string[];
+  softSkillsAr: string[];
   personnalites: string[];
+  personnalitesAr: string[];
   bacs: string[];
+  bacsAr: string[];
   typeBacs: string[];
+  typeBacsAr: string[];
   avantages: string[];
+  avantagesAr: string[];
   inconvenients: string[];
+  inconvenientsAr: string[];
+  tendance: string | null;
+  tendanceAr: string | null;
   metiers: string[];
+  metiersLies: SecteurJobName[];
   salaireLabel: string | null;
   nbFilieres: number;
   nbEcoles: number;
@@ -29,6 +40,20 @@ export type SecteurDetail = SecteurCard & {
   status: string;
   isComplet: boolean;
 };
+
+function parseLinkedMetiers(raw: unknown): SecteurJobName[] {
+  if (!Array.isArray(raw)) return [];
+  const out: SecteurJobName[] = [];
+  for (const row of raw) {
+    if (!row || typeof row !== 'object') continue;
+    const item = row as Record<string, unknown>;
+    const nom = typeof item.nom === 'string' ? item.nom.trim() : '';
+    if (!nom) continue;
+    const arabic = typeof item.nomArabe === 'string' ? item.nomArabe.trim() : '';
+    out.push({ nom, nomArabe: arabic || null });
+  }
+  return out;
+}
 
 function asStringArray(v: unknown): string[] {
   if (!Array.isArray(v)) return [];
@@ -56,6 +81,11 @@ function normalizeSecteur(raw: Record<string, unknown>, score?: number | null): 
   const titreArRaw = raw.titreAr ?? raw.titre_ar;
   const titreAr =
     typeof titreArRaw === 'string' && titreArRaw.trim() !== '' ? titreArRaw.trim() : null;
+  const descriptionArRaw = raw.descriptionAr ?? raw.description_ar;
+  const descriptionAr =
+    typeof descriptionArRaw === 'string' && descriptionArRaw.trim() !== ''
+      ? descriptionArRaw.trim()
+      : null;
   const image = typeof raw.image === 'string' && raw.image.trim() ? raw.image.trim() : null;
   const metiers = asStringArray(raw.metiers);
   const nbMetiersRaw = raw.nbMetiers;
@@ -70,15 +100,25 @@ function normalizeSecteur(raw: Record<string, unknown>, score?: number | null): 
     titreAr,
     code: typeof raw.code === 'string' ? raw.code.trim() : '',
     description: typeof raw.description === 'string' ? raw.description : '',
+    descriptionAr,
     image,
     imageUrl: getEstablishmentFileUrl(image),
     softSkills: asStringArray(raw.softSkills),
+    softSkillsAr: asStringArray(raw.softSkillsAr),
     personnalites: asStringArray(raw.personnalites),
+    personnalitesAr: asStringArray(raw.personnalitesAr),
     bacs: asStringArray(raw.bacs),
+    bacsAr: asStringArray(raw.bacsAr),
     typeBacs: asStringArray(raw.typeBacs),
+    typeBacsAr: asStringArray(raw.typeBacsAr),
     avantages: asStringArray(raw.avantages),
+    avantagesAr: asStringArray(raw.avantagesAr),
     inconvenients: asStringArray(raw.inconvenients),
+    inconvenientsAr: asStringArray(raw.inconvenientsAr),
+    tendance: typeof raw.tendance === 'string' && raw.tendance.trim() ? raw.tendance.trim() : null,
+    tendanceAr: typeof raw.tendanceAr === 'string' && raw.tendanceAr.trim() ? raw.tendanceAr.trim() : null,
     metiers,
+    metiersLies: parseLinkedMetiers(raw.metiersLies),
     salaireLabel: formatSalaire(raw),
     nbFilieres: typeof raw.nbFilieres === 'number' ? raw.nbFilieres : 0,
     nbEcoles: typeof raw.nbEcoles === 'number' ? raw.nbEcoles : 0,
@@ -88,9 +128,54 @@ function normalizeSecteur(raw: Record<string, unknown>, score?: number | null): 
   };
 }
 
-export function pickSecteurTitle(item: Pick<SecteurCard, 'titre' | 'titreAr'>, locale: 'fr' | 'ar'): string {
-  if (locale === 'ar' && item.titreAr?.trim()) return item.titreAr.trim();
+export function pickSecteurList(
+  french: string[],
+  arabic: string[] | null | undefined,
+  locale: 'fr' | 'ar',
+): string[] {
+  if (locale === 'ar' && arabic && arabic.length > 0) return arabic;
+  return french;
+}
+
+export function pickSecteurText(
+  french: string | null | undefined,
+  arabic: string | null | undefined,
+  locale: 'fr' | 'ar',
+): string {
+  const fr = (french || '').trim();
+  const ar = (arabic || '').trim();
+  return locale === 'ar' ? ar || fr : fr;
+}
+
+export function pickSecteurTitle(
+  item: Pick<SecteurCard, 'titre' | 'titreAr'> & { code?: string | null },
+  locale: 'fr' | 'ar',
+): string {
+  if (locale === 'ar') {
+    if (item.titreAr?.trim()) return item.titreAr.trim();
+    const fallback = secteurTitleArByCode(item.code);
+    if (fallback) return fallback;
+  }
   return item.titre;
+}
+
+export type SecteurJobName = { nom: string; nomArabe: string | null };
+
+export async function fetchSecteurJobNames(secteurId: number): Promise<SecteurJobName[]> {
+  const out: SecteurJobName[] = [];
+  for (let page = 1; page <= 5; page += 1) {
+    const url = buildApiUrl('/api/metiers', { secteur: secteurId, page, limit: 100 });
+    const res = await httpGetJson<{ data?: Record<string, unknown>[] }>(url);
+    const rows = res.data ?? [];
+    for (const row of rows) {
+      const nom = typeof row.nom === 'string' ? row.nom.trim() : '';
+      if (!nom) continue;
+      const arabic = typeof row.nomArabe === 'string' ? row.nomArabe.trim() : '';
+      out.push({ nom, nomArabe: arabic || null });
+    }
+    if (rows.length < 100) break;
+  }
+  return out;
 }
 
 export async function fetchSecteursCatalog(opts?: {

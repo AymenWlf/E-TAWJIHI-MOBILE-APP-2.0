@@ -6,6 +6,7 @@ import {
   DiagnosticFieldLabel,
   DiagnosticFormBlock,
   DiagnosticGradeAvailabilityBlock,
+  DiagnosticNoteSur20Input,
   DiagnosticTextInput,
   diagnosticTheme,
 } from '@/components/diagnostic/DiagnosticUi';
@@ -15,6 +16,7 @@ import { Text } from '@/components/ui/Text';
 import { SPECIALITES_MISSION_LABELS } from '@/constants/academicSetup';
 import type { CityRow } from '@/services/referenceData';
 import { prefetchOrientationCities } from '../utils/orientationDiagnosticCatalogCache';
+import { arabicCitySearchText } from '@/utils/moroccanCitySearch';
 import { brand, fontSize, spacing } from '@/theme/tokens';
 import {
   filiereOptionsForNiveau,
@@ -118,6 +120,7 @@ export function OrientationDiagnosticProfileSteps({
         id: String(c.id),
         value: String(c.id),
         label: c.titre,
+        searchText: arabicCitySearchText(c.titre),
       })),
     [cities],
   );
@@ -382,13 +385,36 @@ export function OrientationDiagnosticProfileSteps({
               definitiveLabel={uiLocale === 'ar' ? 'المعدل العام 1ère باك' : 'Moyenne 1ère bac'}
               definitiveValue={p.noteGenerale1ereBac}
               onDefinitiveChange={(v) => onChange({ noteGenerale1ereBac: v })}
-              previsionnelMin={p.noteControleContinu}
-              previsionnelMax={p.noteNational}
-              onPrevisionnelMinChange={(v) => onChange({ noteControleContinu: v })}
-              onPrevisionnelMaxChange={(v) => onChange({ noteNational: v })}
+              previsionnelMin=""
+              previsionnelMax=""
+              onPrevisionnelMinChange={() => undefined}
+              onPrevisionnelMaxChange={() => undefined}
+              showPrevisionnelRange={false}
               rtl={rtl}
               locale={uiLocale}
             />
+            {noteAvail ? (
+              <>
+                <DiagnosticFieldLabel required rtl={rtl}>
+                  {uiLocale === 'ar' ? 'المراقبة المستمرة' : 'Contrôle continu'}
+                </DiagnosticFieldLabel>
+                <DiagnosticNoteSur20Input
+                  value={p.noteControleContinu}
+                  onChangeText={(v) => onChange({ noteControleContinu: v })}
+                  placeholder="/20"
+                  rtl={rtl}
+                />
+                <DiagnosticFieldLabel required rtl={rtl}>
+                  {uiLocale === 'ar' ? 'الوطني التوقعي' : 'National prévisionnel'}
+                </DiagnosticFieldLabel>
+                <DiagnosticNoteSur20Input
+                  value={p.noteNational}
+                  onChangeText={(v) => onChange({ noteNational: v })}
+                  placeholder="/20"
+                  rtl={rtl}
+                />
+              </>
+            ) : null}
           </>
         ) : null}
         {p.bacType === 'mission' ? (

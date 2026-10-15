@@ -7,11 +7,12 @@ import {
   Image,
   Pressable,
   ScrollView,
+  Platform,
   StyleSheet,
   View,
 } from 'react-native';
 import Animated, { FadeInDown, FadeInUp } from 'react-native-reanimated';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DiagnosticStatusBar } from '@/components/diagnostic/DiagnosticUi';
 import { AppConfirmDialog } from '@/components/ui/AppConfirmDialog';
@@ -45,7 +46,7 @@ import {
   type OrientationUiLocale,
 } from '../data/orientationDiagnosticI18n';
 import type { DiagnosticAnswers, OrientationReport, RiasecLetter } from '../types/orientationDiagnosticPrototype';
-import { studentSummaryFromAnswers } from '../utils/orientationDiagnosticEngine';
+import { mergeStudentSummary, studentSummaryFromAnswers } from '../utils/orientationDiagnosticEngine';
 import {
   localizeDiagnosticBody,
   localizeDiagnosticLabel,
@@ -58,7 +59,6 @@ import {
   reportFamilyTierLabel,
   reportFunctioningLabels,
   reportMetierBilingualLines,
-  reportPhraseBilingualLines,
 } from '../utils/orientationDiagnosticReportLocale';
 import { orientationUiLocaleFromApp } from '../utils/orientationUiLocaleFromApp';
 
@@ -89,6 +89,8 @@ const LOGO_H = 56;
 
 export function OrientationDiagnosticReportScreen() {
   const { isRTL, locale } = useLocale();
+  const insets = useSafeAreaInsets();
+  const androidNavInset = Platform.OS === 'android' ? insets.bottom : 0;
   const uiLocale = orientationUiLocaleFromApp(locale);
   const { user, getValidAccessToken } = useAuth();
   const userId = user?.id ?? null;
@@ -178,8 +180,10 @@ export function OrientationDiagnosticReportScreen() {
           profile.noteNational.trim() ||
           (sourceAnswers?.cities?.length ?? 0) > 0),
     );
-    if (hasFilledProfile && sourceAnswers) return studentSummaryFromAnswers(sourceAnswers);
-    return report?.studentSummary ?? null;
+    const live = hasFilledProfile && sourceAnswers ? studentSummaryFromAnswers(sourceAnswers) : null;
+    const stored = report?.studentSummary ?? null;
+    if (!live && !stored) return null;
+    return mergeStudentSummary(live ?? stored, stored);
   }, [report?.studentSummary, sourceAnswers]);
 
   const onDownloadPdf = useCallback(async () => {
@@ -551,72 +555,10 @@ export function OrientationDiagnosticReportScreen() {
             })}
           </Section>
 
-          <Section index={8} title={t('reportSec8')} rtl={isRTL}>
-            {report.ecolesStrategie.map((line, i) => {
-              const text = reportPhraseBilingualLines(line, uiLocale);
-              return (
-                <View key={i} style={[styles.strategyRow, isRTL && styles.rowRtl]}>
-                  <View style={styles.strategyDot} />
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        styles.bullet,
-                        text.primaryRtl ? styles.rtlText : styles.ltrText,
-                      ]}>
-                      {text.primary}
-                    </Text>
-                    {text.secondary ? (
-                      <Text
-                        style={[
-                          styles.cardMeta,
-                          text.secondaryRtl ? styles.rtlText : styles.ltrText,
-                        ]}>
-                        {text.secondary}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              );
-            })}
-            {report.filieresSuggest.length ? (
-              <View style={styles.filieresBox}>
-                <Text style={[styles.filieresLabel, isRTL && styles.rtlText]}>
-                  {uiLocale === 'ar' ? 'شعب مقترحة' : 'Filières suggérées'}
-                </Text>
-                {(() => {
-                  const french = report.filieresSuggest.join(' · ');
-                  const arabic = report.filieresSuggest
-                    .map((item) => localizeReportPhrase(item, 'ar'))
-                    .join(' · ');
-                  const primary = uiLocale === 'ar' ? arabic : french;
-                  const secondary = uiLocale === 'ar' ? french : arabic;
-                  return (
-                    <>
-                      <Text
-                        style={[
-                          styles.filieresValue,
-                          uiLocale === 'ar' ? styles.rtlText : styles.ltrText,
-                        ]}>
-                        {primary}
-                      </Text>
-                      <Text
-                        style={[
-                          styles.cardMeta,
-                          uiLocale === 'ar' ? styles.ltrText : styles.rtlText,
-                        ]}>
-                        {secondary}
-                      </Text>
-                    </>
-                  );
-                })()}
-              </View>
-            ) : null}
-          </Section>
-
           <View style={{ height: 160 }} />
         </ScrollView>
 
-        <View style={styles.ctaDock}>
+        <View style={[styles.ctaDock, { paddingBottom: spacing.md + androidNavInset }]}>
           <View style={styles.ctaFade} />
           <Pressable
             onPress={() => void onDownloadPdf()}
