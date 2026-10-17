@@ -66,7 +66,6 @@ import {
 } from '@/constants/orientationParcours';
 import { fetchPlanParcoursCompletion } from '@/services/planParcours';
 import { resetPlanParcoursStepDev } from '@/services/planReussiteSteps';
-import { useParcoursFeedback } from '@/contexts/ParcoursFeedbackContext';
 import { navigatePlanParcoursStep, type PlanParcoursNavigationAuth } from '@/utils/planParcoursNavigation';
 import { TAWJIH_PLUS_PRODUCT_PATH } from '@/constants/tawjihPlusAccess';
 import { useReloadStudentClientState, useTawjihPlusAccess } from '@/contexts/TawjihPlusAccessContext';
@@ -117,7 +116,6 @@ function HomeTabScreen() {
   const { open: openSidebar } = useAppSidebar();
   const { unreadCount: notifUnreadCount, openDrawer, refreshUnread } = useNotificationsDrawer();
   const { user, isLoading, getValidAccessToken, reloadMe } = useAuth();
-  const { openParcoursFeedback } = useParcoursFeedback();
   const {
     hasAccess: hasTawjihPlusAccess,
     loading: tawjihPlusLoading,
@@ -474,23 +472,9 @@ function HomeTabScreen() {
   const handleOrientationStep = useCallback(
     (stepId: PlanParcoursStepId) => {
       closeOrientationOverview();
-      if (stepId === PLAN_PARCOURS_STEP_IDS.feedback) {
-        guardTawjihPlusParcoursStep(stepId, tawjihPlusGate, () => {
-          openParcoursFeedback({
-            onSubmitted: () => void refreshPlanParcours(),
-          });
-        });
-        return;
-      }
       navigatePlanParcoursStep(stepId, planParcoursNavAuth, tawjihPlusGate);
     },
-    [
-      closeOrientationOverview,
-      openParcoursFeedback,
-      planParcoursNavAuth,
-      refreshPlanParcours,
-      tawjihPlusGate,
-    ],
+    [closeOrientationOverview, planParcoursNavAuth, tawjihPlusGate],
   );
 
   const loadDailyChallenge = useCallback(async () => {

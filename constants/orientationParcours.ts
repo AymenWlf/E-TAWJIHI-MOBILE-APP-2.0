@@ -20,7 +20,6 @@ export const PLAN_PARCOURS_STEP_IDS = {
   orientationDiagnostic: 'orientationDiagnostic',
   orientationReport: 'orientationReport',
   recommendation: 'recommendation',
-  feedback: 'feedback',
   applyToSchools: 'applyToSchools',
   inviteFriend: 'inviteFriend',
 } as const;
@@ -30,7 +29,6 @@ export const PLAN_PARCOURS_MOBILE_STEP_KEYS = {
   orientationDiagnostic: 'orientationDiagnostic',
   orientationReport: 'orientationReport',
   recommendation: 'recommendation',
-  feedback: 'feedback',
   applyToSchools: 'applyToSchools',
   inviteFriend: 'inviteFriend',
 } as const;
@@ -105,13 +103,6 @@ export const PLAN_PARCOURS_STEPS: readonly PlanParcoursStepDef[] = [
     icon: 'star-o',
   },
   {
-    id: PLAN_PARCOURS_STEP_IDS.feedback,
-    stepKey: PLAN_PARCOURS_STEP_IDS.feedback,
-    labelKey: 'orientationStepFeedback',
-    shortLabelKey: 'orientationStepFeedbackShort',
-    icon: 'comment-o',
-  },
-  {
     id: PLAN_PARCOURS_STEP_IDS.applyToSchools,
     stepKey: PLAN_PARCOURS_STEP_IDS.applyToSchools,
     labelKey: 'orientationStepApplyToSchools',
@@ -175,8 +166,6 @@ export function isPlanStepComplete(
       return completion.orientationReportComplete;
     case RECOMMENDATION_PARCOURS_STEP_ID:
       return isRecommendationParcoursStepComplete(completion);
-    case PLAN_PARCOURS_STEP_IDS.feedback:
-      return completion.feedbackComplete;
     case PLAN_PARCOURS_STEP_IDS.applyToSchools:
       return completion.applyToSchoolsComplete;
     case PLAN_PARCOURS_STEP_IDS.inviteFriend:
@@ -263,8 +252,6 @@ export function getPlanParcoursDevResetPayload(stepId: PlanParcoursStepId): {
         resetAccountSetup: false,
         planStepKeys: [PLAN_PARCOURS_MOBILE_STEP_KEYS.recommendation, 'schoolSelection'],
       };
-    case PLAN_PARCOURS_STEP_IDS.feedback:
-      return { resetAccountSetup: false, planStepKeys: [PLAN_PARCOURS_MOBILE_STEP_KEYS.feedback] };
     case PLAN_PARCOURS_STEP_IDS.applyToSchools:
       return { resetAccountSetup: false, planStepKeys: [PLAN_PARCOURS_MOBILE_STEP_KEYS.applyToSchools] };
     case PLAN_PARCOURS_STEP_IDS.inviteFriend:

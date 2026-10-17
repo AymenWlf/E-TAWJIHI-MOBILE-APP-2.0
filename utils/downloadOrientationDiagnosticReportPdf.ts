@@ -11,12 +11,13 @@ const A4_HEIGHT = 842;
 /** 1,5 cm, marge `@page` du rapport web. */
 const A4_MARGIN = 42;
 
-function fileName(report: OrientationReport): string {
+function fileName(report: OrientationReport, variant: 'simple' | 'detail'): string {
   const safe = (report.studentSummary.fullName || 'rapport')
     .replace(/[^\w-]+/g, '_')
     .slice(0, 40);
   const day = new Date().toISOString().slice(0, 10);
-  return `rapport_orientation_${safe}_${day}.pdf`;
+  const kind = variant === 'simple' ? 'resume' : 'rapport';
+  return `${kind}_orientation_${safe}_${day}.pdf`;
 }
 
 /**
@@ -35,9 +36,10 @@ function htmlForIosPrint(html: string): string {
 export async function downloadOrientationDiagnosticReportPdf(
   report: OrientationReport,
   uiLocale: OrientationUiLocale = 'fr',
+  variant: 'simple' | 'detail' = 'detail',
 ): Promise<void> {
-  const html = buildOrientationDiagnosticReportHtml(report, uiLocale);
-  const name = fileName(report);
+  const html = buildOrientationDiagnosticReportHtml(report, uiLocale, variant);
+  const name = fileName(report, variant);
 
   if (Platform.OS === 'ios') {
     await shareHtmlAsPdf(htmlForIosPrint(html), name, {

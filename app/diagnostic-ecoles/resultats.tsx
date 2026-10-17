@@ -141,7 +141,7 @@ function topRecommendationScore(rows: SchoolDiagnosticRecommendationItem[]): num
   return rows.reduce((max, row) => Math.max(max, Math.round(row.combinedScore || 0)), 0);
 }
 
-function BilingualParagraph({
+function LocalizedParagraph({
   fr,
   ar,
   locale,
@@ -150,26 +150,11 @@ function BilingualParagraph({
   ar: string;
   locale: 'fr' | 'ar';
 }) {
-  const primaryIsAr = locale === 'ar';
+  const isAr = locale === 'ar';
   return (
-    <View style={styles.bilingualBlock}>
-      <Text
-        style={[
-          styles.insightTxt,
-          primaryIsAr ? styles.rtlText : styles.ltrText,
-          primaryIsAr && styles.arabicFace,
-        ]}>
-        {primaryIsAr ? ar : fr}
-      </Text>
-      <Text
-        style={[
-          styles.insightSecondary,
-          primaryIsAr ? styles.secondaryUnderRtl : styles.secondaryUnderLtr,
-          !primaryIsAr && styles.arabicFace,
-        ]}>
-        {primaryIsAr ? fr : ar}
-      </Text>
-    </View>
+    <Text style={[styles.insightTxt, isAr ? styles.rtlText : styles.ltrText, isAr && styles.arabicFace]}>
+      {isAr ? ar : fr}
+    </Text>
   );
 }
 
@@ -612,7 +597,7 @@ export default function DiagnosticResultatsScreen() {
                 style={[styles.insightLabel, alignText, isRTL && styles.rtlNoTransform]}>
                 {cpy.profile}
               </Text>
-              <BilingualParagraph fr={profilePair.fr} ar={profilePair.ar} locale={reportLocale} />
+              <LocalizedParagraph fr={profilePair.fr} ar={profilePair.ar} locale={reportLocale} />
             </View>
           </View>
         ) : null}
@@ -640,7 +625,7 @@ export default function DiagnosticResultatsScreen() {
                 style={[styles.insightLabel, alignText, isRTL && styles.rtlNoTransform]}>
                 {cpy.synthesis}
               </Text>
-              <BilingualParagraph fr={GLOBAL_COMMENT_FR} ar={GLOBAL_COMMENT_AR} locale={reportLocale} />
+              <LocalizedParagraph fr={GLOBAL_COMMENT_FR} ar={GLOBAL_COMMENT_AR} locale={reportLocale} />
             </View>
           </View>
         ) : null}
@@ -1013,15 +998,6 @@ const styles = StyleSheet.create({
   followStickyCard: { marginBottom: 0 },
   rtlText: { writingDirection: 'rtl', textAlign: 'right' },
   ltrText: { writingDirection: 'ltr', textAlign: 'left' },
-  bilingualBlock: { gap: 3, alignSelf: 'stretch' },
-  insightSecondary: {
-    fontSize: fontSize.xs,
-    fontWeight: '600',
-    color: brand.textMuted,
-    lineHeight: 18,
-  },
-  secondaryUnderRtl: { writingDirection: 'ltr', textAlign: 'right' },
-  secondaryUnderLtr: { writingDirection: 'rtl', textAlign: 'left' },
   langSlot: { marginTop: 2 },
   scroll: { flex: 1, backgroundColor: '#F8FAFC' },
   scrollRtl: DIR_RTL,

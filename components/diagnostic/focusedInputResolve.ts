@@ -1,0 +1,1 @@
+export { readFocusedInput } from './focusedInputHost';

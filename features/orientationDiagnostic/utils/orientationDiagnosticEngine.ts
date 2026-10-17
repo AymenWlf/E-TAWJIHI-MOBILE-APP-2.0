@@ -13,7 +13,6 @@ import {
   isMetierSectorStepId,
   isSchoolTypeStepId,
   METIERS_PER_SECTOR_MAX,
-  ORIENTATION_DIAGNOSTIC_STEPS,
   RIASEC_LABELS,
   SCHOOLS_PER_TYPE_MAX,
 } from '../data/orientationDiagnosticQuestions';
@@ -35,7 +34,6 @@ import type {
   DiagnosticAnswers,
   FamilyReco,
   FunctioningScores,
-  Likert5,
   MetierReco,
   OrientationReport,
   RiasecLetter,
@@ -43,6 +41,17 @@ import type {
 } from '../types/orientationDiagnosticPrototype';
 
 const LETTERS: RiasecLetter[] = ['R', 'I', 'A', 'S', 'E', 'C'];
+
+let runtimeSteps: DiagnosticStep[] | null = null;
+
+/** Questions chargées depuis la définition publiée. */
+export function registerOrientationDefinitionSteps(steps: DiagnosticStep[] | null): void {
+  runtimeSteps = steps && steps.length ? steps : null;
+}
+
+export function orientationStepsFor(): DiagnosticStep[] {
+  return (runtimeSteps ?? []).filter((step) => step.active !== false);
+}
 
 function emptyRiasec(): RiasecScores {
   return { R: 0, I: 0, A: 0, S: 0, E: 0, C: 0 };
@@ -52,8 +61,9 @@ function clamp(n: number, min = 0, max = 100) {
   return Math.max(min, Math.min(max, Math.round(n)));
 }
 
-function likertTo100(v: Likert5): number {
-  return ((v - 1) / 4) * 100;
+function likertTo100(v: number): number {
+  if (v > 5) return Math.max(0, Math.min(100, v));
+  return Math.max(0, Math.min(100, ((v - 1) / 4) * 100));
 }
 
 function topCode(scores: RiasecScores, n = 3): string {
@@ -69,14 +79,14 @@ function topLetters(scores: RiasecScores): [RiasecLetter, RiasecLetter, RiasecLe
 }
 
 function optionValue(stepId: string, choiceId: string): number | undefined {
-  const step = ORIENTATION_DIAGNOSTIC_STEPS.find((s) => s.id === stepId);
+  const step = orientationStepsFor().find((s) => s.id === stepId);
   return step?.options?.find((o) => o.id === choiceId)?.value;
 }
 
 function scoreDeclared(answers: DiagnosticAnswers): RiasecScores {
   const sums = emptyRiasec();
   const counts = emptyRiasec();
-  for (const step of ORIENTATION_DIAGNOSTIC_STEPS) {
+  for (const step of orientationStepsFor()) {
     if (step.kind !== 'likert' || !step.riasecDim) continue;
     const v = answers.likert[step.id];
     if (!v) continue;
@@ -92,7 +102,7 @@ function scoreDeclared(answers: DiagnosticAnswers): RiasecScores {
 
 function scoreBehavioral(answers: DiagnosticAnswers): RiasecScores {
   const pts = emptyRiasec();
-  for (const step of ORIENTATION_DIAGNOSTIC_STEPS) {
+  for (const step of orientationStepsFor()) {
     if (step.kind !== 'situation') continue;
     const ans = answers.situations[step.id];
     if (!ans?.most || !ans?.least) continue;
@@ -980,7 +990,7 @@ export function isStepAnswered(
 ): boolean {
   const step =
     stepOverride ??
-    ORIENTATION_DIAGNOSTIC_STEPS.find((s) => s.id === stepId) ??
+    orientationStepsFor().find((s) => s.id === stepId) ??
     (isMetierSectorStepId(stepId)
       ? ({
           id: stepId,
@@ -1003,7 +1013,7 @@ export function isStepAnswered(
     case 'single':
       return Boolean(answers.single[stepId]);
     case 'likert':
-      return Boolean(answers.likert[stepId]);
+      return answers.likert[stepId] != null;
     case 'situation': {
       const s = answers.situations[stepId];
       return Boolean(s?.most && s?.least && s.most !== s.least);

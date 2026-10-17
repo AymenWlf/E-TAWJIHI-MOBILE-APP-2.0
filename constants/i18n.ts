@@ -387,8 +387,6 @@ export type HomeCopyKey =
   | 'diagnosticRecoFollowBanner'
   | 'diagnosticRecoFollowBannerDone'
   | 'practical_diagnostic_recommandations_follow_hint'
-  | 'orientationStepFeedback'
-  | 'orientationStepFeedbackShort'
   | 'appFeedbackTitle'
   | 'appFeedbackIntro'
   | 'appFeedbackEyebrow'
@@ -2179,7 +2177,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     orientationFranchisedEmpty: 'Aucune étape franchie pour le moment.',
     orientationContinueCta: 'Continuer',
     orientationSeeAllSteps: 'Voir le détail',
-    orientationStepCountLabel: '7 étapes',
+    orientationStepCountLabel: '6 étapes',
     orientationStepAccountSetup: 'Configuration du compte',
     orientationStepAccountSetupShort: 'Compte',
     orientationStepBadgeDone: 'Fait',
@@ -2230,8 +2228,6 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
       'Étape validée — vous suivez vos écoles recommandées.',
     practical_diagnostic_recommandations_follow_hint:
       'Suivez au moins 3 écoles dans la liste de recommandations.',
-    orientationStepFeedback: 'Feedback',
-    orientationStepFeedbackShort: 'Feedback',
     appFeedbackTitle: 'Votre avis sur l’application',
     appFeedbackEyebrow: 'Amélioration continue',
     appFeedbackIntro:
@@ -4145,7 +4141,7 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     orientationFranchisedEmpty: 'لا توجد خطوة مكتملة بعد.',
     orientationContinueCta: 'متابعة',
     orientationSeeAllSteps: 'عرض التفاصيل',
-    orientationStepCountLabel: '7 خطوات',
+    orientationStepCountLabel: '6 خطوات',
     orientationStepAccountSetup: 'إعداد الحساب',
     orientationStepAccountSetupShort: 'الحساب',
     orientationStepBadgeDone: 'مكتمل',
@@ -4195,8 +4191,6 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     diagnosticRecoFollowBannerDone: 'تمت الخطوة — تتابع مؤسساتك الموصى بها.',
     practical_diagnostic_recommandations_follow_hint:
       'تابع 3 مؤسسات على الأقل من قائمة التوصيات.',
-    orientationStepFeedback: 'ملاحظات',
-    orientationStepFeedbackShort: 'ملاحظات',
     appFeedbackTitle: 'رأيك في التطبيق',
     appFeedbackEyebrow: 'تحسين مستمر',
     appFeedbackIntro:

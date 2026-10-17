@@ -2,15 +2,39 @@ import { buildApiUrl } from '@/constants/api';
 import type {
   DiagnosticAnswers,
   DiagnosticStep,
+  ModuleId,
   OrientationReport,
 } from '@/features/orientationDiagnostic/types/orientationDiagnosticPrototype';
 import { httpGetJson, httpPostJson, httpPutJson } from '@/services/http';
+
+export type OrientationTestModule = {
+  code: ModuleId | string;
+  position: number;
+  active?: boolean;
+  label: string;
+  labelAr: string;
+  short: string;
+  shortAr: string;
+  duration: string;
+  durationAr: string;
+  objective: string;
+  objectiveAr: string;
+};
+
+export type OrientationTestDefinition = {
+  version: number;
+  updatedAt?: string;
+  modules: OrientationTestModule[];
+  questions: DiagnosticStep[];
+  copies?: Array<{ code: string; category: string; textFr: string; textAr: string }>;
+};
 
 export type OrientationDiagnosticServerSession = {
   id: number;
   stepId: string;
   phase: 'quiz' | 'report';
   uiLocale: string;
+  modelVersion?: '1.0' | '2.0';
   answers: DiagnosticAnswers;
   report: OrientationReport | null;
   steps: DiagnosticStep[];
@@ -23,6 +47,16 @@ type Envelope<T> = { success?: boolean; message?: string; data?: T };
 
 function authHeaders(token: string): Record<string, string> {
   return { Authorization: `Bearer ${token}` };
+}
+
+export async function fetchOrientationTestDefinition(
+  token: string,
+): Promise<OrientationTestDefinition | null> {
+  const res = await httpGetJson<Envelope<OrientationTestDefinition>>(
+    buildApiUrl('/api/orientation-diagnostic/definition'),
+    { headers: authHeaders(token) },
+  );
+  return res.data ?? null;
 }
 
 export async function fetchOrientationDiagnosticSession(

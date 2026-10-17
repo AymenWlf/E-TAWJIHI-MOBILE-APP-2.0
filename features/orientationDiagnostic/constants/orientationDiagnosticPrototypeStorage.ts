@@ -184,6 +184,7 @@ export const ORIENTATION_MODULE_ORDER: ModuleId[] = [
   'situations',
   'functioning',
   'ambitions',
+  'readiness',
   'reality',
   'careers',
   'schools',

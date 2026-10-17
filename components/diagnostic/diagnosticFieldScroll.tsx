@@ -1,5 +1,7 @@
 import { createContext, useContext, type ReactNode, type RefObject } from 'react';
-import { Platform, TextInput, type ScrollView, type View } from 'react-native';
+import { Platform, type ScrollView, type View } from 'react-native';
+
+import { readFocusedInput } from './focusedInputResolve';
 
 const DiagnosticFieldScrollContext = createContext<(() => void) | null>(null);
 
@@ -35,8 +37,8 @@ export function scrollFocusedInputIntoView(
   contentRef: RefObject<View | null>,
 ) {
   const content = contentRef.current;
-  const focused = TextInput.State.currentlyFocusedInput();
-  if (!content || !focused || typeof focused.measureLayout !== 'function') {
+  const focused = readFocusedInput();
+  if (!content || !focused) {
     return;
   }
 

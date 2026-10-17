@@ -4,8 +4,10 @@ import { localizeDisplayedStudyCities, localizeRiasecLabel, riasecCodeParts, tOd
 import type {
   FunctioningScores,
   OrientationReport,
+  OrientationSchoolReco,
   RiasecLetter,
 } from '@/features/orientationDiagnostic/types/orientationDiagnosticPrototype';
+import { partitionFacultePublique } from '@/features/orientationDiagnostic/utils/orientationFacultePubliqueGroup';
 import {
   localizeDiagnosticBody,
   localizeDiagnosticLabel,
@@ -329,6 +331,45 @@ function printSchoolLogo(logo: string | null | undefined, name: string): string 
   return `https://ui-avatars.com/api/?name=${encodeURIComponent(label || 'Ecole')}&background=333e8f&color=fff&size=128&bold=true`;
 }
 
+function schoolGroupHtml(schools: OrientationSchoolReco[], uiLocale: OrientationUiLocale): string {
+  const t = (key: string) => tOd(uiLocale, key);
+  const isAr = uiLocale === 'ar';
+  const rows = (list: OrientationSchoolReco[]) =>
+    list
+      .map((raw) => {
+        const e = localizeSchoolRecoReasons(raw, uiLocale);
+        const cities = e.villes?.length ? e.villes.join(' · ') : e.ville || '';
+        const diplomes = (e.diplomes ?? []).slice(0, 3).join(' · ');
+        const name =
+          e.nomArabe && e.nomArabe.trim() && e.nomArabe.trim() !== e.nom
+            ? `${e.sigle ? `${e.sigle} — ` : ''}${e.nom} · ${e.nomArabe.trim()}`
+            : `${e.sigle ? `${e.sigle} — ` : ''}${e.nom}`;
+        const meta = [
+          e.typeEcole ? localizeReportPhrase(e.typeEcole, uiLocale) : null,
+          e.dureeEtudes,
+          diplomes,
+          e.orientationPlanLabel
+            ? localizeReportPhrase(e.orientationPlanLabel, uiLocale)
+            : e.orientationPlan
+              ? localizeReportPhrase(`Plan ${e.orientationPlan}`, uiLocale)
+              : null,
+          e.admissionLabel ? localizeReportPhrase(e.admissionLabel, uiLocale) : null,
+          e.tierLabel,
+        ]
+          .filter(Boolean)
+          .join(' · ');
+        const logo = printSchoolLogo(e.logo, e.sigle || e.nom);
+        return `<div class="school-row avoid-break"><img class="school-logo" src="${esc(logo)}" alt="" /><div style="flex:1;min-width:0"><div style="font-weight:bold">${bilingualHtml(name)}</div>${cities ? `<div class="text-sm text-secondary" style="margin-top:2px;line-height:1.4">${esc(cities)}</div>` : ''}<div class="text-sm text-secondary" style="margin-top:2px">${esc(meta)}</div></div><strong class="text-primary">${esc(formatReportScorePercent(e.combinedScore, isAr ? 'ar' : 'fr'))}</strong></div>`;
+      })
+      .join('');
+  const { facultes, others } = partitionFacultePublique(schools);
+  const block = (title: string, list: OrientationSchoolReco[]) =>
+    list.length
+      ? `<h3 style="font-size:12pt;font-weight:bold;color:#1e40af;margin:12px 0 8px">${esc(title)}</h3>${rows(list)}`
+      : '';
+  return `${block(t('schoolGroupFacultesPubliques'), facultes)}${block(t('schoolGroupAutresEcoles'), others)}`;
+}
+
 function scoreBar(label: string, value: number, barClass: string): string {
   const pct = Math.max(0, Math.min(100, Math.round(value)));
   return `<div class="score-row"><div class="score-row-head"><span>${esc(label)}</span><strong class="text-primary">${pct}%</strong></div><div class="bar-container"><div class="bar ${barClass}" style="width:${pct}%"></div></div></div>`;
@@ -350,6 +391,7 @@ function tierText(tier: string, uiLocale: OrientationUiLocale): string {
 export function buildOrientationDiagnosticReportHtml(
   report: OrientationReport,
   uiLocale: OrientationUiLocale = 'fr',
+  variant: 'simple' | 'detail' = 'detail',
 ): string {
   const isAr = uiLocale === 'ar';
   const t = (key: string) => tOd(uiLocale, key);
@@ -363,7 +405,84 @@ export function buildOrientationDiagnosticReportHtml(
       day: 'numeric',
     });
   const fullName = report.studentSummary.fullName || 'Élève';
-  const topSchools = (report.ecolesRecommandees ?? []).slice(0, 12);
+  if (variant === 'simple') {
+    const dateLabel = formatDate();
+    const riasecNames = riasecCodeParts(s.codeConsolide, uiLocale)
+      .map((part) => `${part.letter} ${part.label}`)
+      .join(' · ');
+    const identity = (
+      [
+        [isAr ? 'الاسم الكامل' : 'Nom complet', report.studentSummary.fullName],
+        [isAr ? 'المستوى' : 'Niveau', report.studentSummary.studyLevel],
+        [isAr ? 'الباك والشعبة' : 'Bac / filière', report.studentSummary.bacLabel],
+        [isAr ? 'مدن الدراسة' : 'Villes d’études', localizeDisplayedStudyCities(report.studentSummary.city, uiLocale)],
+      ] as const
+    )
+      .map(
+        ([k, v]) =>
+          `<div class="info-cell"><div class="k">${esc(k)}</div><div class="v">${esc(v || '—')}</div></div>`,
+      )
+      .join('');
+    const bars = ordered
+      .map((letter) =>
+        scoreBar(`${letter} · ${localizeRiasecLabel(letter, uiLocale)}`, s.riasecConsolide[letter], 'bar-interest'),
+      )
+      .join('');
+    const ranked = (report.preferences?.versusRankings?.metiers ?? []).slice(0, 3).map((item) => item.label);
+    const metierLabels = ranked.length ? ranked : report.metiers.slice(0, 3).map((item) => item.label);
+    const metiers = metierLabels.length
+      ? `<div class="section no-break"><h2 class="section-title">${esc(t('reportSimpleMetiers'))}</h2><ol class="list-plain">${metierLabels
+          .map((label) => `<li>${bilingualHtml(label)}</li>`)
+          .join('')}</ol></div>`
+      : '';
+    const preferredSchools = (report.ecolesRecommandees ?? []).filter(
+      (school) => school.tier === 'recommended' || school.tier === 'possible',
+    );
+    const schools = preferredSchools.length
+      ? preferredSchools
+      : (report.ecolesRecommandees ?? []).filter((school) => school.tier !== 'avoid').slice(0, 12);
+    const schoolRows = schoolGroupHtml(schools, uiLocale);
+    const body = `<div class="print-only" dir="${isAr ? 'rtl' : 'ltr'}">
+<style>${PRINT_CSS}${isAr ? PRINT_CSS_RTL : ''}</style>
+<div class="watermark">${esc(BRAND.domain)}</div>
+<div class="header-section">
+  <div>
+    <h1 style="font-size:18pt;font-weight:bold;color:#2563eb;margin-bottom:5px">${isAr ? 'ملخص التوجيه' : "Résumé d'orientation"}</h1>
+    <p class="text-secondary">${esc(fullName)} • ${isAr ? 'أُنشئ في' : 'Généré le'} ${esc(dateLabel)}</p>
+    <p class="text-sm text-secondary" style="margin-top:4px">RIASEC ${esc(s.codeConsolide || '—')}${riasecNames ? ` · ${esc(riasecNames)}` : ''}</p>
+  </div>
+  <img src="${BRAND.logo}" alt="${esc(BRAND.domain)}" class="header-logo" />
+</div>
+<div class="section no-break">
+  <h2 class="section-title">${esc(t('reportSec0'))}</h2>
+  <div class="card" style="background-color:#eff6ff;border:1px solid #93c5fd"><div class="info-grid">${identity}</div></div>
+</div>
+<div class="section">
+  <h2 class="section-title">${esc(t('reportSimpleRiasec'))}</h2>
+  <div class="card">
+    <h3 style="font-size:13pt;font-weight:bold;color:#1e40af;margin:0 0 6px">${esc(localizeProfileTitle(report.profileTitle, uiLocale))}</h3>
+    <p style="margin:0 0 10px;font-size:10pt;color:#4b5563">${esc(localizeProfileSentence(report, uiLocale))}</p>
+    <p style="margin:0 0 10px;font-size:10pt">${esc(t('reportDominante'))} : <strong>${esc(localizeRiasecLabel(report.dominante.primary, uiLocale))}</strong> · ${esc(t('reportSecondaire'))} : <strong>${esc(localizeRiasecLabel(report.dominante.secondary, uiLocale))}</strong> · ${esc(t('reportComplementaire'))} : <strong>${esc(localizeRiasecLabel(report.dominante.tertiary, uiLocale))}</strong></p>
+    ${bars}
+  </div>
+</div>
+${metiers}
+<div class="section">
+  <h2 class="section-title">${esc(t('reportSimpleSchools'))}</h2>
+  <p class="text-sm text-secondary" style="margin-top:0">${esc(t('reportSimpleSchoolsLead'))}</p>
+  ${schoolRows || `<p>${esc(t('reportSimpleEmptySchools'))}</p>`}
+</div>
+<div class="footer">${isAr ? 'ملخص التوجيه' : "Résumé d'orientation"} - ${esc(fullName)} - ${esc(dateLabel)}</div>
+</div>`;
+    return `<!DOCTYPE html>
+<html lang="${uiLocale}" dir="${isAr ? 'rtl' : 'ltr'}">
+<head><meta charset="utf-8" /><title>${isAr ? 'ملخص التوجيه' : "Résumé d'orientation"} - ${esc(fullName)}</title></head>
+<body>${body}</body>
+</html>`;
+  }
+  const rankedSchools = report.ecolesRecommandees ?? [];
+  const schoolGroups = partitionFacultePublique(rankedSchools);
+  const topSchools = [...schoolGroups.facultes.slice(0, 12), ...schoolGroups.others.slice(0, 12)];
   const topMetiers = report.metiers.slice(0, 10);
   const dateLabel = formatDate();
   const riasecNames = riasecCodeParts(s.codeConsolide, uiLocale)
@@ -474,33 +593,7 @@ export function buildOrientationDiagnosticReportHtml(
   const filieres = report.filieresSuggest ?? [];
   const strategie = report.ecolesStrategie ?? [];
 
-  const schoolRows = topSchools
-    .map((raw) => {
-      const e = localizeSchoolRecoReasons(raw, uiLocale);
-      const cities = e.villes?.length ? e.villes.join(' · ') : e.ville || '';
-      const diplomes = (e.diplomes ?? []).slice(0, 3).join(' · ');
-      const name =
-        e.nomArabe && e.nomArabe.trim() && e.nomArabe.trim() !== e.nom
-          ? `${e.sigle ? `${e.sigle} — ` : ''}${e.nom} · ${e.nomArabe.trim()}`
-          : `${e.sigle ? `${e.sigle} — ` : ''}${e.nom}`;
-      const meta = [
-        e.typeEcole ? localizeReportPhrase(e.typeEcole, uiLocale) : null,
-        e.dureeEtudes,
-        diplomes,
-        e.orientationPlanLabel
-          ? localizeReportPhrase(e.orientationPlanLabel, uiLocale)
-          : e.orientationPlan
-            ? localizeReportPhrase(`Plan ${e.orientationPlan}`, uiLocale)
-            : null,
-        e.admissionLabel ? localizeReportPhrase(e.admissionLabel, uiLocale) : null,
-        e.tierLabel,
-      ]
-        .filter(Boolean)
-        .join(' · ');
-      const logo = printSchoolLogo(e.logo, e.sigle || e.nom);
-      return `<div class="school-row avoid-break"><img class="school-logo" src="${esc(logo)}" alt="" /><div style="flex:1;min-width:0"><div style="font-weight:bold">${bilingualHtml(name)}</div>${cities ? `<div class="text-sm text-secondary" style="margin-top:2px;line-height:1.4">${esc(cities)}</div>` : ''}<div class="text-sm text-secondary" style="margin-top:2px">${esc(meta)}</div></div><strong class="text-primary">${esc(formatReportScorePercent(e.combinedScore, isAr ? 'ar' : 'fr'))}</strong></div>`;
-    })
-    .join('');
+  const schoolRows = schoolGroupHtml(topSchools, uiLocale);
 
   const qr = `https://api.qrserver.com/v1/create-qr-code/?size=80x80&data=${encodeURIComponent(BRAND.registerUrl)}`;
 

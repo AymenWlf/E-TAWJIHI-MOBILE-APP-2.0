@@ -130,11 +130,28 @@ export function buildSecteurDetailView(
     ]),
     exemplesMetiers: s.metiersLies?.length
       ? uniq(s.metiersLies.map((job) => pickLocalizedJobName(job.nom || '', job.nomArabe, locale)).filter((name) => name.trim() !== ''))
-      : uniq((s.metiers || []).map((name) => pickLocalizedJobName(name, null, locale))),
-    nbMetiers: s.metiersLies?.length ? s.metiersLies.length : s.nbMetiers,
+      : [],
+    nbMetiers: s.metiersLies ? s.metiersLies.length : undefined,
     nbEcoles: s.nbEcoles,
     source: 'api',
   };
+}
+
+function splitMetierEntries(items: string[], mode: 'slash' | 'comma'): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  for (const item of items) {
+    const slashed = item.replace(/\\\//g, '/').split(/\s+\/\s+/);
+    const pieces = mode === 'comma' ? slashed.flatMap((part) => part.split(/\s*[,،]\s*/)) : slashed;
+    for (const piece of pieces) {
+      const text = piece.trim();
+      const key = text.toLocaleLowerCase();
+      if (!text || seen.has(key)) continue;
+      seen.add(key);
+      out.push(text);
+    }
+  }
+  return out;
 }
 
 function storedList(
@@ -209,9 +226,9 @@ export function buildMetierDetailView(
     secteurLabel: titre || undefined,
     description,
     missions: storedList(m.missions, m.missionsAr, locale),
-    competences: storedList(m.competences, m.competencesAr, locale),
-    formations: storedList(m.formations, m.formationsAr, locale),
-    debouches: storedList(m.debouches, m.debouchesAr, locale),
+    competences: splitMetierEntries(storedList(m.competences, m.competencesAr, locale), 'slash'),
+    formations: splitMetierEntries(storedList(m.formations, m.formationsAr, locale), 'slash'),
+    debouches: splitMetierEntries(storedList(m.debouches, m.debouchesAr, locale), 'comma'),
     tendance: storedText(m.tendance, m.tendanceAr, locale),
     salaireLabel: salaryFrom(null, m.salaireMin, m.salaireMax, locale),
     niveauAccessibilite: localizeAccessibilite(m.niveauAccessibilite, locale),

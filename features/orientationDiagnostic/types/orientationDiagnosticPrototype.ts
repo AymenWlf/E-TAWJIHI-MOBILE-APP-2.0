@@ -11,6 +11,7 @@ export type ModuleId =
   | 'situations'
   | 'functioning'
   | 'ambitions'
+  | 'readiness'
   | 'reality'
   | 'careers'
   | 'schools'
@@ -30,15 +31,17 @@ export type StepKind =
   | 'dynamic_schools'
   | 'profile_identity'
   | 'profile_school'
-  | 'profile_grades';
+  | 'profile_grades'
+  | 'adaptive_versus';
 
 export type ChoiceOption = {
   id: string;
   label: string;
   /** Mapping RIASEC optionnel (situations, etc.) */
   riasec?: RiasecLetter;
-  /** Score dimension fonctionnement / ambition */
+  /** Score dimension fonctionnement / ambition, ou valeur Likert 0–100 */
   value?: number;
+  labelAr?: string;
   /** Meta école (Versus / sélection) */
   orientationPlan?: 'A' | 'B' | 'C' | 'D' | null;
   admissionType?: string | null;
@@ -88,6 +91,15 @@ export type PreferenceSchool = {
   versusRank?: number | null;
 };
 
+export type OrientationScoring = {
+  axis: string;
+  dimension: string;
+  aggregation?: string;
+  weight?: number;
+  situationMost?: number;
+  situationLeast?: number;
+};
+
 export type DiagnosticStep = {
   id: string;
   module: ModuleId;
@@ -114,6 +126,13 @@ export type DiagnosticStep = {
   schoolType?: string;
   /** Clé multi associée (ex. sch_ecoles__public) */
   schoolTypeKey?: string;
+  position?: number;
+  active?: boolean;
+  titleAr?: string;
+  subtitleAr?: string;
+  leftLabelAr?: string;
+  rightLabelAr?: string;
+  scoring?: OrientationScoring;
 };
 
 export type SituationAnswer = { most: string; least: string };
@@ -121,7 +140,9 @@ export type SituationAnswer = { most: string; least: string };
 export type DiagnosticAnswers = {
   /** stepId → réponse */
   single: Record<string, string>;
-  likert: Record<string, Likert5>;
+  likert: Record<string, number>;
+  /** 1.0 conserve l’ancien moteur. 2.0 sépare RIASEC, fonctionnement, readiness et faisabilité. */
+  modelVersion?: '1.0' | '2.0';
   situations: Record<string, SituationAnswer>;
   multi: Record<string, string[]>;
   sliders: Record<string, number>; // 0–100
@@ -276,6 +297,29 @@ export type OrientationReport = {
   diagnosticLabel: string;
   diagnosticBody: string;
   moteursOrdered: { key: keyof AmbitionScores; label: string; score: number }[];
+  modelVersion?: '1.0' | '2.0';
+  v2?: {
+    readiness: { concern: number; control: number; curiosity: number; confidence: number; score: number };
+    reliabilityScore: number;
+    reliabilityNotes: string[];
+    balancedProfile: boolean;
+    profileTitleAr?: string;
+    profileSentenceAr?: string;
+    diagnosticLabel: string;
+    diagnosticBody: string;
+    careerScores: Array<{
+      id: string;
+      label: string;
+      personalFit: number | null;
+      functioningFit: number | null;
+      aspirationFit: number | null;
+      feasibility: number;
+      global: number | null;
+      declaredInterest: 'fort' | 'moyen' | 'faible';
+      accessLabel: string;
+    }>;
+    constraints?: { salaryPreference?: string };
+  };
   /** Choix explicites de l’étudiant (modules métiers / écoles / versus) */
   preferences: {
     sectors: string[];

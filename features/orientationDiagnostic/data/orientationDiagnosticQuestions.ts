@@ -41,6 +41,12 @@ export const MODULE_META: Record<
     duration: '~1,5 min',
     objective: 'Identifier tes moteurs professionnels',
   },
+  readiness: {
+    label: 'Mon projet',
+    short: 'Projet',
+    duration: '~1 min',
+    objective: 'Mesurer où en est ton projet d’orientation',
+  },
   reality: {
     label: 'Ma réalité & dilemmes',
     short: 'Réalité',
@@ -781,15 +787,19 @@ export function buildSchoolStepsForTypes(
  * Étapes du quiz hors Versus : remplace les placeholders
  * `car_metiers` (par secteur) et `sch_ecoles` (par type).
  */
-export function buildOrientationCoreSteps(answers: {
-  multi: Record<string, string[]>;
-  labels?: Record<string, string>;
-}): import('../types/orientationDiagnosticPrototype').DiagnosticStep[] {
+export function buildOrientationCoreSteps(
+  answers: {
+    multi: Record<string, string[]>;
+    labels?: Record<string, string>;
+  },
+  sourceSteps: import('../types/orientationDiagnosticPrototype').DiagnosticStep[] = [],
+): import('../types/orientationDiagnosticPrototype').DiagnosticStep[] {
   const sectorIds = answers.multi.car_secteurs ?? [];
   const schoolTypes = answers.multi.sch_types ?? [];
   const labels = answers.labels ?? {};
   const out: import('../types/orientationDiagnosticPrototype').DiagnosticStep[] = [];
-  for (const step of ORIENTATION_DIAGNOSTIC_STEPS) {
+  for (const step of sourceSteps) {
+    if (step.active === false) continue;
     if (step.id === 'car_metiers') {
       if (sectorIds.length) {
         out.push(...buildMetierStepsForSectors(sectorIds, labels));

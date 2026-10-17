@@ -101,6 +101,8 @@ export type AccountOrientationPrefill = {
   studyLevel?: string | null;
   bacType?: string | null;
   filiere?: string | null;
+  city?: string | null;
+  cityId?: string | null;
 };
 
 function mapAccountBacType(raw: string | null | undefined): string {
@@ -143,6 +145,9 @@ export function withAccountOrientationPrefill(
     if (!bacType) bacType = 'marocain';
   }
 
+  const cityId = current.cityId.trim() ? current.cityId : (account.cityId ?? '').trim();
+  const city = current.city.trim() ? current.city : (account.city ?? '').trim();
+
   if (
     firstName === current.firstName &&
     lastName === current.lastName &&
@@ -150,6 +155,8 @@ export function withAccountOrientationPrefill(
     studyLevel === current.studyLevel &&
     bacType === current.bacType &&
     bacFiliere === current.bacFiliere &&
+    cityId === current.cityId &&
+    city === current.city &&
     profile
   ) {
     return profile.bacSpecialites ? profile : current;
@@ -163,6 +170,8 @@ export function withAccountOrientationPrefill(
     studyLevel,
     bacType,
     bacFiliere,
+    cityId,
+    city,
   };
 }
 

@@ -15,7 +15,6 @@ import {
 import {
   establishmentAcceptsBacFiliere,
   extractVersusSignals,
-  schoolMatchesProfile,
   VERSUS_FACULTES_PUBLIQUES_ID,
 } from './orientationDiagnosticVersus';
 import {
@@ -792,7 +791,7 @@ async function loadEstablishmentsForReco(): Promise<Establishment[]> {
 }
 
 /**
- * Charge les écoles actives et les classe
+ * Classe toutes les écoles actives
  * avec les mêmes paliers que le diagnostic mobile (sans IA).
  */
 export async function buildSchoolRecommendations(
@@ -805,7 +804,6 @@ export async function buildSchoolRecommendations(
   const payload = answersToSchoolMatchPayload(answers, lookup);
 
   return list
-    .filter((e) => schoolMatchesProfile(e, answers))
     .map((e) => withTier(scoreEstablishment(payload, e)))
     .filter((r) => r.establishmentId > 0)
     .sort((a, b) => {

@@ -288,7 +288,9 @@ export function OrientationDiagnosticStepContent({
     const opts = (displayStep.options ?? []).map((opt) => ({
       id: opt.id,
       label:
-        uiLocale === 'ar' ? RIASEC_LIKERT_AR[opt.id] ?? opt.label : opt.label,
+        uiLocale === 'ar'
+          ? opt.labelAr || RIASEC_LIKERT_AR[opt.id] || opt.label
+          : opt.label,
     }));
     const selectedId =
       answers.likert[step.id] != null ? String(answers.likert[step.id]) : undefined;
@@ -314,8 +316,8 @@ export function OrientationDiagnosticStepContent({
     return (
       <View style={styles.gap}>
         {opts.map((opt) => {
-          const val = Number(opt.id) as Likert5;
-          const on = answers.likert[step.id] === val;
+          const val = Number(opt.id);
+          const on = answers.likert[step.id] != null && Number(answers.likert[step.id]) === val;
           return (
             <DiagnosticChoiceRow
               key={opt.id}

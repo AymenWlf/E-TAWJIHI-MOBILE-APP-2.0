@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ActivityIndicator, Keyboard, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -26,6 +26,7 @@ export function OrientationDiagnosticWizardShell({
   uiLocale,
   rtl,
   currentModule,
+  moduleOrder = ORIENTATION_MODULE_ORDER,
   completedModules,
   stepIndex,
   totalSteps,
@@ -44,6 +45,7 @@ export function OrientationDiagnosticWizardShell({
   uiLocale: OrientationUiLocale;
   rtl?: boolean;
   currentModule: ModuleId;
+  moduleOrder?: ModuleId[];
   completedModules: ModuleId[];
   stepIndex: number;
   totalSteps: number;
@@ -61,6 +63,27 @@ export function OrientationDiagnosticWizardShell({
 }) {
   const doneSet = new Set(completedModules);
   const progressPct = totalSteps > 0 ? ((stepIndex + 1) / totalSteps) * 100 : 0;
+  const moduleScrollRef = useRef<ScrollView>(null);
+  const moduleViewportWidth = useRef(0);
+  const moduleFrames = useRef<Partial<Record<ModuleId, { x: number; width: number }>>>({});
+
+  const revealCurrentModule = (animated: boolean) => {
+    const frame = moduleFrames.current[currentModule];
+    const viewport = moduleViewportWidth.current;
+    if (!frame || viewport <= 0) {
+      if (rtl) moduleScrollRef.current?.scrollToEnd({ animated });
+      return;
+    }
+    const x = rtl
+      ? Math.max(0, frame.x + frame.width - viewport + spacing.sm)
+      : Math.max(0, frame.x - spacing.sm);
+    moduleScrollRef.current?.scrollTo({ x, animated });
+  };
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => revealCurrentModule(false));
+    return () => cancelAnimationFrame(frame);
+  }, [currentModule, rtl, moduleOrder]);
   const insets = useSafeAreaInsets();
   const [keyboardOpen, setKeyboardOpen] = useState(false);
   useEffect(() => {
@@ -111,20 +134,23 @@ export function OrientationDiagnosticWizardShell({
       </View>
 
       <ScrollView
+        ref={moduleScrollRef}
         horizontal
         showsHorizontalScrollIndicator={false}
         style={styles.moduleScroller}
-        contentContainerStyle={[styles.moduleTrack, rtl && styles.moduleTrackRtl]}>
-        {ORIENTATION_MODULE_ORDER.map((mod, index) => {
+        contentContainerStyle={[styles.moduleTrack, rtl && styles.moduleTrackRtl]}
+        onLayout={(event) => {
+          moduleViewportWidth.current = event.nativeEvent.layout.width;
+          revealCurrentModule(false);
+        }}
+        onContentSizeChange={() => revealCurrentModule(false)}>
+        {moduleOrder.map((mod, index) => {
           const done = doneSet.has(mod);
           const active = mod === currentModule;
-          const currentIndex = ORIENTATION_MODULE_ORDER.indexOf(currentModule);
-          const completedReached = Math.max(
-            -1,
-            ...ORIENTATION_MODULE_ORDER.map((id, idIndex) => (doneSet.has(id) ? idIndex : -1)),
-          );
-          const reachedIndex = Math.max(currentIndex, completedReached);
-          const canOpen = Boolean(onSelectModule) && index <= reachedIndex;
+          const currentIndex = moduleOrder.indexOf(currentModule);
+          const firstGap = moduleOrder.findIndex((id) => !doneSet.has(id));
+          const frontier = firstGap < 0 ? moduleOrder.length - 1 : Math.max(firstGap, currentIndex);
+          const canOpen = Boolean(onSelectModule) && (done || index <= frontier);
           const meta = localizeModuleMeta(mod, uiLocale);
           return (
             <Pressable
@@ -134,6 +160,11 @@ export function OrientationDiagnosticWizardShell({
               accessibilityRole="button"
               accessibilityState={{ disabled: !canOpen, selected: active }}
               accessibilityLabel={meta.label}
+              onLayout={(event) => {
+                const { x, width } = event.nativeEvent.layout;
+                moduleFrames.current[mod] = { x, width };
+                if (mod === currentModule) revealCurrentModule(false);
+              }}
               style={({ pressed }) => [
                 styles.moduleStep,
                 pressed && canOpen && { opacity: 0.75 },
@@ -168,7 +199,7 @@ export function OrientationDiagnosticWizardShell({
         })}
       </ScrollView>
 
-      <View style={styles.progressTrack}>
+      <View style={[styles.progressTrack, rtl && styles.progressTrackRtl]}>
         <View style={[styles.progressFill, { width: `${Math.min(100, progressPct)}%` }]} />
       </View>
       </SafeAreaView>
@@ -313,20 +344,22 @@ const styles = StyleSheet.create({
   moduleNameOn: { color: brand.white },
   moduleDotDone: { backgroundColor: 'rgba(47,206,148,0.35)', borderColor: homeShell.green },
   moduleDotActive: {
-    backgroundColor: brand.white,
-    borderColor: brand.white,
+    backgroundColor: brand.warning,
+    borderColor: '#FDE68A',
     borderWidth: 2,
   },
-  moduleDotTxtActive: { color: brand.primary },
-  moduleNameActive: { color: brand.white, fontWeight: '800' },
+  moduleDotTxtActive: { color: '#78350F' },
+  moduleNameActive: { color: '#FDE68A', fontWeight: '800' },
   progressTrack: {
     height: 4,
+    flexDirection: 'row',
     backgroundColor: 'rgba(255,255,255,0.2)',
     marginHorizontal: spacing.md,
     marginBottom: 6,
     borderRadius: 2,
     overflow: 'hidden',
   },
+  progressTrackRtl: { flexDirection: 'row-reverse' },
   progressFill: { height: '100%', backgroundColor: brand.white },
   avoid: { flex: 1 },
   body: { flex: 1, paddingHorizontal: spacing.md },

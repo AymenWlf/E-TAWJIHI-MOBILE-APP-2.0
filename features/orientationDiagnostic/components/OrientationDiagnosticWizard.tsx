@@ -1,7 +1,7 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { router, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Keyboard, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, AppState, Keyboard, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { DiagnosticStepHeader } from '@/components/diagnostic/DiagnosticUi';
 import {
@@ -17,6 +17,7 @@ import { postPlanReussiteStep } from '@/services/planReussiteSteps';
 import {
   fetchOrientationDiagnosticServerReport,
   fetchOrientationDiagnosticSession,
+  fetchOrientationTestDefinition,
   resetOrientationDiagnosticSession,
   saveOrientationDiagnosticStep,
 } from '@/services/orientationDiagnosticSession';
@@ -37,6 +38,15 @@ import {
   type AccountOrientationPrefill,
 } from '../data/orientationDiagnosticProfile';
 import { buildOrientationCoreSteps } from '../data/orientationDiagnosticQuestions';
+import { applyOrientationV2 } from '../utils/orientationDiagnosticEngineV2';
+import { registerOrientationDefinitionSteps } from '../utils/orientationDiagnosticEngine';
+import {
+  lastContiguousModule,
+  modulesFullyAnswered,
+  publishedModuleOrder,
+  publishedTestModules,
+  publishedTestSteps,
+} from '../utils/orientationPublishedDefinition';
 import { localizeModuleMeta, localizeStep, tOd } from '../data/orientationDiagnosticI18n';
 import type { DiagnosticAnswers } from '../types/orientationDiagnosticPrototype';
 import {
@@ -73,8 +83,52 @@ function orientationAnswersScore(answers: DiagnosticAnswers | null | undefined):
   return filled + (profile.bacSpecialites?.length ?? 0) + (answers?.cities?.length ?? 0);
 }
 
-function richerOrientationAnswers(current: DiagnosticAnswers, pending: DiagnosticAnswers): DiagnosticAnswers {
-  return orientationAnswersScore(current) >= orientationAnswersScore(pending) ? current : pending;
+function orientationProgressScore(answers: DiagnosticAnswers | null | undefined): number {
+  if (!answers) return 0;
+  const multi = Object.values(answers.multi || {}).reduce((sum, ids) => sum + (ids?.length ?? 0), 0);
+  return (
+    orientationAnswersScore(answers) +
+    Object.keys(answers.single || {}).length +
+    Object.keys(answers.likert || {}).length +
+    Object.keys(answers.situations || {}).length +
+    multi
+  );
+}
+
+function stepIdAliases(stepId: string): string[] {
+  if (stepId === 'prof_identity' || stepId === 'profile_identity') {
+    return ['prof_identity', 'profile_identity'];
+  }
+  return [stepId];
+}
+
+/** Reprend l’étape enregistrée, sinon la première question encore sans réponse. */
+function quizAnswerCount(answers: DiagnosticAnswers | null | undefined): number {
+  if (!answers) return 0;
+  const multi = Object.values(answers.multi || {}).reduce((sum, ids) => sum + (ids?.length ?? 0), 0);
+  return (
+    Object.keys(answers.single || {}).length +
+    Object.keys(answers.likert || {}).length +
+    Object.keys(answers.situations || {}).length +
+    multi +
+    (answers.cities?.length ?? 0)
+  );
+}
+
+function findResumeStepIndex(
+  steps: DiagnosticStep[],
+  stepId: string | null | undefined,
+  answers: DiagnosticAnswers,
+): number {
+  const pending = steps.findIndex((item) => !isStepAnswered(item.id, answers, item));
+  const pendingIndex = pending >= 0 ? pending : Math.max(0, steps.length - 1);
+  if (!stepId) return pendingIndex;
+  const aliases = stepIdAliases(stepId);
+  const exact = steps.findIndex((item) => aliases.includes(item.id));
+  if (exact < 0) return pendingIndex;
+  const saved = steps[exact];
+  if (saved && isStepAnswered(saved.id, answers, saved) && pendingIndex > exact) return pendingIndex;
+  return exact;
 }
 
 export function OrientationDiagnosticWizard() {
@@ -100,44 +154,64 @@ export function OrientationDiagnosticWizard() {
   const [lastCompletedModule, setLastCompletedModule] = useState<ModuleId | null>(null);
   const [completedModules, setCompletedModules] = useState<ModuleId[]>([]);
   const [confirmKind, setConfirmKind] = useState<'quit' | 'retake' | null>(null);
-  const [remoteSteps, setRemoteSteps] = useState<DiagnosticStep[] | null>(null);
+  const [definitionSteps, setDefinitionSteps] = useState<DiagnosticStep[] | null>(null);
+  const [definitionStatus, setDefinitionStatus] = useState<'loading' | 'ready' | 'error'>('loading');
+  const [definitionRetry, setDefinitionRetry] = useState(0);
+  const [moduleOrder, setModuleOrder] = useState<ModuleId[]>(ORIENTATION_MODULE_ORDER);
+  const modelVersionRef = useRef<'1.0' | '2.0'>('2.0');
+  const userJumpedRef = useRef(false);
+  const quizLiveRef = useRef(false);
   const [accountPrefill, setAccountPrefill] = useState<AccountOrientationPrefill | null>(null);
+  const [profileFetchDone, setProfileFetchDone] = useState(false);
+  const [profilePrefillReady, setProfilePrefillReady] = useState(false);
   const pendingAccountPersist = useRef<DiagnosticAnswers | null>(null);
   const resumedRef = useRef(false);
   const uiLocaleRef = useRef(uiLocale);
   uiLocaleRef.current = uiLocale;
   /** Étape affichée : empêche une liste serveur incomplète de renvoyer au début. */
   const heldStepIdRef = useRef<string | null>(null);
+  const answersRef = useRef(answers);
+  answersRef.current = answers;
 
   const persistProgress = useCallback(
     (patch: Partial<OrientationDiagnosticPrototypeDraft> & { answers: DiagnosticAnswers }) => {
-      void persistOrientationDiagnosticPrototypeDraft({
-        userId,
-        phase: patch.phase ?? 'quiz',
-        stepId: patch.stepId ?? 'profile_identity',
-        lastCompletedModule: patch.lastCompletedModule ?? lastCompletedModule,
-        completedModules: patch.completedModules ?? completedModules,
-        answers: patch.answers,
-        ui: {
-          situationBriefDone: patch.ui?.situationBriefDone ?? situationBriefDone,
-          versusBriefDone: patch.ui?.versusBriefDone ?? versusBriefDone,
-          situationPhase: patch.ui?.situationPhase ?? situationPhase,
-        },
-        uiLocale,
-        report: patch.report ?? null,
-        reportParcoursSynced: patch.reportParcoursSynced,
-      });
+      const savedAnswers = {
+        ...patch.answers,
+        modelVersion: patch.answers.modelVersion ?? modelVersionRef.current,
+      };
       void (async () => {
+        const existing = await readOrientationDiagnosticPrototypeDraft(userId);
+        const wouldWipeQuiz =
+          (patch.phase ?? 'quiz') !== 'report' &&
+          existing?.phase === 'quiz' &&
+          quizAnswerCount(existing.answers) > 0 &&
+          quizAnswerCount(savedAnswers) === 0;
+        if (wouldWipeQuiz) return;
+        await persistOrientationDiagnosticPrototypeDraft({
+          userId,
+          phase: patch.phase ?? 'quiz',
+          stepId: patch.stepId ?? heldStepIdRef.current ?? 'profile_identity',
+          lastCompletedModule: patch.lastCompletedModule ?? lastCompletedModule,
+          completedModules: patch.completedModules ?? completedModules,
+          answers: savedAnswers,
+          ui: {
+            situationBriefDone: patch.ui?.situationBriefDone ?? situationBriefDone,
+            versusBriefDone: patch.ui?.versusBriefDone ?? versusBriefDone,
+            situationPhase: patch.ui?.situationPhase ?? situationPhase,
+          },
+          uiLocale,
+          report: patch.report ?? null,
+          reportParcoursSynced: patch.reportParcoursSynced,
+        });
         const token = await getValidAccessToken();
         if (!token) return;
-        const session = await saveOrientationDiagnosticStep(token, {
-          stepId: patch.stepId ?? 'prof_identity',
+        await saveOrientationDiagnosticStep(token, {
+          stepId: patch.stepId ?? heldStepIdRef.current ?? 'profile_identity',
           phase: patch.phase === 'report' ? 'report' : 'quiz',
           uiLocale: uiLocaleRef.current,
-          answers: patch.answers,
+          answers: savedAnswers,
           clientUpdatedAt: new Date().toISOString(),
         });
-        if (session?.steps?.length) setRemoteSteps(session.steps);
       })().catch(() => undefined);
     },
     [
@@ -153,10 +227,12 @@ export function OrientationDiagnosticWizard() {
   );
 
   useEffect(() => {
+    if (quizLiveRef.current && !forceFreshRef.current) return;
     let cancelled = false;
     void (async () => {
       if (forceFreshRef.current) {
         forceFreshRef.current = false;
+        userJumpedRef.current = false;
         const freshAnswers = emptyAnswers();
         await clearOrientationDiagnosticPrototypeDraft(userId);
         const freshToken = await getValidAccessToken();
@@ -165,7 +241,6 @@ export function OrientationDiagnosticWizard() {
         }
         await clearOrientationDiagnosticPrototypeDraft(userId);
         if (cancelled) return;
-        setRemoteSteps(null);
         setAnswers(freshAnswers);
         setStepIndex(0);
         setRestoreStepId(null);
@@ -175,7 +250,7 @@ export function OrientationDiagnosticWizard() {
         setLastCompletedModule(null);
         setCompletedModules([]);
         resumedRef.current = false;
-        const firstId = buildOrientationCoreSteps({ multi: {}, labels: {} })[0]?.id || 'prof_identity';
+        const firstId = 'profile_identity';
         await persistOrientationDiagnosticPrototypeDraft({
           userId,
           phase: 'quiz',
@@ -195,21 +270,24 @@ export function OrientationDiagnosticWizard() {
       if (token) {
         try {
           const server = await fetchOrientationDiagnosticSession(token);
-          const localTime = draft?.savedAt ? Date.parse(draft.savedAt) : 0;
-          const serverTime = server?.updatedAt ? Date.parse(server.updatedAt) : 0;
-          const serverHasAnswers = Boolean(server && Object.keys(server.answers || {}).length > 0);
-          if (server && serverHasAnswers && serverTime >= localTime && !cancelled) {
-            if (server.steps?.length) setRemoteSteps(server.steps);
+          const localScore = orientationProgressScore(draft?.answers);
+          const serverScore = orientationProgressScore(server?.answers);
+          const serverHasAnswers = serverScore > 0;
+          const useServer = Boolean(server && serverHasAnswers && (serverScore > localScore || !draft?.answers));
+          if (useServer && server && !cancelled) {
+            if (server.modelVersion === '1.0' || server.modelVersion === '2.0') {
+              modelVersionRef.current = server.modelVersion;
+            }
             const restored = { ...emptyAnswers(), ...server.answers };
             setAnswers(restored);
             await persistOrientationDiagnosticPrototypeDraft({
               userId,
               phase: server.phase,
               stepId: server.stepId,
-              lastCompletedModule: null,
-              completedModules: [],
+              lastCompletedModule: draft?.lastCompletedModule ?? null,
+              completedModules: draft?.completedModules ?? [],
               answers: restored,
-              ui: { situationBriefDone: false, versusBriefDone: false, situationPhase: 'most' },
+              ui: draft?.ui ?? { situationBriefDone: false, versusBriefDone: false, situationPhase: 'most' },
               uiLocale: uiLocaleRef.current,
               report: server.report,
             });
@@ -230,9 +308,6 @@ export function OrientationDiagnosticWizard() {
               answers: draft.answers,
               clientUpdatedAt: draft.savedAt || new Date().toISOString(),
             })
-              .then((session) => {
-                if (session?.steps?.length) setRemoteSteps(session.steps);
-              })
               .catch(() => undefined);
           }
         } catch {
@@ -259,7 +334,7 @@ export function OrientationDiagnosticWizard() {
       if (!cancelled) {
         const fresh = emptyAnswers();
         setAnswers(fresh);
-        const firstId = buildOrientationCoreSteps({ multi: {}, labels: {} })[0]?.id || 'profile_identity';
+        const firstId = 'profile_identity';
         void persistOrientationDiagnosticPrototypeDraft({
           userId,
           phase: 'quiz',
@@ -278,32 +353,77 @@ export function OrientationDiagnosticWizard() {
     };
   }, [userId, getValidAccessToken]);
 
+  useEffect(() => {
+    let alive = true;
+    let keepReady = false;
+    setDefinitionStatus((status) => {
+      keepReady = status === 'ready';
+      return status === 'ready' ? status : 'loading';
+    });
+    void (async () => {
+      const token = await getValidAccessToken();
+      if (!token) {
+        if (alive) {
+          registerOrientationDefinitionSteps(null);
+          setDefinitionSteps(null);
+          setDefinitionStatus('error');
+        }
+        return;
+      }
+      try {
+        const definition = await fetchOrientationTestDefinition(token);
+        if (!alive) return;
+        const steps = definition ? publishedTestSteps(definition) : [];
+        if (!steps.length) {
+          if (!keepReady) {
+            registerOrientationDefinitionSteps(null);
+            setDefinitionSteps(null);
+            setDefinitionStatus('error');
+          }
+          return;
+        }
+        registerOrientationDefinitionSteps(steps);
+        setDefinitionSteps(steps);
+        const order = publishedModuleOrder(publishedTestModules(definition!, steps));
+        if (order.length) setModuleOrder(order);
+        setDefinitionStatus('ready');
+      } catch {
+        if (!alive || keepReady) return;
+        registerOrientationDefinitionSteps(null);
+        setDefinitionSteps(null);
+        setDefinitionStatus('error');
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [getValidAccessToken, definitionRetry]);
+
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => {
+      if (next === 'active') setDefinitionRetry((count) => count + 1);
+    });
+    return () => sub.remove();
+  }, []);
+
   const coreSteps = useMemo(
-    () => buildOrientationCoreSteps(answers),
-    [answers.multi.car_secteurs, answers.multi.sch_types, answers.labels],
+    () => (definitionSteps ? buildOrientationCoreSteps(answers, definitionSteps) : []),
+    [definitionSteps, answers.multi.car_secteurs, answers.multi.sch_types, answers.labels],
   );
   const localQuizSteps = useMemo(
     () => [...coreSteps, ...versusPlanToSteps(answers.versusPlan ?? [])],
     [coreSteps, answers.versusPlan],
   );
-  const anchorStepId = restoreStepId || heldStepIdRef.current;
-  const quizSteps = useMemo(() => {
-    if (!remoteSteps?.length) return localQuizSteps;
-    if (
-      anchorStepId &&
-      !remoteSteps.some((item) => item.id === anchorStepId) &&
-      localQuizSteps.some((item) => item.id === anchorStepId)
-    ) {
-      return localQuizSteps;
-    }
-    return remoteSteps;
-  }, [remoteSteps, localQuizSteps, anchorStepId]);
-  const versusStart = remoteSteps?.findIndex((item) => item.kind === 'versus') ?? -1;
-  const coreStepsCount = remoteSteps?.length
-    ? versusStart >= 0
-      ? versusStart
-      : remoteSteps.length
-    : coreSteps.length;
+  const quizSteps = useMemo(
+    () => (definitionSteps?.length ? localQuizSteps : []),
+    [definitionSteps, localQuizSteps],
+  );
+  const versusStart = quizSteps.findIndex((item) => item.kind === 'versus');
+  const coreStepsCount = versusStart >= 0 ? versusStart : quizSteps.length;
+  const answeredModuleIds = useMemo(
+    () => modulesFullyAnswered(moduleOrder, quizSteps, answers),
+    [moduleOrder, quizSteps, answers],
+  );
   const totalSteps = Math.max(quizSteps.length, coreStepsCount);
   const step = quizSteps[stepIndex];
   if (restoreStepId) heldStepIdRef.current = restoreStepId;
@@ -313,8 +433,10 @@ export function OrientationDiagnosticWizard() {
     let alive = true;
     void (async () => {
       const token = await getValidAccessToken();
+      if (!alive) return;
       if (!token) {
-        if (alive) setAccountPrefill(null);
+        setAccountPrefill(null);
+        setProfileFetchDone(true);
         return;
       }
       try {
@@ -327,6 +449,8 @@ export function OrientationDiagnosticWizard() {
           studyLevel: profile?.niveau,
           bacType: profile?.bacType,
           filiere: profile?.filiere,
+          city: profile?.ville?.titre,
+          cityId: profile?.ville?.id != null ? String(profile.ville.id) : '',
         });
       } catch {
         if (!alive) return;
@@ -336,6 +460,7 @@ export function OrientationDiagnosticWizard() {
           phone: user?.phone,
         });
       }
+      if (alive) setProfileFetchDone(true);
     })();
     return () => {
       alive = false;
@@ -343,24 +468,28 @@ export function OrientationDiagnosticWizard() {
   }, [user?.id, user?.phone, user?.firstName, user?.lastName, getValidAccessToken]);
 
   useEffect(() => {
-    if (booting || !accountPrefill) return;
-    setAnswers((prev) => {
-      const profile = withAccountOrientationPrefill(prev.profile, accountPrefill);
-      if (profile === prev.profile) return prev;
-      const next = { ...prev, profile };
-      pendingAccountPersist.current = next;
-      return next;
-    });
-  }, [booting, accountPrefill, answers.profile]);
+    if (booting || !profileFetchDone) return;
+    if (accountPrefill) {
+      setAnswers((prev) => {
+        const profile = withAccountOrientationPrefill(prev.profile, accountPrefill);
+        if (profile === prev.profile) return prev;
+        const next = { ...prev, profile };
+        pendingAccountPersist.current = next;
+        return next;
+      });
+    }
+    setProfilePrefillReady(true);
+  }, [booting, profileFetchDone, accountPrefill, answers.profile]);
 
   useEffect(() => {
     const next = pendingAccountPersist.current;
     if (!next || booting || restoreStepId) return;
     pendingAccountPersist.current = null;
+    const latest = answersRef.current;
     persistProgress({
       phase: 'quiz',
-      stepId: step?.id || heldStepIdRef.current || 'prof_identity',
-      answers: richerOrientationAnswers(answers, next),
+      stepId: step?.id || heldStepIdRef.current || 'profile_identity',
+      answers: { ...latest, profile: next.profile ?? latest.profile },
       lastCompletedModule,
     });
   }, [answers.profile, booting, step?.id, lastCompletedModule, persistProgress]);
@@ -399,13 +528,12 @@ export function OrientationDiagnosticWizard() {
     Boolean(step?.kind === 'versus') && stepIndex === firstVersusIndex && !versusBriefDone;
 
   useEffect(() => {
+    if (userJumpedRef.current) return;
+    if (definitionStatus !== 'ready') return;
     if (!restoreStepId || !quizSteps.length) return;
-    const idx = quizSteps.findIndex((s) => s.id === restoreStepId);
-    // Liste pas encore reconstruite (secteur / métier / école) : attendre, ne pas revenir au début.
-    if (idx < 0) return;
-    setStepIndex(idx);
+    setStepIndex(findResumeStepIndex(quizSteps, restoreStepId, answers));
     setRestoreStepId(null);
-  }, [quizSteps, restoreStepId]);
+  }, [quizSteps, restoreStepId, definitionStatus, answers]);
 
   useEffect(() => {
     if (restoreStepId) return;
@@ -430,7 +558,12 @@ export function OrientationDiagnosticWizard() {
     async (ans: DiagnosticAnswers) => {
       setReportBuilding(true);
       try {
-        let report = buildOrientationReport(ans);
+        const stamped = {
+          ...ans,
+          modelVersion: ans.modelVersion ?? modelVersionRef.current,
+        };
+        let report = buildOrientationReport(stamped);
+        if (stamped.modelVersion === '2.0') report = applyOrientationV2(report, stamped);
         const ecolesRecommandees = await buildSchoolRecommendations(ans);
         report = { ...report, ecolesRecommandees };
         const tokenForReport = await getValidAccessToken();
@@ -440,7 +573,7 @@ export function OrientationDiagnosticWizard() {
               stepId: 'report',
               phase: 'report',
               uiLocale: uiLocaleRef.current,
-              answers: ans,
+              answers: stamped,
               clientUpdatedAt: new Date().toISOString(),
             });
             const remote = await fetchOrientationDiagnosticServerReport(tokenForReport);
@@ -460,13 +593,14 @@ export function OrientationDiagnosticWizard() {
         } catch {
           /* le CTA rapport pourra retenter la sync */
         }
+        const doneModules = modulesFullyAnswered(moduleOrder, quizSteps, stamped);
         await persistOrientationDiagnosticPrototypeDraft({
           userId,
           phase: 'report',
           stepId: 'report',
-          lastCompletedModule: 'versus',
-          completedModules: completedModulesUpTo('versus'),
-          answers: ans,
+          lastCompletedModule: lastContiguousModule(moduleOrder, doneModules),
+          completedModules: doneModules,
+          answers: stamped,
           ui: { situationBriefDone, versusBriefDone, situationPhase: 'most' },
           uiLocale: uiLocaleRef.current,
           report,
@@ -481,7 +615,7 @@ export function OrientationDiagnosticWizard() {
         setReportBuilding(false);
       }
     },
-    [getValidAccessToken, situationBriefDone, versusBriefDone, uiLocale, userId],
+    [getValidAccessToken, moduleOrder, quizSteps, situationBriefDone, versusBriefDone, uiLocale, userId],
   );
 
   const enterVersusModule = useCallback(async () => {
@@ -526,17 +660,15 @@ export function OrientationDiagnosticWizard() {
       setVersusBriefDone(false);
       setStepIndex(coreStepsCount);
       const versusFirstId = versusPlanToSteps(merged.versusPlan ?? [])[0]?.id || 'versus';
-      const doneMods = completedModulesUpTo(completedModule, [
-        ...completedModulesUpTo(lastCompletedModule),
-        completedModule,
-      ]);
-      setLastCompletedModule(completedModule);
+      const doneMods = modulesFullyAnswered(moduleOrder, quizSteps, merged);
+      const doneLast = lastContiguousModule(moduleOrder, doneMods);
+      setLastCompletedModule(doneLast);
       setCompletedModules(doneMods);
       persistProgress({
         phase: 'quiz',
         stepId: versusFirstId,
         answers: merged,
-        lastCompletedModule: completedModule,
+        lastCompletedModule: doneLast,
         completedModules: doneMods,
         ui: { versusBriefDone: false, situationBriefDone, situationPhase: 'most' },
       });
@@ -552,7 +684,9 @@ export function OrientationDiagnosticWizard() {
     coreStepsCount,
     finishWithReport,
     lastCompletedModule,
+    moduleOrder,
     persistProgress,
+    quizSteps,
     situationBriefDone,
     step?.module,
     uiLocale,
@@ -619,25 +753,22 @@ export function OrientationDiagnosticWizard() {
     const nextIndex = stepIndex + 1;
     const nextStep = quizSteps[nextIndex];
     const crossedModule = Boolean(nextStep && nextStep.module !== step.module);
+    userJumpedRef.current = true;
+    setRestoreStepId(null);
     setSituationPhase('most');
     setStepIndex(nextIndex);
-    let nextLast = lastCompletedModule;
-    let nextCompleted = completedModules;
-    if (crossedModule) {
-      nextLast = step.module;
-      nextCompleted = completedModulesUpTo(step.module, [
-        ...completedModulesUpTo(lastCompletedModule),
-        step.module,
-      ]);
-      setLastCompletedModule(nextLast);
-      setCompletedModules(nextCompleted);
+    const nextCompleted = modulesFullyAnswered(moduleOrder, quizSteps, answers);
+    const nextLast = lastContiguousModule(moduleOrder, nextCompleted);
+    if (crossedModule && nextCompleted.includes(step.module)) {
       setModuleFlash(tOd(uiLocale, 'moduleSaved'));
     }
+    setLastCompletedModule(nextLast);
+    setCompletedModules(nextCompleted);
     persistProgress({
       phase: 'quiz',
       stepId: nextStep?.id || step.id,
       answers,
-      lastCompletedModule: crossedModule ? step.module : lastCompletedModule,
+      lastCompletedModule: nextLast,
       completedModules: nextCompleted,
       ui: { situationBriefDone, versusBriefDone, situationPhase: 'most' },
     });
@@ -678,6 +809,8 @@ export function OrientationDiagnosticWizard() {
 
   const goPrev = () => {
     if (!canGoBack) return;
+    userJumpedRef.current = true;
+    setRestoreStepId(null);
     if (showSituationBrief) {
       setStepIndex((i) => i - 1);
       setSituationPhase('most');
@@ -719,19 +852,16 @@ export function OrientationDiagnosticWizard() {
 
   const goToModule = (moduleId: ModuleId) => {
     if (versusBuilding || reportBuilding || catalogLoading || !step) return;
-    const currentReached = ORIENTATION_MODULE_ORDER.indexOf(step.module);
-    const savedReached = lastCompletedModule
-      ? ORIENTATION_MODULE_ORDER.indexOf(lastCompletedModule)
-      : -1;
-    const completedReached = Math.max(
-      -1,
-      ...completedModules.map((id) => ORIENTATION_MODULE_ORDER.indexOf(id)),
-    );
-    const reachedIndex = Math.max(currentReached, savedReached, completedReached);
-    const targetIndex = ORIENTATION_MODULE_ORDER.indexOf(moduleId);
-    if (targetIndex < 0 || reachedIndex < 0 || targetIndex > reachedIndex) return;
+    const currentIndex = moduleOrder.indexOf(step.module);
+    const firstGap = moduleOrder.findIndex((id) => !answeredModuleIds.includes(id));
+    const openIndex = firstGap < 0 ? moduleOrder.length - 1 : Math.max(firstGap, currentIndex);
+    const targetIndex = moduleOrder.indexOf(moduleId);
+    const reopened = answeredModuleIds.includes(moduleId);
+    if (targetIndex < 0 || (targetIndex > openIndex && !reopened)) return;
     const targetStepIndex = quizSteps.findIndex((item) => item.module === moduleId);
     if (targetStepIndex < 0 || targetStepIndex === stepIndex) return;
+    userJumpedRef.current = true;
+    setRestoreStepId(null);
     setSituationPhase('most');
     setStepIndex(targetStepIndex);
     persistProgress({
@@ -760,7 +890,6 @@ export function OrientationDiagnosticWizard() {
     void (async () => {
       const fresh = emptyAnswers();
       await clearOrientationDiagnosticPrototypeDraft(userId);
-      setRemoteSteps(null);
       const token = await getValidAccessToken();
       if (token) {
         await resetOrientationDiagnosticSession(token).catch(() => undefined);
@@ -779,7 +908,7 @@ export function OrientationDiagnosticWizard() {
       setCompletedModules([]);
       resumedRef.current = false;
       const firstId =
-        buildOrientationCoreSteps({ multi: {}, labels: {} })[0]?.id || 'profile_identity';
+        'profile_identity';
       await persistOrientationDiagnosticPrototypeDraft({
         userId,
         phase: 'quiz',
@@ -803,13 +932,36 @@ export function OrientationDiagnosticWizard() {
     return () => sub.remove();
   }, []);
 
-  if (booting || !step || !displayStep) {
+  if (booting || definitionStatus === 'loading' || !profilePrefillReady) {
     return (
       <View style={styles.boot}>
         <ActivityIndicator size="large" color={brand.primary} />
+        <Text style={styles.bootLabel}>{tOd(uiLocale, 'btnLoading')}</Text>
       </View>
     );
   }
+
+  if (definitionStatus !== 'ready' || !step || !displayStep) {
+    return (
+      <View style={styles.boot}>
+        <Text style={styles.errorTitle}>{tOd(uiLocale, 'testLoadError')}</Text>
+        <Pressable
+          onPress={() => setDefinitionRetry((count) => count + 1)}
+          style={styles.errorBtn}
+          accessibilityRole="button">
+          <Text style={styles.errorBtnTxt}>{tOd(uiLocale, 'testLoadRetry')}</Text>
+        </Pressable>
+        <Pressable
+          onPress={() => router.replace('/(tabs)' as never)}
+          style={styles.errorBtnGhost}
+          accessibilityRole="button">
+          <Text style={styles.errorBtnGhostTxt}>{tOd(uiLocale, 'testLoadHome')}</Text>
+        </Pressable>
+      </View>
+    );
+  }
+
+  quizLiveRef.current = true;
 
   const subtitle =
     showSituationBrief || showVersusBrief
@@ -826,7 +978,8 @@ export function OrientationDiagnosticWizard() {
         uiLocale={uiLocale}
         rtl={isRTL}
         currentModule={step.module}
-        completedModules={completedModules}
+        moduleOrder={moduleOrder}
+        completedModules={answeredModuleIds}
         stepIndex={stepIndex}
         totalSteps={totalSteps}
         onBack={goPrev}
@@ -924,7 +1077,13 @@ export function OrientationDiagnosticWizard() {
 }
 
 const styles = StyleSheet.create({
-  boot: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: brand.backgroundSoft },
+  boot: { flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: brand.backgroundSoft, padding: spacing.lg, gap: spacing.md },
+  bootLabel: { fontSize: fontSize.sm, fontWeight: '700', color: brand.textMuted, textAlign: 'center' },
+  errorTitle: { fontSize: fontSize.md, fontWeight: '800', color: brand.primary, textAlign: 'center' },
+  errorBtn: { backgroundColor: brand.primary, borderRadius: 14, paddingVertical: 12, paddingHorizontal: 22 },
+  errorBtnTxt: { color: brand.white, fontWeight: '800' },
+  errorBtnGhost: { paddingVertical: 10, paddingHorizontal: 18 },
+  errorBtnGhostTxt: { color: brand.primary, fontWeight: '800' },
   scrollView: { flex: 1 },
   scroll: { paddingTop: 8, paddingBottom: spacing.sm, gap: 6 },
   moduleBanner: {

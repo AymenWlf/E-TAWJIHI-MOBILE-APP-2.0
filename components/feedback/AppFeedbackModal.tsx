@@ -39,7 +39,6 @@ import {
   type AppFeedbackTextKey,
   type AppFeedbackTexts,
 } from '@/constants/appFeedback';
-import { PLAN_PARCOURS_MOBILE_STEP_KEYS } from '@/constants/orientationParcours';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { submitParcoursAppFeedback } from '@/services/parcoursAppFeedback';
@@ -289,7 +288,7 @@ export function AppFeedbackModal({
       });
 
       if (markParcoursStep) {
-        await completePlanParcoursStep(token, PLAN_PARCOURS_MOBILE_STEP_KEYS.feedback);
+        await completePlanParcoursStep(token, 'feedback');
       }
 
       setThanks(true);

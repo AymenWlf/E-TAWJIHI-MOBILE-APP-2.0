@@ -47,7 +47,7 @@ function completionFromSteps(
     recommendationComplete:
       recommendationStepMarked && followCount >= RECOMMENDATION_FOLLOW_MIN_COUNT,
     recommendationFollowCount: followCount,
-    feedbackComplete: stepBool(steps, PLAN_PARCOURS_MOBILE_STEP_KEYS.feedback),
+    feedbackComplete: stepBool(steps, 'feedback'),
     applyToSchoolsComplete: stepBool(steps, PLAN_PARCOURS_MOBILE_STEP_KEYS.applyToSchools),
     inviteFriendComplete: inviteFriendQualifiedCount >= INVITE_FRIEND_QUALIFIED_MIN_COUNT,
     inviteFriendQualifiedCount,

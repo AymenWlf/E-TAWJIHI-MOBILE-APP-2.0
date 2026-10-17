@@ -30,6 +30,10 @@ import {
 } from '@/services/orientationDiagnosticSession';
 import { postPlanReussiteStep } from '@/services/planReussiteSteps';
 import { homeShell } from '@/theme/homeShell';
+import {
+  fallbackEstablishmentAvatarName,
+  getEstablishmentLogoUrl,
+} from '@/constants/establishmentMedia';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { downloadOrientationDiagnosticReportPdf } from '@/utils/downloadOrientationDiagnosticReportPdf';
 import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
@@ -43,6 +47,7 @@ import {
   localizeRiasecLabel,
   riasecCodeParts,
   tOd,
+  tOdFill,
   type OrientationUiLocale,
 } from '../data/orientationDiagnosticI18n';
 import type { DiagnosticAnswers, OrientationReport, RiasecLetter } from '../types/orientationDiagnosticPrototype';
@@ -55,12 +60,84 @@ import {
   localizeProfileSentence,
   localizeProfileTitle,
   localizeReportPhrase,
+  localizeTierLabel,
   reportAmbitionLabel,
   reportFamilyTierLabel,
   reportFunctioningLabels,
   reportMetierBilingualLines,
 } from '../utils/orientationDiagnosticReportLocale';
 import { orientationUiLocaleFromApp } from '../utils/orientationUiLocaleFromApp';
+import { partitionFacultePublique } from '../utils/orientationFacultePubliqueGroup';
+import {
+  groupSchoolRecosByTier,
+  ORIENTATION_SCHOOL_TIER_ORDER,
+} from '../utils/orientationDiagnosticSchoolReco';
+
+const GAP_NOTE = /Écart d’environ (\d+) points.*sur ([RIASEC])\.?$/;
+
+function OrientationV2ScorePanel({
+  report,
+  uiLocale,
+  isRTL,
+}: {
+  report: OrientationReport;
+  uiLocale: OrientationUiLocale;
+  isRTL: boolean;
+}) {
+  const v2 = report.v2;
+  if (report.modelVersion !== '2.0' || !v2) return null;
+  const ar = uiLocale === 'ar';
+  const gaps = v2.reliabilityNotes
+    .map((note) => {
+      const match = note.match(GAP_NOTE);
+      return match ? { points: Number(match[1]), letter: match[2] } : null;
+    })
+    .filter((item): item is { points: number; letter: string } => item != null);
+  const bars = [
+    [ar ? 'الاهتمام' : 'Préoccupation', v2.readiness.concern],
+    [ar ? 'التحكم' : 'Contrôle', v2.readiness.control],
+    [ar ? 'الفضول' : 'Curiosité', v2.readiness.curiosity],
+    [ar ? 'الثقة' : 'Confiance', v2.readiness.confidence],
+  ] as const;
+  return (
+    <View style={styles.v2Card}>
+      <Text style={[styles.cardTitle, isRTL && styles.rtlText]}>
+        {ar ? 'قراءة النموذج 2.0' : 'Lecture du modèle 2.0'}
+      </Text>
+      <Text style={[styles.lead, isRTL && styles.rtlText]}>
+        {ar
+          ? 'الاهتمامات، أسلوب العمل، الجاهزية والولوج تُقرأ كل واحدة على حدة.'
+          : 'Intérêts, fonctionnement, readiness et accès se lisent chacun à part.'}
+      </Text>
+      <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText]}>
+        {ar ? 'الجاهزية' : 'Readiness'} {Math.round(v2.readiness.score)} %
+      </Text>
+      {bars.map(([label, value]) => (
+        <View key={label} style={styles.v2Bar}>
+          <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>{label}</Text>
+          <View style={styles.barTrack}>
+            <View style={[styles.barFill, { width: `${Math.max(4, Math.min(100, value))}%`, backgroundColor: brand.primary }]} />
+          </View>
+          <Text style={styles.barPct} latinDigits>{Math.round(value)}</Text>
+        </View>
+      ))}
+      <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText]}>
+        {ar ? 'الموثوقية' : 'Fiabilité'} {Math.round(v2.reliabilityScore)} %
+      </Text>
+      {gaps.length ? (
+        gaps.map((gap) => (
+          <Text key={gap.letter} style={[styles.cardMeta, isRTL && styles.rtlText]}>
+            {gap.letter} · {ar ? `فارق ${gap.points} نقطة` : `${gap.points} pts d’écart déclaré / comportemental`}
+          </Text>
+        ))
+      ) : (
+        <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>
+          {ar ? 'لا يوجد فارق ملحوظ بين الطبقتين.' : 'Pas d’écart marqué entre les deux lectures RIASEC.'}
+        </Text>
+      )}
+    </View>
+  );
+}
 
 const RIASEC_LETTERS: RiasecLetter[] = ['R', 'I', 'A', 'S', 'E', 'C'];
 const RIASEC_COLORS: Record<RiasecLetter, string> = {
@@ -101,6 +178,10 @@ export function OrientationDiagnosticReportScreen() {
   const [marking, setMarking] = useState(false);
   const [pdfBusy, setPdfBusy] = useState(false);
   const [retakeConfirmVisible, setRetakeConfirmVisible] = useState(false);
+  const [reading, setReading] = useState<'simple' | 'detail'>('simple');
+  const [facultesOpen, setFacultesOpen] = useState(false);
+  const [visibleFacultes, setVisibleFacultes] = useState(6);
+  const [visibleOthers, setVisibleOthers] = useState(6);
 
   useEffect(() => {
     let cancelled = false;
@@ -183,16 +264,17 @@ export function OrientationDiagnosticReportScreen() {
     const live = hasFilledProfile && sourceAnswers ? studentSummaryFromAnswers(sourceAnswers) : null;
     const stored = report?.studentSummary ?? null;
     if (!live && !stored) return null;
-    return mergeStudentSummary(live ?? stored, stored);
+    return mergeStudentSummary(live ?? stored!, stored);
   }, [report?.studentSummary, sourceAnswers]);
 
-  const onDownloadPdf = useCallback(async () => {
+  const onDownloadPdf = useCallback(async (variant: 'simple' | 'detail' = 'detail') => {
     if (!report || pdfBusy) return;
     setPdfBusy(true);
     try {
       await downloadOrientationDiagnosticReportPdf(
         identitySummary ? { ...report, studentSummary: identitySummary } : report,
         uiLocale,
+        variant,
       );
     } catch {
       Alert.alert(
@@ -235,6 +317,31 @@ export function OrientationDiagnosticReportScreen() {
   const scores = report.scores.riasecConsolide;
   const fnLabels = reportFunctioningLabels(uiLocale);
   const s = report.scores;
+  const orderedSimpleSchools = [
+    ...(report.ecolesRecommandees ?? []).filter(
+      (school) => school.tier === 'recommended' || school.tier === 'possible',
+    ),
+    ...(report.ecolesRecommandees ?? []).filter(
+      (school) => school.tier !== 'recommended' && school.tier !== 'possible',
+    ),
+  ];
+  const { facultes: simpleFacultes, others: simpleOthers } = partitionFacultePublique(orderedSimpleSchools);
+  const simpleGroups = [
+    {
+      key: 'facultes',
+      title: t('schoolGroupFacultesPubliques'),
+      items: simpleFacultes,
+      visible: visibleFacultes,
+      loadMore: () => setVisibleFacultes((count) => count + 6),
+    },
+    {
+      key: 'others',
+      title: t('schoolGroupAutresEcoles'),
+      items: simpleOthers,
+      visible: visibleOthers,
+      loadMore: () => setVisibleOthers((count) => count + 6),
+    },
+  ];
 
   const identityItems = [
     { label: t('reportKvEleve'), value: identitySummary?.fullName },
@@ -371,6 +478,150 @@ export function OrientationDiagnosticReportScreen() {
             />
           </Animated.View>
 
+          <View style={[styles.readRow, isRTL && styles.rowRtl]}>
+            <Text style={[styles.readLabel, isRTL && styles.rtlText]}>{t('reportReadLabel')}</Text>
+            <View style={[styles.readToggle, isRTL && styles.rowRtl]}>
+              <Pressable
+                onPress={() => setReading('simple')}
+                style={[styles.readBtn, reading === 'simple' && styles.readBtnOn]}
+                accessibilityRole="button">
+                <Text style={[styles.readBtnTxt, reading === 'simple' && styles.readBtnTxtOn]}>
+                  {t('reportReadSimple')}
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => setReading('detail')}
+                style={[styles.readBtn, reading === 'detail' && styles.readBtnOn]}
+                accessibilityRole="button">
+                <Text style={[styles.readBtnTxt, reading === 'detail' && styles.readBtnTxtOn]}>
+                  {t('reportReadDetail')}
+                </Text>
+              </Pressable>
+            </View>
+          </View>
+
+          {reading === 'simple' ? (
+            <>
+              <Text style={[styles.lead, isRTL && styles.rtlText]}>{t('reportSimpleLead')}</Text>
+              <Section index={0} title={t('reportSec0')} rtl={isRTL}>
+                <View style={styles.kvGrid}>
+                  {identityItems.map((item) => (
+                    <View key={item.label} style={styles.kvCard}>
+                      <Text style={[styles.kvLabel, isRTL && styles.rtlText]}>{item.label}</Text>
+                      <Text style={[styles.kvValue, isRTL && styles.rtlText]}>{item.value}</Text>
+                    </View>
+                  ))}
+                </View>
+              </Section>
+              <Section index={1} title={t('reportSimpleRiasec')} rtl={isRTL}>
+                <Text style={[styles.lead, isRTL && styles.rtlText]}>
+                  {t('reportDominante')} : {localizeRiasecLabel(report.dominante.primary, uiLocale)}
+                  {' · '}
+                  {t('reportSecondaire')} : {localizeRiasecLabel(report.dominante.secondary, uiLocale)}
+                </Text>
+                <View style={styles.barsBlock}>
+                  {RIASEC_LETTERS.map((L) => (
+                    <View key={L} style={[styles.barRow, isRTL && styles.rowRtl]}>
+                      <View style={[styles.letterBadge, { backgroundColor: RIASEC_COLORS[L] }]}>
+                        <Text style={styles.letterBadgeTxt}>{L}</Text>
+                      </View>
+                      <Text style={[styles.barLabel, isRTL && styles.rtlText]}>
+                        {localizeRiasecLabel(L, uiLocale)}
+                      </Text>
+                      <View style={styles.barTrack}>
+                        <View
+                          style={[
+                            styles.barFill,
+                            { width: `${scores[L]}%`, backgroundColor: RIASEC_COLORS[L] },
+                          ]}
+                        />
+                      </View>
+                      <Text style={styles.barPct} latinDigits>
+                        {scores[L]}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+              </Section>
+              <Section index={2} title={t('reportSimpleMetiers')} rtl={isRTL}>
+                {report.metiers.slice(0, 3).map((m, i) => (
+                  <View key={m.id} style={[styles.rankRow, isRTL && styles.rowRtl]}>
+                    <Text style={styles.rank} latinDigits>
+                      {i + 1}
+                    </Text>
+                    <Text style={[styles.cardTitle, isRTL && styles.rtlText]}>{m.label}</Text>
+                  </View>
+                ))}
+              </Section>
+              <Section index={3} title={t('reportSimpleSchools')} rtl={isRTL}>
+                <Text style={[styles.lead, isRTL && styles.rtlText]}>{t('reportSimpleSchoolsLead')}</Text>
+                {simpleFacultes.length + simpleOthers.length === 0 ? (
+                  <Text style={[styles.lead, isRTL && styles.rtlText]}>{t('reportSimpleEmptySchools')}</Text>
+                ) : (
+                  simpleGroups.map((group) =>
+                    group.items.length ? (
+                      <View
+                        key={group.key}
+                        style={[styles.simpleGroup, group.key === 'facultes' && styles.simpleFacultes]}>
+                        {group.key === 'facultes' ? (
+                          <Pressable
+                            onPress={() => setFacultesOpen((open) => !open)}
+                            style={[styles.simpleAccordion, isRTL && styles.rowRtl]}
+                            accessibilityRole="button"
+                            accessibilityState={{ expanded: facultesOpen }}>
+                            <View style={{ flex: 1, gap: 2 }}>
+                              <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText]}>{group.title}</Text>
+                              <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>
+                                {facultesOpen ? t('schoolGroupFacultesOpen') : t('schoolGroupFacultesPubliquesHint')}
+                              </Text>
+                            </View>
+                            <Text style={styles.simpleAccordionMeta}>
+                              {tOdFill(uiLocale, 'schoolGroupFacultesPubliquesCount', { n: group.items.length })}{' '}
+                              {facultesOpen ? '▴' : '▾'}
+                            </Text>
+                          </Pressable>
+                        ) : (
+                          <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText]}>{group.title}</Text>
+                        )}
+                        {group.key === 'facultes' && !facultesOpen ? (
+                          <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>{t('schoolGroupFacultesClosed')}</Text>
+                        ) : null}
+                        {(group.key !== 'facultes' || facultesOpen) && group.items.slice(0, group.visible).map((school) => {
+                          const logo =
+                            getEstablishmentLogoUrl(school.logo) ||
+                            fallbackEstablishmentAvatarName(school.nom, school.sigle);
+                          return (
+                            <View key={school.establishmentId} style={[styles.simpleSchool, isRTL && styles.rowRtl]}>
+                              <Image source={{ uri: logo }} style={styles.simpleSchoolLogo} resizeMode="contain" />
+                              <View style={{ flex: 1, gap: 2 }}>
+                                <Text style={[styles.cardTitle, isRTL && styles.rtlText]}>
+                                  {school.sigle ? `${school.sigle} — ${school.nom}` : school.nom}
+                                </Text>
+                                {school.nomArabe ? (
+                                  <Text style={[styles.cardMeta, styles.rtlText]}>{school.nomArabe}</Text>
+                                ) : null}
+                                <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>{school.ville}</Text>
+                              </View>
+                              <Text style={styles.simpleSchoolTier}>{localizeTierLabel(school.tier, uiLocale)}</Text>
+                            </View>
+                          );
+                        })}
+                        {(group.key !== 'facultes' || facultesOpen) && group.visible < group.items.length ? (
+                          <Pressable
+                            onPress={group.loadMore}
+                            style={styles.simpleMore}
+                            accessibilityRole="button">
+                            <Text style={styles.simpleMoreTxt}>{t('reportLoadMoreSchools')}</Text>
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    ) : null,
+                  )
+                )}
+              </Section>
+            </>
+          ) : (
+          <>
           <Section index={0} title={t('reportSec0')} rtl={isRTL}>
             <View style={styles.kvGrid}>
               {identityItems.map((item) => (
@@ -432,6 +683,8 @@ export function OrientationDiagnosticReportScreen() {
               ))}
             </View>
           </Section>
+
+          <OrientationV2ScorePanel report={report} uiLocale={uiLocale} isRTL={isRTL} />
 
           <Section index={2} title={t('reportSec2')} rtl={isRTL}>
             <View style={styles.radarGrid}>
@@ -555,25 +808,95 @@ export function OrientationDiagnosticReportScreen() {
             })}
           </Section>
 
-          <View style={{ height: 160 }} />
+          <Section index={8} title={t('reportSec9')} rtl={isRTL}>
+            {(() => {
+              const schools = report.ecolesRecommandees ?? [];
+              const { facultes, others } = partitionFacultePublique(schools);
+              const buckets = groupSchoolRecosByTier(others);
+              if (!schools.length) {
+                return <Text style={[styles.lead, isRTL && styles.rtlText]}>{t('reportSimpleEmptySchools')}</Text>;
+              }
+              return (
+                <>
+                  {facultes.length ? (
+                    <View style={styles.simpleGroup}>
+                      <Pressable
+                        onPress={() => setFacultesOpen((open) => !open)}
+                        style={[styles.simpleAccordion, isRTL && styles.rowRtl]}
+                        accessibilityRole="button"
+                        accessibilityState={{ expanded: facultesOpen }}>
+                        <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText, { flex: 1 }]}>
+                          {t('schoolGroupFacultesPubliques')}
+                        </Text>
+                        <Text style={styles.simpleAccordionMeta}>
+                          {tOdFill(uiLocale, 'schoolGroupFacultesPubliquesCount', { n: facultes.length })}{' '}
+                          {facultesOpen ? '▴' : '▾'}
+                        </Text>
+                      </Pressable>
+                      {facultesOpen
+                        ? facultes.map((school) => (
+                            <Text key={school.establishmentId} style={[styles.cardTitle, isRTL && styles.rtlText]}>
+                              {school.sigle ? `${school.sigle} — ${school.nom}` : school.nom}
+                            </Text>
+                          ))
+                        : (
+                          <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>{t('schoolGroupFacultesClosed')}</Text>
+                        )}
+                    </View>
+                  ) : null}
+                  {ORIENTATION_SCHOOL_TIER_ORDER.map((tier) => {
+                    const list = buckets[tier];
+                    if (!list.length) return null;
+                    return (
+                      <View key={tier} style={styles.simpleGroup}>
+                        <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText]}>
+                          {localizeTierLabel(tier, uiLocale)} · {list.length}
+                        </Text>
+                        {list.slice(0, 8).map((school) => (
+                          <Text key={school.establishmentId} style={[styles.cardMeta, isRTL && styles.rtlText]}>
+                            {school.sigle ? `${school.sigle} — ${school.nom}` : school.nom}
+                          </Text>
+                        ))}
+                      </View>
+                    );
+                  })}
+                </>
+              );
+            })()}
+          </Section>
+          </>
+          )}
+
+          <View style={styles.pdfActions}>
+            <Pressable
+              onPress={() => void onDownloadPdf('simple')}
+              style={({ pressed }) => [styles.ctaPdf, pressed && { opacity: 0.92 }]}
+              disabled={pdfBusy}
+              accessibilityRole="button">
+              {pdfBusy ? (
+                <ActivityIndicator color={brand.primary} />
+              ) : (
+                <>
+                  <FontAwesome name="file-pdf-o" size={15} color={brand.primary} />
+                  <Text style={styles.ctaPdfTxt}>{t('reportPdfSimple')}</Text>
+                </>
+              )}
+            </Pressable>
+            <Pressable
+              onPress={() => void onDownloadPdf('detail')}
+              style={({ pressed }) => [styles.ctaPdf, pressed && { opacity: 0.92 }]}
+              disabled={pdfBusy}
+              accessibilityRole="button">
+              <FontAwesome name="file-pdf-o" size={15} color={brand.primary} />
+              <Text style={styles.ctaPdfTxt}>{t('reportPdfDetail')}</Text>
+            </Pressable>
+          </View>
+
+          <View style={{ height: 120 }} />
         </ScrollView>
 
         <View style={[styles.ctaDock, { paddingBottom: spacing.md + androidNavInset }]}>
           <View style={styles.ctaFade} />
-          <Pressable
-            onPress={() => void onDownloadPdf()}
-            style={({ pressed }) => [styles.ctaPdf, pressed && { opacity: 0.92 }]}
-            disabled={pdfBusy}
-            accessibilityRole="button">
-            {pdfBusy ? (
-              <ActivityIndicator color={brand.primary} />
-            ) : (
-              <>
-                <FontAwesome name="file-pdf-o" size={15} color={brand.primary} />
-                <Text style={styles.ctaPdfTxt}>{t('reportPdf')}</Text>
-              </>
-            )}
-          </Pressable>
           <Pressable
             onPress={() => {
               void markReportComplete().finally(() => {
@@ -735,6 +1058,100 @@ const styles = StyleSheet.create({
     backgroundColor: brand.primary,
     paddingBottom: spacing.sm,
   },
+  readRow: {
+    gap: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  readLabel: {
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.4,
+    color: brand.textMuted,
+    textTransform: 'uppercase',
+  },
+  readToggle: {
+    flexDirection: 'row',
+    alignSelf: 'flex-start',
+    padding: 3,
+    borderRadius: 999,
+    backgroundColor: '#E8EDF6',
+  },
+  readBtn: {
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+  },
+  readBtnOn: { backgroundColor: brand.primary },
+  readBtnTxt: { fontSize: fontSize.sm, fontWeight: '800', color: '#475569' },
+  readBtnTxtOn: { color: brand.white },
+  simpleGroup: {
+    gap: spacing.sm,
+    marginTop: spacing.md,
+  },
+  simpleFacultes: {
+    marginBottom: spacing.xxl,
+  },
+  simpleGroupTitle: {
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    color: brand.primary,
+  },
+  simpleAccordion: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.sm,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: 'rgba(51,62,143,0.18)',
+    backgroundColor: '#F8FAFC',
+  },
+  v2Card: {
+    gap: spacing.sm,
+    padding: spacing.md,
+    borderRadius: 16,
+    backgroundColor: brand.white,
+    borderWidth: 1,
+    borderColor: 'rgba(51,62,143,0.12)',
+  },
+  v2Bar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  simpleAccordionMeta: {
+    fontSize: 12,
+    fontWeight: '800',
+    color: brand.primary,
+  },
+  simpleSchool: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+    paddingVertical: spacing.sm,
+  },
+  simpleSchoolLogo: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#F8FAFC',
+  },
+  simpleSchoolTier: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: brand.primary,
+  },
+  simpleMore: {
+    alignSelf: 'flex-start',
+    marginTop: spacing.sm,
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 999,
+    borderWidth: 1,
+    borderColor: brand.primary,
+  },
+  simpleMoreTxt: { color: brand.primary, fontWeight: '800', fontSize: fontSize.sm },
   backBtn: {
     width: 36,
     height: 36,
@@ -1242,6 +1659,10 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
   },
   filieresValue: { fontSize: fontSize.sm, fontWeight: '700', color: '#065F46', lineHeight: 20 },
+  pdfActions: {
+    marginTop: spacing.lg,
+    gap: spacing.sm,
+  },
   ctaDock: {
     position: 'absolute',
     left: 0,
@@ -1265,7 +1686,6 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderWidth: 1.5,
     borderColor: 'rgba(51,62,143,0.28)',
-    marginBottom: spacing.sm,
   },
   ctaPdfTxt: { color: brand.primary, fontWeight: '800', fontSize: fontSize.md },
   cta: {
