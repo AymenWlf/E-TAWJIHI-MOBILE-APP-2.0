@@ -8,7 +8,7 @@ import type {
   RiasecLetter,
 } from '@/features/orientationDiagnostic/types/orientationDiagnosticPrototype';
 import { partitionFacultePublique } from '@/features/orientationDiagnostic/utils/orientationFacultePubliqueGroup';
-import { isSchoolReasonTag, schoolReasonTags } from '@/utils/schoolReasonTags';
+import { collectSchoolReasonTags, isSchoolReasonTag } from '@/utils/schoolReasonTags';
 import {
   groupSchoolRecosByTier,
   ORIENTATION_SCHOOL_TIER_ORDER,
@@ -347,7 +347,7 @@ function schoolCardHtml(raw: OrientationSchoolReco, uiLocale: OrientationUiLocal
   const secondary = isAr ? (arabic ? french : '') : arabic;
   const typeLabel = e.typeEcole ? localizeReportPhrase(e.typeEcole, uiLocale) : '';
   const city = e.ville?.trim() || t('cityNotSet');
-  const tags = schoolReasonTags(raw.reasonsYes ?? e.reasonsYes, uiLocale);
+  const tags = collectSchoolReasonTags(raw.reasonsYes, raw.reasonsNo, uiLocale);
   const tagHtml = tags.length
     ? `<div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px">${tags
         .map(

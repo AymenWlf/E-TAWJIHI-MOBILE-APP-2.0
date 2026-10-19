@@ -10,7 +10,7 @@ import {
   tierColor,
   type DiagnosticTier,
 } from '@/utils/schoolDiagnosticTier';
-import { isSchoolReasonTag, schoolReasonTags } from '@/utils/schoolReasonTags';
+import { collectSchoolReasonTags, isSchoolReasonTag } from '@/utils/schoolReasonTags';
 
 function esc(s: string): string {
   return String(s ?? '')
@@ -70,7 +70,7 @@ export function buildSchoolDiagnosticRecommendationsHtml(
       row.nomArabe && row.nomArabe !== row.nom
         ? `${row.sigle ? `${row.sigle} — ` : ''}${row.nom} · ${row.nomArabe}`
         : `${row.sigle ? `${row.sigle} — ` : ''}${row.nom}`;
-    const tags = schoolReasonTags(row.reasonsYes ?? [], locale);
+    const tags = collectSchoolReasonTags(row.reasonsYes, row.reasonsNo, locale);
     const tagHtml = tags.length
       ? `<div class="tags">${tags
           .map(

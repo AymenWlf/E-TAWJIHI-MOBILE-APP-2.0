@@ -9,7 +9,7 @@ import type { SchoolDiagnosticRecommendationItem } from '@/services/schoolRecomm
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { establishmentRecommendationTitle, formatDiagnosticPercent } from '@/utils/diagnosticDisplayText';
-import { schoolReasonTags } from '@/utils/schoolReasonTags';
+import { collectSchoolReasonTags } from '@/utils/schoolReasonTags';
 import { tierLabel } from '@/utils/schoolDiagnosticTier';
 import { formatNoteFr20 } from '@/utils/diagnosticBacComparisonNote';
 import { preserveLtrDigitsInRtlLabel } from '@/utils/bidiText';
@@ -59,7 +59,7 @@ function DiagnosticRecommendationRowInner({
   followLabelFollowing = 'Suivi',
 }: Props) {
   const title = establishmentRecommendationTitle(row, isRTL);
-  const tags = schoolReasonTags(row.reasonsYes ?? [], reportLocale);
+  const tags = collectSchoolReasonTags(row.reasonsYes, row.reasonsNo, reportLocale);
   const scoreLabel = formatDiagnosticPercent(row.combinedScore, isRTL);
   const iaScore = row.iaScore != null ? Math.round(row.iaScore) : null;
   const iaAccent = iaScore != null ? iaScoreAccent(iaScore) : brand.primary;
