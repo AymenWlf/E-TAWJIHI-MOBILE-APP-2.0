@@ -799,6 +799,30 @@ const STUDY_CITY_ID_TO_LABEL: Record<string, string> = {
   fes: 'Fès',
 };
 
+function parseMeasureNote(raw?: string): number | null {
+  const text = (raw || '').trim().replace(',', '.');
+  if (!text) return null;
+  const note = Number(text);
+  if (!Number.isFinite(note) || note < 0 || note > 20) return null;
+  return note;
+}
+
+function formatMeasureNote(note: number): string {
+  const text = (Math.round(note * 10) / 10).toFixed(1).replace('.', ',');
+  return text.endsWith(',0') ? text.slice(0, -2) : text;
+}
+
+/** 75 % national + 25 % moyenne des notes saisies (1ère bac et contrôle continu). */
+function marocainMeasurementNote(premiere?: string, cc?: string, national?: string): number | null {
+  const regionalParts = [parseMeasureNote(premiere), parseMeasureNote(cc)].filter((n): n is number => n != null);
+  const regional = regionalParts.length
+    ? regionalParts.reduce((sum, n) => sum + n, 0) / regionalParts.length
+    : null;
+  const nationalNote = parseMeasureNote(national);
+  if (regional != null && nationalNote != null) return 0.25 * regional + 0.75 * nationalNote;
+  return null;
+}
+
 /** Villes d’études choisies dans le module Réalité (pas la ville du profil). */
 function studyCitiesLabelFromAnswers(answers: DiagnosticAnswers): string {
   const selected = answers.cities ?? [];
@@ -831,7 +855,10 @@ export function studentSummaryFromAnswers(answers: DiagnosticAnswers) {
   let notesLabel = 'Non renseignées';
   if (p.bacType === 'marocain' && (p.noteGenerale1ereBac || p.noteControleContinu || p.noteNational)) {
     const estim = p.noteAvailability === 'estimation' ? ' (estim.)' : '';
-    notesLabel = `1ère ${p.noteGenerale1ereBac || '—'} · CC ${p.noteControleContinu || '—'} · Nat. ${p.noteNational || '—'}${estim}`;
+    const measure = marocainMeasurementNote(p.noteGenerale1ereBac, p.noteControleContinu, p.noteNational);
+    notesLabel = `1ère ${p.noteGenerale1ereBac || '—'} · CC ${p.noteControleContinu || '—'} · Nat. ${p.noteNational || '—'}${
+      measure != null ? ` · Mesure ${formatMeasureNote(measure)}/20 (75 % nat. + 25 % 1ère/CC)` : ''
+    }${estim}`;
   } else if (p.bacType === 'mission' && (p.noteGeneralePremiere || p.noteGeneraleBac)) {
     notesLabel = `1ère ${p.noteGeneralePremiere || '—'} · Term. ${p.noteGeneraleTerminale || '—'} · Bac ${
       p.noteGeneraleBac || '—'

@@ -159,6 +159,10 @@ export function mapOrientationAnswersToSchoolQuickForm(
   const definitive = notesAreDefinitive(p.noteAvailability);
   const bacType = match.bacType === 'mission' || match.bacType === 'normal' ? match.bacType : '';
 
+  const measuredNote =
+    bacType === 'normal'
+      ? marocainComparisonNote(p.noteGenerale1ereBac, p.noteControleContinu, p.noteNational)
+      : '';
   let noteBacFinaleSur20 = '';
   let bacGradeReceived: '' | 'yes' | 'no' = '';
   if (bacType === 'normal' && p.noteNational.trim()) {
@@ -192,8 +196,8 @@ export function mapOrientationAnswersToSchoolQuickForm(
     regionalGradeReceived: bacType === 'normal' && p.noteGenerale1ereBac.trim() ? 'yes' : '',
     noteGeneraleSemestre1SecondBacSur20: bacType === 'normal' ? p.noteControleContinu.trim() : '',
     semestre1BacGradeReceived: bacType === 'normal' && p.noteControleContinu.trim() ? 'yes' : '',
-    noteBacFinaleSur20: bacType === 'normal' ? marocainComparisonNote(p) : noteBacFinaleSur20,
-    bacGradeReceived: bacType === 'normal' ? (marocainComparisonNote(p) ? 'yes' : '') : bacGradeReceived,
+    noteBacFinaleSur20: bacType === 'normal' ? measuredNote : noteBacFinaleSur20,
+    bacGradeReceived: bacType === 'normal' ? (measuredNote ? 'yes' : '') : bacGradeReceived,
     previsionnelBacNationalMinSur20: bacType === 'normal' ? p.noteNational.trim() : '',
     previsionnelBacNationalMaxSur20: bacType === 'normal' ? p.noteNational.trim() : '',
 

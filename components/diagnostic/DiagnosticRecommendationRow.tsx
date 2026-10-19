@@ -9,6 +9,8 @@ import type { SchoolDiagnosticRecommendationItem } from '@/services/schoolRecomm
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { establishmentRecommendationTitle, formatDiagnosticPercent } from '@/utils/diagnosticDisplayText';
+import { schoolReasonTags } from '@/utils/schoolReasonTags';
+import { tierLabel } from '@/utils/schoolDiagnosticTier';
 import { formatNoteFr20 } from '@/utils/diagnosticBacComparisonNote';
 import { preserveLtrDigitsInRtlLabel } from '@/utils/bidiText';
 import {
@@ -57,6 +59,7 @@ function DiagnosticRecommendationRowInner({
   followLabelFollowing = 'Suivi',
 }: Props) {
   const title = establishmentRecommendationTitle(row, isRTL);
+  const tags = schoolReasonTags(row.reasonsYes ?? [], reportLocale);
   const scoreLabel = formatDiagnosticPercent(row.combinedScore, isRTL);
   const iaScore = row.iaScore != null ? Math.round(row.iaScore) : null;
   const iaAccent = iaScore != null ? iaScoreAccent(iaScore) : brand.primary;
@@ -94,7 +97,21 @@ function DiagnosticRecommendationRowInner({
               </Text>
             ) : null}
             <EstablishmentTypeBadge type={row.typeEcole} size="xs" />
+            <Text style={[styles.tierLabel, { color: accent }]}>{tierLabel(tier, reportLocale)}</Text>
           </View>
+          {tags.length ? (
+            <View style={[styles.tags, isRTL && styles.tagsRtl]}>
+              {tags.map((tag) => (
+                <View
+                  key={tag.key}
+                  style={[styles.tag, { backgroundColor: tag.background, borderColor: `${tag.color}55` }]}>
+                  <Text style={[styles.tagLabel, { color: tag.color }, isRTL && styles.rtlText]}>
+                    {tag.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
           {showSeuilBadge ? (
             <View style={[styles.seuilBadge, isRTL && styles.seuilBadgeRtl]}>
               <View
@@ -237,7 +254,7 @@ const styles = StyleSheet.create({
   rtlText: { writingDirection: 'rtl', textAlign: 'right' },
   topRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: spacing.sm,
     padding: spacing.sm,
     paddingStart: spacing.md,
@@ -245,6 +262,17 @@ const styles = StyleSheet.create({
   topRowRtl: DIR_RTL,
   body: { flex: 1, minWidth: 0, gap: 4 },
   title: { fontWeight: '800', fontSize: fontSize.sm, color: brand.text, lineHeight: 20 },
+  tierLabel: { fontSize: fontSize.xs, fontWeight: '800' },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
+  tagsRtl: DIR_RTL,
+  tag: {
+    borderWidth: 1,
+    borderRadius: radius.md,
+    paddingVertical: 3,
+    paddingHorizontal: 8,
+    maxWidth: '100%',
+  },
+  tagLabel: { fontSize: 10, fontWeight: '800', lineHeight: 14 },
   metaRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',

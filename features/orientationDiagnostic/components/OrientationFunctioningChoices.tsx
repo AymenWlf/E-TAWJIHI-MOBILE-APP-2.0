@@ -29,7 +29,7 @@ export function FunctioningScaleChoices({
   highHint?: string;
 }) {
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, rtl && DIR_RTL]}>
       <View style={[styles.scaleTrack, rtl && styles.scaleTrackRtl]}>
         <View style={styles.scaleBar}>
           <View
@@ -176,7 +176,7 @@ export function FunctioningDilemmaChoices({
   rtl?: boolean;
 }) {
   return (
-    <View style={styles.wrap}>
+    <View style={[styles.wrap, rtl && DIR_RTL]}>
       <View style={[styles.dilemmaPair, rtl && styles.dilemmaPairRtl]}>
         {(
           [

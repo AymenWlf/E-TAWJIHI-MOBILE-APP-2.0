@@ -10,6 +10,7 @@ import {
   tierColor,
   type DiagnosticTier,
 } from '@/utils/schoolDiagnosticTier';
+import { isSchoolReasonTag, schoolReasonTags } from '@/utils/schoolReasonTags';
 
 function esc(s: string): string {
   return String(s ?? '')
@@ -69,7 +70,17 @@ export function buildSchoolDiagnosticRecommendationsHtml(
       row.nomArabe && row.nomArabe !== row.nom
         ? `${row.sigle ? `${row.sigle} — ` : ''}${row.nom} · ${row.nomArabe}`
         : `${row.sigle ? `${row.sigle} — ` : ''}${row.nom}`;
+    const tags = schoolReasonTags(row.reasonsYes ?? [], locale);
+    const tagHtml = tags.length
+      ? `<div class="tags">${tags
+          .map(
+            (tag) =>
+              `<span class="tag" style="background:${tag.background};color:${tag.color};border-color:${tag.color}55">${esc(tag.label)}</span>`,
+          )
+          .join('')}</div>`
+      : '';
     const reasons = (row.reasonsYes ?? [])
+      .filter((reason) => !isSchoolReasonTag(reason))
       .slice(0, 2)
       .map((r) => `<li>+ ${esc(localizeReportPhrase(r, locale))}</li>`)
       .join('');
@@ -78,6 +89,7 @@ export function buildSchoolDiagnosticRecommendationsHtml(
         <div>
           <h4>${esc(nom)}</h4>
           <p class="muted">${esc(row.ville || '')}${row.typeEcole ? ` · ${esc(row.typeEcole)}` : ''}</p>
+          ${tagHtml}
         </div>
         <div class="score">${esc(formatReportScorePercent(row.combinedScore, locale))}</div>
       </div>
@@ -118,6 +130,8 @@ export function buildSchoolDiagnosticRecommendationsHtml(
   .card-top { display: flex; justify-content: space-between; gap: 10px; align-items: flex-start; }
   .score { font-weight: 800; color: #fff; background: #333E8F; border-radius: 999px; padding: 4px 10px; font-size: 12px; white-space: nowrap; }
   ul { margin: 6px 0 0; padding-${isAr ? 'right' : 'left'}: 16px; color: #065f46; }
+  .tags { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 6px; }
+  .tag { display: inline-block; border: 1px solid transparent; border-radius: 999px; padding: 2px 8px; font-size: 10px; font-weight: 700; line-height: 1.35; }
   .box { background: #EEF1F7; border-radius: 8px; padding: 10px; margin: 10px 0; }
   .foot { margin-top: 18px; font-size: 10px; color: #94a3b8; border-top: 1px solid #e2e8f0; padding-top: 8px; }
 </style>

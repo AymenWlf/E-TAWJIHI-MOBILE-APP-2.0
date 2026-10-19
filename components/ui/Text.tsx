@@ -26,9 +26,13 @@ export function Text({ style, latinDigits, children, ...props }: AppTextProps) {
   const arabic = isRTL && !skip ? applyArabicFontOverlay(flat) : undefined;
   const hasExplicitAlign =
     flat?.textAlign != null && flat.textAlign !== 'auto' && flat.textAlign !== 'inherit';
+  const keepLtr = flat?.writingDirection === 'ltr';
   const rtlAlign: TextStyle | undefined =
-    isRTL && !skipLatinFont && !hasExplicitAlign
-      ? { textAlign: 'right', writingDirection: 'rtl' }
+    isRTL && !skipLatinFont && !keepLtr
+      ? {
+          writingDirection: 'rtl',
+          textAlign: hasExplicitAlign && flat?.textAlign !== 'left' ? flat?.textAlign : 'right',
+        }
       : undefined;
   return (
     <RNText {...props} style={[style, arabic, rtlAlign]}>

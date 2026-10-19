@@ -28,12 +28,10 @@ import {
   fetchOrientationDiagnosticServerReport,
   resetOrientationDiagnosticSession,
 } from '@/services/orientationDiagnosticSession';
+import { fetchSchoolRecommendationDiagnosticByPublicCode } from '@/services/schoolRecommendationDiagnostic';
+import { reportSchoolsFromDiagnostic } from '@/features/orientationDiagnostic/utils/orientationReportSchoolsFromDiagnostic';
 import { postPlanReussiteStep } from '@/services/planReussiteSteps';
 import { homeShell } from '@/theme/homeShell';
-import {
-  fallbackEstablishmentAvatarName,
-  getEstablishmentLogoUrl,
-} from '@/constants/establishmentMedia';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { downloadOrientationDiagnosticReportPdf } from '@/utils/downloadOrientationDiagnosticReportPdf';
 import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
@@ -47,7 +45,6 @@ import {
   localizeRiasecLabel,
   riasecCodeParts,
   tOd,
-  tOdFill,
   type OrientationUiLocale,
 } from '../data/orientationDiagnosticI18n';
 import type { DiagnosticAnswers, OrientationReport, RiasecLetter } from '../types/orientationDiagnosticPrototype';
@@ -60,18 +57,12 @@ import {
   localizeProfileSentence,
   localizeProfileTitle,
   localizeReportPhrase,
-  localizeTierLabel,
   reportAmbitionLabel,
   reportFamilyTierLabel,
   reportFunctioningLabels,
   reportMetierBilingualLines,
 } from '../utils/orientationDiagnosticReportLocale';
 import { orientationUiLocaleFromApp } from '../utils/orientationUiLocaleFromApp';
-import { partitionFacultePublique } from '../utils/orientationFacultePubliqueGroup';
-import {
-  groupSchoolRecosByTier,
-  ORIENTATION_SCHOOL_TIER_ORDER,
-} from '../utils/orientationDiagnosticSchoolReco';
 
 const GAP_NOTE = /Écart d’environ (\d+) points.*sur ([RIASEC])\.?$/;
 
@@ -176,12 +167,9 @@ export function OrientationDiagnosticReportScreen() {
   const [report, setReport] = useState<OrientationReport | null>(null);
   const [sourceAnswers, setSourceAnswers] = useState<DiagnosticAnswers | null>(null);
   const [marking, setMarking] = useState(false);
-  const [pdfBusy, setPdfBusy] = useState(false);
+  const [pdfBusy, setPdfBusy] = useState<'simple' | 'detail' | null>(null);
   const [retakeConfirmVisible, setRetakeConfirmVisible] = useState(false);
   const [reading, setReading] = useState<'simple' | 'detail'>('simple');
-  const [facultesOpen, setFacultesOpen] = useState(false);
-  const [visibleFacultes, setVisibleFacultes] = useState(6);
-  const [visibleOthers, setVisibleOthers] = useState(6);
 
   useEffect(() => {
     let cancelled = false;
@@ -195,16 +183,28 @@ export function OrientationDiagnosticReportScreen() {
           const remote = await fetchOrientationDiagnosticServerReport(token);
           if (!cancelled && remote && !Array.isArray(remote)) {
             nextReport = remote;
-            if (draft) {
-              await persistOrientationDiagnosticPrototypeDraft({
-                ...draft,
-                phase: 'report',
-                report: remote,
-              });
-            }
           }
         } catch {
           /* le rapport déjà en cache reste affiché */
+        }
+        const code = draft?.schoolRecoPublicCode?.trim().toLowerCase() ?? '';
+        if (nextReport && /^[a-f0-9]{32}$/.test(code)) {
+          try {
+            const diagnostic = await fetchSchoolRecommendationDiagnosticByPublicCode(code, token);
+            const schools = reportSchoolsFromDiagnostic(diagnostic);
+            if (schools.length) {
+              nextReport = { ...nextReport, ecolesRecommandees: schools };
+            }
+          } catch {
+            /* le classement du rapport serveur reste affiché */
+          }
+        }
+        if (!cancelled && nextReport && draft) {
+          await persistOrientationDiagnosticPrototypeDraft({
+            ...draft,
+            phase: 'report',
+            report: nextReport,
+          });
         }
       }
       if (cancelled) return;
@@ -269,7 +269,7 @@ export function OrientationDiagnosticReportScreen() {
 
   const onDownloadPdf = useCallback(async (variant: 'simple' | 'detail' = 'detail') => {
     if (!report || pdfBusy) return;
-    setPdfBusy(true);
+    setPdfBusy(variant);
     try {
       await downloadOrientationDiagnosticReportPdf(
         identitySummary ? { ...report, studentSummary: identitySummary } : report,
@@ -282,7 +282,7 @@ export function OrientationDiagnosticReportScreen() {
         tOd(uiLocale, 'reportPdfError'),
       );
     } finally {
-      setPdfBusy(false);
+      setPdfBusy(null);
     }
   }, [identitySummary, pdfBusy, report, uiLocale]);
 
@@ -317,31 +317,6 @@ export function OrientationDiagnosticReportScreen() {
   const scores = report.scores.riasecConsolide;
   const fnLabels = reportFunctioningLabels(uiLocale);
   const s = report.scores;
-  const orderedSimpleSchools = [
-    ...(report.ecolesRecommandees ?? []).filter(
-      (school) => school.tier === 'recommended' || school.tier === 'possible',
-    ),
-    ...(report.ecolesRecommandees ?? []).filter(
-      (school) => school.tier !== 'recommended' && school.tier !== 'possible',
-    ),
-  ];
-  const { facultes: simpleFacultes, others: simpleOthers } = partitionFacultePublique(orderedSimpleSchools);
-  const simpleGroups = [
-    {
-      key: 'facultes',
-      title: t('schoolGroupFacultesPubliques'),
-      items: simpleFacultes,
-      visible: visibleFacultes,
-      loadMore: () => setVisibleFacultes((count) => count + 6),
-    },
-    {
-      key: 'others',
-      title: t('schoolGroupAutresEcoles'),
-      items: simpleOthers,
-      visible: visibleOthers,
-      loadMore: () => setVisibleOthers((count) => count + 6),
-    },
-  ];
 
   const identityItems = [
     { label: t('reportKvEleve'), value: identitySummary?.fullName },
@@ -544,80 +519,34 @@ export function OrientationDiagnosticReportScreen() {
                 </View>
               </Section>
               <Section index={2} title={t('reportSimpleMetiers')} rtl={isRTL}>
-                {report.metiers.slice(0, 3).map((m, i) => (
-                  <View key={m.id} style={[styles.rankRow, isRTL && styles.rowRtl]}>
-                    <Text style={styles.rank} latinDigits>
-                      {i + 1}
-                    </Text>
-                    <Text style={[styles.cardTitle, isRTL && styles.rtlText]}>{m.label}</Text>
-                  </View>
-                ))}
-              </Section>
-              <Section index={3} title={t('reportSimpleSchools')} rtl={isRTL}>
-                <Text style={[styles.lead, isRTL && styles.rtlText]}>{t('reportSimpleSchoolsLead')}</Text>
-                {simpleFacultes.length + simpleOthers.length === 0 ? (
-                  <Text style={[styles.lead, isRTL && styles.rtlText]}>{t('reportSimpleEmptySchools')}</Text>
-                ) : (
-                  simpleGroups.map((group) =>
-                    group.items.length ? (
-                      <View
-                        key={group.key}
-                        style={[styles.simpleGroup, group.key === 'facultes' && styles.simpleFacultes]}>
-                        {group.key === 'facultes' ? (
-                          <Pressable
-                            onPress={() => setFacultesOpen((open) => !open)}
-                            style={[styles.simpleAccordion, isRTL && styles.rowRtl]}
-                            accessibilityRole="button"
-                            accessibilityState={{ expanded: facultesOpen }}>
-                            <View style={{ flex: 1, gap: 2 }}>
-                              <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText]}>{group.title}</Text>
-                              <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>
-                                {facultesOpen ? t('schoolGroupFacultesOpen') : t('schoolGroupFacultesPubliquesHint')}
-                              </Text>
-                            </View>
-                            <Text style={styles.simpleAccordionMeta}>
-                              {tOdFill(uiLocale, 'schoolGroupFacultesPubliquesCount', { n: group.items.length })}{' '}
-                              {facultesOpen ? '▴' : '▾'}
-                            </Text>
-                          </Pressable>
-                        ) : (
-                          <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText]}>{group.title}</Text>
-                        )}
-                        {group.key === 'facultes' && !facultesOpen ? (
-                          <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>{t('schoolGroupFacultesClosed')}</Text>
-                        ) : null}
-                        {(group.key !== 'facultes' || facultesOpen) && group.items.slice(0, group.visible).map((school) => {
-                          const logo =
-                            getEstablishmentLogoUrl(school.logo) ||
-                            fallbackEstablishmentAvatarName(school.nom, school.sigle);
-                          return (
-                            <View key={school.establishmentId} style={[styles.simpleSchool, isRTL && styles.rowRtl]}>
-                              <Image source={{ uri: logo }} style={styles.simpleSchoolLogo} resizeMode="contain" />
-                              <View style={{ flex: 1, gap: 2 }}>
-                                <Text style={[styles.cardTitle, isRTL && styles.rtlText]}>
-                                  {school.sigle ? `${school.sigle} — ${school.nom}` : school.nom}
-                                </Text>
-                                {school.nomArabe ? (
-                                  <Text style={[styles.cardMeta, styles.rtlText]}>{school.nomArabe}</Text>
-                                ) : null}
-                                <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>{school.ville}</Text>
-                              </View>
-                              <Text style={styles.simpleSchoolTier}>{localizeTierLabel(school.tier, uiLocale)}</Text>
-                            </View>
-                          );
-                        })}
-                        {(group.key !== 'facultes' || facultesOpen) && group.visible < group.items.length ? (
-                          <Pressable
-                            onPress={group.loadMore}
-                            style={styles.simpleMore}
-                            accessibilityRole="button">
-                            <Text style={styles.simpleMoreTxt}>{t('reportLoadMoreSchools')}</Text>
-                          </Pressable>
+                {report.metiers.slice(0, 3).map((m, i) => {
+                  const name = reportMetierBilingualLines(m.id, m.label, uiLocale);
+                  return (
+                    <View key={m.id} style={[styles.rankRow, isRTL && styles.rowRtl]}>
+                      <Text style={styles.rank} latinDigits>
+                        {i + 1}
+                      </Text>
+                      <View style={{ flex: 1 }}>
+                        <Text
+                          style={[
+                            styles.cardTitle,
+                            name.primaryRtl ? styles.rtlText : styles.ltrText,
+                          ]}>
+                          {name.primary}
+                        </Text>
+                        {name.secondary ? (
+                          <Text
+                            style={[
+                              styles.cardMeta,
+                              name.secondaryRtl ? styles.rtlText : styles.ltrText,
+                            ]}>
+                            {name.secondary}
+                          </Text>
                         ) : null}
                       </View>
-                    ) : null,
-                  )
-                )}
+                    </View>
+                  );
+                })}
               </Section>
             </>
           ) : (
@@ -808,62 +737,6 @@ export function OrientationDiagnosticReportScreen() {
             })}
           </Section>
 
-          <Section index={8} title={t('reportSec9')} rtl={isRTL}>
-            {(() => {
-              const schools = report.ecolesRecommandees ?? [];
-              const { facultes, others } = partitionFacultePublique(schools);
-              const buckets = groupSchoolRecosByTier(others);
-              if (!schools.length) {
-                return <Text style={[styles.lead, isRTL && styles.rtlText]}>{t('reportSimpleEmptySchools')}</Text>;
-              }
-              return (
-                <>
-                  {facultes.length ? (
-                    <View style={styles.simpleGroup}>
-                      <Pressable
-                        onPress={() => setFacultesOpen((open) => !open)}
-                        style={[styles.simpleAccordion, isRTL && styles.rowRtl]}
-                        accessibilityRole="button"
-                        accessibilityState={{ expanded: facultesOpen }}>
-                        <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText, { flex: 1 }]}>
-                          {t('schoolGroupFacultesPubliques')}
-                        </Text>
-                        <Text style={styles.simpleAccordionMeta}>
-                          {tOdFill(uiLocale, 'schoolGroupFacultesPubliquesCount', { n: facultes.length })}{' '}
-                          {facultesOpen ? '▴' : '▾'}
-                        </Text>
-                      </Pressable>
-                      {facultesOpen
-                        ? facultes.map((school) => (
-                            <Text key={school.establishmentId} style={[styles.cardTitle, isRTL && styles.rtlText]}>
-                              {school.sigle ? `${school.sigle} — ${school.nom}` : school.nom}
-                            </Text>
-                          ))
-                        : (
-                          <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>{t('schoolGroupFacultesClosed')}</Text>
-                        )}
-                    </View>
-                  ) : null}
-                  {ORIENTATION_SCHOOL_TIER_ORDER.map((tier) => {
-                    const list = buckets[tier];
-                    if (!list.length) return null;
-                    return (
-                      <View key={tier} style={styles.simpleGroup}>
-                        <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText]}>
-                          {localizeTierLabel(tier, uiLocale)} · {list.length}
-                        </Text>
-                        {list.slice(0, 8).map((school) => (
-                          <Text key={school.establishmentId} style={[styles.cardMeta, isRTL && styles.rtlText]}>
-                            {school.sigle ? `${school.sigle} — ${school.nom}` : school.nom}
-                          </Text>
-                        ))}
-                      </View>
-                    );
-                  })}
-                </>
-              );
-            })()}
-          </Section>
           </>
           )}
 
@@ -871,9 +744,9 @@ export function OrientationDiagnosticReportScreen() {
             <Pressable
               onPress={() => void onDownloadPdf('simple')}
               style={({ pressed }) => [styles.ctaPdf, pressed && { opacity: 0.92 }]}
-              disabled={pdfBusy}
+              disabled={pdfBusy != null}
               accessibilityRole="button">
-              {pdfBusy ? (
+              {pdfBusy === 'simple' ? (
                 <ActivityIndicator color={brand.primary} />
               ) : (
                 <>
@@ -885,10 +758,16 @@ export function OrientationDiagnosticReportScreen() {
             <Pressable
               onPress={() => void onDownloadPdf('detail')}
               style={({ pressed }) => [styles.ctaPdf, pressed && { opacity: 0.92 }]}
-              disabled={pdfBusy}
+              disabled={pdfBusy != null}
               accessibilityRole="button">
-              <FontAwesome name="file-pdf-o" size={15} color={brand.primary} />
-              <Text style={styles.ctaPdfTxt}>{t('reportPdfDetail')}</Text>
+              {pdfBusy === 'detail' ? (
+                <ActivityIndicator color={brand.primary} />
+              ) : (
+                <>
+                  <FontAwesome name="file-pdf-o" size={15} color={brand.primary} />
+                  <Text style={styles.ctaPdfTxt}>{t('reportPdfDetail')}</Text>
+                </>
+              )}
             </Pressable>
           </View>
 
@@ -1089,7 +968,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
   simpleFacultes: {
-    marginBottom: spacing.xxl,
+    marginTop: spacing.xxl,
   },
   simpleGroupTitle: {
     fontSize: fontSize.md,

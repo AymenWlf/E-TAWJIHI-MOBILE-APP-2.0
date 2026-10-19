@@ -243,7 +243,7 @@ export function DiagnosticChoiceRow({
           <FontAwesome name={icon} size={14} color={selected ? brand.primary : brand.textMuted} />
         </View>
       ) : null}
-      <View style={[styles.choiceTextCol, rtl && styles.choiceTextColRtl]}>
+      <View style={[styles.choiceTextCol, rtl && styles.choiceTextColRtl, rtl && DIR_RTL]}>
         {/[\u0600-\u06FF]/.test(label) ? (
           <ArabicMixedLabel
             label={label}
@@ -700,7 +700,7 @@ export function DiagnosticStepHeader({
   compact?: boolean;
 }) {
   return (
-    <View style={[styles.stepHeader, compact && styles.stepHeaderCompact, rtl && styles.stepHeaderRtl]}>
+    <View style={[styles.stepHeader, compact && styles.stepHeaderCompact, rtl && styles.stepHeaderRtl, rtl && DIR_RTL]}>
       <View style={[styles.stepHeaderIcon, compact && styles.stepHeaderIconCompact]}>
         <FontAwesome name={icon} size={compact ? 15 : 20} color={brand.primary} />
       </View>

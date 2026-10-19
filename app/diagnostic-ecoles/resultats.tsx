@@ -41,8 +41,7 @@ import {
   DIAGNOSTIC_LOADING_COPY,
   DIAGNOSTIC_RECOMMENDATION_HOME_DELAY_MS,
 } from '@/constants/diagnosticWizardUi';
-import { resolveDiagnosticReportLocale } from '@/utils/schoolDiagnosticPayloadDisplayContext';
-import { computeDiagnosticBacComparisonNote } from '@/utils/diagnosticBacComparisonNote';
+import { computeDiagnosticBacComparisonNote, formatNoteFr20 } from '@/utils/diagnosticBacComparisonNote';
 import { emitNotificationsRefresh } from '@/services/notifications';
 import { applyDiagnosticHardBlocksToRow } from '@/utils/schoolDiagnosticHardBlocks';
 import {
@@ -66,6 +65,7 @@ const COPY = {
     emptyNoOrientation:
       'Terminez d’abord le test d’orientation pour générer vos recommandations d’écoles.',
     emptyGoOrientation: 'Ouvrir le test d’orientation',
+    superieuresTitle: 'Écoles supérieures',
     facultesTitle: 'Universités et facultés publiques',
     facultesHint: 'Accès ouvert — ouvrir pour voir la liste',
     facultesCount: (n: number) => `${n} établissement${n > 1 ? 's' : ''}`,
@@ -91,6 +91,7 @@ const COPY = {
     schools: 'عرض المدارس الموصى بها',
     emptyNoOrientation: 'أنهِ أولاً اختبار التوجيه لإنشاء توصيات المدارس.',
     emptyGoOrientation: 'فتح اختبار التوجيه',
+    superieuresTitle: 'المدارس العليا',
     facultesTitle: 'الجامعات والكليات العمومية',
     facultesHint: 'ولوج مفتوح — افتح لعرض القائمة',
     facultesCount: (n: number) => `${n} مؤسسة`,
@@ -298,9 +299,6 @@ export default function DiagnosticResultatsScreen() {
     if (deferred) generateStartedRef.current = false;
     const pl = (data.payload ?? {}) as Record<string, unknown>;
     setDiagnosticPayload(pl);
-    if (!reportLocaleLocked.current) {
-      setReportLocale(resolveDiagnosticReportLocale(pl, appLocale === 'ar' ? 'ar' : 'fr'));
-    }
     const bacSummary = computeDiagnosticBacComparisonNote(pl);
     const normalized = (data.recommendations ?? []).map((row) =>
       applyDiagnosticHardBlocksToRow(row, pl, bacSummary),
@@ -315,6 +313,11 @@ export default function DiagnosticResultatsScreen() {
     if (!pending) {
       emitNotificationsRefresh({ force: true });
     }
+  }, []);
+
+  useEffect(() => {
+    if (reportLocaleLocked.current) return;
+    setReportLocale(appLocale === 'ar' ? 'ar' : 'fr');
   }, [appLocale]);
 
   useEffect(() => {
@@ -473,6 +476,34 @@ export default function DiagnosticResultatsScreen() {
     [diagnosticPayload],
   );
 
+  const measurementLine = useMemo(() => {
+    if (bacComparison.comparisonNote == null) return '';
+    const read = (value: unknown) => Number.parseFloat(String(value ?? '').replace(',', '.'));
+    const premiereNote = read(diagnosticPayload.noteGeneralePremiereBacSur20);
+    const ccNote = read(diagnosticPayload.noteGeneraleSemestre1SecondBacSur20);
+    const parts: string[] = [];
+    if (Number.isFinite(premiereNote)) {
+      parts.push(reportLocale === 'ar' ? `الأولى ${formatNoteFr20(premiereNote)}` : `1ère ${formatNoteFr20(premiereNote)}`);
+    }
+    if (Number.isFinite(ccNote)) {
+      parts.push(reportLocale === 'ar' ? `المراقبة ${formatNoteFr20(ccNote)}` : `CC ${formatNoteFr20(ccNote)}`);
+    }
+    if (bacComparison.nationalReference != null) {
+      parts.push(
+        reportLocale === 'ar'
+          ? `الوطني ${formatNoteFr20(bacComparison.nationalReference)}`
+          : `Nat. ${formatNoteFr20(bacComparison.nationalReference)}`,
+      );
+    }
+    const measure = formatNoteFr20(bacComparison.comparisonNote);
+    parts.push(
+      reportLocale === 'ar'
+        ? `القياس ${measure}/20 (75٪ وطني + 25٪ الأولى/المراقبة)`
+        : `Mesure ${measure}/20 (75 % nat. + 25 % 1ère/CC)`,
+    );
+    return parts.join(' · ');
+  }, [bacComparison, diagnosticPayload, reportLocale]);
+
   const { facultes, others: nonFaculteRows } = useMemo(
     () => partitionFacultePublique(rows),
     [rows],
@@ -583,7 +614,7 @@ export default function DiagnosticResultatsScreen() {
   );
 
   const recommendationListHeader = useMemo(() => {
-    if (!profileSummary && !globalComment) return null;
+    if (!profileSummary && !globalComment && nonFaculteRows.length === 0) return null;
     const profilePair = profileSummaryPair(profileSummary, rows.length, topRecommendationScore(rows));
     return (
       <View style={styles.listHeaderWrap}>
@@ -598,6 +629,11 @@ export default function DiagnosticResultatsScreen() {
                 {cpy.profile}
               </Text>
               <LocalizedParagraph fr={profilePair.fr} ar={profilePair.ar} locale={reportLocale} />
+              {measurementLine ? (
+                <Text style={[styles.insightTxt, alignText, isRTL && styles.arabicFace]} latinDigits>
+                  {measurementLine}
+                </Text>
+              ) : null}
             </View>
           </View>
         ) : null}
@@ -629,9 +665,12 @@ export default function DiagnosticResultatsScreen() {
             </View>
           </View>
         ) : null}
+        {nonFaculteRows.length > 0 ? (
+          <Text style={[styles.groupHeading, isRTL && styles.rtlText]}>{cpy.superieuresTitle}</Text>
+        ) : null}
       </View>
     );
-  }, [alignText, cpy, globalComment, isRTL, profileSummary, reportLocale, rows]);
+  }, [alignText, cpy, globalComment, isRTL, measurementLine, nonFaculteRows.length, profileSummary, reportLocale, rows]);
 
   const recommendationListFooter = useMemo(
     () => (
@@ -1008,6 +1047,12 @@ const styles = StyleSheet.create({
   },
   scrollContentRtl: { ...DIR_RTL, alignItems: 'stretch' },
   listHeaderWrap: { gap: spacing.md, marginBottom: spacing.md },
+  groupHeading: {
+    fontSize: fontSize.md,
+    fontWeight: '800',
+    color: brand.primary,
+    marginTop: spacing.sm,
+  },
   centerRtl: DIR_RTL,
   footerActionsRtl: { ...DIR_RTL, alignItems: 'stretch' },
   ctaPrimaryRtl: DIR_RTL,
@@ -1074,6 +1119,7 @@ const styles = StyleSheet.create({
   },
   insightTxt: { fontSize: fontSize.sm, color: brand.text, lineHeight: 21 },
   arabicFace: { fontFamily: CAIRO.bold },
+  section: { marginBottom: spacing.sm },
   tierHeader: {
     flexDirection: 'row',
     alignItems: 'center',

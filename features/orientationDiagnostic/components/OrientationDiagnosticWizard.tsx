@@ -24,6 +24,7 @@ import {
 import { getUserProfile } from '@/services/userProfile';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { DIR_RTL } from '@/utils/layoutDirection';
 import {
   clearOrientationDiagnosticPrototypeDraft,
   completedModulesUpTo,
@@ -998,7 +999,7 @@ export function OrientationDiagnosticWizard() {
           keyboardShouldPersistTaps="handled"
           keyboardDismissMode="interactive"
           showsVerticalScrollIndicator={false}>
-          <View ref={scrollContentRef} collapsable={false}>
+          <View ref={scrollContentRef} collapsable={false} style={isRTL ? DIR_RTL : undefined}>
           <View style={styles.moduleBanner}>
             <Text style={[styles.moduleLabel, isRTL && styles.rtlText, isRTL && styles.moduleLabelRtl]}>{localizeModuleMeta(step.module, uiLocale).label}</Text>
             <Text style={[styles.moduleObjective, isRTL && styles.rtlText, isRTL && styles.moduleObjectiveRtl]}>

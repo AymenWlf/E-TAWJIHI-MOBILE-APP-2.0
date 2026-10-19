@@ -240,6 +240,12 @@ const PHRASE_AR: Record<string, string> = {
   'Data science': 'علم البيانات',
   'Statistique': 'الإحصاء',
   'Mathématiques appliquées': 'الرياضيات التطبيقية',
+  'Plan A (ambitieux) pris en compte avec votre note de mesure et le seuil.':
+    'الخطة A (طموحة) محسوبة مع نقطة القياس وعتبة القبول.',
+  'Plan B (accessible) pris en compte avec votre note de mesure et le seuil.':
+    'الخطة B (في المتناول) محسوبة مع نقطة القياس وعتبة القبول.',
+  'Plan C (sécurité) pris en compte avec votre note de mesure et le seuil.':
+    'الخطة C (آمنة) محسوبة مع نقطة القياس وعتبة القبول.',
 };
 
 const TIER_AR: Record<DiagnosticTierId, string> = {
