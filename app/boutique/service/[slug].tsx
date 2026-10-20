@@ -1,9 +1,8 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
-  ActivityIndicator,
   Image,
   Pressable,
   ScrollView,
@@ -21,14 +20,12 @@ import { ShopDetailScreenSkeleton } from '@/components/shop/ShopDetailScreenSkel
 import { Text } from '@/components/ui/Text';
 import { ETAWJIHI_LOGO_TRANSPARENT } from '@/constants/brandAssets';
 import { platformServiceGalleryLogoIconSize } from '@/constants/platformServiceBrandVisual';
-import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import { useSharePreview } from '@/contexts/SharePreviewContext';
 import { useShopCart } from '@/contexts/ShopCartContext';
 import { useEligibilityProfile } from '@/hooks/useEligibilityProfile';
 import { usePlatformServiceCatalogEntitlements } from '@/hooks/usePlatformServiceCatalogEntitlements';
 import {
-  fetchPlatformServiceCatalogEntitlements,
   fetchPlatformServiceBySlug,
   fetchPlatformServices,
   platformServiceLocalizedDescription,
@@ -38,17 +35,12 @@ import {
 } from '@/services/platformServices';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
-import { getShopPathAfterBuyNow } from '@/utils/shopCartStorage';
+import { openPlatformServiceWhatsAppOrder } from '@/utils/platformServiceWhatsAppOrder';
 import {
   formatShopPrice,
   shopFormatPromoDiscountPercentLabel,
   shopPromoDiscountPercent,
 } from '@/utils/shopFormatPrice';
-import { platformServiceCartProductId } from '@/utils/platformServiceCart';
-import {
-  addPlatformServiceToCartWithEviction,
-  platformServiceCanAddToCart,
-} from '@/utils/platformServiceCartEviction';
 import { platformServiceCatalogPurchasable } from '@/utils/platformServiceEntitlementUi';
 import {
   platformServiceActivePromotionalPrice,
@@ -77,10 +69,9 @@ export default function PlatformServiceDetailScreen() {
   const { width } = useWindowDimensions();
   const { locale, isRTL, t } = useLocale();
   const { presentShare } = useSharePreview();
-  const { user, getValidAccessToken } = useAuth();
   const { slug: slugParam } = useLocalSearchParams<{ slug: string }>();
   const slug = typeof slugParam === 'string' ? slugParam : Array.isArray(slugParam) ? slugParam[0] : '';
-  const { removeLine, replaceLines, lines: cartLines, count: cartCount } = useShopCart();
+  const { lines: cartLines, count: cartCount } = useShopCart();
 
   const cartPlatformServiceSlugs = useMemo(
     () =>
@@ -97,13 +88,7 @@ export default function PlatformServiceDetailScreen() {
   const [service, setService] = useState<PlatformServiceItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [notFound, setNotFound] = useState(false);
-  const [addingToCart, setAddingToCart] = useState(false);
-
-  const cartPid = useMemo(
-    () => (slug ? platformServiceCartProductId(slug) : 0),
-    [slug],
-  );
-  const inCart = useMemo(() => cartLines.some((l) => l.productId === cartPid), [cartLines, cartPid]);
+  const galleryIconSize = useMemo(() => platformServiceGalleryLogoIconSize(width), [width]);
 
   useEffect(() => {
     if (!slug) {
@@ -183,152 +168,25 @@ export default function PlatformServiceDetailScreen() {
     promoPct != null ? `−${shopFormatPromoDiscountPercentLabel(promoPct)}%` : null;
   const priceInactive = platformServiceCatalogCardInactive(entitlement, entitlementsLoading);
 
-  const galleryIconSize = useMemo(() => platformServiceGalleryLogoIconSize(width), [width]);
-
-  const handleAdd = useCallback(async () => {
-    if (!service) return;
-    let ent = entitlement;
-    if (!platformServiceCanAddToCart(ent)) {
-      try {
-        const token = await getValidAccessToken();
-        const fresh = await fetchPlatformServiceCatalogEntitlements(
-          {
-            phone: user?.phone?.trim() || undefined,
-            cartSlugs: cartPlatformServiceSlugs,
-            niveau: eligibilityProfile?.niveau,
-          },
-          token,
-        );
-        ent = fresh[service.slug] ?? ent;
-      } catch {
-        /* garde l’entitlement en cache */
-      }
-    }
-    if (!platformServiceCanAddToCart(ent)) return;
-    setAddingToCart(true);
-    try {
-      const productId = platformServiceCartProductId(service.slug);
-      if (inCart) {
-        await removeLine(productId);
-        return;
-      }
-      const unit = platformServiceEffectiveUnitPriceString(service, ent);
-      const currency = platformServiceCurrency(service.currency);
-      const line = {
-        productId,
+  const isUpgrade = entitlement?.status === 'upgrade_available';
+  const whatsAppLabel = !purchasable
+    ? platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'shopServiceWhatsAppOrder')
+    : isUpgrade
+      ? t('shopServiceWhatsAppUpgrade')
+      : t('shopServiceWhatsAppOrder');
+  const openServiceWhatsApp = () => {
+    if (!service || !purchasable) return;
+    const priceLabel = formatShopPrice(unitStr, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 });
+    openPlatformServiceWhatsAppOrder(
+      {
+        name: service.name,
         slug: service.slug,
-        title: service.name,
-        price: unit,
-        currency,
-        quantity: 1,
-        type: 'service' as const,
-        lineKind: 'platform_service' as const,
-        platformServiceSlug: service.slug,
-        images: [] as string[],
-        isFreeShipping: Boolean(service.isFreeShipping),
-        platformServiceBrandIcon: service.brandIcon,
-        platformServiceBrandColor: service.brandColor,
-      };
-      const canProceed = await addPlatformServiceToCartWithEviction({
-        entitlement: ent,
-        replaceLines,
-        lineToAdd: line,
-        newServiceName: service.name,
-        resolveServiceName: (slug) => serviceNames.get(slug) ?? slug,
-        locale,
-        t,
-      });
-      if (!canProceed) return;
-      void recordShopBoutiqueEvent('add_to_cart', undefined, service.slug);
-    } finally {
-      setAddingToCart(false);
-    }
-  }, [
-    service,
-    inCart,
-    replaceLines,
-    removeLine,
-    entitlement,
-    serviceNames,
-    locale,
-    t,
-    cartPlatformServiceSlugs,
-    eligibilityProfile?.niveau,
-    getValidAccessToken,
-    user?.phone,
-  ]);
-
-  const handleBuyNow = useCallback(async () => {
-    if (!service) return;
-    let ent = entitlement;
-    if (!platformServiceCanAddToCart(ent)) {
-      try {
-        const token = await getValidAccessToken();
-        const fresh = await fetchPlatformServiceCatalogEntitlements(
-          {
-            phone: user?.phone?.trim() || undefined,
-            cartSlugs: cartPlatformServiceSlugs,
-            niveau: eligibilityProfile?.niveau,
-          },
-          token,
-        );
-        ent = fresh[service.slug] ?? ent;
-      } catch {
-        /* garde l’entitlement en cache */
-      }
-    }
-    if (!platformServiceCanAddToCart(ent)) return;
-    setAddingToCart(true);
-    try {
-      if (!inCart) {
-        const unit = platformServiceEffectiveUnitPriceString(service, ent);
-        const currency = platformServiceCurrency(service.currency);
-        const line = {
-          productId: platformServiceCartProductId(service.slug),
-          slug: service.slug,
-          title: service.name,
-          price: unit,
-          currency,
-          quantity: 1,
-          type: 'service' as const,
-          lineKind: 'platform_service' as const,
-          platformServiceSlug: service.slug,
-          images: [] as string[],
-          isFreeShipping: Boolean(service.isFreeShipping),
-          platformServiceBrandIcon: service.brandIcon,
-          platformServiceBrandColor: service.brandColor,
-        };
-        const canProceed = await addPlatformServiceToCartWithEviction({
-          entitlement: ent,
-          replaceLines,
-          lineToAdd: line,
-          newServiceName: service.name,
-          resolveServiceName: (slug) => serviceNames.get(slug) ?? slug,
-          locale,
-          t,
-        });
-        if (!canProceed) return;
-        void recordShopBoutiqueEvent('add_to_cart', undefined, service.slug);
-      }
-      const path = await getShopPathAfterBuyNow();
-      router.push(path as any);
-    } finally {
-      setAddingToCart(false);
-    }
-  }, [
-    service,
-    inCart,
-    replaceLines,
-    router,
-    entitlement,
-    serviceNames,
-    locale,
-    t,
-    cartPlatformServiceSlugs,
-    eligibilityProfile?.niveau,
-    getValidAccessToken,
-    user?.phone,
-  ]);
+        priceLabel,
+        intent: isUpgrade ? 'upgrade' : 'order',
+      },
+      locale === 'ar' ? 'ar' : 'fr',
+    );
+  };
 
   if (loading) {
     return (
@@ -607,11 +465,8 @@ export default function PlatformServiceDetailScreen() {
           ) : null}
 
           <View style={styles.hintBox}>
-            <FontAwesome name="info-circle" size={14} color={brand.primary} />
-            <Text style={styles.hintTxt}>
-              Après confirmation, l’équipe vous indique les modalités de paiement (virement, espèces au bureau ou
-              consignes en ligne) selon le service choisi.
-            </Text>
+            <FontAwesome name="whatsapp" size={14} color="#128C7E" />
+            <Text style={styles.hintTxt}>{t('shopServiceWhatsAppHint')}</Text>
           </View>
 
           <View style={{ height: 120 }} />
@@ -621,56 +476,18 @@ export default function PlatformServiceDetailScreen() {
       <SafeAreaView edges={['bottom']} style={styles.footer}>
         <View style={styles.footerBtns}>
           <Pressable
-            onPress={() => void handleAdd()}
-            disabled={addingToCart || entitlementsLoading || !purchasable}
-            style={({ pressed }) => [
-              styles.addBtn,
-              inCart && purchasable && styles.addBtnIn,
-              (!purchasable || entitlementsLoading) && styles.addBtnDisabled,
-              pressed && purchasable && !entitlementsLoading && { opacity: 0.88 },
-            ]}
-            accessibilityLabel={
-              !purchasable
-                ? t('shopEntitlementNotPurchasable')
-                : inCart
-                  ? t('shopRemoveFromCartA11y')
-                  : t('shopAddA11y')
-            }
-          >
-            {addingToCart ? (
-              <ActivityIndicator size="small" color={!purchasable ? '#94A3B8' : inCart ? brand.white : brand.primary} />
-            ) : (
-              <>
-                <FontAwesome
-                  name={inCart && purchasable ? 'check' : 'shopping-cart'}
-                  size={15}
-                  color={!purchasable ? '#94A3B8' : inCart && purchasable ? brand.white : brand.primary}
-                />
-                <Text
-                  style={[
-                    styles.addBtnTxt,
-                    inCart && purchasable && styles.addBtnTxtIn,
-                    !purchasable && styles.addBtnTxtDisabled,
-                  ]}
-                >
-                  {!purchasable
-                    ? platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'Panier')
-                    : inCart
-                      ? 'Au panier'
-                      : 'Panier'}
-                </Text>
-              </>
-            )}
-          </Pressable>
-          <Pressable
-            onPress={() => void handleBuyNow()}
-            disabled={addingToCart || entitlementsLoading || !purchasable}
+            onPress={openServiceWhatsApp}
+            disabled={entitlementsLoading || !purchasable}
             style={({ pressed }) => [
               styles.buyBtn,
               (!purchasable || entitlementsLoading) && styles.buyBtnDisabled,
               pressed && purchasable && !entitlementsLoading && { opacity: 0.9 },
             ]}
+            accessibilityLabel={whatsAppLabel}
           >
+            {purchasable && !entitlementsLoading ? (
+              <FontAwesome name="whatsapp" size={16} color={brand.white} />
+            ) : null}
             <Text
               style={[
                 styles.buyBtnTxt,
@@ -678,13 +495,11 @@ export default function PlatformServiceDetailScreen() {
                 (!purchasable || entitlementsLoading) && styles.buyBtnTxtDisabled,
               ]}
             >
-              {entitlement?.status === 'upgrade_available' || !purchasable
-                ? platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'shopBuyNow')
-                : service.cta}
+              {whatsAppLabel}
             </Text>
-            {!purchasable || entitlementsLoading ? null : (
+            {purchasable && !entitlementsLoading ? (
               <FontAwesome name="arrow-right" size={13} color={brand.white} />
-            )}
+            ) : null}
           </Pressable>
         </View>
       </SafeAreaView>
@@ -987,8 +802,8 @@ const styles = StyleSheet.create({
   buyBtn: {
     flex: 1,
     height: 48,
+    backgroundColor: '#128C7E',
     borderRadius: radius.md,
-    backgroundColor: brand.primary,
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',

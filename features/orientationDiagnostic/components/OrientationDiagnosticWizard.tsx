@@ -54,6 +54,9 @@ import {
   buildOrientationReport,
   emptyAnswers,
   isStepAnswered,
+  mergeStudentSummary,
+  restoreDiagnosticAnswers,
+  studentSummaryFromAnswers,
 } from '../utils/orientationDiagnosticEngine';
 import { buildSchoolRecommendations } from '../utils/orientationDiagnosticSchoolReco';
 import { orientationUiLocaleFromApp } from '../utils/orientationUiLocaleFromApp';
@@ -268,9 +271,11 @@ export function OrientationDiagnosticWizard() {
       }
       const draft = await readOrientationDiagnosticPrototypeDraft(userId);
       const token = await getValidAccessToken();
+      let serverAnswers = draft?.answers ?? null;
       if (token) {
         try {
           const server = await fetchOrientationDiagnosticSession(token);
+          serverAnswers = server?.answers ?? serverAnswers;
           const localScore = orientationProgressScore(draft?.answers);
           const serverScore = orientationProgressScore(server?.answers);
           const serverHasAnswers = serverScore > 0;
@@ -279,7 +284,7 @@ export function OrientationDiagnosticWizard() {
             if (server.modelVersion === '1.0' || server.modelVersion === '2.0') {
               modelVersionRef.current = server.modelVersion;
             }
-            const restored = { ...emptyAnswers(), ...server.answers };
+            const restored = restoreDiagnosticAnswers(server.answers, draft?.answers);
             setAnswers(restored);
             await persistOrientationDiagnosticPrototypeDraft({
               userId,
@@ -302,14 +307,19 @@ export function OrientationDiagnosticWizard() {
             return;
           }
           if (draft && (draft.phase === 'quiz' || draft.phase === 'report') && draft.answers) {
+            const merged = restoreDiagnosticAnswers(draft.answers, server?.answers);
             void saveOrientationDiagnosticStep(token, {
               stepId: draft.stepId,
               phase: draft.phase === 'report' ? 'report' : 'quiz',
               uiLocale: uiLocaleRef.current,
-              answers: draft.answers,
+              answers: merged,
               clientUpdatedAt: draft.savedAt || new Date().toISOString(),
             })
               .catch(() => undefined);
+            await persistOrientationDiagnosticPrototypeDraft({
+              ...draft,
+              answers: merged,
+            });
           }
         } catch {
           /* reprise locale */
@@ -320,7 +330,7 @@ export function OrientationDiagnosticWizard() {
         return;
       }
       if (draft?.phase === 'quiz' && draft.answers) {
-        setAnswers(draft.answers);
+        setAnswers(restoreDiagnosticAnswers(draft.answers, serverAnswers));
         setSituationBriefDone(draft.ui.situationBriefDone);
         setVersusBriefDone(draft.ui.versusBriefDone);
         setSituationPhase(draft.ui.situationPhase);
@@ -490,10 +500,13 @@ export function OrientationDiagnosticWizard() {
     persistProgress({
       phase: 'quiz',
       stepId: step?.id || heldStepIdRef.current || 'profile_identity',
-      answers: { ...latest, profile: next.profile ?? latest.profile },
+      answers: {
+        ...latest,
+        profile: withAccountOrientationPrefill(latest.profile, accountPrefill ?? {}),
+      },
       lastCompletedModule,
     });
-  }, [answers.profile, booting, step?.id, lastCompletedModule, persistProgress]);
+  }, [accountPrefill, answers.profile, booting, step?.id, lastCompletedModule, persistProgress]);
 
   useEffect(() => {
     let alive = true;
@@ -578,7 +591,16 @@ export function OrientationDiagnosticWizard() {
               clientUpdatedAt: new Date().toISOString(),
             });
             const remote = await fetchOrientationDiagnosticServerReport(tokenForReport);
-            if (remote) report = remote as OrientationReport;
+            if (remote) {
+              const remoteReport = remote as OrientationReport;
+              report = {
+                ...remoteReport,
+                studentSummary: mergeStudentSummary(
+                  studentSummaryFromAnswers(stamped),
+                  mergeStudentSummary(report.studentSummary, remoteReport.studentSummary),
+                ),
+              };
+            }
           } catch {
             /* le rapport local reste utilisé si le serveur est injoignable */
           }

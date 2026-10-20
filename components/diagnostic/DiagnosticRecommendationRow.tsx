@@ -1,5 +1,5 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
-import { memo } from 'react';
+import { memo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { EstablishmentRowLogoThumb } from '@/components/shop/EstablishmentRowLogoThumb';
@@ -60,6 +60,8 @@ function DiagnosticRecommendationRowInner({
 }: Props) {
   const title = establishmentRecommendationTitle(row, isRTL);
   const tags = collectSchoolReasonTags(row.reasonsYes, row.reasonsNo, reportLocale);
+  const [tagsOpen, setTagsOpen] = useState(false);
+  const moreLabel = reportLocale === 'ar' ? (tagsOpen ? 'عرض أقل' : 'عرض المزيد') : tagsOpen ? 'Voir moins' : 'Voir plus';
   const scoreLabel = formatDiagnosticPercent(row.combinedScore, isRTL);
   const iaScore = row.iaScore != null ? Math.round(row.iaScore) : null;
   const iaAccent = iaScore != null ? iaScoreAccent(iaScore) : brand.primary;
@@ -99,19 +101,6 @@ function DiagnosticRecommendationRowInner({
             <EstablishmentTypeBadge type={row.typeEcole} size="xs" />
             <Text style={[styles.tierLabel, { color: accent }]}>{tierLabel(tier, reportLocale)}</Text>
           </View>
-          {tags.length ? (
-            <View style={[styles.tags, isRTL && styles.tagsRtl]}>
-              {tags.map((tag) => (
-                <View
-                  key={tag.key}
-                  style={[styles.tag, { backgroundColor: tag.background, borderColor: `${tag.color}55` }]}>
-                  <Text style={[styles.tagLabel, { color: tag.color }, isRTL && styles.rtlText]}>
-                    {tag.label}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
           {showSeuilBadge ? (
             <View style={[styles.seuilBadge, isRTL && styles.seuilBadgeRtl]}>
               <View
@@ -183,6 +172,36 @@ function DiagnosticRecommendationRowInner({
           style={styles.chevron}
         />
       </Pressable>
+
+      {tags.length ? (
+        <View style={[styles.moreBlock, isRTL && styles.moreBlockRtl]}>
+          <Pressable
+            onPress={() => setTagsOpen((open) => !open)}
+            style={({ pressed }) => [styles.moreBtn, pressed && { opacity: 0.8 }]}
+            accessibilityRole="button"
+            accessibilityState={{ expanded: tagsOpen }}>
+            <Text style={[styles.moreBtnTxt, isRTL && styles.rtlText]}>{moreLabel}</Text>
+            <FontAwesome
+              name={tagsOpen ? 'chevron-up' : 'chevron-down'}
+              size={11}
+              color={brand.primary}
+            />
+          </Pressable>
+          {tagsOpen ? (
+            <View style={[styles.tags, isRTL && styles.tagsRtl]}>
+              {tags.map((tag) => (
+                <View
+                  key={tag.key}
+                  style={[styles.tag, { backgroundColor: tag.background, borderColor: `${tag.color}55` }]}>
+                  <Text style={[styles.tagLabel, { color: tag.color }, isRTL && styles.rtlText]}>
+                    {tag.label}
+                  </Text>
+                </View>
+              ))}
+            </View>
+          ) : null}
+        </View>
+      ) : null}
 
       {showFollowAction && onToggleFollow ? (
         <View style={[styles.followBar, isRTL && styles.followBarRtl]}>
@@ -263,7 +282,25 @@ const styles = StyleSheet.create({
   body: { flex: 1, minWidth: 0, gap: 4 },
   title: { fontWeight: '800', fontSize: fontSize.sm, color: brand.text, lineHeight: 20 },
   tierLabel: { fontSize: fontSize.xs, fontWeight: '800' },
-  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 2 },
+  moreBlock: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+    gap: 8,
+  },
+  moreBlockRtl: DIR_RTL,
+  moreBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    alignSelf: 'flex-start',
+    gap: 6,
+    paddingVertical: 4,
+  },
+  moreBtnTxt: {
+    fontSize: fontSize.xs,
+    fontWeight: '800',
+    color: brand.primary,
+  },
+  tags: { flexDirection: 'row', flexWrap: 'wrap', gap: 4 },
   tagsRtl: DIR_RTL,
   tag: {
     borderWidth: 1,

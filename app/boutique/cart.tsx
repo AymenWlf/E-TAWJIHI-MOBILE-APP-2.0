@@ -14,12 +14,13 @@ import { brand, fontSize, radius, spacing } from '@/theme/tokens';
 import { formatShopPrice, shopParsePriceString, shopPriceFormatOptsForCatalogOrCartLine } from '@/utils/shopFormatPrice';
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
 import { isPlatformServiceCartLine } from '@/utils/platformServiceCart';
+import { openPlatformServicesWhatsAppOrder } from '@/utils/platformServiceWhatsAppOrder';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 
 import { DIR_RTL } from '@/utils/layoutDirection';
 export default function BoutiqueCartScreen() {
   const router = useRouter();
-  const { t, isRTL } = useLocale();
+  const { t, isRTL, locale } = useLocale();
   const { lines, count, updateQuantity, removeLine, hydrateImages, ready } = useShopCart();
 
   const payMethodLines = useMemo(
@@ -42,11 +43,29 @@ export default function BoutiqueCartScreen() {
     void recordShopBoutiqueEvent('view_cart');
   }, []);
 
+  const serviceLines = useMemo(() => lines.filter((l) => isPlatformServiceCartLine(l)), [lines]);
+  const productLines = useMemo(() => lines.filter((l) => !isPlatformServiceCartLine(l)), [lines]);
+  const servicesOnly = serviceLines.length > 0 && productLines.length === 0;
   const subtotal = useMemo(
     () => lines.reduce((acc, l) => acc + shopParsePriceString(l.price) * l.quantity, 0),
     [lines],
   );
   const currency = lines[0]?.currency ?? 'MAD';
+  const checkoutSubtotal = useMemo(
+    () => productLines.reduce((acc, l) => acc + shopParsePriceString(l.price) * l.quantity, 0),
+    [productLines],
+  );
+  const openServicesOnWhatsApp = () => {
+    openPlatformServicesWhatsAppOrder(
+      serviceLines.map((l) => ({
+        name: l.title,
+        slug: l.platformServiceSlug ?? l.slug,
+        price: l.price,
+        currency: l.currency,
+      })),
+      locale === 'ar' ? 'ar' : 'fr',
+    );
+  };
   const cartWideFreeShipping = useMemo(
     () => lines.length > 0 && lines.some((l) => l.isFreeShipping === true),
     [lines],
@@ -168,6 +187,27 @@ export default function BoutiqueCartScreen() {
                       </Text>
                     </View>
 
+                    {isSvc ? (
+                      <Pressable
+                        onPress={() =>
+                          openPlatformServicesWhatsAppOrder(
+                            [
+                              {
+                                name: l.title,
+                                slug: l.platformServiceSlug ?? l.slug,
+                                price: l.price,
+                                currency: l.currency,
+                              },
+                            ],
+                            locale === 'ar' ? 'ar' : 'fr',
+                          )
+                        }
+                        style={({ pressed }) => [styles.whatsAppBtn, isRTL && styles.rowRtl, pressed && { opacity: 0.9 }]}
+                      >
+                        <FontAwesome name="whatsapp" size={13} color={brand.white} />
+                        <Text style={styles.whatsAppBtnTxt}>{t('shopServiceWhatsAppOrder')}</Text>
+                      </Pressable>
+                    ) : null}
                     <Pressable
                       onPress={() => void removeLine(l.productId)}
                       hitSlop={6}
@@ -225,14 +265,32 @@ export default function BoutiqueCartScreen() {
             <View style={[styles.checkoutBar, isRTL && styles.rowRtl]}>
               <View style={{ flex: 1 }}>
                 <Text style={[styles.checkoutBarLbl, isRTL && styles.txtRtl]}>{t('shopCartFooterTotal')}</Text>
-                <Text style={[styles.checkoutBarTotal, isRTL && styles.txtRtl]}>{formatShopPrice(String(subtotal), currency)}</Text>
+                <Text style={[styles.checkoutBarTotal, isRTL && styles.txtRtl]}>
+                  {formatShopPrice(String(servicesOnly ? subtotal : checkoutSubtotal), currency)}
+                </Text>
               </View>
               <Pressable
-                onPress={() => router.push('/boutique/checkout' as any)}
-                style={({ pressed }) => [styles.checkoutBtn, isRTL && styles.rowRtl, pressed && { opacity: 0.92 }]}
+                onPress={() => {
+                  if (servicesOnly) {
+                    openServicesOnWhatsApp();
+                    return;
+                  }
+                  router.push('/boutique/checkout' as any);
+                }}
+                style={({ pressed }) => [
+                  styles.checkoutBtn,
+                  servicesOnly && styles.checkoutBtnWhatsApp,
+                  isRTL && styles.rowRtl,
+                  pressed && { opacity: 0.92 },
+                ]}
               >
-                <Text style={styles.checkoutBtnTxt}>{t('shopCartGoCheckout')}</Text>
-                <FontAwesome name={isRTL ? 'arrow-left' : 'arrow-right'} size={13} color={brand.white} />
+                {servicesOnly ? <FontAwesome name="whatsapp" size={14} color={brand.white} /> : null}
+                <Text style={styles.checkoutBtnTxt}>
+                  {servicesOnly ? t('shopServiceWhatsAppOrder') : t('shopCartGoCheckout')}
+                </Text>
+                {servicesOnly ? null : (
+                  <FontAwesome name={isRTL ? 'arrow-left' : 'arrow-right'} size={13} color={brand.white} />
+                )}
               </Pressable>
             </View>
           </SafeAreaView>
@@ -435,6 +493,19 @@ const styles = StyleSheet.create({
     backgroundColor: brand.primary,
   },
   checkoutBtnTxt: { color: brand.white, fontSize: fontSize.sm, fontWeight: '800' },
+  checkoutBtnWhatsApp: { backgroundColor: '#128C7E' },
+  whatsAppBtn: {
+    alignSelf: 'flex-start',
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 8,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+    borderRadius: radius.sm,
+    backgroundColor: '#128C7E',
+  },
+  whatsAppBtnTxt: { color: brand.white, fontSize: 12, fontWeight: '800' },
 
   emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xxl },
   emptyIcon: {

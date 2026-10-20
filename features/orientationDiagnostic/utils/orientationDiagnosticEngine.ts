@@ -24,6 +24,7 @@ import {
   formatProfileBacFiliereLabel,
   mapFiliereToCtx,
   mapStudyLevelToCtx,
+  mergeDiagnosticProfiles,
   validateProfileGrades,
   validateProfileIdentity,
   validateProfileSchool,
@@ -778,6 +779,31 @@ export function emptyAnswers(): DiagnosticAnswers {
   };
 }
 
+/** Reprend un payload session/brouillon sans perdre les champs profil renseignés. */
+export function restoreDiagnosticAnswers(
+  ...sources: Array<Partial<DiagnosticAnswers> | null | undefined>
+): DiagnosticAnswers {
+  const base = emptyAnswers();
+  const profiles: Array<Partial<DiagnosticProfile> | null | undefined> = [];
+  let merged: DiagnosticAnswers = base;
+  for (const raw of sources) {
+    if (!raw || typeof raw !== 'object') continue;
+    profiles.push(raw.profile);
+    merged = {
+      ...merged,
+      ...raw,
+      schoolMeta: raw.schoolMeta && Object.keys(raw.schoolMeta).length ? raw.schoolMeta : merged.schoolMeta,
+      labels: raw.labels && Object.keys(raw.labels).length ? raw.labels : merged.labels,
+      versusPlan: raw.versusPlan?.length ? raw.versusPlan : merged.versusPlan,
+      versusField: raw.versusField ?? merged.versusField,
+      versusLog: raw.versusLog?.length ? raw.versusLog : merged.versusLog,
+      versusRankings: raw.versusRankings ?? merged.versusRankings,
+    };
+  }
+  merged.profile = mergeDiagnosticProfiles(...profiles);
+  return merged;
+}
+
 function syncProfileToContext(answers: DiagnosticAnswers): DiagnosticAnswers {
   const p = answers.profile;
   if (!p?.studyLevel) return answers;
@@ -845,7 +871,7 @@ function studyCitiesLabelFromAnswers(answers: DiagnosticAnswers): string {
 }
 
 export function studentSummaryFromAnswers(answers: DiagnosticAnswers) {
-  const p = answers.profile;
+  const p = mergeDiagnosticProfiles(answers?.profile);
   const bacLabel =
     p.bacType === 'mission'
       ? `Mission · ${(p.bacSpecialites || []).join(', ') || '—'}`

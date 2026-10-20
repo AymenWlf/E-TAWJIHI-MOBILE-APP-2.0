@@ -28,6 +28,8 @@ import {
   platformServiceActivePromotionalPrice,
   platformServiceCurrency,
 } from '@/utils/platformServicePrice';
+import { openPlatformServiceWhatsAppOrder } from '@/utils/platformServiceWhatsAppOrder';
+import { formatShopPrice } from '@/utils/shopFormatPrice';
 import { recordShopBoutiqueEvent } from '@/services/shopBoutiqueAnalytics';
 import {
   normalizePlatformServiceBrandColor,
@@ -50,10 +52,10 @@ export type ShopServiceCatalogCardProps = {
   entitlement?: PlatformServiceCatalogEntitlement;
   entitlementsLoading?: boolean;
   serviceNameBySlug?: Map<string, string>;
-  inCart: boolean;
+  inCart?: boolean;
   onOpenDetail: () => void;
-  onAddCart: () => void;
-  onBuyNow: () => void;
+  onAddCart?: () => void;
+  onBuyNow?: () => void;
   layout?: 'carousel' | 'stack';
 };
 
@@ -94,6 +96,27 @@ export function ShopServiceCatalogCard({
   );
   const showPromoStyle = hasPromo || isUpgradePrice;
   const purchasable = platformServiceCatalogPurchasable(entitlement, entitlementsLoading);
+  const isUpgrade = entitlement?.status === 'upgrade_available';
+  const whatsAppLabel = !purchasable
+    ? platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'shopServiceWhatsAppOrder')
+    : isUpgrade
+      ? t('shopServiceWhatsAppUpgrade')
+      : t('shopServiceWhatsAppOrder');
+  const openServiceWhatsApp = () => {
+    if (!purchasable) return;
+    const priceLabel = pricePrimary
+      ? formatShopPrice(pricePrimary, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+      : null;
+    openPlatformServiceWhatsAppOrder(
+      {
+        name: s.name,
+        slug: s.slug,
+        priceLabel,
+        intent: isUpgrade ? 'upgrade' : 'order',
+      },
+      locale === 'ar' ? 'ar' : 'fr',
+    );
+  };
 
   const localizedDesc =
     platformServiceLocalizedMiniDescription(s, locale) ??
@@ -260,52 +283,27 @@ export function ShopServiceCatalogCard({
       <View style={[styles.actionsBar, isStack && styles.actionsBarStack]}>
         <View style={styles.actions}>
           <Pressable
-            onPress={() => {
-              if (!purchasable && !inCart) return;
-              void onAddCart();
-            }}
-            disabled={(!purchasable && !inCart) || entitlementsLoading}
-            style={({ pressed }) => [
-              styles.cartBtn,
-              inCart && styles.cartBtnOn,
-              ((!purchasable && !inCart) || entitlementsLoading) && styles.btnDisabled,
-              pressed && purchasable && !entitlementsLoading && { opacity: 0.88 },
-            ]}
-            accessibilityLabel={
-              !purchasable && !inCart ? t('shopEntitlementNotPurchasable') : inCart ? t('shopRemoveFromCartA11y') : t('shopAddA11y')
-            }
-          >
-            <FontAwesome
-              name={inCart ? 'check' : 'shopping-cart'}
-              size={15}
-              color={!purchasable && !inCart ? '#94A3B8' : inCart ? brand.white : brand.primary}
-            />
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              if (!purchasable && !inCart) return;
-              void onBuyNow();
-            }}
-            disabled={(!purchasable && !inCart) || entitlementsLoading}
+            onPress={openServiceWhatsApp}
+            disabled={!purchasable || entitlementsLoading}
             style={({ pressed }) => [
               styles.buyBtn,
-              ((!purchasable && !inCart) || entitlementsLoading) && styles.buyBtnDisabled,
+              (!purchasable || entitlementsLoading) && styles.buyBtnDisabled,
               pressed && purchasable && !entitlementsLoading && { opacity: 0.92 },
             ]}
-            accessibilityLabel={
-              !purchasable && !inCart ? t('shopEntitlementNotPurchasable') : t('shopBuyNowA11y')
-            }
+            accessibilityLabel={whatsAppLabel}
           >
+            {purchasable && !entitlementsLoading ? (
+              <FontAwesome name="whatsapp" size={16} color={brand.white} />
+            ) : null}
             <Text
               style={[
                 styles.buyTxt,
                 isRTL && styles.buyTxtRtl,
-                ((!purchasable && !inCart) || entitlementsLoading) && styles.buyTxtDisabled,
+                (!purchasable || entitlementsLoading) && styles.buyTxtDisabled,
               ]}
             >
-              {platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'shopBuyNow')}
+              {whatsAppLabel}
             </Text>
-            <FontAwesome name={isRTL ? 'angle-left' : 'angle-right'} size={14} color={brand.white} />
           </Pressable>
         </View>
       </View>
@@ -660,13 +658,13 @@ const styles = StyleSheet.create({
   buyBtn: {
     flex: 1,
     minHeight: 46,
+    backgroundColor: '#128C7E',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     gap: 8,
     paddingHorizontal: spacing.md,
     borderRadius: radius.md,
-    backgroundColor: brand.primary,
   },
   buyBtnDisabled: {
     backgroundColor: '#CBD5E1',

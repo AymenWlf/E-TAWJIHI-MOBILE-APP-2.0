@@ -60,6 +60,16 @@ const COPY = {
     subtitle: 'Classement issu de votre test d’orientation',
     synthesis: 'Synthèse IA',
     profile: 'Votre profil',
+    profileIntro: 'Classement basé sur ton profil (secteurs, villes, bac, budget, type d’école).',
+    scoredLabel: 'Établissements scorés',
+    bestScoreLabel: 'Meilleur score',
+    moyenneLabel: 'Moyenne générale',
+    moyenneFormula: '25 % régionale + 25 % contrôle continu + 50 % nationale',
+    measureLabel: '75 % + 25 %',
+    measureFormula: '75 % nationale + 25 % (régionale et contrôle continu)',
+    notePremiere: 'Note régionale',
+    noteCc: 'Contrôle continu',
+    noteNational: 'Note nationale',
     edit: 'Refaire le test d’orientation',
     schools: 'Voir les écoles recommandées',
     emptyNoOrientation:
@@ -87,6 +97,16 @@ const COPY = {
     subtitle: 'الترتيب مستمد من اختبار التوجيه',
     synthesis: 'ملخص الذكاء الاصطناعي',
     profile: 'ملفك',
+    profileIntro: 'الترتيب مبني على ملفك (القطاعات، المدن، الباك، الميزانية، نوع المدرسة).',
+    scoredLabel: 'مؤسسات مقيّمة',
+    bestScoreLabel: 'أعلى نقطة',
+    moyenneLabel: 'المعدل العام',
+    moyenneFormula: '25٪ جهوية + 25٪ مراقبة مستمرة + 50٪ وطنية',
+    measureLabel: '75٪ + 25٪',
+    measureFormula: '75٪ وطنية + 25٪ (الجهوية والمراقبة المستمرة)',
+    notePremiere: 'النقطة الجهوية',
+    noteCc: 'المراقبة المستمرة',
+    noteNational: 'النقطة الوطنية',
     edit: 'إعادة اختبار التوجيه',
     schools: 'عرض المدارس الموصى بها',
     emptyNoOrientation: 'أنهِ أولاً اختبار التوجيه لإنشاء توصيات المدارس.',
@@ -129,10 +149,6 @@ type RecommendationSection = {
   data: RecommendationListItem[];
 };
 
-const PROFILE_SUMMARY_FR =
-  'Classement basé sur ton profil (secteurs, villes, bac, budget, type d’école).';
-const PROFILE_SUMMARY_AR =
-  'الترتيب مبني على ملفك (القطاعات، المدن، الباك، الميزانية، نوع المدرسة).';
 const GLOBAL_COMMENT_FR =
   'Les scores sont calculés instantanément par l’algorithme E-TAWJIHI. Suis au moins 3 écoles pour valider l’étape du parcours.';
 const GLOBAL_COMMENT_AR =
@@ -159,13 +175,11 @@ function LocalizedParagraph({
   );
 }
 
-function profileSummaryPair(summary: string | null, count: number, topScore: number): { fr: string; ar: string } {
+function profileStats(summary: string | null, count: number, topScore: number): { count: number; score: number } {
   const match = summary?.match(/(\d+)[^\d]+(\d+)\s*%/);
-  const n = match ? Number(match[1]) : count;
-  const score = match ? Number(match[2]) : topScore;
   return {
-    fr: `${PROFILE_SUMMARY_FR} ${n} établissements scorés — meilleur score ${score}%.`,
-    ar: `${PROFILE_SUMMARY_AR} تم تقييم ${n} مؤسسة — أعلى نقطة ${score}٪.`,
+    count: match ? Number(match[1]) : count,
+    score: match ? Number(match[2]) : topScore,
   };
 }
 
@@ -476,33 +490,35 @@ export default function DiagnosticResultatsScreen() {
     [diagnosticPayload],
   );
 
-  const measurementLine = useMemo(() => {
-    if (bacComparison.comparisonNote == null) return '';
+  const measurementNotes = useMemo(() => {
+    if (bacComparison.comparisonNote == null) return null;
     const read = (value: unknown) => Number.parseFloat(String(value ?? '').replace(',', '.'));
     const premiereNote = read(diagnosticPayload.noteGeneralePremiereBacSur20);
     const ccNote = read(diagnosticPayload.noteGeneraleSemestre1SecondBacSur20);
-    const parts: string[] = [];
+    const chips: { id: string; label: string; value: string }[] = [];
     if (Number.isFinite(premiereNote)) {
-      parts.push(reportLocale === 'ar' ? `الأولى ${formatNoteFr20(premiereNote)}` : `1ère ${formatNoteFr20(premiereNote)}`);
+      chips.push({ id: 'premiere', label: cpy.notePremiere, value: formatNoteFr20(premiereNote) });
     }
     if (Number.isFinite(ccNote)) {
-      parts.push(reportLocale === 'ar' ? `المراقبة ${formatNoteFr20(ccNote)}` : `CC ${formatNoteFr20(ccNote)}`);
+      chips.push({ id: 'cc', label: cpy.noteCc, value: formatNoteFr20(ccNote) });
     }
     if (bacComparison.nationalReference != null) {
-      parts.push(
-        reportLocale === 'ar'
-          ? `الوطني ${formatNoteFr20(bacComparison.nationalReference)}`
-          : `Nat. ${formatNoteFr20(bacComparison.nationalReference)}`,
-      );
+      chips.push({
+        id: 'national',
+        label: cpy.noteNational,
+        value: formatNoteFr20(bacComparison.nationalReference),
+      });
     }
-    const measure = formatNoteFr20(bacComparison.comparisonNote);
-    parts.push(
-      reportLocale === 'ar'
-        ? `القياس ${measure}/20 (75٪ وطني + 25٪ الأولى/المراقبة)`
-        : `Mesure ${measure}/20 (75 % nat. + 25 % 1ère/CC)`,
-    );
-    return parts.join(' · ');
-  }, [bacComparison, diagnosticPayload, reportLocale]);
+    const moyenne =
+      Number.isFinite(premiereNote) && Number.isFinite(ccNote) && bacComparison.nationalReference != null
+        ? formatNoteFr20(premiereNote * 0.25 + ccNote * 0.25 + bacComparison.nationalReference * 0.5)
+        : null;
+    return {
+      chips,
+      moyenne,
+      measure: formatNoteFr20(bacComparison.comparisonNote),
+    };
+  }, [bacComparison, cpy.noteCc, cpy.noteNational, cpy.notePremiere, diagnosticPayload]);
 
   const { facultes, others: nonFaculteRows } = useMemo(
     () => partitionFacultePublique(rows),
@@ -615,26 +631,70 @@ export default function DiagnosticResultatsScreen() {
 
   const recommendationListHeader = useMemo(() => {
     if (!profileSummary && !globalComment && nonFaculteRows.length === 0) return null;
-    const profilePair = profileSummaryPair(profileSummary, rows.length, topRecommendationScore(rows));
+    const stats = profileStats(profileSummary, rows.length, topRecommendationScore(rows));
     return (
       <View style={styles.listHeaderWrap}>
         {profileSummary ? (
-          <View style={[styles.insightCard, isRTL && styles.insightCardRtl]}>
-            <View style={[styles.insightIcon, { backgroundColor: diagnosticTheme.primarySoft }]}>
-              <FontAwesome name="user-circle" size={18} color={brand.primary} />
+          <View style={[styles.profileCard, isRTL && styles.insightCardRtl]}>
+            <View style={styles.profileHead}>
+              <View style={[styles.insightIcon, { backgroundColor: diagnosticTheme.primarySoft }]}>
+                <FontAwesome name="user-circle" size={18} color={brand.primary} />
+              </View>
+              <Text style={[styles.insightLabel, alignText, isRTL && styles.rtlNoTransform]}>{cpy.profile}</Text>
             </View>
-            <View style={styles.insightBody}>
-              <Text
-                style={[styles.insightLabel, alignText, isRTL && styles.rtlNoTransform]}>
-                {cpy.profile}
-              </Text>
-              <LocalizedParagraph fr={profilePair.fr} ar={profilePair.ar} locale={reportLocale} />
-              {measurementLine ? (
-                <Text style={[styles.insightTxt, alignText, isRTL && styles.arabicFace]} latinDigits>
-                  {measurementLine}
+            <Text style={[styles.insightTxt, alignText, isRTL && styles.arabicFace]}>{cpy.profileIntro}</Text>
+            <View style={styles.profileStats}>
+              <View style={styles.profileStat}>
+                <Text style={styles.profileStatValue} latinDigits>
+                  {stats.count}
                 </Text>
-              ) : null}
+                <Text style={[styles.profileStatLabel, alignText, isRTL && styles.arabicFace]}>{cpy.scoredLabel}</Text>
+              </View>
+              <View style={styles.profileStat}>
+                <Text style={styles.profileStatValue} latinDigits>
+                  {`${stats.score}%`}
+                </Text>
+                <Text style={[styles.profileStatLabel, alignText, isRTL && styles.arabicFace]}>{cpy.bestScoreLabel}</Text>
+              </View>
             </View>
+            {measurementNotes ? (
+              <View style={styles.profileNotes}>
+                <View style={styles.profileNotesRow}>
+                  {measurementNotes.chips.map((chip) => (
+                    <View key={chip.id} style={styles.profileNoteCell}>
+                      <Text style={[styles.profileChipLabel, alignText, isRTL && styles.arabicFace]}>{chip.label}</Text>
+                      <Text style={styles.profileChipValue} latinDigits>
+                        {`${chip.value}/20`}
+                      </Text>
+                    </View>
+                  ))}
+                </View>
+                {measurementNotes.moyenne ? (
+                  <View style={[styles.profileCalc, styles.profileCalcAverage, isRTL && styles.profileCalcRtl]}>
+                    <View style={styles.profileCalcCopy}>
+                      <Text style={[styles.profileCalcTitle, styles.profileCalcAverageText, alignText, isRTL && styles.arabicFace]}>
+                        {cpy.moyenneLabel}
+                      </Text>
+                      <Text style={[styles.profileFormula, alignText, isRTL && styles.arabicFace]}>{cpy.moyenneFormula}</Text>
+                    </View>
+                    <Text style={[styles.profileCalcValue, styles.profileCalcAverageText]} latinDigits>
+                      {`${measurementNotes.moyenne}/20`}
+                    </Text>
+                  </View>
+                ) : null}
+                <View style={[styles.profileCalc, styles.profileCalcMeasure, isRTL && styles.profileCalcRtl]}>
+                  <View style={styles.profileCalcCopy}>
+                    <Text style={[styles.profileCalcTitle, styles.profileChipMeasureValue, alignText, isRTL && styles.arabicFace]}>
+                      {cpy.measureLabel}
+                    </Text>
+                    <Text style={[styles.profileFormula, alignText, isRTL && styles.arabicFace]}>{cpy.measureFormula}</Text>
+                  </View>
+                  <Text style={[styles.profileCalcValue, styles.profileChipMeasureValue]} latinDigits>
+                    {`${measurementNotes.measure}/20`}
+                  </Text>
+                </View>
+              </View>
+            ) : null}
           </View>
         ) : null}
 
@@ -670,7 +730,7 @@ export default function DiagnosticResultatsScreen() {
         ) : null}
       </View>
     );
-  }, [alignText, cpy, globalComment, isRTL, measurementLine, nonFaculteRows.length, profileSummary, reportLocale, rows]);
+  }, [alignText, cpy, globalComment, isRTL, measurementNotes, nonFaculteRows.length, profileSummary, reportLocale, rows]);
 
   const recommendationListFooter = useMemo(
     () => (
@@ -1118,6 +1178,103 @@ const styles = StyleSheet.create({
     letterSpacing: 0.35,
   },
   insightTxt: { fontSize: fontSize.sm, color: brand.text, lineHeight: 21 },
+  profileCard: {
+    backgroundColor: brand.white,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    gap: 10,
+    borderWidth: 1,
+    borderColor: homeShell.borderOnWhite,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#333E8F',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.06,
+        shadowRadius: 8,
+      },
+      android: { elevation: 0 },
+    }),
+  },
+  profileHead: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  profileStats: {
+    flexDirection: 'row',
+    gap: 8,
+  },
+  profileStat: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    backgroundColor: '#F8FAFC',
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    paddingVertical: 10,
+    paddingHorizontal: 8,
+    gap: 2,
+  },
+  profileStatValue: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: brand.primary,
+    writingDirection: 'ltr',
+  },
+  profileStatLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: brand.textMuted,
+    textAlign: 'center',
+    lineHeight: 15,
+  },
+  profileNotes: { gap: 8 },
+  profileNotesRow: { flexDirection: 'row', gap: 8 },
+  profileNoteCell: {
+    flex: 1,
+    minWidth: 0,
+    alignItems: 'center',
+    gap: 2,
+    backgroundColor: '#F1F5F9',
+    borderRadius: radius.md,
+    paddingHorizontal: 6,
+    paddingVertical: 8,
+  },
+  profileCalcRtl: DIR_RTL,
+  profileCalc: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    borderRadius: radius.md,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
+  },
+  profileCalcCopy: { flex: 1, minWidth: 0, gap: 2 },
+  profileCalcAverage: { backgroundColor: '#EFF6FF' },
+  profileCalcMeasure: { backgroundColor: '#ECFDF5' },
+  profileCalcTitle: { fontSize: 13, fontWeight: '800' },
+  profileCalcAverageText: { color: '#1E40AF' },
+  profileCalcValue: { fontSize: 16, fontWeight: '800', writingDirection: 'ltr' },
+  profileChipLabel: {
+    fontSize: 11,
+    fontWeight: '700',
+    color: brand.textMuted,
+  },
+  profileChipValue: {
+    fontSize: 14,
+    fontWeight: '800',
+    color: brand.text,
+    writingDirection: 'ltr',
+  },
+  profileChipMeasureValue: { color: '#047857' },
+  profileFormula: {
+    fontSize: 11,
+    lineHeight: 15,
+    color: brand.textSecondary,
+    fontWeight: '600',
+  },
   arabicFace: { fontFamily: CAIRO.bold },
   section: { marginBottom: spacing.sm },
   tierHeader: {

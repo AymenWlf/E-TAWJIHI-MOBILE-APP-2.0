@@ -1,6 +1,6 @@
 import FontAwesome from '@expo/vector-icons/FontAwesome';
 import { router } from 'expo-router';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -26,6 +26,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useLocale } from '@/contexts/LocaleContext';
 import {
   fetchOrientationDiagnosticServerReport,
+  fetchOrientationDiagnosticSession,
   resetOrientationDiagnosticSession,
 } from '@/services/orientationDiagnosticSession';
 import { fetchSchoolRecommendationDiagnosticByPublicCode } from '@/services/schoolRecommendationDiagnostic';
@@ -33,6 +34,7 @@ import { reportSchoolsFromDiagnostic } from '@/features/orientationDiagnostic/ut
 import { postPlanReussiteStep } from '@/services/planReussiteSteps';
 import { homeShell } from '@/theme/homeShell';
 import { brand, fontSize, radius, spacing } from '@/theme/tokens';
+import { DIR_RTL } from '@/utils/layoutDirection';
 import { downloadOrientationDiagnosticReportPdf } from '@/utils/downloadOrientationDiagnosticReportPdf';
 import { navigateToSchoolDiagnosticEntry } from '@/utils/navigateToSchoolDiagnosticEntry';
 import {
@@ -48,23 +50,92 @@ import {
   type OrientationUiLocale,
 } from '../data/orientationDiagnosticI18n';
 import type { DiagnosticAnswers, OrientationReport, RiasecLetter } from '../types/orientationDiagnosticPrototype';
-import { mergeStudentSummary, studentSummaryFromAnswers } from '../utils/orientationDiagnosticEngine';
+import {
+  mergeStudentSummary,
+  restoreDiagnosticAnswers,
+  studentSummaryFromAnswers,
+} from '../utils/orientationDiagnosticEngine';
 import {
   localizeDiagnosticBody,
   localizeDiagnosticLabel,
-  localizeFamilyLabel,
-  localizeForceLine,
   localizeProfileSentence,
   localizeProfileTitle,
-  localizeReportPhrase,
-  reportAmbitionLabel,
-  reportFamilyTierLabel,
-  reportFunctioningLabels,
   reportMetierBilingualLines,
 } from '../utils/orientationDiagnosticReportLocale';
 import { orientationUiLocaleFromApp } from '../utils/orientationUiLocaleFromApp';
+import { seuilChipTone, seuilNotesFromLabel, type SeuilNoteChip } from '../utils/seuilNotesDisplay';
 
 const GAP_NOTE = /Écart d’environ (\d+) points.*sur ([RIASEC])\.?$/;
+
+const SEUIL_LABEL_KEY: Record<SeuilNoteChip['id'], string> = {
+  premiere: 'reportSeuilPremiere',
+  cc: 'reportSeuilCc',
+  national: 'reportSeuilNat',
+  term: 'reportSeuilTerm',
+  bac: 'reportSeuilBac',
+};
+
+function SeuilNotesCard({
+  notesLabel,
+  t,
+  rtl,
+}: {
+  notesLabel?: string | null;
+  t: (key: string) => string;
+  rtl: boolean;
+}) {
+  const notes = seuilNotesFromLabel(notesLabel);
+  if (!notes) return null;
+  const labelFor = (id: SeuilNoteChip['id']) =>
+    notes.kind === 'marocain' && id === 'premiere' ? t('reportSeuilRegional') : t(SEUIL_LABEL_KEY[id]);
+  return (
+    <View style={styles.seuilCard}>
+      <Text style={[styles.seuilTitle, rtl && styles.rtlText]}>{t('reportSeuilTitle')}</Text>
+      <View style={styles.seuilNotesRow}>
+        {notes.chips.map((chip) => {
+          const tone = seuilChipTone(chip.id);
+          return (
+            <View key={chip.id} style={[styles.seuilNoteCell, { backgroundColor: tone.background }]}>
+              <Text style={[styles.seuilChipLabel, { color: tone.color }, rtl && styles.rtlText]}>{labelFor(chip.id)}</Text>
+              <Text style={[styles.seuilNoteValue, { color: tone.color }]} latinDigits>
+                {`${chip.value}/20`}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+      {notes.moyenneGenerale ? (
+        <View style={[styles.seuilCalc, styles.seuilCalcAverage, rtl && styles.rowRtl]}>
+          <View style={styles.seuilCalcCopy}>
+            <Text style={[styles.seuilCalcTitle, styles.seuilCalcTitleAverage, rtl && styles.rtlText]}>
+              {t('reportSeuilMoyenne')}
+            </Text>
+            <Text style={[styles.seuilHint, rtl && styles.rtlText]}>{t('reportSeuilMoyenneFormula')}</Text>
+          </View>
+          <Text style={[styles.seuilCalcValue, styles.seuilCalcTitleAverage]} latinDigits>
+            {`${notes.moyenneGenerale}/20`}
+          </Text>
+        </View>
+      ) : null}
+      {notes.measure ? (
+        <View style={[styles.seuilCalc, styles.seuilCalcMeasure, rtl && styles.rowRtl]}>
+          <View style={styles.seuilCalcCopy}>
+            <Text style={[styles.seuilCalcTitle, styles.seuilCalcTitleMeasure, rtl && styles.rtlText]}>
+              {t('reportSeuil7525')}
+            </Text>
+            <Text style={[styles.seuilHint, rtl && styles.rtlText]}>{t('reportSeuil7525Formula')}</Text>
+          </View>
+          <Text style={[styles.seuilCalcValue, styles.seuilCalcTitleMeasure]} latinDigits>
+            {`${notes.measure}/20`}
+          </Text>
+        </View>
+      ) : null}
+      <Text style={[styles.seuilHint, rtl && styles.rtlText]}>
+        {notes.kind === 'mission' ? t('reportSeuilMissionHint') : t('reportSeuilHint')}
+      </Text>
+    </View>
+  );
+}
 
 function OrientationV2ScorePanel({
   report,
@@ -84,12 +155,6 @@ function OrientationV2ScorePanel({
       return match ? { points: Number(match[1]), letter: match[2] } : null;
     })
     .filter((item): item is { points: number; letter: string } => item != null);
-  const bars = [
-    [ar ? 'الاهتمام' : 'Préoccupation', v2.readiness.concern],
-    [ar ? 'التحكم' : 'Contrôle', v2.readiness.control],
-    [ar ? 'الفضول' : 'Curiosité', v2.readiness.curiosity],
-    [ar ? 'الثقة' : 'Confiance', v2.readiness.confidence],
-  ] as const;
   return (
     <View style={styles.v2Card}>
       <Text style={[styles.cardTitle, isRTL && styles.rtlText]}>
@@ -97,35 +162,28 @@ function OrientationV2ScorePanel({
       </Text>
       <Text style={[styles.lead, isRTL && styles.rtlText]}>
         {ar
-          ? 'الاهتمامات، أسلوب العمل، الجاهزية والولوج تُقرأ كل واحدة على حدة.'
-          : 'Intérêts, fonctionnement, readiness et accès se lisent chacun à part.'}
+          ? 'مؤشران فقط: جاهزية الاختيار، وتوافق الإجابات.'
+          : 'Deux indicateurs : ta préparation à choisir, et la cohérence des réponses.'}
       </Text>
-      <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText]}>
-        {ar ? 'الجاهزية' : 'Readiness'} {Math.round(v2.readiness.score)} %
-      </Text>
-      {bars.map(([label, value]) => (
-        <View key={label} style={styles.v2Bar}>
-          <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>{label}</Text>
-          <View style={styles.barTrack}>
-            <View style={[styles.barFill, { width: `${Math.max(4, Math.min(100, value))}%`, backgroundColor: brand.primary }]} />
-          </View>
-          <Text style={styles.barPct} latinDigits>{Math.round(value)}</Text>
+      <View style={[styles.v2Stats, isRTL && styles.rowRtl]}>
+        <View style={styles.v2Stat}>
+          <Text style={[styles.kvLabel, isRTL && styles.rtlText]}>{ar ? 'الجاهزية' : 'Préparation'}</Text>
+          <Text style={styles.v2StatValue} latinDigits>{`${Math.round(v2.readiness.score)} %`}</Text>
         </View>
-      ))}
-      <Text style={[styles.simpleGroupTitle, isRTL && styles.rtlText]}>
-        {ar ? 'الموثوقية' : 'Fiabilité'} {Math.round(v2.reliabilityScore)} %
+        <View style={styles.v2Stat}>
+          <Text style={[styles.kvLabel, isRTL && styles.rtlText]}>{ar ? 'الموثوقية' : 'Cohérence'}</Text>
+          <Text style={styles.v2StatValue} latinDigits>{`${Math.round(v2.reliabilityScore)} %`}</Text>
+        </View>
+      </View>
+      <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>
+        {gaps.length
+          ? ar
+            ? `فارق ${gaps[0].points} نقطة على ${gaps[0].letter}`
+            : `Écart de ${gaps[0].points} pts sur ${gaps[0].letter}`
+          : ar
+            ? 'الإجابات متوافقة.'
+            : 'Les deux lectures RIASEC s’accordent.'}
       </Text>
-      {gaps.length ? (
-        gaps.map((gap) => (
-          <Text key={gap.letter} style={[styles.cardMeta, isRTL && styles.rtlText]}>
-            {gap.letter} · {ar ? `فارق ${gap.points} نقطة` : `${gap.points} pts d’écart déclaré / comportemental`}
-          </Text>
-        ))
-      ) : (
-        <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>
-          {ar ? 'لا يوجد فارق ملحوظ بين الطبقتين.' : 'Pas d’écart marqué entre les deux lectures RIASEC.'}
-        </Text>
-      )}
     </View>
   );
 }
@@ -139,20 +197,6 @@ const RIASEC_COLORS: Record<RiasecLetter, string> = {
   E: '#D97706',
   C: '#475569',
 };
-const FUNCTIONING_KEYS = [
-  'autonomie',
-  'leadership',
-  'analyse',
-  'contactHumain',
-  'structure',
-  'creativite',
-  'action',
-  'incertitude',
-  'pratique',
-  'collaboration',
-  'variete',
-] as const;
-
 const LOGO_H = 56;
 
 export function OrientationDiagnosticReportScreen() {
@@ -167,18 +211,26 @@ export function OrientationDiagnosticReportScreen() {
   const [report, setReport] = useState<OrientationReport | null>(null);
   const [sourceAnswers, setSourceAnswers] = useState<DiagnosticAnswers | null>(null);
   const [marking, setMarking] = useState(false);
-  const [pdfBusy, setPdfBusy] = useState<'simple' | 'detail' | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
   const [retakeConfirmVisible, setRetakeConfirmVisible] = useState(false);
-  const [reading, setReading] = useState<'simple' | 'detail'>('simple');
 
   useEffect(() => {
     let cancelled = false;
     void (async () => {
       const draft = await readOrientationDiagnosticPrototypeDraft(userId);
       let nextReport = draft?.report ?? null;
-      if (!cancelled && draft?.answers) setSourceAnswers(draft.answers);
       const token = await getValidAccessToken();
+      let sessionAnswers = draft?.answers ?? null;
       if (token) {
+        try {
+          const session = await fetchOrientationDiagnosticSession(token);
+          if (session?.answers) sessionAnswers = session.answers;
+          if (!nextReport && session?.report && !Array.isArray(session.report)) {
+            nextReport = session.report;
+          }
+        } catch {
+          /* le brouillon local reste utilisé */
+        }
         try {
           const remote = await fetchOrientationDiagnosticServerReport(token);
           if (!cancelled && remote && !Array.isArray(remote)) {
@@ -199,13 +251,28 @@ export function OrientationDiagnosticReportScreen() {
             /* le classement du rapport serveur reste affiché */
           }
         }
-        if (!cancelled && nextReport && draft) {
-          await persistOrientationDiagnosticPrototypeDraft({
-            ...draft,
-            phase: 'report',
-            report: nextReport,
-          });
-        }
+      }
+      const restored = restoreDiagnosticAnswers(draft?.answers, sessionAnswers);
+      if (nextReport) {
+        nextReport = {
+          ...nextReport,
+          studentSummary: mergeStudentSummary(
+            mergeStudentSummary(
+              studentSummaryFromAnswers(restored),
+              draft?.report?.studentSummary,
+            ),
+            nextReport.studentSummary,
+          ),
+        };
+      }
+      if (!cancelled) setSourceAnswers(restored);
+      if (token && !cancelled && nextReport && draft) {
+        await persistOrientationDiagnosticPrototypeDraft({
+          ...draft,
+          phase: 'report',
+          answers: restored,
+          report: nextReport,
+        });
       }
       if (cancelled) return;
       if (nextReport) {
@@ -250,31 +317,20 @@ export function OrientationDiagnosticReportScreen() {
   }, [report, markReportComplete]);
 
   const identitySummary = useMemo(() => {
-    const profile = sourceAnswers?.profile;
-    const hasFilledProfile = Boolean(
-      profile &&
-        (profile.firstName.trim() ||
-          profile.lastName.trim() ||
-          profile.studyLevel.trim() ||
-          profile.bacFiliere.trim() ||
-          profile.bacType.trim() ||
-          profile.noteNational.trim() ||
-          (sourceAnswers?.cities?.length ?? 0) > 0),
-    );
-    const live = hasFilledProfile && sourceAnswers ? studentSummaryFromAnswers(sourceAnswers) : null;
     const stored = report?.studentSummary ?? null;
+    const live = sourceAnswers ? studentSummaryFromAnswers(sourceAnswers) : stored;
     if (!live && !stored) return null;
     return mergeStudentSummary(live ?? stored!, stored);
   }, [report?.studentSummary, sourceAnswers]);
 
-  const onDownloadPdf = useCallback(async (variant: 'simple' | 'detail' = 'detail') => {
+  const onDownloadPdf = useCallback(async () => {
     if (!report || pdfBusy) return;
-    setPdfBusy(variant);
+    setPdfBusy(true);
     try {
       await downloadOrientationDiagnosticReportPdf(
         identitySummary ? { ...report, studentSummary: identitySummary } : report,
         uiLocale,
-        variant,
+        'simple',
       );
     } catch {
       Alert.alert(
@@ -282,7 +338,7 @@ export function OrientationDiagnosticReportScreen() {
         tOd(uiLocale, 'reportPdfError'),
       );
     } finally {
-      setPdfBusy(null);
+      setPdfBusy(false);
     }
   }, [identitySummary, pdfBusy, report, uiLocale]);
 
@@ -315,7 +371,6 @@ export function OrientationDiagnosticReportScreen() {
   const diagLabel = localizeDiagnosticLabel(report.diagnosticLabel, uiLocale);
   const diagBody = localizeDiagnosticBody(report, uiLocale);
   const scores = report.scores.riasecConsolide;
-  const fnLabels = reportFunctioningLabels(uiLocale);
   const s = report.scores;
 
   const identityItems = [
@@ -398,7 +453,7 @@ export function OrientationDiagnosticReportScreen() {
                   </Text>
                   <RiasecProfileRow code={s.codeConsolide} uiLocale={uiLocale} rtl={isRTL} />
                   <Text style={[styles.passDiag, isRTL && styles.rtlText]}>{diagLabel}</Text>
-                  <View style={styles.passMetrics}>
+                  <View style={[styles.passMetrics, isRTL && DIR_RTL]}>
                     <View style={styles.passMetric}>
                       <Text style={styles.passMetricLabel}>{t('reportPassAmbition')}</Text>
                       <Text style={styles.passMetricValue} latinDigits>
@@ -433,11 +488,13 @@ export function OrientationDiagnosticReportScreen() {
 
           <Animated.View
             entering={FadeInUp.delay(80).duration(380)}
-            style={[styles.snapshot, isRTL && styles.rowRtl]}>
+            style={[styles.snapshot, isRTL && DIR_RTL]}>
             <SnapshotItem
-              k={s.codeConsolide ? `RIASEC · ${s.codeConsolide}` : 'RIASEC'}
-              v={riasecCodeParts(s.codeConsolide, uiLocale).map((part) => part.label).join(' · ') || '—'}
+              k="RIASEC"
+              v={s.codeConsolide || '—'}
               rtl={isRTL}
+              wide
+              extra={<RiasecProfileRow code={s.codeConsolide} uiLocale={uiLocale} rtl={isRTL} tone="onLight" />}
             />
             <SnapshotItem
               k={t('reportPassAmbition')}
@@ -453,40 +510,20 @@ export function OrientationDiagnosticReportScreen() {
             />
           </Animated.View>
 
-          <View style={[styles.readRow, isRTL && styles.rowRtl]}>
-            <Text style={[styles.readLabel, isRTL && styles.rtlText]}>{t('reportReadLabel')}</Text>
-            <View style={[styles.readToggle, isRTL && styles.rowRtl]}>
-              <Pressable
-                onPress={() => setReading('simple')}
-                style={[styles.readBtn, reading === 'simple' && styles.readBtnOn]}
-                accessibilityRole="button">
-                <Text style={[styles.readBtnTxt, reading === 'simple' && styles.readBtnTxtOn]}>
-                  {t('reportReadSimple')}
-                </Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setReading('detail')}
-                style={[styles.readBtn, reading === 'detail' && styles.readBtnOn]}
-                accessibilityRole="button">
-                <Text style={[styles.readBtnTxt, reading === 'detail' && styles.readBtnTxtOn]}>
-                  {t('reportReadDetail')}
-                </Text>
-              </Pressable>
-            </View>
-          </View>
-
-          {reading === 'simple' ? (
             <>
               <Text style={[styles.lead, isRTL && styles.rtlText]}>{t('reportSimpleLead')}</Text>
               <Section index={0} title={t('reportSec0')} rtl={isRTL}>
                 <View style={styles.kvGrid}>
-                  {identityItems.map((item) => (
+                  {identityItems
+                    .filter((item) => item.label !== t('reportKvNotes'))
+                    .map((item) => (
                     <View key={item.label} style={styles.kvCard}>
                       <Text style={[styles.kvLabel, isRTL && styles.rtlText]}>{item.label}</Text>
                       <Text style={[styles.kvValue, isRTL && styles.rtlText]}>{item.value}</Text>
                     </View>
                   ))}
                 </View>
+                <SeuilNotesCard notesLabel={identitySummary?.notesLabel} t={t} rtl={isRTL} />
               </Section>
               <Section index={1} title={t('reportSimpleRiasec')} rtl={isRTL}>
                 <Text style={[styles.lead, isRTL && styles.rtlText]}>
@@ -518,6 +555,7 @@ export function OrientationDiagnosticReportScreen() {
                   ))}
                 </View>
               </Section>
+              <OrientationV2ScorePanel report={report} uiLocale={uiLocale} isRTL={isRTL} />
               <Section index={2} title={t('reportSimpleMetiers')} rtl={isRTL}>
                 {report.metiers.slice(0, 3).map((m, i) => {
                   const name = reportMetierBilingualLines(m.id, m.label, uiLocale);
@@ -549,223 +587,18 @@ export function OrientationDiagnosticReportScreen() {
                 })}
               </Section>
             </>
-          ) : (
-          <>
-          <Section index={0} title={t('reportSec0')} rtl={isRTL}>
-            <View style={styles.kvGrid}>
-              {identityItems.map((item) => (
-                <View key={item.label} style={styles.kvCard}>
-                  <Text style={[styles.kvLabel, isRTL && styles.rtlText]}>{item.label}</Text>
-                  <Text style={[styles.kvValue, isRTL && styles.rtlText]}>{item.value}</Text>
-                </View>
-              ))}
-            </View>
-          </Section>
-
-          <Section index={1} title={t('reportSec1')} rtl={isRTL}>
-            <Text style={[styles.lead, isRTL && styles.rtlText]}>{t('reportRiasecIntro')}</Text>
-            <LayerCard
-              rtl={isRTL}
-              index="01"
-              tag={t('reportLayer1Tag')}
-              title={`${t('reportLayer1Title')} · ${s.codeDeclare}`}
-              body={t('reportLayer1Body')}
-              how={t('reportLayer1How')}
-            />
-            <LayerCard
-              rtl={isRTL}
-              index="02"
-              tag={t('reportLayer2Tag')}
-              title={`${t('reportLayer2Title')} · ${s.codeComportemental}`}
-              body={t('reportLayer2Body')}
-              how={t('reportLayer2How')}
-            />
-            <LayerCard
-              rtl={isRTL}
-              index="03"
-              tag={t('reportLayer3Tag')}
-              title={`${t('reportLayer3Title')} · ${s.codeConsolide}`}
-              body={t('reportLayer3Body')}
-              how={t('reportLayer3How')}
-            />
-            <View style={styles.barsBlock}>
-              {RIASEC_LETTERS.map((L) => (
-                <View key={L} style={[styles.barRow, isRTL && styles.rowRtl]}>
-                  <View style={[styles.letterBadge, { backgroundColor: RIASEC_COLORS[L] }]}>
-                    <Text style={styles.letterBadgeTxt}>{L}</Text>
-                  </View>
-                  <Text style={[styles.barLabel, isRTL && styles.rtlText]}>
-                    {localizeRiasecLabel(L, uiLocale)}
-                  </Text>
-                  <View style={styles.barTrack}>
-                    <View
-                      style={[
-                        styles.barFill,
-                        { width: `${scores[L]}%`, backgroundColor: RIASEC_COLORS[L] },
-                      ]}
-                    />
-                  </View>
-                  <Text style={styles.barPct} latinDigits>
-                    {scores[L]}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </Section>
-
-          <OrientationV2ScorePanel report={report} uiLocale={uiLocale} isRTL={isRTL} />
-
-          <Section index={2} title={t('reportSec2')} rtl={isRTL}>
-            <View style={styles.radarGrid}>
-              {FUNCTIONING_KEYS.map((key) => (
-                <View key={key} style={styles.radarItem}>
-                  <Text style={styles.radarValue} latinDigits>
-                    {s.functioning[key]}%
-                  </Text>
-                  <Text style={[styles.radarLabel, isRTL && styles.rtlText]}>{fnLabels[key]}</Text>
-                </View>
-              ))}
-            </View>
-          </Section>
-
-          <Section index={3} title={t('reportSec3')} rtl={isRTL}>
-            {report.moteursOrdered.map((m, i) => (
-              <View key={m.key} style={[styles.barRow, isRTL && styles.rowRtl]}>
-                <Text style={styles.rank} latinDigits>
-                  {i + 1}
-                </Text>
-                <Text style={[styles.barLabelWide, isRTL && styles.rtlText]}>
-                  {reportAmbitionLabel(m.key, m.label, uiLocale)}
-                </Text>
-                <View style={styles.barTrack}>
-                  <View style={[styles.barFill, { width: `${m.score}%` }]} />
-                </View>
-                <Text style={styles.barPct} latinDigits>
-                  {m.score}
-                </Text>
-              </View>
-            ))}
-          </Section>
-
-          <Section index={4} title={t('reportSec4')} rtl={isRTL}>
-            <View style={styles.chipWrap}>
-              {report.forces.map((f) => (
-                <View key={f} style={styles.chipGood}>
-                  <Text style={styles.chipGoodIcon}>+</Text>
-                  <Text style={[styles.chipGoodTxt, isRTL && styles.rtlText]}>
-                    {localizeForceLine(f, uiLocale, report.dominante)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </Section>
-
-          <Section index={5} title={t('reportSec5')} rtl={isRTL}>
-            <View style={styles.chipWrap}>
-              {report.vigilances.map((f) => (
-                <View key={f} style={styles.chipWarn}>
-                  <Text style={styles.chipWarnIcon}>!</Text>
-                  <Text style={[styles.chipWarnTxt, isRTL && styles.rtlText]}>
-                    {localizeReportPhrase(f, uiLocale)}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </Section>
-
-          <Section index={6} title={t('reportSec6')} rtl={isRTL}>
-            {report.families.slice(0, 8).map((f, i) => (
-              <View key={f.id} style={[styles.rankRow, isRTL && styles.rowRtl]}>
-                <Text style={styles.rank} latinDigits>
-                  {i + 1}
-                </Text>
-                <View style={{ flex: 1 }}>
-                  <Text style={[styles.cardTitle, isRTL && styles.rtlText]}>
-                    {localizeFamilyLabel(f.id, uiLocale) ||
-                      localizeFamilyLabel(f.label, uiLocale) ||
-                      f.label}
-                  </Text>
-                  <Text style={[styles.cardMeta, isRTL && styles.rtlText]}>
-                    {reportFamilyTierLabel(f.tier, uiLocale)}
-                  </Text>
-                </View>
-                <View style={styles.scorePill}>
-                  <Text style={styles.scorePillTxt} latinDigits>
-                    {uiLocale === 'ar' ? `${f.score}٪` : `${f.score}%`}
-                  </Text>
-                </View>
-              </View>
-            ))}
-          </Section>
-
-          <Section
-            index={7}
-            title={uiLocale === 'ar' ? '7. المهن الأنسب لملفك' : t('reportSec7')}
-            rtl={isRTL}>
-            {report.metiers.slice(0, 10).map((m, i) => {
-              const name = reportMetierBilingualLines(m.id, m.label, uiLocale);
-              return (
-                <View key={m.id} style={[styles.rankRow, isRTL && styles.rowRtl]}>
-                  <Text style={styles.rank} latinDigits>
-                    {i + 1}
-                  </Text>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        styles.cardTitle,
-                        name.primaryRtl ? styles.rtlText : styles.ltrText,
-                      ]}>
-                      {name.primary}
-                    </Text>
-                    {name.secondary ? (
-                      <Text
-                        style={[
-                          styles.cardMeta,
-                          name.secondaryRtl ? styles.rtlText : styles.ltrText,
-                        ]}>
-                        {name.secondary}
-                      </Text>
-                    ) : null}
-                  </View>
-                  <View style={styles.scorePill}>
-                    <Text style={styles.scorePillTxt} latinDigits>
-                      {uiLocale === 'ar' ? `${m.score}٪` : `${m.score}%`}
-                    </Text>
-                  </View>
-                </View>
-              );
-            })}
-          </Section>
-
-          </>
-          )}
-
           <View style={styles.pdfActions}>
             <Pressable
-              onPress={() => void onDownloadPdf('simple')}
+              onPress={() => void onDownloadPdf()}
               style={({ pressed }) => [styles.ctaPdf, pressed && { opacity: 0.92 }]}
-              disabled={pdfBusy != null}
+              disabled={pdfBusy}
               accessibilityRole="button">
-              {pdfBusy === 'simple' ? (
+              {pdfBusy ? (
                 <ActivityIndicator color={brand.primary} />
               ) : (
                 <>
                   <FontAwesome name="file-pdf-o" size={15} color={brand.primary} />
-                  <Text style={styles.ctaPdfTxt}>{t('reportPdfSimple')}</Text>
-                </>
-              )}
-            </Pressable>
-            <Pressable
-              onPress={() => void onDownloadPdf('detail')}
-              style={({ pressed }) => [styles.ctaPdf, pressed && { opacity: 0.92 }]}
-              disabled={pdfBusy != null}
-              accessibilityRole="button">
-              {pdfBusy === 'detail' ? (
-                <ActivityIndicator color={brand.primary} />
-              ) : (
-                <>
-                  <FontAwesome name="file-pdf-o" size={15} color={brand.primary} />
-                  <Text style={styles.ctaPdfTxt}>{t('reportPdfDetail')}</Text>
+                  <Text style={styles.ctaPdfTxt}>{t('reportPdf')}</Text>
                 </>
               )}
             </Pressable>
@@ -826,19 +659,26 @@ function RiasecProfileRow({
   code,
   uiLocale,
   rtl,
+  tone = 'onDark',
 }: {
   code: string;
   uiLocale: OrientationUiLocale;
   rtl?: boolean;
+  tone?: 'onDark' | 'onLight';
 }) {
   const parts = riasecCodeParts(code, uiLocale);
   if (!parts.length) return null;
+  const onLight = tone === 'onLight';
   return (
-    <View style={[styles.riasecRow, rtl && styles.rowRtl]}>
+    <View style={[styles.riasecRow, rtl && DIR_RTL]}>
       {parts.map((part) => (
-        <View key={part.letter} style={[styles.riasecChip, rtl && styles.rowRtl]}>
-          <Text style={styles.riasecLetter}>{part.letter}</Text>
-          <Text style={[styles.riasecName, rtl && styles.rtlText]}>{part.label}</Text>
+        <View
+          key={part.letter}
+          style={[styles.riasecChip, onLight && styles.riasecChipOnLight, rtl && styles.rowRtl]}>
+          <Text style={[styles.riasecLetter, onLight && styles.riasecLetterOnLight]}>{part.letter}</Text>
+          <Text style={[styles.riasecName, onLight && styles.riasecNameOnLight, rtl && styles.rtlText]}>
+            {part.label}
+          </Text>
         </View>
       ))}
     </View>
@@ -850,48 +690,31 @@ function SnapshotItem({
   v,
   rtl,
   accent,
+  wide,
+  extra,
 }: {
   k: string;
   v: string;
   rtl?: boolean;
   accent?: boolean;
+  wide?: boolean;
+  extra?: ReactNode;
 }) {
   return (
-    <View style={[styles.snapshotItem, accent && styles.snapshotItemAccent]}>
-      <Text style={[styles.snapshotK, rtl && styles.rtlText]}>{k}</Text>
-      <Text style={[styles.snapshotV, rtl && styles.rtlText]} latinDigits>
+    <View
+      style={[
+        styles.snapshotItem,
+        accent && styles.snapshotItemAccent,
+        wide && styles.snapshotItemWide,
+        rtl && DIR_RTL,
+      ]}>
+      <Text style={[styles.snapshotK, rtl && styles.rtlText, rtl && styles.snapshotKRtl]}>{k}</Text>
+      <Text
+        style={[styles.snapshotV, wide && styles.snapshotVCode, rtl && styles.rtlText]}
+        latinDigits>
         {v}
       </Text>
-    </View>
-  );
-}
-
-function LayerCard({
-  index,
-  tag,
-  title,
-  body,
-  how,
-  rtl,
-}: {
-  index: string;
-  tag: string;
-  title: string;
-  body: string;
-  how: string;
-  rtl?: boolean;
-}) {
-  return (
-    <View style={styles.layer}>
-      <View style={[styles.layerHead, rtl && styles.rowRtl]}>
-        <Text style={styles.layerIndex} latinDigits>
-          {index}
-        </Text>
-        <Text style={[styles.layerTag, rtl && styles.rtlText]}>{tag}</Text>
-      </View>
-      <Text style={[styles.layerTitle, rtl && styles.rtlText]}>{title}</Text>
-      <Text style={[styles.cardBody, rtl && styles.rtlText]}>{body}</Text>
-      <Text style={[styles.layerHow, rtl && styles.rtlText]}>{how}</Text>
+      {extra}
     </View>
   );
 }
@@ -994,10 +817,24 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: 'rgba(51,62,143,0.12)',
   },
-  v2Bar: {
+  v2Stats: {
     flexDirection: 'row',
-    alignItems: 'center',
     gap: spacing.sm,
+  },
+  v2Stat: {
+    flex: 1,
+    minWidth: 0,
+    padding: spacing.sm,
+    borderRadius: 12,
+    backgroundColor: '#F8FAFC',
+    borderWidth: 1,
+    borderColor: 'rgba(51,62,143,0.08)',
+    gap: 4,
+  },
+  v2StatValue: {
+    fontSize: 22,
+    fontWeight: '900',
+    color: brand.primary,
   },
   simpleAccordionMeta: {
     fontSize: 12,
@@ -1140,6 +977,18 @@ const styles = StyleSheet.create({
     color: brand.white,
     fontSize: 13,
     fontWeight: '700',
+    flexShrink: 1,
+  },
+  riasecChipOnLight: {
+    backgroundColor: '#f1f5f9',
+    borderColor: '#e2e8f0',
+  },
+  riasecLetterOnLight: {
+    backgroundColor: brand.primary,
+    color: brand.white,
+  },
+  riasecNameOnLight: {
+    color: brand.primary,
   },
   heroTitle: {
     fontSize: 24,
@@ -1250,9 +1099,11 @@ const styles = StyleSheet.create({
     color: brand.white,
   },
   passDiag: { fontSize: fontSize.sm, color: 'rgba(255,255,255,0.82)', marginBottom: 4 },
-  passMetrics: { flexDirection: 'row', gap: spacing.sm },
+  passMetrics: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
   passMetric: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '42%',
+    minWidth: 112,
     backgroundColor: 'rgba(255,255,255,0.08)',
     borderRadius: radius.md,
     padding: spacing.sm,
@@ -1262,10 +1113,11 @@ const styles = StyleSheet.create({
   passMetricLabel: {
     fontSize: 10,
     fontWeight: '800',
-    letterSpacing: 0.8,
+    letterSpacing: 0.4,
     color: 'rgba(255,255,255,0.55)',
     marginBottom: 2,
     textTransform: 'uppercase',
+    lineHeight: 14,
   },
   passMetricValue: { fontSize: fontSize.lg, fontWeight: '900', color: homeShell.green },
   passFoot: {
@@ -1301,17 +1153,25 @@ const styles = StyleSheet.create({
   },
   snapshot: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     gap: spacing.sm,
   },
   snapshotItem: {
-    flex: 1,
+    flexGrow: 1,
+    flexBasis: '42%',
+    minWidth: 132,
+    maxWidth: '100%',
     backgroundColor: brand.white,
     borderRadius: radius.lg,
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.sm + 2,
+    paddingHorizontal: spacing.sm + 2,
     borderWidth: 1,
     borderColor: 'rgba(51,62,143,0.08)',
-    gap: 2,
+    gap: 4,
+  },
+  snapshotItemWide: {
+    flexBasis: '100%',
+    minWidth: '100%',
   },
   snapshotItemAccent: {
     backgroundColor: homeShell.greenSurface,
@@ -1323,11 +1183,22 @@ const styles = StyleSheet.create({
     color: brand.textMuted,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    lineHeight: 14,
+  },
+  snapshotKRtl: {
+    letterSpacing: 0,
+    textTransform: 'none',
   },
   snapshotV: {
-    fontSize: fontSize.md,
+    fontSize: 22,
     fontWeight: '900',
     color: brand.primary,
+    lineHeight: 26,
+  },
+  snapshotVCode: {
+    fontSize: 26,
+    letterSpacing: 1.2,
+    lineHeight: 30,
   },
   section: {
     backgroundColor: brand.white,
@@ -1373,6 +1244,45 @@ const styles = StyleSheet.create({
   },
   kvLabel: { fontSize: 10, fontWeight: '700', color: brand.textMuted, textTransform: 'uppercase' },
   kvValue: { fontSize: fontSize.sm, fontWeight: '700', color: brand.text, lineHeight: 18 },
+  seuilCard: {
+    marginTop: spacing.sm,
+    backgroundColor: '#F8FAFC',
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: '#E2E8F0',
+    padding: spacing.sm,
+    gap: 8,
+  },
+  seuilTitle: { fontSize: fontSize.sm, fontWeight: '800', color: brand.primary },
+  seuilNotesRow: { flexDirection: 'row', gap: 8 },
+  seuilNoteCell: {
+    flex: 1,
+    minWidth: 0,
+    borderRadius: radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    gap: 2,
+  },
+  seuilNoteValue: { fontSize: 16, fontWeight: '800', writingDirection: 'ltr' },
+  seuilCalc: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: 8,
+    borderRadius: radius.md,
+    paddingVertical: 8,
+    paddingHorizontal: 10,
+  },
+  seuilCalcCopy: { flex: 1, minWidth: 0, gap: 2 },
+  seuilCalcAverage: { backgroundColor: '#EFF6FF' },
+  seuilCalcMeasure: { backgroundColor: '#ECFDF5' },
+  seuilCalcTitle: { fontSize: 13, fontWeight: '800' },
+  seuilCalcTitleAverage: { color: '#1E40AF' },
+  seuilCalcTitleMeasure: { color: '#047857' },
+  seuilCalcValue: { fontSize: 16, fontWeight: '800', writingDirection: 'ltr' },
+  seuilChipLabel: { fontSize: 11, fontWeight: '700', textAlign: 'center' },
+  seuilHint: { fontSize: 12, lineHeight: 17, color: brand.textSecondary, fontWeight: '600' },
   layer: {
     backgroundColor: '#F5F7FB',
     borderRadius: radius.md,

@@ -175,6 +175,30 @@ export function withAccountOrientationPrefill(
   };
 }
 
+/** Fusionne les profils en gardant chaque champ déjà renseigné (brouillon + session). */
+export function mergeDiagnosticProfiles(
+  ...sources: Array<Partial<DiagnosticProfile> | null | undefined>
+): DiagnosticProfile {
+  const out: DiagnosticProfile = { ...EMPTY_DIAGNOSTIC_PROFILE, bacSpecialites: [] };
+  for (const source of sources) {
+    if (!source || typeof source !== 'object' || Array.isArray(source)) continue;
+    (Object.keys(EMPTY_DIAGNOSTIC_PROFILE) as (keyof DiagnosticProfile)[]).forEach((key) => {
+      if (key === 'bacSpecialites') {
+        if (out.bacSpecialites.length) return;
+        const specs = Array.isArray(source.bacSpecialites)
+          ? source.bacSpecialites.map((item) => String(item ?? '').trim()).filter(Boolean)
+          : [];
+        if (specs.length) out.bacSpecialites = specs;
+        return;
+      }
+      if (String(out[key] ?? '').trim()) return;
+      const incoming = String(source[key] ?? '').trim();
+      if (incoming) (out as unknown as Record<string, string>)[key] = String(source[key]);
+    });
+  }
+  return out;
+}
+
 export function isBacStudyLevel(level: string): boolean {
   return (
     level.includes('Baccalauréat') ||

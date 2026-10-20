@@ -101,6 +101,7 @@ import {
   platformServiceCurrency,
   platformServiceEffectiveUnitPriceString,
 } from '@/utils/platformServicePrice';
+import { openPlatformServiceWhatsAppOrder } from '@/utils/platformServiceWhatsAppOrder';
 import { DIR_LTR, DIR_RTL } from '@/utils/layoutDirection';
 const PAGE_SIZE = 20;
 const { width: SCREEN_W } = Dimensions.get('window');
@@ -258,89 +259,6 @@ export default function BoutiqueTabScreen() {
     entitlementsLoading,
     eligibilityProfileLoading,
   ]);
-
-  const putPlatformServiceInCart = useCallback(
-    async (s: PlatformServiceItem) => {
-      let ent = serviceEntitlementsBySlug[s.slug];
-      if (!platformServiceCanAddToCart(ent)) {
-        try {
-          const token = await getValidAccessToken();
-          const fresh = await fetchPlatformServiceCatalogEntitlements(
-            { phone: user?.phone?.trim() || undefined, cartSlugs: cartPlatformServiceSlugs, niveau: eligibilityProfile?.niveau },
-            token,
-          );
-          ent = fresh[s.slug] ?? ent;
-        } catch {
-          /* garde l’entitlement en cache */
-        }
-      }
-      if (ent && !platformServiceCanAddToCart(ent)) return;
-      const unit = platformServiceEffectiveUnitPriceString(s, ent);
-      const currency = platformServiceCurrency(s.currency);
-      const line = {
-        productId: platformServiceCartProductId(s.slug),
-        slug: s.slug,
-        title: s.name,
-        price: unit,
-        currency,
-        quantity: 1,
-        type: 'service' as const,
-        lineKind: 'platform_service' as const,
-        platformServiceSlug: s.slug,
-        images: [] as string[],
-        isFreeShipping: Boolean(s.isFreeShipping),
-        platformServiceBrandIcon: s.brandIcon,
-        platformServiceBrandColor: s.brandColor,
-      };
-      const canProceed = await addPlatformServiceToCartWithEviction({
-        entitlement: ent,
-        replaceLines,
-        lineToAdd: line,
-        newServiceName: s.name,
-        resolveServiceName: (slug) => serviceItems.find((x) => x.slug === slug)?.name ?? slug,
-        locale,
-        t,
-      });
-      if (!canProceed) return;
-      void recordShopBoutiqueEvent('add_to_cart', undefined, s.slug);
-    },
-    [
-      replaceLines,
-      removeLine,
-      serviceEntitlementsBySlug,
-      serviceItems,
-      locale,
-      t,
-      cartPlatformServiceSlugs,
-      eligibilityProfile?.niveau,
-      getValidAccessToken,
-      user?.phone,
-    ],
-  );
-
-  const addPlatformServiceToCart = useCallback(
-    async (s: PlatformServiceItem) => {
-      const productId = platformServiceCartProductId(s.slug);
-      if (inCartIds.has(productId)) {
-        await removeLine(productId);
-        return;
-      }
-      await putPlatformServiceInCart(s);
-    },
-    [inCartIds, removeLine, putPlatformServiceInCart],
-  );
-
-  const buyPlatformServiceNow = useCallback(
-    async (s: PlatformServiceItem) => {
-      const productId = platformServiceCartProductId(s.slug);
-      if (!inCartIds.has(productId)) {
-        await putPlatformServiceInCart(s);
-      }
-      const path = await getShopPathAfterBuyNow();
-      router.push(path as any);
-    },
-    [inCartIds, putPlatformServiceInCart, router],
-  );
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search.trim()), 350);
@@ -691,10 +609,7 @@ export default function BoutiqueTabScreen() {
                       entitlement={serviceEntitlementsBySlug[s.slug]}
                       entitlementsLoading={entitlementsLoading}
                       serviceNameBySlug={serviceNameBySlug}
-                      inCart={inCartIds.has(platformServiceCartProductId(s.slug))}
                       onOpenDetail={() => router.push(`/boutique/service/${encodeURIComponent(s.slug)}` as any)}
-                      onAddCart={() => void addPlatformServiceToCart(s)}
-                      onBuyNow={() => void buyPlatformServiceNow(s)}
                     />
                   ))}
                 </ScrollView>
@@ -735,16 +650,6 @@ export default function BoutiqueTabScreen() {
     serviceCarouselPad,
     serviceCarouselCardW,
     previewCardsMeasureKey,
-    eligibilityProfile,
-    eligibilityProfileLoading,
-    router,
-    t,
-    isRTL,
-    showShopGrid,
-    locale,
-    addPlatformServiceToCart,
-    buyPlatformServiceNow,
-    inCartIds,
     serviceEntitlementsBySlug,
     entitlementsLoading,
     serviceNameBySlug,
@@ -811,18 +716,12 @@ export default function BoutiqueTabScreen() {
         entitlement={serviceEntitlementsBySlug[s.slug]}
         entitlementsLoading={entitlementsLoading}
         serviceNameBySlug={serviceNameBySlug}
-        inCart={inCartIds.has(platformServiceCartProductId(s.slug))}
         onOpenDetail={() => router.push(`/boutique/service/${encodeURIComponent(s.slug)}` as any)}
-        onAddCart={() => void addPlatformServiceToCart(s)}
-        onBuyNow={() => void buyPlatformServiceNow(s)}
       />
     ),
     [
-      addPlatformServiceToCart,
-      buyPlatformServiceNow,
       eligibilityProfile,
       eligibilityProfileLoading,
-      inCartIds,
       isRTL,
       locale,
       router,
@@ -972,10 +871,7 @@ function ServiceCompactCard({
   entitlement,
   entitlementsLoading = false,
   serviceNameBySlug = new Map<string, string>(),
-  inCart,
   onOpenDetail,
-  onAddCart,
-  onBuyNow,
   layout = 'stack',
   carouselWidth,
 }: {
@@ -988,10 +884,7 @@ function ServiceCompactCard({
   entitlement?: PlatformServiceCatalogEntitlement;
   entitlementsLoading?: boolean;
   serviceNameBySlug?: Map<string, string>;
-  inCart: boolean;
   onOpenDetail: () => void;
-  onAddCart: () => void;
-  onBuyNow: () => void;
   layout?: 'carousel' | 'stack';
   carouselWidth?: number;
 }) {
@@ -1030,8 +923,28 @@ function ServiceCompactCard({
   );
 
   const showEligibilityBadge = !eligibilityProfileLoading;
-
   const purchasable = platformServiceCatalogPurchasable(entitlement, entitlementsLoading);
+  const isUpgrade = entitlement?.status === 'upgrade_available';
+  const whatsAppLabel = !purchasable
+    ? platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'shopServiceWhatsAppOrder')
+    : isUpgrade
+      ? t('shopServiceWhatsAppUpgrade')
+      : t('shopServiceWhatsAppOrder');
+  const openServiceWhatsApp = () => {
+    if (!purchasable) return;
+    const priceLabel = pricePrimary
+      ? formatShopPrice(pricePrimary, cur, { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+      : null;
+    openPlatformServiceWhatsAppOrder(
+      {
+        name: s.name,
+        slug: s.slug,
+        priceLabel,
+        intent: isUpgrade ? 'upgrade' : 'order',
+      },
+      locale === 'ar' ? 'ar' : 'fr',
+    );
+  };
   const { outerMinHeightStyle, onMeasureLayout } = usePlatformServiceUniformCardHeight(s.slug);
   useEffect(() => {
     void recordShopBoutiqueEvent('impression_listing', undefined, s.slug);
@@ -1201,56 +1114,26 @@ function ServiceCompactCard({
       <View style={[styles.svcCompactActionsBar, isStack && styles.svcCompactActionsBarStack]}>
         <View style={styles.svcCompactActions}>
           <Pressable
-            onPress={() => {
-              if (!purchasable && !inCart) return;
-              void onAddCart();
-            }}
-            disabled={(!purchasable && !inCart) || entitlementsLoading}
-            style={({ pressed }) => [
-              styles.svcCompactIconBtn,
-              inCart && styles.svcCompactIconBtnIn,
-              (!purchasable && !inCart) || entitlementsLoading
-                ? styles.svcCompactIconBtnDisabled
-                : undefined,
-              pressed && purchasable && !entitlementsLoading && { opacity: 0.88 },
-            ]}
-            accessibilityLabel={
-              !purchasable && !inCart
-                ? t('shopEntitlementNotPurchasable')
-                : inCart
-                  ? t('shopRemoveFromCartA11y')
-                  : t('shopAddA11y')
-            }
-          >
-            <FontAwesome
-              name={inCart ? 'check' : 'shopping-cart'}
-              size={14}
-              color={!purchasable && !inCart ? '#94A3B8' : inCart ? brand.white : brand.primary}
-            />
-          </Pressable>
-          <Pressable
-            onPress={() => {
-              if (!purchasable && !inCart) return;
-              void onBuyNow();
-            }}
-            disabled={(!purchasable && !inCart) || entitlementsLoading}
+            onPress={openServiceWhatsApp}
+            disabled={!purchasable || entitlementsLoading}
             style={({ pressed }) => [
               styles.svcCompactBuyBtn,
-              ((!purchasable && !inCart) || entitlementsLoading) && styles.svcCompactBuyBtnDisabled,
+              (!purchasable || entitlementsLoading) && styles.svcCompactBuyBtnDisabled,
               pressed && purchasable && !entitlementsLoading && { opacity: 0.9 },
             ]}
-            accessibilityLabel={
-              !purchasable && !inCart ? t('shopEntitlementNotPurchasable') : t('shopBuyNowA11y')
-            }
+            accessibilityLabel={whatsAppLabel}
           >
+            {purchasable && !entitlementsLoading ? (
+              <FontAwesome name="whatsapp" size={16} color={brand.white} />
+            ) : null}
             <Text
               style={[
                 styles.svcCompactBuyTxt,
                 isRTL && styles.svcCompactBuyTxtRtl,
-                ((!purchasable && !inCart) || entitlementsLoading) && styles.svcCompactBuyTxtDisabled,
+                (!purchasable || entitlementsLoading) && styles.svcCompactBuyTxtDisabled,
               ]}
             >
-              {platformServiceEntitlementCtaLabel(entitlement, (key) => t(key as Parameters<typeof t>[0]), 'shopBuyNow')}
+              {whatsAppLabel}
             </Text>
           </Pressable>
         </View>
@@ -2127,9 +2010,12 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 40,
     borderRadius: radius.sm,
-    backgroundColor: brand.primary,
+    backgroundColor: '#128C7E',
+    flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 10,
   },
   svcCompactBuyTxt: {
     color: brand.white,

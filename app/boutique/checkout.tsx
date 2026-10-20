@@ -41,11 +41,11 @@ import { createShopOrder, fetchShopPublicSettings, hydrateCartLinesPricesViaApi 
 import { usePlatformServiceCatalogEntitlements } from '@/hooks/usePlatformServiceCatalogEntitlements';
 import { useShopFlowSystemBars } from '@/hooks/useShopFlowSystemBars';
 import {
-  checkPlatformServicePurchaseEligibility,
   fetchPlatformServices,
   type PlatformServiceItem,
 } from '@/services/platformServices';
 import { isPlatformServiceCartLine } from '@/utils/platformServiceCart';
+import { openPlatformServicesWhatsAppOrder } from '@/utils/platformServiceWhatsAppOrder';
 import { resolveUpgradeSourceName } from '@/utils/platformServiceEntitlementUi';
 import type { ShopPromoDiscountType } from '@/services/shopPromo';
 import {
@@ -71,7 +71,7 @@ import {
 import { shopProductPrimaryImage } from '@/utils/shopImageUrl';
 import { saveShopOrderAccessToken } from '@/utils/shopOrderTokenStorage';
 import { getMobileVisitorId } from '@/utils/visitorId';
-import { getUserFacingApiError, getUserFacingApiFailureMessage } from '@/utils/apiError';
+import { getUserFacingApiError } from '@/utils/apiError';
 import { isBacStudyProfileLevel } from '@/utils/academicProfileLevels';
 import {
   filiereOptionsForNiveau,
@@ -489,6 +489,16 @@ export default function BoutiqueCheckoutScreen() {
   );
   const { bySlug: serviceEntitlementsBySlug, loading: entitlementsLoading } =
     usePlatformServiceCatalogEntitlements(cartServiceSlugs);
+  const servicesOnlyWhatsAppLabel = useMemo(() => {
+    const svc = lines.filter(isPlatformServiceCartLine);
+    if (svc.length === 1) {
+      const slug = String((svc[0].platformServiceSlug ?? svc[0].slug) ?? '').trim();
+      if (serviceEntitlementsBySlug[slug]?.status === 'upgrade_available') {
+        return t('shopServiceWhatsAppUpgrade');
+      }
+    }
+    return t('shopServiceWhatsAppOrder');
+  }, [lines, serviceEntitlementsBySlug, t]);
   const [serviceBySlug, setServiceBySlug] = useState<Map<string, PlatformServiceItem>>(new Map());
   const [serviceNameBySlug, setServiceNameBySlug] = useState<Map<string, string>>(new Map());
 
@@ -759,7 +769,26 @@ export default function BoutiqueCheckoutScreen() {
     );
   }
 
+  const openCartServicesOnWhatsApp = () => {
+    openPlatformServicesWhatsAppOrder(
+      lines.filter(isPlatformServiceCartLine).map((l) => ({
+        name: l.title,
+        slug: l.platformServiceSlug ?? l.slug,
+        price: l.price,
+        currency: l.currency,
+        intent: serviceEntitlementsBySlug[String(l.platformServiceSlug ?? l.slug ?? '').trim()]?.status === 'upgrade_available'
+          ? 'upgrade'
+          : 'order',
+      })),
+      locale === 'ar' ? 'ar' : 'fr',
+    );
+  };
+
   const onSubmit = async () => {
+    if (hasAnyService && !hasPhysicalProducts) {
+      openCartServicesOnWhatsApp();
+      return;
+    }
     setError(null);
     const validation = collectCheckoutValidationErrors({
       email,
@@ -789,44 +818,14 @@ export default function BoutiqueCheckoutScreen() {
     }
     setFieldErrors(new Set());
 
-    const serviceSlugs = lines
-      .filter(isPlatformServiceCartLine)
-      .map((l) => String((l.platformServiceSlug ?? l.slug) ?? '').trim())
-      .filter(Boolean);
-    if (serviceSlugs.length > 0) {
-      try {
-        const accessToken = user ? await getValidAccessToken() : null;
-        const elig = await checkPlatformServicePurchaseEligibility(
-          { slugs: serviceSlugs, phone: phone.trim() || undefined },
-          accessToken,
-        );
-        if (!elig.allowed) {
-          const msg = getUserFacingApiFailureMessage(t, { context: 'checkout' });
-          setError(msg);
-          Alert.alert(t('commonErrorTitle'), msg);
-          return;
-        }
-      } catch (e) {
-        const msg = getUserFacingApiError(e, t, { context: 'checkout' });
-        setError(msg);
-        Alert.alert(t('commonErrorTitle'), msg);
-        return;
-      }
-    }
-
     setSubmitting(true);
     try {
       const analyticsVisitorId = await getMobileVisitorId();
       const accessToken = user ? await getValidAccessToken() : null;
       const result = await createShopOrder({
-        lines: lines.map((l) =>
-          isPlatformServiceCartLine(l)
-            ? {
-                platformServiceSlug: String((l.platformServiceSlug ?? l.slug) ?? '').trim(),
-                quantity: 1,
-              }
-            : { productId: l.productId, quantity: l.quantity },
-        ),
+        lines: lines
+          .filter((l) => !isPlatformServiceCartLine(l))
+          .map((l) => ({ productId: l.productId, quantity: l.quantity })),
         email: email.trim(),
         fullName: fullName.trim(),
         phone: phone.trim(),
@@ -838,23 +837,11 @@ export default function BoutiqueCheckoutScreen() {
         analyticsVisitorId,
         analyticsViewport: 'mobile',
         orderChannel: 'mobile_app',
-        ...(hasAnyService
-          ? {
-              studyLevel: studyLevel.trim(),
-              bacType: bacType.trim() || undefined,
-              filiere: filiere.trim() || undefined,
-              specialiteMission1: isMissionBac ? specialiteMission1.trim() : undefined,
-              specialiteMission2: isMissionBac ? specialiteMission2.trim() : undefined,
-              specialiteMission3:
-                isMissionBac && specialiteMission3.trim() ? specialiteMission3.trim() : undefined,
-              studentCity: studentCity.trim(),
-              servicePaymentModality: servicePayment as ServicePaymentChoice,
-            }
-          : {}),
         promoCode: promoCode.trim() || undefined,
       }, accessToken);
       await saveShopOrderAccessToken(result.publicId, result.accessToken);
       await clear();
+      if (hasAnyService) openCartServicesOnWhatsApp();
       router.replace({ pathname: '/boutique/thank-you', params: { publicId: result.publicId } });
     } catch (e) {
       const errMsg = getUserFacingApiError(e, t, { context: 'checkout', fallbackKey: 'shopCheckoutErrSubmit' });
@@ -1305,6 +1292,11 @@ export default function BoutiqueCheckoutScreen() {
           <View style={{ height: 100 }} />
         </ScrollView>
 
+              ) : hasAnyService && !hasPhysicalProducts ? (
+                <>
+                  <FontAwesome name="whatsapp" size={15} color={brand.white} />
+                  <Text style={[styles.confirmTxt, isRTL && styles.txtRtl]}>{servicesOnlyWhatsAppLabel}</Text>
+                </>
         <SafeAreaView edges={['bottom']} style={[styles.footerSafe, { backgroundColor: bottomColor }]}>
           <View style={styles.bottomBar}>
             <Pressable

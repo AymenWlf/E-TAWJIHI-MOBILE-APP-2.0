@@ -189,7 +189,7 @@ function OrientationStepsStrip({
   layout: StackCardLayout;
   compact?: boolean;
 }) {
-  const { t, isRTL } = useLocale();
+  const { t } = useLocale();
   const state = resolvePlanParcoursState(completion, tasks);
   const scale = layout.cardH / BASE_CARD_H;
   const iconSz = Math.max(8, Math.round(layout.iconSize * (compact ? 0.52 : 0.58)));
@@ -199,7 +199,7 @@ function OrientationStepsStrip({
 
   return (
     <View style={styles.orientationStepsWrap}>
-      <View style={[styles.orientationStepsRow, isRTL && styles.orientationStepsRowRtl]}>
+      <View style={styles.orientationStepsRow}>
         {PLAN_PARCOURS_STEPS.map((step, i) => {
           const done = isPlanStepComplete(step.id, completion);
           const current = !state.allDone && nextStep?.id === step.id;
@@ -310,8 +310,8 @@ function DailyActionsBlock({
   onPressTassjilTrack?: () => void;
 }) {
   const { t, isRTL } = useLocale();
-  const padV = Math.max(10, Math.round(layout.boxPad * 0.72));
-  const padH = Math.max(8, Math.round(layout.boxPad * 0.58));
+  const padV = layout.boxPad;
+  const padH = layout.boxPad;
   const iconSz = Math.max(17, Math.round(layout.iconSize * 1.12));
   const titleFs = Math.max(11, layout.validityValue);
   const badgeFs = Math.max(9, layout.validityLabel);
@@ -355,7 +355,6 @@ function DailyActionsBlock({
         style={({ pressed }) => [
           styles.dailyMini,
           gameOnly && styles.dailyMiniFullWidth,
-          gameOnly && styles.dailyMiniFillCard,
           isRTL && styles.dailyMiniRtl,
           {
             paddingVertical: padV,
@@ -371,7 +370,7 @@ function DailyActionsBlock({
         ]}>
         {!gamePending && !gameLoading ? (
           <View
-            style={[styles.dailyPlayedCheckBadgeBase, isRTL ? { left: 8 } : { right: 8 }]}
+            style={[styles.dailyPlayedCheckBadgeBase, { end: 12 }]}
             pointerEvents="none">
             <FontAwesome name="check-circle" size={playedCheckSize} color={homeShell.greenDark} />
           </View>
@@ -507,7 +506,7 @@ function DailyActionsBlock({
           ]}>
           {orientationLocked ? (
             <View
-              style={[styles.dailyPlayedCheckBadgeBase, isRTL ? { left: 8 } : { right: 8 }]}
+              style={[styles.dailyPlayedCheckBadgeBase, { end: 12 }]}
               pointerEvents="none">
               <FontAwesome name="lock" size={Math.max(16, iconSz - 1)} color={brand.textMuted} />
             </View>
@@ -600,11 +599,13 @@ function StackCardFace({
     ? resolvePlanParcoursState(planCompletion, card.remainingOrientationTasks)
     : null;
   const nameLines = progress ? 2 : practicalDef ? 2 : card.bacResults ? 1 : 3;
-  /** 1re carte : progression + actions quotidiennes — répartition verticale homogène. */
+  /** 1re carte : progression + actions quotidiennes — hauteur = contenu, pas un cadre fixe. */
   const packedOrientationDaily = progress != null && card.dailyActions != null;
   const iconHeroSz = Math.max(28, Math.round(layout.iconSize * 2.35));
 
-  const cardInnerSize = { height: cardH, minHeight: cardH };
+  const cardInnerSize = packedOrientationDaily
+    ? { minHeight: cardH }
+    : { height: cardH, minHeight: cardH };
 
   if (card.bacResults) {
     const bacMain = !bacStackPeek;
@@ -670,14 +671,20 @@ function StackCardFace({
         uniformStack && styles.cardInnerStack,
         {
           ...cardInnerSize,
-          paddingTop: layout.pad,
+          paddingTop: layout.pad + 6,
           paddingBottom: layout.pad,
           paddingEnd: layout.pad,
           paddingStart: layout.pad + layout.padStripe,
         },
       ]}>
       <View style={[styles.stripe, { backgroundColor: stripe }]} />
-      <View style={[styles.cardColumn, uniformStack && styles.cardColumnStackFill]}>
+      <View
+        style={[
+          styles.cardColumn,
+          uniformStack && !packedOrientationDaily && styles.cardColumnStackFill,
+          packedOrientationDaily && styles.cardColumnHugContent,
+          isRTL && DIR_RTL,
+        ]}>
         <View style={styles.cardTop} collapsable={false}>
           {practicalDef ? (
             <>
@@ -752,7 +759,10 @@ function StackCardFace({
           <View
             style={[
               styles.firstCardStackFill,
-              { marginTop: layout.validityMT, gap: layout.validityMT },
+              {
+                marginTop: card.academicPackLine ? Math.max(12, layout.validityMT + 4) : layout.validityMT,
+                gap: Math.max(12, layout.validityMT + 6),
+              },
             ]}>
             <View style={styles.firstCardStackHalf}>
               <DeckPressable
@@ -769,7 +779,7 @@ function StackCardFace({
                   },
                   pressed && onOpenOrientationOverview ? { opacity: 0.92 } : null,
                 ]}>
-                <View style={[styles.orientationRow, isRTL && styles.orientationRowRtl]}>
+                <View style={styles.orientationRow}>
                   <Text
                     style={[styles.orientationLabel, isRTL && styles.orientationLblRtl, { fontSize: layout.validityLabel }]}
                     numberOfLines={1}>
@@ -870,7 +880,7 @@ function StackCardFace({
               },
               pressed && onOpenOrientationOverview ? { opacity: 0.92 } : null,
             ]}>
-            <View style={[styles.orientationRow, isRTL && styles.orientationRowRtl]}>
+            <View style={styles.orientationRow}>
               <Text
                 style={[styles.orientationLabel, isRTL && styles.orientationLblRtl, { fontSize: layout.validityLabel }]}
                 numberOfLines={1}>
@@ -951,12 +961,14 @@ function StackCardFace({
             </View>
           </View>
         ) : null}
-        <View
-          style={[
-            styles.cardFlexFill,
-            (card.dailyActions != null || practicalDef) && styles.cardFlexFillWhenDaily,
-          ]}
-        />
+        {packedOrientationDaily ? null : (
+          <View
+            style={[
+              styles.cardFlexFill,
+              card.dailyActions != null || practicalDef ? styles.cardFlexFillWhenDaily : null,
+            ]}
+          />
+        )}
         {practicalDef ? (
           <View
             style={[
@@ -987,7 +999,7 @@ function StackCardFace({
               styles.hintSpacer,
               {
                 marginTop: layout.hintMT,
-                minHeight: packedOrientationDaily ? spacing.sm : layout.hintMinH,
+                minHeight: packedOrientationDaily ? 4 : layout.hintMinH,
               },
             ]}
           />
@@ -1022,6 +1034,7 @@ function DeckLayer({
   cardH,
   uniformStack = false,
   bacStackPeek = false,
+  onTopContentLayout,
 }: {
   stackPos: 0 | 1 | 2;
   card: HomeStackCard;
@@ -1048,9 +1061,14 @@ function DeckLayer({
   onOpenBacThresholds?: () => void;
   bacThresholdsLoading?: boolean;
   uniformStack?: boolean;
+  onTopContentLayout?: (height: number) => void;
 }) {
   const baseY = stackPos * 10;
-  const clipSized = { height: cardH, minHeight: cardH, width: '100%' as const };
+  const growToContent =
+    isTop && card.orientationProgress != null && card.dailyActions != null;
+  const clipSized = growToContent
+    ? { minHeight: cardH, width: '100%' as const }
+    : { height: cardH, minHeight: cardH, width: '100%' as const };
   const baseScale = uniformStack ? 1 : 1 - stackPos * 0.045;
   /** Carte du dessus au-dessus des autres */
   const zIndex = stackPos === 0 ? 100 : stackPos === 1 ? 50 : 25;
@@ -1131,7 +1149,13 @@ function DeckLayer({
       pointerEvents={isTop ? 'auto' : 'none'}
       style={[styles.stackLayer, { width }, style]}
       collapsable={false}>
-        <View style={[styles.cardElevate, clipSized]}>
+        <View
+          style={[styles.cardElevate, clipSized]}
+          onLayout={
+            growToContent
+              ? (e) => onTopContentLayout?.(e.nativeEvent.layout.height)
+              : undefined
+          }>
         <View style={[styles.cardClip, clipSized]}>
           <StackCardFace
             card={card}
@@ -1192,12 +1216,23 @@ export function HomeStackedPackCards({
     () => getHomeStackCardHeight(layout, hasBacCard, isRTL),
     [layout, hasBacCard, isRTL],
   );
-  const topCardH = stackCardH;
+  const [topContentH, setTopContentH] = useState(0);
+  const onTopContentLayout = useCallback((h: number) => {
+    setTopContentH((prev) => (Math.round(prev) === Math.round(h) ? prev : h));
+  }, []);
+  useEffect(() => {
+    setTopContentH(0);
+  }, [headIndex]);
+  const topCard = n > 0 ? cards[headIndex] : undefined;
+  const topGrowsToContent =
+    topCard?.orientationProgress != null && topCard?.dailyActions != null;
+  const topFaceH =
+    topGrowsToContent && topContentH > 0 ? Math.max(stackCardH, topContentH) : stackCardH;
   /** Toutes les cartes de la pile à la même hauteur lorsque le bac est dans le deck. */
   const uniformStack = hasBacCard;
   const stackPeekPad = n > 1 ? (Math.min(3, n) - 1) * 10 : 0;
   const stackArenaTail = 8;
-  const stackOuterH = topCardH + stackPeekPad + stackArenaTail;
+  const stackOuterH = topFaceH + stackPeekPad + stackArenaTail;
   const openOrientationOverview = useCallback(
     (title: string, completion: PlanParcoursCompletion, tasks?: OrientationParcoursTask[]) => {
       onOpenOrientationOverviewProp?.({ title, completion, tasks });
@@ -1424,6 +1459,7 @@ export function HomeStackedPackCards({
               cardH={layerCardH}
               uniformStack={uniformStack}
               bacStackPeek={bacStackPeek}
+              onTopContentLayout={onTopContentLayout}
             />
           );
 
@@ -1505,10 +1541,16 @@ const styles = StyleSheet.create({
   },
   cardColumn: {
     flex: 1,
+    width: '100%',
     flexDirection: 'column',
     justifyContent: 'flex-start',
     minHeight: 0,
     zIndex: 1,
+  },
+  cardColumnHugContent: {
+    flexGrow: 0,
+    flexShrink: 0,
+    flex: 0,
   },
   cardColumnStackFill: {
     flex: 1,
@@ -1549,26 +1591,24 @@ const styles = StyleSheet.create({
     flexShrink: 0,
     minHeight: 0,
   },
-  /** 1re carte : zone sous le titre = moitié progression / moitié jeu+info (hauteur homogène). */
+  /** 1re carte : zone sous le titre = progression puis boutons jeu / TASSJIL. */
   firstCardStackFill: {
-    flex: 1,
-    minHeight: 0,
+    flexGrow: 0,
+    flexShrink: 0,
     width: '100%',
     flexDirection: 'column',
   },
   firstCardStackHalf: {
-    flex: 1,
-    minHeight: 0,
+    flexGrow: 0,
+    flexShrink: 0,
     width: '100%',
-    justifyContent: 'center',
   },
-  /** Moitié basse : le bloc défi quotidien remplit toute la hauteur disponible. */
   firstCardStackHalfDaily: {
-    justifyContent: 'flex-start',
+    flexGrow: 0,
+    flexShrink: 0,
+    width: '100%',
   },
   firstCardDailyStretch: {
-    flex: 1,
-    minHeight: 0,
     width: '100%',
     alignSelf: 'stretch',
   },
@@ -1610,11 +1650,15 @@ const styles = StyleSheet.create({
   academicPackLine: {
     color: brand.textSecondary,
     fontWeight: '700',
+    width: '100%',
+    flexShrink: 1,
   },
   packName: {
     color: brand.text,
     fontWeight: '800',
     letterSpacing: -0.5,
+    width: '100%',
+    flexShrink: 1,
   },
   practicalLinkBox: {
     alignItems: 'center',
@@ -1661,17 +1705,16 @@ const styles = StyleSheet.create({
     color: brand.text,
     fontWeight: '800',
   },
-  /** Deux boutons côte à côte : occupe la hauteur disponible (colonne parente flex). */
+  /** Deux boutons côte à côte, hauteur du contenu (coupe + libellé + badge). */
   dailyActionsWrap: {
-    flex: 1,
+    flexGrow: 0,
+    flexShrink: 0,
     flexDirection: 'row',
     alignItems: 'stretch',
     alignSelf: 'stretch',
-    gap: 8,
+    gap: 10,
     width: '100%',
-    minHeight: 0,
   },
-  /** Une seule tuile (défi) : pleine largeur et hauteur de la zone basse de la carte. */
   dailyActionsWrapGameOnly: {
     alignItems: 'stretch',
     alignSelf: 'stretch',
@@ -1687,6 +1730,7 @@ const styles = StyleSheet.create({
     flexDirection: 'column',
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
   },
   dailyMiniRtl: {
     alignItems: 'center',
@@ -1702,12 +1746,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
     maxWidth: '100%',
     width: '100%',
-  },
-  /** Défi seul (FR typique) : occupe tout le reste de la carte sous la progression. */
-  dailyMiniFillCard: {
-    alignSelf: 'stretch',
-    flex: 1,
-    minHeight: 0,
   },
   dailyMiniIcon: {
     marginBottom: 6,
@@ -1775,7 +1813,7 @@ const styles = StyleSheet.create({
   },
   dailyPlayedCheckBadgeBase: {
     position: 'absolute',
-    top: 6,
+    top: 10,
     zIndex: 2,
   },
   dailyMiniTitleMuted: {
@@ -1800,8 +1838,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 6,
-    backgroundColor:
-      Platform.OS === 'android' ? homeShell.greenSurfaceStrong : homeShell.greenAlpha18,
+    backgroundColor: homeShell.greenAlpha18,
   },
   dailyMiniBadgeTxt: {
     color: homeShell.greenDark,
@@ -1890,8 +1927,9 @@ const styles = StyleSheet.create({
   },
   orientationStepsEmpty: {
     flexDirection: 'row',
-    alignItems: 'center',
+    marginTop: 8,
     width: '100%',
+    paddingHorizontal: 2,
     minHeight: 22,
   },
   orientationStepsRow: {

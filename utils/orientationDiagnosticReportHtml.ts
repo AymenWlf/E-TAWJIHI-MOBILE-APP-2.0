@@ -8,6 +8,7 @@ import type {
   RiasecLetter,
 } from '@/features/orientationDiagnostic/types/orientationDiagnosticPrototype';
 import { partitionFacultePublique } from '@/features/orientationDiagnostic/utils/orientationFacultePubliqueGroup';
+import { seuilNotesPrintHtml } from '@/features/orientationDiagnostic/utils/seuilNotesDisplay';
 import { collectSchoolReasonTags, isSchoolReasonTag } from '@/utils/schoolReasonTags';
 import {
   groupSchoolRecosByTier,

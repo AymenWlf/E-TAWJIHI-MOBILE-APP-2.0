@@ -1275,6 +1275,9 @@ export type HomeCopyKey =
   | 'shopRemoveFromCartA11y'
   | 'shopBuyNow'
   | 'shopBuyNowA11y'
+  | 'shopServiceWhatsAppOrder'
+  | 'shopServiceWhatsAppUpgrade'
+  | 'shopServiceWhatsAppHint'
   | 'shopViewProductA11y'
   | 'shopViewServiceA11y'
   | 'shopThankHeroTitle'
@@ -3195,8 +3198,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopAddA11y: 'Ajouter au panier',
     shopAddedA11y: 'Déjà au panier',
     shopRemoveFromCartA11y: 'Retirer du panier',
-    shopBuyNow: 'Commander',
-    shopBuyNowA11y: 'Commander maintenant',
+  shopBuyNow: 'Commander',
+  shopBuyNowA11y: 'Commander maintenant',
+  shopServiceWhatsAppOrder: 'Commander sur WhatsApp',
+  shopServiceWhatsAppUpgrade: 'Upgrade par WhatsApp',
+  shopServiceWhatsAppHint: 'La commande et l’upgrade se font sur WhatsApp. L’équipe confirme ensuite les modalités de paiement.',
     shopViewProductA11y: 'Voir le produit',
     shopViewServiceA11y: 'Voir le service',
     shopThankHeroTitle: 'Merci pour votre commande',
@@ -5133,8 +5139,11 @@ export const HOME_COPY: Record<AppLocale, Record<HomeCopyKey, string>> = {
     shopAddA11y: 'أضف إلى السلة',
     shopAddedA11y: 'موجود في السلة',
     shopRemoveFromCartA11y: 'إزالة من السلة',
-    shopBuyNow: 'اطلب الآن',
-    shopBuyNowA11y: 'اطلب الآن',
+  shopBuyNow: 'اطلب الآن',
+  shopBuyNowA11y: 'اطلب الآن',
+  shopServiceWhatsAppOrder: 'اطلب عبر WhatsApp',
+  shopServiceWhatsAppUpgrade: 'ترقية عبر WhatsApp',
+  shopServiceWhatsAppHint: 'الطلب والترقية عبر WhatsApp. يؤكد الفريق بعد ذلك طرق الدفع.',
     shopViewProductA11y: 'عرض المنتج',
     shopViewServiceA11y: 'عرض الخدمة',
     shopThankHeroTitle: 'شكرًا على طلبك',
